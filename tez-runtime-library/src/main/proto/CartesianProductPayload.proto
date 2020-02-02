@@ -1,0 +1,38 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+option java_package = "org.apache.tez.runtime.library.cartesianproduct";
+option java_outer_classname = "CartesianProductUserPayload";
+
+message CartesianProductConfigProto {
+    required bool isPartitioned = 1;
+    repeated string sources = 2;
+    repeated int32 numPartitions = 3;
+    optional string filterClassName = 4;
+    optional bytes filterUserPayload = 5;
+    optional float minFraction = 6;
+    optional float maxFraction = 7;
+    optional int32 maxParallelism = 8;
+    optional int64 minOpsPerWorker = 9;
+    repeated int32 numChunks = 10;
+    repeated int32 numTaskPerVertexInGroup = 11;
+    optional int32 positionInGroup = 12;
+    optional int32 numPartitionsForFairCase = 13;
+    optional bool enableGrouping = 14;
+    optional float groupingFraction = 15;
+}

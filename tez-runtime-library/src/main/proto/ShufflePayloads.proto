@@ -1,0 +1,62 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+option java_package = "org.apache.tez.runtime.library.shuffle.impl";
+option java_outer_classname = "ShuffleUserPayloads";
+option java_generate_equals_and_hash = true;
+
+message DataMovementEventPayloadProto {
+  optional bytes empty_partitions = 1;
+  optional string host = 2;
+  optional int32 port = 3;
+  optional string path_component = 4;
+  optional int32 run_duration = 5;
+  optional bool pipelined = 7; // Related to pipelined shuffle
+  optional bool last_event = 8; // Related to pipelined shuffle
+  optional int32 spill_id = 9; //  Related to pipelined shuffle.
+} 
+
+message DataProto {
+  optional int32 raw_length = 1;
+  optional int32 compressed_length = 2;
+  optional bytes data = 3;
+}
+
+message InputInformationEventPayloadProto {
+  optional int32 partition_range = 1;
+}
+
+// DetailedPartitionStatsProto represents size of a list of partitions.
+// It is more accurate than the partition_stats.
+message DetailedPartitionStatsProto {
+  repeated int32 size_in_mb = 1;
+}
+
+message VertexManagerEventPayloadProto {
+  optional int64 output_size = 1;
+  optional bytes partition_stats = 2;
+  optional DetailedPartitionStatsProto detailed_partition_stats = 3;
+  optional int64 num_record = 4;
+}
+
+message ShuffleEdgeManagerConfigPayloadProto {
+  optional int32 num_source_task_outputs = 1;
+  optional int32 num_destination_tasks = 2;
+  optional int32 base_partition_range = 3;
+  optional int32 remainder_range_for_last_shuffler = 4;
+}

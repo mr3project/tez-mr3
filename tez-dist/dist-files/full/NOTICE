@@ -1,0 +1,34 @@
+Apache Tez
+Copyright (c) 2015 The Apache Software Foundation
+
+This product includes software developed at
+The Apache Software Foundation (http://www.apache.org/).
+
+This product includes jersey libraries : jersey-client, jersey-core
+jersey-guice and jersey-json.  The details on how to obtain those
+modules are available at https://jersey.java.net/.
+
+This product includes javax.servlet-api library. The details on
+how to obtain the library are available at
+http://servlet-spec.java.net/.
+
+This produce includes jaxb-api-2.2.2, jaxb-impl-2.2.3-1 libraries. 
+The details on how to obtain the library are available at 
+https://jaxb.java.net/
+
+This product includes JavaBeans Activation Framework. The details on how
+to obtain the library is available at
+http://www.oracle.com/technetwork/articles/java/index-135046.html
+
+This product bundles the tez-ui war which includes fonts protected
+under the Open Font License.  These fonts can only be distributed
+as part of a piece of software, but not individually.
+See the license for details.  http://scripts.sil.org/OFL.
+More information on included fonts can be found in the LICENSE file
+within the tez-ui-*.war file.
+
+This product bundles Apache XML Commons XML APIs.
+  Portions of this software were originally based on the following:
+     - software copyright (c) 1999, IBM Corporation., http://www.ibm.com.
+     - software copyright (c) 1999, Sun Microsystems., http://www.sun.com.
+     - software copyright (c) 2000 World Wide Web Consortium, http://www.w3.org

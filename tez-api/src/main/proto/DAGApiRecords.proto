@@ -1,0 +1,304 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+option java_package = "org.apache.tez.dag.api.records";
+option java_outer_classname = "DAGProtos";
+option java_generate_equals_and_hash = true;
+
+// DAG plan messages
+
+// Many of these types have a dual in the Tez-api.  To reduce confusion, these types have prefix or suffix
+// of "Plan" to indicate they are to be used in the dag-plan.
+// The big types use a suffix:  JobPlan, VertexPlan, EdgePlan
+//   --> these get more direct use in the runtime and the naming is natural.
+// The enums and utility types use prefix: PlanVertexType, PlanEdgeConnectionPaatern, etc
+//   --> there is not great naming choice for these that avoids ambiguity, but this one seems acceptable.
+
+enum PlanVertexType {
+  INPUT = 0;
+  NORMAL = 1;
+  OUTPUT = 2;
+}
+
+enum PlanEdgeDataMovementType {
+  ONE_TO_ONE = 0;
+  BROADCAST = 1;
+  SCATTER_GATHER = 2;
+  CUSTOM = 3;
+}
+
+enum PlanEdgeDataSourceType {
+  PERSISTED = 0;
+  PERSISTED_RELIABLE = 1;
+  EPHEMERAL = 2;
+}
+
+enum PlanEdgeSchedulingType {
+  SEQUENTIAL = 0;
+  CONCURRENT = 1;
+}
+
+message PlanKeyValuePair {
+  required string key = 1;
+  required string value = 2;
+}
+
+enum PlanLocalResourceType {
+  FILE = 0;
+  ARCHIVE = 1;
+  PATTERN = 2;
+}
+
+enum PlanLocalResourceVisibility {
+  PUBLIC = 0;
+  PRIVATE = 1;
+  APPLICATION = 2;
+}
+
+message PlanLocalResource {
+  required string name = 1;
+  required string uri = 2;
+  required int64 size = 3;
+  required int64 timeStamp = 4;
+  required PlanLocalResourceType type = 5;
+  required PlanLocalResourceVisibility visibility = 6;
+  optional string pattern = 7; // only used if type=PATTERN
+}
+
+// Each taskLocationHint represents a single split in in the input.
+// It is the list of [{rack,machines}] that host a replica of each particular split.
+// For now it is represented as pair-of-arrays rather than array-of-pairs.
+message PlanTaskLocationHint {
+  repeated string rack = 1;
+  repeated string host = 2;
+}
+
+message PlanGroupInputEdgeInfo {
+  required string dest_vertex_name = 1;
+  required TezEntityDescriptorProto merged_input = 2;
+}
+
+message PlanVertexGroupInfo {
+  optional string group_name = 1;
+  repeated string group_members = 2;
+  repeated string outputs = 3;
+  repeated PlanGroupInputEdgeInfo edge_merged_inputs = 4;
+}
+
+message PlanTaskConfiguration {
+  required int32 numTasks = 1;
+  required int32 memoryMb = 2;
+  required int32 virtualCores = 3;
+  required string javaOpts = 4;
+  required string taskModule = 5;
+  repeated PlanLocalResource localResource = 6;
+  repeated PlanKeyValuePair environmentSetting = 7;
+}
+
+message TezEntityDescriptorProto {
+  optional string class_name = 1;
+  optional TezUserPayloadProto tez_user_payload = 2;
+  optional bytes history_text = 3;
+}
+
+message TezUserPayloadProto {
+  optional bytes user_payload = 1;
+  optional int32 version = 2;
+}
+
+message RootInputLeafOutputProto {
+  optional string name = 1;
+  optional TezEntityDescriptorProto i_o_descriptor = 2;
+  optional TezEntityDescriptorProto controller_descriptor = 3;
+}
+
+message VertexExecutionContextProto {
+  optional bool execute_in_am = 1;
+  optional bool execute_in_containers = 2;
+  optional string task_scheduler_name = 3;
+  optional string container_launcher_name = 4;
+  optional string task_comm_name = 5;
+}
+
+message VertexPlan {
+  required string name = 1;
+  required PlanVertexType type = 2;
+  optional TezEntityDescriptorProto processor_descriptor = 3;
+  required PlanTaskConfiguration taskConfig = 4;
+  repeated PlanTaskLocationHint taskLocationHint = 5;
+  repeated string inEdgeId = 6;
+  repeated string outEdgeId = 7;
+  repeated RootInputLeafOutputProto inputs = 8;
+  repeated RootInputLeafOutputProto outputs = 9;
+  optional TezEntityDescriptorProto vertex_manager_plugin = 10;
+  optional ConfigurationProto vertexConf = 11;
+  optional VertexExecutionContextProto execution_context = 12;
+}
+
+message PlanEdgeProperty {
+  required PlanEdgeDataMovementType dataMovementType = 1;
+  required PlanEdgeDataSourceType dataSourceType = 2;
+  required PlanEdgeSchedulingType schedulingType = 3;
+  optional TezEntityDescriptorProto edge_source = 4;
+  optional TezEntityDescriptorProto edge_destination = 5;
+  optional TezEntityDescriptorProto edge_manager = 6;
+}
+
+message EdgePlan {
+  required string id = 1;
+  required string inputVertexName = 2;
+  required string outputVertexName = 3;
+  required PlanEdgeDataMovementType dataMovementType = 4;
+  required PlanEdgeDataSourceType dataSourceType = 5;
+  required PlanEdgeSchedulingType schedulingType = 6;
+  optional TezEntityDescriptorProto edge_source = 7;
+  optional TezEntityDescriptorProto edge_destination = 8;
+  optional TezEntityDescriptorProto edge_manager = 9;
+}
+
+message TezNamedEntityDescriptorProto {
+  optional string name = 1;
+  optional TezEntityDescriptorProto entity_descriptor = 2;
+}
+
+
+message AMPluginDescriptorProto {
+  optional bool containers_enabled = 1 [default = true];
+  optional bool uber_enabled = 2 [default = false];
+  repeated TezNamedEntityDescriptorProto task_schedulers = 3;
+  repeated TezNamedEntityDescriptorProto container_launchers = 4;
+  repeated TezNamedEntityDescriptorProto task_communicators = 5;
+}
+
+message ConfigurationProto {
+  repeated PlanKeyValuePair confKeyValues = 1;
+  optional AMPluginDescriptorProto am_plugin_descriptor = 2;
+}
+
+message CallerContextProto {
+  optional string context = 1;
+  optional string callerType = 2;
+  optional string callerId = 3;
+  optional string blob = 4;
+}
+
+message ACLInfo {
+  repeated string usersWithViewAccess = 1;
+  repeated string usersWithModifyAccess = 2;
+  repeated string groupsWithViewAccess = 3;
+  repeated string groupsWithModifyAccess = 4;
+}
+
+message DAGPlan {
+  required string name = 1;
+  repeated VertexPlan vertex = 2;
+  repeated EdgePlan edge = 3;
+  optional ConfigurationProto dagConf = 4;
+  optional bytes credentials_binary = 5;
+  repeated PlanVertexGroupInfo vertex_groups = 6;
+  repeated PlanLocalResource local_resource = 7;
+  optional string dag_info = 8;
+  optional VertexExecutionContextProto default_execution_context = 9;
+  optional CallerContextProto caller_context = 10;
+  optional ACLInfo aclInfo = 11;
+}
+
+// DAG monitoring messages
+message ProgressProto {
+  optional int32 totalTaskCount = 1;
+  optional int32 succeededTaskCount = 2;
+  optional int32 runningTaskCount = 3;
+  optional int32 failedTaskCount = 4;
+  optional int32 killedTaskCount = 5;
+  optional int32 failedTaskAttemptCount = 6;
+  optional int32 killedTaskAttemptCount = 7;
+}
+
+enum VertexStatusStateProto {
+  VERTEX_NEW = 0;
+  VERTEX_INITIALIZING = 1;
+  VERTEX_RECOVERING = 2;
+  VERTEX_INITED = 3;
+  VERTEX_RUNNING = 4;
+  VERTEX_SUCCEEDED = 5;
+  VERTEX_FAILED = 6;
+  VERTEX_KILLED = 7;
+  VERTEX_ERROR = 8;
+  VERTEX_TERMINATING = 9;
+  VERTEX_COMMITTING = 10;
+}
+
+message VertexStatusProto {
+  optional VertexStatusStateProto state = 1;
+  repeated string diagnostics = 2;
+  optional ProgressProto progress = 3;
+  optional TezCountersProto vertexCounters = 4;
+}
+
+enum DAGStatusStateProto {
+  DAG_SUBMITTED = 0;
+  DAG_INITING = 1;
+  DAG_RUNNING = 2;
+  DAG_SUCCEEDED = 3;
+  DAG_KILLED = 4;
+  DAG_FAILED = 5;
+  DAG_ERROR = 6;
+  DAG_TERMINATING = 7;
+  DAG_COMMITTING = 8;
+}
+
+message StringProgressPairProto {
+  required string key = 1;
+  required ProgressProto progress = 2;
+}
+
+message DAGStatusProto {
+  optional DAGStatusStateProto state = 1;
+  repeated string diagnostics = 2;
+  optional ProgressProto DAGProgress = 3;
+  repeated StringProgressPairProto vertexProgress = 4;
+  optional TezCountersProto dagCounters = 5;
+}
+
+message PlanLocalResourcesProto {
+  repeated PlanLocalResource localResources = 1;
+}
+
+message TezCounterProto {
+  optional string name = 1;
+  optional string display_name = 2;
+  optional int64 value = 3;
+}
+
+message TezCounterGroupProto {
+  optional string name = 1;
+  optional string display_name = 2;
+  repeated TezCounterProto counters = 3;
+}
+
+message TezCountersProto {
+  repeated TezCounterGroupProto counter_groups = 1;
+}
+
+enum StatusGetOptsProto {
+  GET_COUNTERS = 0;
+}
+
+message VertexLocationHintProto {
+  repeated PlanTaskLocationHint task_location_hints = 1;
+}
