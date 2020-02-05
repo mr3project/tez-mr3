@@ -32,6 +32,7 @@ import org.apache.hadoop.util.ReflectionUtils;
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLSocketFactory;
 import java.io.IOException;
 import java.net.HttpURLConnection;
@@ -167,6 +168,27 @@ public class SSLFactory implements ConnectionConfigurator {
     return keystoresFactory;
   }
 
+  /**
+   * Returns a configured SSLEngine.
+   *
+   * @return the configured SSLEngine.
+   * @throws GeneralSecurityException thrown if the SSL engine could not
+   * be initialized.
+   * @throws IOException thrown if and IO error occurred while loading
+   * the server keystore.
+   */
+  public SSLEngine createSSLEngine()
+    throws GeneralSecurityException, IOException {
+    SSLEngine sslEngine = context.createSSLEngine();
+    if (mode == Mode.CLIENT) {
+      sslEngine.setUseClientMode(true);
+    } else {
+      sslEngine.setUseClientMode(false);
+      sslEngine.setNeedClientAuth(requireClientCert);
+    }
+    sslEngine.setEnabledProtocols(enabledProtocols);
+    return sslEngine;
+  }
 
   /**
    * Returns a configured SSLSocketFactory.
