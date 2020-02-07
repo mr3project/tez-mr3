@@ -22,6 +22,7 @@ import java.io.DataInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.net.InetAddress;
 import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.nio.channels.FileChannel;
@@ -506,7 +507,13 @@ public class Fetcher extends CallableWithNdc<FetchResult> {
 
   private HostFetchResult setupConnection(Collection<InputAttemptIdentifier> attempts) {
     try {
-      StringBuilder baseURI = ShuffleUtils.constructBaseURIForShuffleHandler(host,
+      String finalHost;
+      if (httpConnectionParams.isSslShuffle()) {
+        finalHost = InetAddress.getByName(host).getHostName();
+      } else {
+        finalHost = host;
+      }
+      StringBuilder baseURI = ShuffleUtils.constructBaseURIForShuffleHandler(finalHost,
           port, partition, partitionCount, appId.toString(), dagIdentifier, httpConnectionParams.isSslShuffle());
       this.url = ShuffleUtils.constructInputURL(baseURI.toString(), attempts,
           httpConnectionParams.isKeepAlive());
