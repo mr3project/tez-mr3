@@ -19,6 +19,7 @@ package org.apache.tez.runtime.library.common.shuffle.orderedgrouped;
 
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -345,7 +346,13 @@ class FetcherOrderedGrouped extends CallableWithNdc<Void> {
       throws IOException {
     boolean connectSucceeded = false;
     try {
-      StringBuilder baseURI = ShuffleUtils.constructBaseURIForShuffleHandler(host.getHost(),
+      String finalHost;
+      if (sslShuffle) {
+        finalHost = InetAddress.getByName(host.getHost()).getHostName();
+      } else {
+        finalHost = host.getHost();
+      }
+      StringBuilder baseURI = ShuffleUtils.constructBaseURIForShuffleHandler(finalHost,
           host.getPort(), host.getPartitionId(), host.getPartitionCount(), applicationId, dagId, sslShuffle);
       URL url = ShuffleUtils.constructInputURL(baseURI.toString(), attempts, httpConnectionParams.isKeepAlive());
       httpConnection = ShuffleUtils.getHttpConnection(asyncHttp, url, httpConnectionParams,
