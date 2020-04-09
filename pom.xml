@@ -105,6 +105,12 @@
   <dependencyManagement>
     <dependencies>
       <dependency>
+        <groupId>log4j</groupId>
+        <artifactId>log4j</artifactId>
+        <version>1.2.17</version>
+        <scope>provided</scope>
+      </dependency>
+      <dependency>
         <groupId>org.apache.tez</groupId>
         <artifactId>hadoop-shim</artifactId>
         <version>${project.version}</version>
@@ -241,6 +247,10 @@
         <artifactId>hadoop-common</artifactId>
         <version>${hadoop.version}</version>
         <exclusions>
+          <exclusion>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+          </exclusion>
           <exclusion>
             <groupId>org.apache.curator</groupId>
             <artifactId>curator-client</artifactId>
@@ -390,6 +400,10 @@
         <scope>test</scope>
         <exclusions>
           <exclusion>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+          </exclusion>
+          <exclusion>
             <groupId>org.apache.curator</groupId>
             <artifactId>curator-client</artifactId>
           </exclusion>
@@ -476,6 +490,10 @@
         <version>${hadoop.version}</version>
         <exclusions>
           <exclusion>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+          </exclusion>
+          <exclusion>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-annotations</artifactId>
           </exclusion>
@@ -519,6 +537,10 @@
         <version>${hadoop.version}</version>
         <exclusions>
           <exclusion>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+          </exclusion>
+          <exclusion>
             <groupId>org.mortbay.jetty</groupId>
             <artifactId>jetty-util</artifactId>
           </exclusion>
@@ -529,6 +551,10 @@
         <artifactId>hadoop-yarn-common</artifactId>
         <version>${hadoop.version}</version>
         <exclusions>
+          <exclusion>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+          </exclusion>
           <exclusion>
             <groupId>javax.xml.bind</groupId>
             <artifactId>jaxb-api</artifactId>
