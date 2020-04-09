@@ -248,6 +248,11 @@
         <version>${hadoop.version}</version>
         <exclusions>
           <exclusion>
+            <!-- exclude because it is not needed for test-local MR3/master -->
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+          </exclusion>
+          <exclusion>
             <groupId>commons-logging</groupId>
             <artifactId>commons-logging</artifactId>
           </exclusion>
@@ -399,6 +404,10 @@
         <type>test-jar</type>
         <scope>test</scope>
         <exclusions>
+          <exclusion>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+          </exclusion>
           <exclusion>
             <groupId>commons-logging</groupId>
             <artifactId>commons-logging</artifactId>
