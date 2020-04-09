@@ -43,7 +43,7 @@
     <jetty.version>9.3.24.v20180605</jetty.version>
     <pig.version>0.13.0</pig.version>
     <javac.version>1.8</javac.version>
-    <slf4j.version>1.7.10</slf4j.version>
+    <slf4j.version>1.7.30</slf4j.version>
     <enforced.java.version>[${javac.version},)</enforced.java.version>
     <distMgmtSnapshotsId>apache.snapshots.https</distMgmtSnapshotsId>
     <distMgmtSnapshotsName>Apache Development Snapshot Repository</distMgmtSnapshotsName>
