@@ -18,47 +18,10 @@
 
 package org.apache.tez.dag.app.dag;
 
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
-import javax.annotation.Nullable;
-
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.yarn.api.records.Resource;
-import org.apache.tez.common.counters.TezCounters;
-import org.apache.tez.dag.api.EdgeManagerPluginDescriptor;
-import org.apache.tez.dag.api.EdgeProperty;
-import org.apache.tez.dag.api.InputDescriptor;
-import org.apache.tez.dag.api.InputInitializerDescriptor;
-import org.apache.tez.dag.api.OutputCommitterDescriptor;
-import org.apache.tez.dag.api.OutputDescriptor;
-import org.apache.tez.dag.api.ProcessorDescriptor;
-import org.apache.tez.dag.api.RootInputLeafOutput;
-import org.apache.tez.dag.api.VertexLocationHint;
-import org.apache.tez.dag.api.VertexManagerPluginContext.ScheduleTaskRequest;
-import org.apache.tez.dag.api.TaskLocationHint;
-import org.apache.tez.dag.api.client.StatusGetOpts;
-import org.apache.tez.dag.api.records.DAGProtos.RootInputLeafOutputProto;
-import org.apache.tez.dag.api.records.DAGProtos.VertexPlan;
-import org.apache.tez.dag.api.client.ProgressBuilder;
-import org.apache.tez.dag.api.client.VertexStatusBuilder;
-import org.apache.tez.dag.app.TaskAttemptEventInfo;
-import org.apache.tez.dag.app.dag.event.SpeculatorEvent;
-import org.apache.tez.dag.app.dag.impl.AMUserCodeException;
 import org.apache.tez.dag.app.dag.impl.Edge;
-import org.apache.tez.dag.app.dag.impl.ServicePluginInfo;
-import org.apache.tez.dag.records.TezTaskAttemptID;
-import org.apache.tez.dag.records.TezTaskID;
 import org.apache.tez.dag.records.TezVertexID;
-import org.apache.tez.runtime.api.OutputCommitter;
-import org.apache.tez.runtime.api.InputSpecUpdate;
-import org.apache.tez.runtime.api.VertexStatistics;
-import org.apache.tez.runtime.api.impl.GroupInputSpec;
-import org.apache.tez.runtime.api.impl.InputSpec;
-import org.apache.tez.runtime.api.impl.OutputSpec;
-
 
 /**
  * Main interface to interact with the job. Provides only getters.
