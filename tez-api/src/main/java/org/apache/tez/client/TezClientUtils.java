@@ -84,7 +84,6 @@ import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.security.client.ClientToAMTokenIdentifier;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.util.Records;
-import org.apache.log4j.Level;
 import org.apache.tez.common.TezCommonUtils;
 import org.apache.tez.common.TezYARNUtils;
 import org.apache.tez.common.VersionInfo;
@@ -656,14 +655,6 @@ public class TezClientUtils {
         TezClientUtils.createLocalResource(fs,
           binaryPath, LocalResourceType.FILE,
           LocalResourceVisibility.APPLICATION));
-
-      if (Level.DEBUG.isGreaterOrEqual(Level.toLevel(amLogLevel))) {
-        Path textPath = localizeDagPlanAsText(dagPB, fs, amConfig, strAppId, tezSysStagingPath);
-        amLocalResources.put(TezConstants.TEZ_PB_PLAN_TEXT_NAME,
-            TezClientUtils.createLocalResource(fs,
-                textPath, LocalResourceType.FILE,
-                LocalResourceVisibility.APPLICATION));
-      }
     }
 
     // Send the shuffle token as part of the AM launch context, so that the NM running the AM can

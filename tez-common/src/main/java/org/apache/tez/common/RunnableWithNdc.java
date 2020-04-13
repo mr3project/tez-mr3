@@ -17,25 +17,15 @@
  */
 package org.apache.tez.common;
 
-import java.util.Stack;
-
-import org.apache.log4j.NDC;
-
+// not used in Tez, but may be used in Hive
 public abstract class RunnableWithNdc implements Runnable {
-  private final Stack ndcStack;
 
   public RunnableWithNdc() {
-    ndcStack = NDC.cloneStack();
   }
 
   @Override
   public final void run() {
-    NDC.inherit(ndcStack);
-    try {
-      runInternal();
-    } finally {
-      NDC.clear();
-    }
+    runInternal();
   }
 
   protected abstract void runInternal();

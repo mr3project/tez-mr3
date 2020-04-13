@@ -42,8 +42,6 @@ import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.util.Clock;
 import org.apache.hadoop.yarn.util.SystemClock;
-import org.apache.log4j.Level;
-import org.apache.log4j.LogManager;
 import org.apache.tez.common.DrainDispatcher;
 import org.apache.tez.common.MockDNSToSwitchMapping;
 import org.apache.tez.common.security.ACLManager;
@@ -370,7 +368,6 @@ public class TestDAGRecovery {
     dispatcher.init(conf);
     dispatcher.start();
     doReturn(dispatcher.getEventHandler()).when(appContext).getEventHandler();
-    LogManager.getRootLogger().setLevel(Level.DEBUG);
   }
 
 

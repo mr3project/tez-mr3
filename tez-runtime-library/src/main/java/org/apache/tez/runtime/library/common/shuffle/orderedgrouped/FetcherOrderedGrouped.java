@@ -29,12 +29,12 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.tez.http.BaseHttpConnection;
 import org.apache.tez.http.HttpConnectionParams;
-import org.apache.tez.common.CallableWithNdc;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -54,7 +54,7 @@ import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 
 import com.google.common.annotations.VisibleForTesting;
 
-class FetcherOrderedGrouped extends CallableWithNdc<Void> {
+class FetcherOrderedGrouped implements Callable<Void> {
   
   private static final Logger LOG = LoggerFactory.getLogger(FetcherOrderedGrouped.class);
 
@@ -187,7 +187,7 @@ class FetcherOrderedGrouped extends CallableWithNdc<Void> {
   }
 
   @Override
-  public Void callInternal() {
+  public Void call() {
     try {
       remaining = null; // Safety.
       fetchNext();

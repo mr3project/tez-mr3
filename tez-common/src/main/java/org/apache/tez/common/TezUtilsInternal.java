@@ -45,7 +45,6 @@ import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.log4j.Appender;
 import org.apache.tez.common.io.NonSyncByteArrayOutputStream;
 import org.apache.tez.dag.api.DagTypeConverters;
 import org.apache.tez.dag.records.TezDAGID;
@@ -194,31 +193,6 @@ public class TezUtilsInternal {
   public static void updateLoggers(String addend) throws FileNotFoundException {
 
     LOG.info("Redirecting log file based on addend: " + addend);
-
-    Appender appender = org.apache.log4j.Logger.getRootLogger().getAppender(
-        TezConstants.TEZ_CONTAINER_LOGGER_NAME);
-    if (appender != null) {
-      if (appender instanceof TezContainerLogAppender) {
-        TezContainerLogAppender claAppender = (TezContainerLogAppender) appender;
-        claAppender.setLogFileName(constructLogFileName(
-            TezConstants.TEZ_CONTAINER_LOG_FILE_NAME, addend));
-        claAppender.activateOptions();
-      } else {
-        LOG.warn("Appender is a " + appender.getClass() + "; require an instance of "
-            + TezContainerLogAppender.class.getName() + " to reconfigure the logger output");
-      }
-    } else {
-      LOG.warn("Not configured with appender named: " + TezConstants.TEZ_CONTAINER_LOGGER_NAME
-          + ". Cannot reconfigure logger output");
-    }
-  }
-
-  private static String constructLogFileName(String base, String addend) {
-    if (addend == null || addend.isEmpty()) {
-      return base;
-    } else {
-      return base + "_" + addend;
-    }
   }
 
   public static BitSet fromByteArray(byte[] bytes) {

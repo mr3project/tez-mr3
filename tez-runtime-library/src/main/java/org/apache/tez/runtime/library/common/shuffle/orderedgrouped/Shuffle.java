@@ -20,6 +20,7 @@ package org.apache.tez.runtime.library.common.shuffle.orderedgrouped;
 import java.io.IOException;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -41,7 +42,6 @@ import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.io.compress.DefaultCodec;
 import org.apache.hadoop.util.ReflectionUtils;
-import org.apache.tez.common.CallableWithNdc;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.TezUtilsInternal;
 import org.apache.tez.common.counters.TaskCounter;
@@ -284,9 +284,9 @@ public class Shuffle implements ExceptionReporter {
   }
 
   // Not handling any shutdown logic here. That's handled by the callback from this invocation.
-  private class RunShuffleCallable extends CallableWithNdc<TezRawKeyValueIterator> {
+  private class RunShuffleCallable implements Callable<TezRawKeyValueIterator> {
     @Override
-    protected TezRawKeyValueIterator callInternal() throws IOException, InterruptedException {
+    public TezRawKeyValueIterator call() throws IOException, InterruptedException {
 
       if (!isShutDown.get()) {
         try {

@@ -34,15 +34,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CompletionService;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorCompletionService;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.*;
 
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.tez.hadoop.shim.HadoopShim;
@@ -53,9 +45,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.tez.common.CallableWithNdc;
 import org.apache.tez.common.ReflectionUtils;
-import org.apache.tez.common.RunnableWithNdc;
 import org.apache.tez.common.TezExecutors;
 import org.apache.tez.dag.api.InputDescriptor;
 import org.apache.tez.dag.api.OutputDescriptor;
@@ -425,7 +415,7 @@ public class LogicalIOProcessorRuntimeTask extends RuntimeTask {
     }
   }
 
-  private class InitializeInputCallable extends CallableWithNdc<Void> {
+  private class InitializeInputCallable implements Callable<Void> {
 
     private final InputSpec inputSpec;
     private final int inputIndex;
@@ -436,7 +426,7 @@ public class LogicalIOProcessorRuntimeTask extends RuntimeTask {
     }
 
     @Override
-    protected Void callInternal() throws Exception {
+    public Void call() throws Exception {
       String oldThreadName = Thread.currentThread().getName();
       try {
         Thread.currentThread().setName(oldThreadName + " Initialize: {" + inputSpec.getSourceVertexName() + "}");
@@ -471,7 +461,7 @@ public class LogicalIOProcessorRuntimeTask extends RuntimeTask {
     }
   }
 
-  private static class StartInputCallable extends CallableWithNdc<Void> {
+  private static class StartInputCallable implements Callable<Void> {
     private final LogicalInput input;
     private final String srcVertexName;
 
@@ -481,7 +471,7 @@ public class LogicalIOProcessorRuntimeTask extends RuntimeTask {
     }
 
     @Override
-    protected Void callInternal() throws Exception {
+    public Void call() throws Exception {
       String oldThreadName = Thread.currentThread().getName();
       try {
         Thread.currentThread().setName(oldThreadName + " Start: {" + srcVertexName + "}");
@@ -502,7 +492,7 @@ public class LogicalIOProcessorRuntimeTask extends RuntimeTask {
     }
   }
 
-  private class InitializeOutputCallable extends CallableWithNdc<Void> {
+  private class InitializeOutputCallable implements Callable<Void> {
 
     private final OutputSpec outputSpec;
     private final int outputIndex;
@@ -513,7 +503,7 @@ public class LogicalIOProcessorRuntimeTask extends RuntimeTask {
     }
 
     @Override
-    protected Void callInternal() throws Exception {
+    public Void call() throws Exception {
       String oldThreadName = Thread.currentThread().getName();
       try {
         Thread.currentThread().setName(oldThreadName + " Initialize: {" + outputSpec.getDestinationVertexName() + "}");
@@ -785,8 +775,8 @@ public class LogicalIOProcessorRuntimeTask extends RuntimeTask {
   }
 
   private void startRouterThread() {
-    eventRouterThread = new Thread(new RunnableWithNdc() {
-      public void runInternal() {
+    eventRouterThread = new Thread(new Runnable() {
+      public void run() {
         while (!isTaskDone() && !Thread.currentThread().isInterrupted()) {
           try {
             TezEvent e = eventsToBeProcessed.take();

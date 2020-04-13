@@ -1027,7 +1027,7 @@ public class TestShuffleScheduler {
           }
           return null;
         }
-      }).when(mockFetcher).callInternal();
+      }).when(mockFetcher).call();
       return mockFetcher;
     }
   }

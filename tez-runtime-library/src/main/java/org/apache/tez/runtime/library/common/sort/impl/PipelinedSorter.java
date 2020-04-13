@@ -26,11 +26,7 @@ import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.PriorityQueue;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.zip.Deflater;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -48,7 +44,6 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.tez.common.TezUtilsInternal;
-import org.apache.tez.common.CallableWithNdc;
 import org.apache.tez.common.io.NonSyncDataOutputStream;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.library.common.comparator.ProxyComparator;
@@ -1267,7 +1262,7 @@ public class PipelinedSorter extends ExternalSorter {
     }
   }
 
-  private static class SortTask extends CallableWithNdc<SpanIterator> {
+  private static class SortTask implements Callable<SpanIterator> {
     private final SortSpan sortable;
     private final IndexedSorter sorter;
 
@@ -1277,7 +1272,7 @@ public class PipelinedSorter extends ExternalSorter {
     }
 
     @Override
-    protected SpanIterator callInternal() {
+    public SpanIterator call() {
       return sortable.sort(sorter);
     }
   }

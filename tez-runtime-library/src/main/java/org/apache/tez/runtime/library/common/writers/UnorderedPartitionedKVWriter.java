@@ -27,6 +27,7 @@ import java.util.BitSet;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
@@ -50,7 +51,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.tez.common.CallableWithNdc;
 import org.apache.tez.common.TezCommonUtils;
 import org.apache.tez.common.TezUtilsInternal;
 import org.apache.tez.common.counters.TaskCounter;
@@ -557,7 +557,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   }
 
   // All spills using compression for now.
-  private class SpillCallable extends CallableWithNdc<SpillResult> {
+  private class SpillCallable implements Callable<SpillResult> {
 
     private final List<WrappedBuffer> filledBuffers;
     private final CompressionCodec codec;
@@ -583,7 +583,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     }
 
     @Override
-    protected SpillResult callInternal() throws IOException {
+    public SpillResult call() throws IOException {
       // This should not be called with an empty buffer. Check before invoking.
 
       // Number of parallel spills determined by number of threads.

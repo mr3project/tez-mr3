@@ -37,6 +37,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -56,7 +57,6 @@ import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.tez.common.CallableWithNdc;
 import org.apache.tez.common.security.JobTokenSecretManager;
 import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
@@ -74,7 +74,7 @@ import com.google.common.base.Preconditions;
  * Responsible for fetching inputs served by the ShuffleHandler for a single
  * host. Construct using {@link FetcherBuilder}
  */
-public class Fetcher extends CallableWithNdc<FetchResult> {
+public class Fetcher implements Callable<FetchResult> {
 
   public static class PathPartition {
 
@@ -247,7 +247,7 @@ public class Fetcher extends CallableWithNdc<FetchResult> {
   }
 
   @Override
-  public FetchResult callInternal() throws Exception {
+  public FetchResult call() throws Exception {
     boolean multiplex = (this.sharedFetchEnabled && this.localDiskFetchEnabled);
 
     if (srcAttempts.size() == 0) {
