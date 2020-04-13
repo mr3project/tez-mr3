@@ -51,7 +51,6 @@ import org.apache.hadoop.yarn.server.nodemanager.ContainerExecutor;
 import org.apache.hadoop.yarn.server.nodemanager.DefaultContainerExecutor;
 import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.dag.api.TezUncheckedException;
-import org.apache.tez.dag.app.DAGAppMaster;
 import org.apache.tez.mapreduce.hadoop.MRConfig;
 import org.apache.tez.mapreduce.hadoop.MRJobConfig;
 
@@ -64,7 +63,7 @@ import com.google.common.collect.Collections2;
  */
 public class MiniTezCluster extends MiniYARNCluster {
 
-  public static final String APPJAR = JarFinder.getJar(DAGAppMaster.class);
+  public static final String APPJAR = JarFinder.getJar(com.datamonad.mr3.master.DAGAppMaster.class);
 
   private static final Logger LOG = LoggerFactory.getLogger(MiniTezCluster.class);
 

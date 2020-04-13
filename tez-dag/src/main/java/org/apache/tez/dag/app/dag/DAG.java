@@ -94,8 +94,6 @@ public interface DAG extends DagInfo {
 
   long getStartTime();
 
-  StateChangeNotifier getStateChangeNotifier();
-
   org.apache.tez.dag.api.Vertex.VertexExecutionContext getDefaultExecutionContext();
 
 }
