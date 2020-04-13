@@ -26,8 +26,6 @@ import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.tez.common.counters.DAGCounter;
 import org.apache.tez.common.counters.TezCounters;
-import org.apache.tez.dag.api.oldrecords.TaskAttemptReport;
-import org.apache.tez.dag.api.oldrecords.TaskAttemptState;
 import org.apache.tez.dag.records.TaskAttemptTerminationCause;
 import org.apache.tez.dag.records.TezDAGID;
 import org.apache.tez.dag.records.TezTaskAttemptID;
@@ -42,7 +40,6 @@ public interface TaskAttempt {
 
   public static class TaskAttemptStatus {
     public TezTaskAttemptID id;
-    public TaskAttemptState state;
     public float progress;
     public TezCounters counters;
     
@@ -72,14 +69,11 @@ public interface TaskAttempt {
   TezVertexID getVertexID();
   TezDAGID getDAGID();
   
-  TaskAttemptReport getReport();
   List<String> getDiagnostics();
   TaskAttemptTerminationCause getTerminationCause();
   TezCounters getCounters();
   float getProgress();
-  TaskAttemptState getState();
-  TaskAttemptState getStateNoLock();
-  
+
   void setLastEventSent(TezEvent lastEventSent);
 
   /** 
