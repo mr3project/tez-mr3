@@ -44,7 +44,6 @@ public interface DAG extends DagInfo {
   TezDAGID getID();
   Map<String, LocalResource> getLocalResources();
   String getName();
-  DAGState getState();
 
   /**
    * Get all the counters of this DAG. This includes job-counters aggregated
