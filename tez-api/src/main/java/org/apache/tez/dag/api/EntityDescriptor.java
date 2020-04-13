@@ -22,14 +22,13 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Objects;
 
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
-
-import com.google.common.base.Preconditions;
 
 /**
  * Describes a given user code entity. Consists of the name of the class implementing
@@ -66,7 +65,7 @@ public class EntityDescriptor<T extends EntityDescriptor<T>> implements Writable
    * @return this object for further chained method calls
    */
   public T setUserPayload(UserPayload userPayload) {
-    Preconditions.checkNotNull(userPayload);
+    Objects.requireNonNull(userPayload);
     this.userPayload = userPayload;
     return (T) this;
   }
