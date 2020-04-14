@@ -108,11 +108,12 @@ public class TezUtils {
    */
   public static Configuration createConfFromByteString(ByteString byteString) throws IOException {
     Objects.requireNonNull(byteString, "ByteString must be specified");
-    SnappyInputStream uncompressIs = new SnappyInputStream(byteString.newInput());
-    DAGProtos.ConfigurationProto confProto = DAGProtos.ConfigurationProto.parseFrom(uncompressIs);
-    Configuration conf = new Configuration(false);
-    readConfFromPB(confProto, conf);
-    return conf;
+    try(SnappyInputStream uncompressIs = new SnappyInputStream(byteString.newInput());) {
+      DAGProtos.ConfigurationProto confProto = DAGProtos.ConfigurationProto.parseFrom(uncompressIs);
+      Configuration conf = new Configuration(false);
+      readConfFromPB(confProto, conf);
+      return conf;
+    }
   }
 
   /**
