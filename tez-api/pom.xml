@@ -26,6 +26,12 @@
 
   <dependencies>
     <dependency>
+      <groupId>org.xerial.snappy</groupId>
+      <artifactId>snappy-java</artifactId>
+      <version>1.1.4</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
       <groupId>com.datamonad.mr3</groupId>
       <artifactId>mr3-core</artifactId>
       <version>${mr3.version}</version>
