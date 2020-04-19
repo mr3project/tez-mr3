@@ -42,6 +42,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.tez.client.CallerContext;
 import org.apache.tez.common.JavaOptsChecker;
+import org.apache.tez.common.TezUtils;
 import org.apache.tez.dag.api.Vertex.VertexExecutionContext;
 import org.apache.tez.dag.api.records.DAGProtos;
 import org.apache.tez.serviceplugins.api.ServicePluginsDescriptor;
@@ -986,12 +987,7 @@ public class DAG {
 
       if (vertex.getConf()!= null && vertex.getConf().size() > 0) {
         ConfigurationProto.Builder confBuilder = ConfigurationProto.newBuilder();
-        for (Map.Entry<String, String> entry : vertex.getConf().entrySet()) {
-          PlanKeyValuePair.Builder keyValueBuilder = PlanKeyValuePair.newBuilder();
-          keyValueBuilder.setKey(entry.getKey());
-          keyValueBuilder.setValue(entry.getValue());
-          confBuilder.addConfKeyValues(keyValueBuilder);
-        }
+        TezUtils.populateConfProtoFromEntries(vertex.getConf().entrySet(), confBuilder);
         vertexBuilder.setVertexConf(confBuilder);
       }
 
@@ -1092,12 +1088,7 @@ public class DAG {
 
     ConfigurationProto.Builder confProtoBuilder = ConfigurationProto.newBuilder();
     if (!this.dagConf.isEmpty()) {
-      for (Entry<String, String> entry : this.dagConf.entrySet()) {
-        PlanKeyValuePair.Builder kvp = PlanKeyValuePair.newBuilder();
-        kvp.setKey(entry.getKey());
-        kvp.setValue(entry.getValue());
-        confProtoBuilder.addConfKeyValues(kvp);
-      }
+      TezUtils.populateConfProtoFromEntries(this.dagConf.entrySet(), confProtoBuilder);
     }
     // Copy historyLogLevel from tezConf into dagConf if its not overridden in dagConf.
     String logLevel = this.dagConf.get(TezConfiguration.TEZ_HISTORY_LOGGING_LOGLEVEL);
