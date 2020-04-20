@@ -1,0 +1,1386 @@
+commit e7c24f06e220cb707f114b4f5cc7210d27cce72d
+Author: Syed Shameerur Rahman <srahman@qubole.com>
+Date:   Sun Apr 19 10:12:09 2020 +0200
+
+    TEZ-4140: Tez DAG Recovery: Discrepancy In Scheduling Vertices During Vertex Recovery (Syed Shameerur Rahman via László Bodor)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> not related
+
+commit 049511708a6735201e19e3af4575dba3a51743eb
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Fri Apr 17 14:41:29 2020 -0500
+
+    TEZ-4147. Reduce NN calls in RecoveryService::handleRecoveryEvent
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> not related
+
+commit c383ff5e7ceca9a1794072c35f0d602d0157ab5f
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Fri Apr 17 08:42:45 2020 -0500
+
+    Checkstyle: '{' is followed by whitespace
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> not related
+
+commit 214c544472f80997755b62c382f016fbe8373177
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Wed Apr 15 08:18:34 2020 +0200
+
+    TEZ-4143: Provide an option to disable DAG graph (.dot) generation for latency sensitive jobs (László Bodor reviewed by Rajesh Balamohan)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> not related
+
+commit f14baf95f35a66566652a17e592bb02b26beba7d
+Author: Rajesh Balamohan <rbalamohan@apache.org>
+Date:   Wed Apr 15 09:25:21 2020 +0530
+
+    TEZ-4146: Register RUNNING state in DAG's state change callback (Rajesh Balamohan, reviewed by Gopal V)
+    --> not related
+
+commit 7dbec63e1f97eea95ab998e16ffcd592ff6be332
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Tue Apr 14 23:02:48 2020 +0200
+
+    TEZ-4145: Reduce lock contention in TezSpillRecord (László Bodor reviewed by Ashutosh Chauhan, Jonathan Turner Eagles, Rajesh Balamohan)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> applied (should also apply to ShuffleHandler in MR3)
+
+commit 0eeef27413db97b52242878301788ac5fd8def16
+Author: Jonathan Eagles <jeagles@apache.org>
+Date:   Mon Apr 13 09:20:10 2020 -0500
+
+    TEZ-4142. TezUtils.createConfFromByteString on Configuration larger than 32MB throws com.google.protobuf.CodedInputStream exception
+    --> applied
+
+commit b5b432bf05d5b902d66c19d5b693bb620c577390
+Author: Jonathan Eagles <jeagles@apache.org>
+Date:   Thu Mar 19 15:43:37 2020 +0000
+
+    TEZ-4134. Upgrade maven surefire plugin to 3.0.0-M4
+    --> unnecessary
+
+commit 9df9f100e5f4e17f4fa67b69623a7bc8f6fd454c
+Author: Zhang Butao <zhangbutao@cmss.chinamobile.com>
+Date:   Mon Mar 16 16:27:22 2020 +0000
+
+    Reduce apache commons collections direct dependencies
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> already handled
+
+commit 240f80bbe1024c911b179bc25b9a99849dee74d0
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Sat Mar 7 12:27:43 2020 +0100
+
+    TEZ-4114: Remove direct jetty dependency from tez (László Bodor reviewed by Ashutosh Chauhan, Jonathan Turner Eagles)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> do not apply because we already exclude jetty
+
+commit ba441c1ca9dac51e20ba8561ed3c4b7b620d9505
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Sun Mar 1 16:27:04 2020 +0100
+
+    TEZ-4097: Report localHostname in Fetcher and FetcherOrderedGrouped failure log messages (László Bodor reviewed by Ashutosh Chauhan)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> applied
+
+commit f12fd5caf965680aa0c56adbe963dad3dca8bd3f
+Author: Jonathan Eagles <jeagles@apache.org>
+Date:   Thu Feb 27 09:04:15 2020 -0600
+
+    TEZ-4127. TestMergeManager#testOnDiskMergerFilenames fails with dot directory name
+    --> applied (not related to MR3)
+
+commit 5755f70f6d1dc0de769e5de9adf41cc7afa1ce73
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Tue Feb 25 11:28:24 2020 +0100
+
+    TEZ-4099: Add details on whether SSL is enabled or not in HttpConnectionParams (László Bodor reviewed by Jonathan Turner Eagles)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> not related to MR3
+
+commit 7e65a9eafd775574db740075968bdce82ea0b7ca
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Tue Feb 25 11:21:21 2020 +0100
+
+    TEZ-3727: When using HDFS federation, token of tez.simple.history.logging.dir is not added, causing AM to fail (contributed by Xi Chen, reviewed by László Bodor, Jonathan Turner Eagles)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> not directly related to MR3 
+
+commit 4c5db43044be74052e113314a6dc4c3ab9b1c72d
+Author: Jonathan Eagles <jeagles@apache.org>
+Date:   Mon Feb 24 16:25:00 2020 -0600
+
+    TEZ-3664. Flaky tests due to writing to /tmp directory
+    --> unnecessary
+
+commit 66a9dc8df3245350c09ee4b035b9398bdde3c853
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Mon Feb 24 16:20:36 2020 +0100
+
+    TEZ-4126: Shell scripts under tez-tools should be runnable (László Bodor reviewed by Jonathan Turner Eagles)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> not related
+
+commit 9be1b1cbc6e859ae815e4f0629e9103d67a1b76b
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Mon Feb 17 09:01:57 2020 +0100
+
+    TEZ-4109: Improve TezCommonUtils.getCredentialsInfo and use it from more contexts (László Bodor reviewed by Ashutosh Chauhan)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> not related to MR3, do not apply (the patch is already inconsistent with the current code)
+
+commit 6a21d48daa2703b5f19dab49785332e0344e45a3
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Thu Feb 13 09:02:51 2020 -0600
+
+    TEZ-4100. Upgrade to Hadoop 3.1.3 and Guava 27
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> do not apply
+
+commit fd19ce6c93bc1f899ccca7161b0c0407f850bd77
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Wed Feb 12 10:09:26 2020 -0600
+
+    TEZ-4123. TestMRRJobsDAGApi flaky timeout - unhealthy node
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> apply only to non-test code
+
+commit 47eed6474ccc5540291953e3ff0f78fd5894897a
+Author: Jonathan Eagles <jeagles@apache.org>
+Date:   Wed Feb 12 10:07:46 2020 -0600
+
+    Revert "TEZ-4123. TestMRRJobsDAGApi flaky timeout - unhealthy node"
+    
+    This reverts commit 1fe978438e6cb213ac7fb70e0dde72c6e290dcae.
+    --> do not apply
+
+commit 1fe978438e6cb213ac7fb70e0dde72c6e290dcae
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Wed Feb 12 10:06:01 2020 -0600
+
+    TEZ-4123. TestMRRJobsDAGApi flaky timeout - unhealthy node
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> do not apply because reverted
+
+commit 544290e5da84596de5554863737aaee3fffa4d19
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Wed Feb 12 09:45:15 2020 -0600
+
+    TEZ-4124. GuavaShim: introduce an interoperability layer for different guava versions
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> do not apply because we do not want to use GuavaShim
+
+commit 86182d0355c89bd632d5617ba517cea469128fb3
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Mon Feb 10 08:56:26 2020 -0600
+
+    TEZ-4122. TestMRRJobsDAGApi should set TezClassLoader
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> not related
+
+commit b078e3a25f892fcd610a1cc15688e825e41a9bcf
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Thu Feb 6 09:01:59 2020 -0600
+
+    TEZ-4081. Container release idle timeout exception for equal min and max values
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> not related
+
+commit 76b96fca8f5a70ecce902740e3673d100a029fca
+Author: Jonathan Eagles <jeagles@apache.org>
+Date:   Wed Feb 5 11:03:15 2020 -0600
+
+    TEZ-4026. Fetch Download rate shows 0.0 MB per second if duration is 0 millis
+    --> applied
+
+commit 7c4c49966cae7fa73e95af30bd539913965998c4
+Author: Jonathan Eagles <jeagles@apache.org>
+Date:   Wed Feb 5 10:52:48 2020 -0600
+
+    Revert "TEZ-4082. Reduce excessive getFileLinkInfo calls in Tez"
+    
+    This reverts commit 7a3e378b59dad2afe1a068669620846b87d6e732.
+    --> do not apply because TEZ-4082 was not applied
+
+commit f214eabfb5f1da5ce5970558d97bf15405e3da9b
+Author: Syed Shameerur Rahman <srahman@qubole.com>
+Date:   Tue Feb 4 22:26:11 2020 -0600
+
+    TEZ-2229. bower ESUDO Cannot be run with sudo -- during build
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> unrelated, but applied 
+
+commit 2736788f49f17bd269b7ea64d959bbaad95421d3
+Author: Ahmed Hussein <ahussein@apache.org>
+Date:   Tue Feb 4 10:44:29 2020 -0600
+
+    TEZ-4106. Add Exponential Smooth RuntimeEstimator to the speculator
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> not related to MR3
+
+commit cf111b1c896db94d40ea92fc6da2a6fcce356114
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Mon Jan 27 12:44:43 2020 -0600
+
+    TEZ-4101. Eliminate some guava dependencies by Java8+ features - Preconditions
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> already applied
+
+commit a3b2dbb7bb16ff9261baf6b2245bd273a5b1122b
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Thu Jan 23 17:52:46 2020 +0100
+
+    TEZ-4117: Fix minor issues in docs/pom.xml (László Bodor reviewed by Jonathan Turner Eagles)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> not related to MR3
+
+commit 8b5d40fe831a33c05464c84d40a0f622cfd64d35
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Thu Jan 23 11:21:21 2020 +0100
+
+    TEZ-4102: Let session credentials be merged before merging am launch credentials (László Bodor reviewed by Ashutosh Chauhan)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> not related to MR3
+
+commit b27e5ddfe40fab0fc493e93dd43a22c9d9f3782c
+Author: Ahmed Hussein <ahussein@apache.org>
+Date:   Wed Jan 22 16:51:13 2020 -0600
+
+    TEZ-3391. Optimize single split MR split reader
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> applied
+
+commit 5b81017a4d11c09cfa0180e3d56e22c22744559b
+Author: Rajesh Balamohan <rbalamohan@apache.org>
+Date:   Wed Jan 22 03:55:46 2020 +0530
+
+    TEZ-4113: TezUtils::createByteStringFromConf should use snappy instead of DeflaterOutputStream (rbalamohan, reviewed by Ashutosh Chauhan)
+    --> already applied
+    --> must include snappy.jar in Tez
+
+commit bf4942b49a3d9c0d326f64715b3e76952b77382d
+Author: Rajesh Balamohan <rbalamohan@apache.org>
+Date:   Mon Jan 20 14:36:43 2020 +0530
+
+    TEZ-4115: turn on data-via-events as default (Contributed by Richard Zhang, reviewed by rbalamohan)
+    --> applied
+
+commit 271351ba29382da08a24adb2ba2327cc68b95efb
+Author: Rajesh Balamohan <rbalamohan@apache.org>
+Date:   Mon Jan 6 11:41:57 2020 +0530
+
+    TEZ-4098: tez-tools improvements: log-split, swimlane (László Bodor, reviewed by rbalamohan)
+    --> not related to MR3
+
+commit a6219ede1c0eaaec97c69e8b74ba7fe0458d5f0f
+Author: Ahmed Hussein <ahussein@apache.org>
+Date:   Tue Dec 17 11:37:48 2019 -0600
+
+    TEZ-4103. Progress in DAG, Vertex, and tasks is incorrect
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> not related to MR3
+
+commit 689d7388592196c320319f026961b3fef0167dc5
+Author: Jonathan Eagles <jeagles@apache.org>
+Date:   Tue Dec 17 09:06:05 2019 -0600
+
+    TEZ-4108. NullPointerException during speculative execution race condition
+    --> not related to MR3
+
+commit 09c6f902fdab527ca537f6b727e70c1579f2a2cf
+Author: Rajesh Balamohan <rbalamohan@apache.org>
+Date:   Mon Dec 16 10:40:10 2019 -0600
+
+    TEZ-1869. Exclude tez-ui war / other dependencies from tez.tar.gz
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> not related
+
+commit c9358108b411c6d168943853bbec3fd7c356e770
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Fri Dec 13 13:17:03 2019 -0600
+
+    TEZ-4107. PreCommit-TEZ-Build fails - Docker failed to build yetus/tez
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> not related
+
+commit 1af0897c88fb32d39606d21b4c0abcee11b1896c
+Author: Ahmed Hussein <ahussein@apache.org>
+Date:   Tue Nov 26 13:59:54 2019 -0600
+
+    TEZ-4067. Tez Speculation decision is calculated on each update by the dispatcher
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> not related to MR3
+
+commit 47f0f354ab38ea2b96ed6ed008f158527b30903f
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Mon Nov 18 13:24:32 2019 -0600
+
+    TEZ-3860. JDK9: ReflectionUtils may not use URLClassLoader
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> do not apply yet, investigate when upgrading to Java 11
+
+commit 9c66f974b2932a2d9551e6e7b6b1ed7e75c02f6d
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Mon Nov 18 10:05:45 2019 -0600
+
+    TEZ-4083. Upgrade to latest 9.3.x Jetty version
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> upgrade to 9.3.27.v20190418 instead because Hive 4 uses 9.3.27.v20190418
+
+commit 32e80e7d8f1ee7fae645c6cf0a3d86c9b9563c9b
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Fri Nov 15 15:54:47 2019 -0600
+
+    TEZ-3992. Update commons-codec from 1.4 to 1.11
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> upgraded to 1.7, not 1.11
+
+commit 616229e65038ec82eafbcf17537e9c2d46751b23
+Author: Jacob Tolar <jacob@sheckel.net>
+Date:   Fri Nov 15 14:38:29 2019 -0600
+
+    TEZ-4084. Tez local mode fails when distributed cache creates link with parent
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> not related
+
+commit cf73f435bee18022804bded8ae9ca526983b6cee
+Author: Jonathan Eagles <jeagles@apache.org>
+Date:   Fri Nov 15 13:13:27 2019 -0600
+
+    TEZ-4085. Tez UI resources vendor.js and tez-ui.js not getting minified in tez releases (Himanshu Mishra via jeagles)
+    --> not related
+
+commit 8c8458f69fec315837feede20bcabb1131ab3835
+Author: Rajesh Balamohan <rbalamohan@apache.org>
+Date:   Sat Nov 9 05:50:09 2019 +0530
+
+    TEZ-4096: SSLFactory should pickup configs from incoming conf payload (rbalamohan, reviewed by gopalv)
+    --> already applied
+
+commit b99c7ce938def1ed98a2d3ca135457f3300ddcf4
+Author: rbalamohan <rbalamohan@apache.org>
+Date:   Fri Oct 18 05:24:39 2019 +0530
+
+    TEZ-4091: UnorderedPartitionedKVWriter::readDataForDME should check if in-mem file is flushed or not (#53)
+    --> applied
+
+commit 3dce6c9ae5e02d02dd84eecf0cd920ef07298b5b
+Author: rbalamohan <rbalamohan@apache.org>
+Date:   Fri Oct 11 09:58:09 2019 +0530
+
+    * TEZ-4088: Create in-memory ifile writer for transferring smaller payloads (follow up of TEZ-4075)
+    
+    * TEZ-4088: Create in-memory ifile writer for transferring smaller payloads (follow up of TEZ-4075) (rbalamohan, reviewed by sseth)
+    --> applied
+
+commit de019d5e31ba72659dd88a3d8fe5db8b4af0a3cd
+Author: rbalamohan <rbalamohan@apache.org>
+Date:   Mon Oct 7 12:27:38 2019 +0530
+
+    TEZ-4075: Reimplement tez.runtime.transfer.data-via-events.enabled (#48) (Contributed by Richard Zhang)
+    
+    * TEZ-4075: Reimplement tez.runtime.transfer.data-via-events.enabled
+    
+    * TEZ-4075: Reimplement tez.runtime.transfer.data-via-events.enabled
+    --> applied
+
+commit 9f5c1b7f6d09884131aa2bab4e01e98768347def
+Author: Siddharth Seth <sseth@apache.org>
+Date:   Sun Oct 6 10:15:07 2019 -0700
+
+    TEZ-4086. Allow various examples to work when outputPath is on a FileSystem other than the default FileSystem. (#45)
+    --> partially applied
+
+commit 7a3e378b59dad2afe1a068669620846b87d6e732
+Author: Jonathan Eagles <jeagles@apache.org>
+Date:   Tue Aug 27 10:40:51 2019 -0500
+
+    TEZ-4082. Reduce excessive getFileLinkInfo calls in Tez
+    --> do not apply because it is reverted later and not related to MR3
+
+commit e62e85c0edd58e436653105dbcf26263f58e0071
+Author: Jesus Camacho Rodriguez <jcamacho@apache.org>
+Date:   Tue Jul 16 13:48:59 2019 -0700
+
+    TEZ-4076. Add hadoop-cloud-storage jar to aws and azure mvn profiles (Jesus Camacho Rodriguez, reviewed by Gopal V)
+    
+    Signed-off-by: Gopal V <gopalv@apache.org>
+    --> already applied
+
+commit 4125639619d5e3252fde62579d431ce5071414ea
+Author: Ying Han <hying04@outlook.com>
+Date:   Fri May 10 04:59:02 2019 -0500
+
+    TEZ-4068. Prevent new speculative attempt after task has issued canCommit to an attempt
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> unrelated to MR3
+
+commit db5f462f9a6ac7faf5fde686bab401afb55ab66b
+Author: Jonathan Eagles <jeagles@apache.org>
+Date:   Fri May 10 04:58:13 2019 -0500
+
+    Revert "TEZ-4062. Speculative attempt scheduling should be aborted when Task has completed"
+    
+    This reverts commit 7d5a1830a51df64b23920901ec2e723999a9dfac.
+    --> unrelated to MR3
+
+commit 7d5a1830a51df64b23920901ec2e723999a9dfac
+Author: Ying Han <hying04@outlook.com>
+Date:   Fri May 10 04:55:29 2019 -0500
+
+    TEZ-4062. Speculative attempt scheduling should be aborted when Task has completed
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> unnecessary
+
+commit 2202f04d4bee465e529a734d9ec855dced170f00
+Author: Kuhu Shukla <kshukla@apache.org>
+Date:   Tue May 7 09:55:03 2019 -0500
+
+    TEZ-4066. Upgrade servlet-api from 2.5 to 3.1.0 (Jonathan Eagles via kshukla)
+    --> unnecessary because we do not use servlet-api
+
+commit 82c1d75c7b3abf7316ba265a599b910fcc2360c7
+Author: Siddharth Seth <sseth@apache.org>
+Date:   Mon May 6 10:52:19 2019 -0700
+
+    EZ-1348. Allow Tez local mode to run against filesystems other than
+    local FS. (Todd Lipcon via sseth)
+    --> partially applied for soure compatibility
+
+commit 4bbd3c2e7600752cfe0d074d61e00e12ea0ee748
+Author: Siddharth Seth <sseth@apache.org>
+Date:   Mon May 6 10:51:43 2019 -0700
+
+    Revert "TEZ-1348. Allow Tez local mode to run against filesystems other than"
+    
+    This reverts commit 46b4004d97dd2f2cde491a93abcdd48c9b82f68e.
+    --> unnecessary
+
+commit 0f71b0b0622f6a9af71bf9d8b3bf22c1a040cccb
+Author: Ying Han <hying04@outlook.com>
+Date:   Fri Apr 26 15:20:29 2019 -0500
+
+    TEZ-4062. Speculative attempt scheduling should be aborted when Task has completed
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> unnecessary
+
+commit 46b4004d97dd2f2cde491a93abcdd48c9b82f68e
+Author: Siddharth Seth <sseth@apache.org>
+Date:   Fri Apr 26 12:21:35 2019 -0700
+
+    TEZ-1348. Allow Tez local mode to run against filesystems other than
+    local FS. (Todd Lipcon via sseth)
+    --> unnecessary because it is reverted
+
+commit 8395a9560a131799f1af49b26e1f10f12ef48752
+Author: Kuhu Shukla <kshukla@apache.org>
+Date:   Fri Mar 29 19:54:27 2019 -0500
+
+    TEZ-4058. Changes for 0.9.2 release
+    --> unnecessary
+
+commit 44344a09ef8e1425ab2f8912a72cbb501b68b19e
+Author: Eric Wohlstadter <ewohlstadter@cloudera.com>
+Date:   Thu Mar 28 13:23:10 2019 -0700
+
+    TEZ-4057: Fix Unsorted broadcast shuffle umasks (Eric Wohlstadter, reviewed by Gopal V)
+    
+    Signed-off-by: Gopal V <gopalv@apache.org>
+    --> already applied
+
+commit d5675c332497c1ac1dedefdf91e87476b5c0d7a9
+Author: Ying Han <hying04@outlook.com>
+Date:   Fri Mar 22 15:56:39 2019 -0500
+
+    TEZ-4045. Task should be accessible from TaskAttempt
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> unnecessary for MR3
+
+commit 6bbb41f5eaa83533bad2a51565f608d87eeacb61
+Author: Kuhu Shukla <kshukla@apache.org>
+Date:   Tue Mar 19 15:10:33 2019 -0500
+
+    TEZ-4031. Support tez gitbox migration (Jonathan Eagles via kshukla)
+    --> unnecessary
+
+commit c4c66b53605f64c9c22f462cc9323bc42f84dd10
+Author: Kuhu Shukla <kshukla@apache.org>
+Date:   Tue Mar 19 15:09:20 2019 -0500
+
+    Revert "TEZ-4031. Support tez gitbox migration (Jonathan Eagles via kshukla)"
+    
+    This reverts commit 4b4aeca67299e10d6f9fcdaa4d4ffaf7a4110cf3.
+    --> unnecessary
+
+commit 96a5e3ec1007cd7203b42d1cc4abce41fa58c340
+Author: Kuhu Shukla <kshukla@apache.org>
+Date:   Thu Mar 14 14:54:58 2019 -0500
+
+    TEZ-4052. Fit dot files ASF License issues - part 2 (Jonathan Eagles via kshukla)
+    --> unnecessary
+
+commit 3524e790fc24ee0d41f409441494ee160c68f2b3
+Author: Gopal V <gopalv@apache.org>
+Date:   Tue Mar 12 10:25:08 2019 -0500
+
+    TEZ-4044. Zookeeper: exclude jline from Zookeeper client from tez dist
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> unnecessary because it has no effect (because we don't include ZooKeeper anyway)
+
+commit f4b7137ddda3f7d3a127ca30eddcf7302d842c2a
+Author: Jaume Marhuenda <jmarhuenda@hortonworks.com>
+Date:   Fri Mar 8 12:02:16 2019 -0600
+
+    TEZ-3995. Fix dot files produced by tests to prevent ASF license warnings in yetus (addendum)
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> unnecessary
+
+commit 4b4aeca67299e10d6f9fcdaa4d4ffaf7a4110cf3
+Author: Kuhu Shukla <kshukla@apache.org>
+Date:   Wed Mar 6 15:24:57 2019 -0600
+
+    TEZ-4031. Support tez gitbox migration (Jonathan Eagles via kshukla)
+    --> unnecessary
+
+commit 8bc2e3703ed3682d48a3f781828a4391c8d14e3a
+Author: Prasanth Jayachandran <prasanthj@apache.org>
+Date:   Mon Mar 4 12:26:05 2019 -0600
+
+    TEZ-4048. Make proto history logger queue size configurable
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> unnecessary
+
+commit 35acf1524f8ca83187b1bb47586811aa29cc2f0b
+Author: Kuhu Shukla <kshukla@apache.org>
+Date:   Thu Feb 28 11:16:22 2019 -0600
+
+    TEZ-4047. Tez trademark in xml is causing xml parsing issue (Jonathan Eagles via kshukla)
+    --> unnecessary
+
+commit 05b1038fa45c4931ef4e264e538f1049ab3531f3
+Author: Kuhu Shukla <kshukla@apache.org>
+Date:   Thu Feb 28 11:06:07 2019 -0600
+
+    TEZ-4050. maven site is failing due to missing configuration. (Jonathan Eagles via kshukla)
+    --> unnecessary 
+
+commit aeb90b46bc69c183754f5cc4f8f29af4946b4559
+Author: Kuhu Shukla <kshukla@apache.org>
+Date:   Thu Feb 28 10:25:42 2019 -0600
+
+    TEZ-4049. Fix findbugs issues in NotRunningJob (Jonathan Eagles via kshukla)
+    --> applied
+
+commit e88e824fccb0e3dac0ce854738040e885f0d606b
+Author: Zhang Butao <zhangbutao@cmss.chinamobile.com>
+Date:   Wed Feb 27 21:57:41 2019 -0600
+
+    TEZ-4032. TEZ will throw Client cannot authenticate via:[TOKEN, KERBEROS] when used with HDFS federation(non viewfs, only hdfs schema used).
+    --> TODO in MR3. It may be that TEZ-4032 is unnecessary because we have hive.mr3.dag.additional.credentials.source.
+
+commit 0093f8b4d9ea38fcdfeb802fe3206c4b2ae8f077
+Author: Ying Han <hying04@outlook.com>
+Date:   Mon Feb 25 22:38:01 2019 -0600
+
+    TEZ-4042. Speculative attempts should avoid running on the same node
+    --> not related
+
+commit 4876dc26ec2a1c365be9e5cc76a016ae715d9caa
+Author: Jonathan Eagles <jeagles@gmail.com>
+Date:   Tue Feb 19 11:17:15 2019 -0600
+
+    TEZ-4035. Tez master breaks with YARN 3.2.0 ApplicationReport API change (jeagles)
+    --> applied
+
+commit ff999d8156a345503f5e3d680a36d6a95186bf79
+Author: Jonathan Eagles <jeagles@gmail.com>
+Date:   Fri Feb 15 17:11:54 2019 -0600
+
+    TEZ-3952. Allow Tez task speculation to grant greater customization of certain parameters (Nishant Dash via jeagles)
+    --> not related to MR3
+
+commit 1234c028b5c088a4d3492a2aab6c91f4f0d3d19b
+Author: Jonathan Eagles <jeagles@gmail.com>
+Date:   Fri Feb 15 16:29:21 2019 -0600
+
+    TEZ-4034. Column selector filter should be case-insensitive (Jacob Tolar via jeagles)
+    --> not applicable (Tez-UI)
+
+commit 1990438047fd92f73d3a8b571895ae3fc2c6ee05
+Author: Kuhu Shukla <kshukla@apache.org>
+Date:   Fri Feb 15 15:44:07 2019 -0600
+
+    TEZ-4043. Create a yetus compatible checkstyle configuration (Jonathan Eagles via kshukla)
+    --> not related
+
+commit 62a1140be8bac21c4f18c3bf6f9cc124ea1a1bfb
+Author: Kuhu Shukla <kshukla@apache.org>
+Date:   Wed Feb 13 14:59:57 2019 -0600
+
+    TEZ-4041. TestExtServicesWithLocalMode fails in docker (Jonathan Eagles via kshukla)
+    --> not related
+
+commit f9da6bbb83fcca59eff7a721f5d5f9e511f23f50
+Author: Kuhu Shukla <kshukla@apache.org>
+Date:   Wed Feb 13 13:07:00 2019 -0600
+
+    TEZ-4040. Upgrade RoaringBitmap version to avoid NoSuchMethodError (Jonathan Eagles via kshukla)
+    --> already applied
+
+commit ffaedf6b34c243b1d4395e04883c0f59c635d676
+Author: Kuhu Shukla <kshukla@apache.org>
+Date:   Tue Feb 12 15:26:25 2019 -0600
+
+    TEZ-4037. Add back DAG search status KILLED (Jonathan Eagles via kshukla)
+    --> not related
+
+commit 3162aab3411f885db3e103f0c16c92de3e2ca46b
+Author: Jonathan Eagles <jeagles@gmail.com>
+Date:   Tue Feb 5 11:33:43 2019 -0600
+
+    TEZ-4036. TestMockDAGAppMaster#testInternalPreemption should assert for failed state (Kuhu Shukla via jeagles)
+    --> not applicable
+
+commit c78d3487f5170321f985c058b8804d25b6eae48c
+Author: Harish JP <harishjp@apache.org>
+Date:   Sun Jan 27 19:27:46 2019 -0800
+
+    TEZ-4028: Events not visible from proto history logging for s3a filesystem until dag completes (Harish JP, via Gopal V)
+    
+    Signed-off-by: Gopal V <gopalv@apache.org>
+    --> not related to MR3
+
+commit a03181742abbf064557d096b3d3cd231c64c1a2a
+Author: Kuhu Shukla <kshukla@yahoo-inc.com>
+Date:   Tue Dec 18 09:14:45 2018 -0600
+
+    TEZ-4027. DagAwareYarnTaskScheduler can miscompute blocked vertices and cause a hang
+    
+    Signed-off-by: Jason Lowe <jlowe@apache.org>
+    --> not applicable
+
+commit f49d665393a884295f529ffc7b9493cfa7bb3853
+Author: Sergey Shelukhin <sershe@apache.org>
+Date:   Tue Dec 11 11:45:58 2018 -0800
+
+    TEZ-3957: Report TASK_DURATION_MILLIS as a Counter for completed tasks (Sergey Shelukhin, reviewed by Gopal V)
+    
+    Signed-off-by: Gopal V <gopalv@apache.org>
+    --> not related to MR3
+
+commit 282bb0a3fddf20260d71b0a6cd798fa5479e7038
+Author: Jonathan Eagles <jeagles@yahoo-inc.com>
+Date:   Tue Nov 27 15:23:48 2018 -0600
+
+    TEZ-4021. API incompatibility wro4j-maven-plugin
+    
+    Signed-off-by: Jason Lowe <jlowe@apache.org>
+    --> do not apply because the current compilation works
+
+commit 9345c2b1d66a530c32e2a7258929b883fe9ec38e
+Author: Jonathan Eagles <jeagles@yahoo-inc.com>
+Date:   Tue Nov 27 11:20:43 2018 -0600
+
+    TEZ-4022. Upgrade Maven Surefire plugin to 3.0.0-M1
+    
+    Signed-off-by: Jason Lowe <jlowe@apache.org>
+    --> do not apply because the current compilation works
+
+commit e6722a96b4827d19850a5a73bc7024941a9deb54
+Author: Jonathan Eagles <jeagles@yahoo-inc.com>
+Date:   Tue Nov 20 16:48:59 2018 -0600
+
+    TEZ-3998. Allow CONCURRENT edge property in DAG construction and introduce ConcurrentSchedulingType (Yingda Chen via jeagles)
+    --> do not apply because it is part of TEZ-3997
+
+commit efc73318342e40dac30ec321119c6536b67c0a64
+Author: Kuhu Shukla <kshukla@yahoo-inc.com>
+Date:   Tue Oct 30 08:51:02 2018 -0500
+
+    TEZ-4004. Update jetty9 to align with Hadoop and Hive (Jonathan Eagles via kshukla)
+    --> already applied
+
+commit d4a62deee9e258ba1a3883b02c4c4446629933ae
+Author: Kuhu Shukla <kshukla@yahoo-inc.com>
+Date:   Fri Oct 26 14:42:06 2018 -0500
+
+    TEZ-4012. Add docker support for Tez. (Jonathan Eagles via kshukla)
+    --> unnecessary
+
+commit 79af4e8d06417829986dfc34b3627ead15d563ee
+Author: Jaume Marhuenda <jmarhuenda@hortonworks.com>
+Date:   Tue Oct 23 15:30:13 2018 -0700
+
+    TEZ-3976: Batch ShuffleManager error report events (Jaume Marhuenda, reviewed by Gopal V)
+    
+    Signed-off-by: Gopal V <gopalv@apache.org>
+    --> do not apply because this was considered already (gla2019.5.6, gla2019.4.8)
+
+commit 927781566bccd0900357691fc4de76e7469492de
+Author: Jonathan Eagles <jeagles@yahoo-inc.com>
+Date:   Wed Oct 10 16:59:04 2018 -0500
+
+    TEZ-3961. Tez UI web.xml tries to reach out to java.sun.com for validation after moving to jetty-9 (Kuhu Shukla via jeagles)
+    --> not releated to MR3
+
+commit a83b1e9d467f5a74ed72da76b1de6e725cc33ebe
+Author: Jonathan Eagles <jeagles@yahoo-inc.com>
+Date:   Wed Oct 10 16:21:21 2018 -0500
+
+    TEZ-3990. The number of shuffle penalties for a host/inputAttemptIdentifier should be capped (Kuhu Shukla via jeagles)
+    --> applied 
+
+commit 2f1738888d3a536b4cdc026c4697ae3d7d3a956e
+Author: Gopal V <gopalv@apache.org>
+Date:   Tue Oct 9 17:02:35 2018 -0500
+
+    TEZ-4003. Add gopalv@apache.org to KEYS file (Gopal V via jeagles)
+    --> unnecessary
+
+commit 7d5c66ac0ccf222b0611de3984abb5b8e97cf349
+Author: Jaume Marhuenda <jmarhuenda@hortonworks.com>
+Date:   Tue Oct 9 13:31:58 2018 -0500
+
+    TEZ-3995. Fix dot files produced by tests to prevent ASF license warnings in yetus (Jaume Marhuenda via jegales)
+    --> unnecessary
+
+commit 39d76a656216d4843908279ef8eaa29a4cc83104
+Author: Jaume Marhuenda <jmarhuenda@hortonworks.com>
+Date:   Tue Oct 9 13:12:17 2018 -0500
+
+    TEZ-3969. TaskAttemptImpl: static fields initialized in instance ctor (Jaume Marhuenda via jegales)
+    --> not applicable
+
+commit 7d73bb2dc6163b04ec34ddf7b7a0300a78464f61
+Author: Jonathan Eagles <jeagles@yahoo-inc.com>
+Date:   Fri Sep 28 10:15:24 2018 -0500
+
+    TEZ-3994. Upgrade maven-surefire-plugin to 0.21.0 to support yetus
+    
+    Signed-off-by: Jason Lowe <jlowe@apache.org>
+    --> choose not to apply
+
+commit 64c04f1121ef1d04118e36b0e4fc3808205a50a8
+Author: Jonathan Eagles <jeagles@yahoo-inc.com>
+Date:   Wed Sep 26 13:48:48 2018 -0700
+
+    TEZ-3975. Add OWASP Dependency Check to the build
+    
+    Signed-off-by: Jason Lowe <jlowe@apache.org>
+    --> unnecessary for MR3
+
+commit 22e2a21791295716e8891134f52b076bfbff1f8f
+Author: Jaume M <jmarhuenda@hortonworks.com>
+Date:   Mon Sep 24 16:13:24 2018 -0700
+
+    TEZ-3981. UnorderedPartitionedKVWriter.getInitialMemoryRequirement may return negative memory (Jaume M via jeagles)
+    --> applied
+
+commit 381dac0ca3cb14fe2f71c54f31cbdabf44ab4b36
+Author: Jonathan Eagles <jeagles@yahoo-inc.com>
+Date:   Thu Sep 20 10:26:42 2018 -0500
+
+    TEZ-3982. DAGAppMaster and tasks should not report negative or invalid progress (Kuhu Shukla via jeagles)
+    --> not applicable
+
+commit c852dbecf5690dbf922d427701b0a3e8e7283f69
+Author: Jonathan Eagles <jeagles@yahoo-inc.com>
+Date:   Tue Sep 18 17:14:44 2018 -0500
+
+    TEZ-3972. Tez DAG can hang when a single task fails to fetch (Kuhu Shukla via jeagles)
+    --> not applicable
+
+commit 68f4cf93a3c7924c38594f2a1db0c0039986464f
+Author: Eric Wohlstadter <ewohlstadter@hortonworks.com>
+Date:   Fri Sep 14 10:51:58 2018 -0500
+
+    TEZ-3988. Update snapshot version in master to 0.10.1-SNAPSHOT
+    
+    Signed-off-by: Jason Lowe <jlowe@apache.org>
+    --> not applicable
+
+commit 082b8e46a4d64913c0e57943e61ade96a93a5c6e
+Author: Hitesh Shah <hitshah@adobe.com>
+Date:   Tue Sep 11 09:34:19 2018 -0700
+
+    TEZ-3989. Fix by-laws related to emeritus clause.
+    
+    Signed-off-by: Jason Lowe <jlowe@apache.org>
+    --> not applicable
+
+commit 567dc28dd8b2daca6a7f38c4768574bb67df780c
+Author: Jaume Marhuenda <jmarhuenda@hortonworks.com>
+Date:   Mon Sep 10 12:50:00 2018 -0700
+
+    TEZ-3984: Shuffle: Out of Band DME event sending causes errors (Jaume Marhuenda, reviewed by Gopal V)
+    
+    Signed-off-by: Gopal V <gopalv@apache.org>
+    --> added
+    --> needs to be tested for correctness
+
+commit 088c80ce231bff5e3c8c77b8b26a164204f9dae8
+Author: Jonathan Eagles <jeagles@yahoo-inc.com>
+Date:   Thu Sep 6 11:24:12 2018 -0500
+
+    TEZ-3973. Add Kuhu Shukla's (kshukla) public key to KEYS (Kuhu Shukla via jeagles)
+    --> not related
+
+commit a37a367b400dd5b1cab22b35a47fb664055f3df6
+Author: Gopal V <gopalv@apache.org>
+Date:   Mon Aug 27 20:37:27 2018 -0700
+
+    TEZ-3980: ShuffleRunner: the wake loop needs to check for shutdown (Gopal V, reviewed by Gunther Hagleitner)
+    --> already contains the check equivalent to TEZ-3980 
+
+commit 5949b0cef6e9b23c1ac5c75461c027b40cafc91d
+Author: Jaume Marhuenda <jmarhuenda@hortonworks.com>
+Date:   Mon Aug 27 20:34:41 2018 -0700
+
+    TEZ-3958: Add internal vertex priority information into the tez dag.dot debug information (Jaume Marhuenda via Gopal V)
+    --> not related
+
+commit 261bbdd5929d562758deb31085b565db8e92d6a2
+Author: Jonathan Eagles <jeagles@yahoo-inc.com>
+Date:   Thu Aug 23 15:33:06 2018 -0500
+
+    TEZ-3977. Add Eric Wohlstadter's public key to KEYS (Eric Wohlstadter via jeagles)
+    --> not related
+
+commit 4b9a7be1b98cff00c44e7d3ffb2486bb59ca6804
+Author: Jonathan Eagles <jeagles@yahoo-inc.com>
+Date:   Thu Aug 16 13:07:36 2018 -0500
+
+    TEZ-3978. DAGClientServer Socket exception when localhost name lookup failures (Jonathan Eagles via jlowe)
+    
+    Signed-off-by: Jason Lowe <jlowe@apache.org>
+    --> not applicable
+
+commit 90c8195de0ddee9da3d4cd07519c8e287c85ad50
+Author: Jaume Marhuenda <jmarhuenda@hortonworks.com>
+Date:   Thu Aug 9 14:39:56 2018 -0700
+
+    TEZ-3974: Correctness regression of TEZ-955 in TEZ-2937 (Jaume Marhuenda, reviewed by Gopal V)
+    --> applied (not related to MR3)
+
+commit fe22f3276d6d97f6b5dfab24490ee2ca32bf73c3
+Author: Jonathan Eagles <jeagles@yahoo-inc.com>
+Date:   Fri Jul 27 09:56:10 2018 -0500
+
+    TEZ-3934. LegacySpeculator sometime issues wrong number of speculative attempts (Nishant Dash via jeagles)
+    --> not applicable
+
+commit dd6a09dc4522ffe3b4df8d0ef4904573211263c0
+Author: Nishant Dash <nishant.dash@oath.com>
+Date:   Tue Jul 24 10:14:53 2018 -0500
+
+    TEZ-3942. RPC getTask writable optimization invalid in hadoop 2.8+
+    
+    Signed-off-by: Jason Lowe <jlowe@apache.org>
+    --> applied (not related to MR3)
+    TezUtils.createUserPayloadFromConf() is called from Hive, but only used for exec-Tez.
+    Hence it is safe to apply this patch.
+
+commit 7e397b4f8ebc5f8faec3e6fc4fd634c9d02cb3e4
+Author: Jaume Marhuenda <jmarhuenda@hortonworks.com>
+Date:   Thu Jul 12 22:39:09 2018 -0700
+
+    TEZ-3965: TestMROutput: Fix the hard-coded /tmp/output paths (Jaume Marhuenda, reviewed by Gopal V)
+    
+    Signed-off-by: Gopal V <gopalv@apache.org>
+    --> applied (test code)
+
+commit 957e34f81fd5cdf3afd035a4a5e2259743eba562
+Author: Eric Wohlstadter <ewohlstadter@hortonworks.com>
+Date:   Thu Jul 12 15:03:16 2018 -0700
+
+    TEZ-3916: Add hadoop-azure-datalake jar to azure profile (Eric Wohlstadter via Gopal V)
+    
+    Signed-off-by: Gopal V <gopalv@apache.org>
+    --> applied
+
+commit 633fde2cd41ae0a2f51b5c34190318bae54a2ee6
+Author: Kuhu Shukla <kshukla@yahoo-inc.com>
+Date:   Thu Jul 12 17:44:19 2018 -0500
+
+    TEZ-3970. NullPointerException in Tez ShuffleHandler Ranged Fetch (Jonathan Eagles via kshukla)
+    --> already applied to ShuffleHandler in MR3
+
+commit 4496f66673de97bbe92e9b143696635038c2b799
+Author: Jason Lowe <jlowe@apache.org>
+Date:   Thu Jul 12 10:48:07 2018 -0500
+
+    TEZ-3964. Inflater not closed in some places (Jaume M via jlowe)
+    --> applied (only to TezCommonUtils.java)
+
+commit 919d328afd1e580a5d72eb64a7ffd5995a93cf4e
+Author: Jason Lowe <jlowe@apache.org>
+Date:   Wed Jul 11 11:04:50 2018 -0500
+
+    TEZ-3955. Upgrade hadoop dependency to 3.0.3 (Jonathan Eagles via jlowe)
+    --> already upgrade to 3.1.2
+
+commit 12ff93779f5c8ef5708bf3f14fb49a628bc41218
+Author: Jonathan Eagles <jeagles@yahoo-inc.com>
+Date:   Mon Jul 9 10:44:06 2018 -0500
+
+    TEZ-3912. Fetchers should be more robust to corrupted inputs (Kuhu Shukla via jeagles)
+    --> applied
+
+commit 5b75ef118b5e7702485c29b91890c0639ac0e0b5
+Author: Jason Lowe <jlowe@apache.org>
+Date:   Fri Jul 6 16:53:57 2018 -0500
+
+    TEZ-3963. Possible InflaterInputStream leaked in TezCommonUtils and related classes (Jaume M via jlowe)
+    --> applied
+
+commit 3baab55810ce5477c4048125e2b192bde9ec134d
+Author: Kuhu Shukla <kshukla@yahoo-inc.com>
+Date:   Fri Jul 6 09:16:44 2018 -0500
+
+    TEZ-3954. Reduce Tez Shuffle Handler Memory needs for holding TezIndexRecords (Jonathan Eagles via kshukla)
+    --> already applied to ShuffleHandler in MR3
+
+commit 06757e9d03c613ef5fd1dfcb1d86615ba2222818
+Author: Harish JP <harishjp@gmail.com>
+Date:   Fri Jun 29 22:31:15 2018 +0530
+
+    TEZ-3960. Better error handling in proto history logger and add doAs support. (harishjp)
+    --> not related to MR3
+
+commit 314dfc79b4b3f528b680b4fee73ad0dca3a3a19b
+Author: Jason Lowe <jlowe@apache.org>
+Date:   Thu Jun 28 16:13:02 2018 -0500
+
+    TEZ-3962. Configuration decode leaks an Inflater object (Eric Wohlstadter via jlowe)
+    --> already applied
+
+commit a39f02e4073af4ee8d6b6a7bcb06198a10aa5aac
+Author: Sreenath <ursreenath@gmail.com>
+Date:   Wed Jun 27 15:32:03 2018 +0530
+
+    TEZ-3959. HTTP 502 for bower install (Harish Jaiprakash via Sree)
+    --> not related to MR3
+
+commit 3f2373e2b2ab3825ef50e9f19b8704265542a8b2
+Author: Sergey Shelukhin <sershe@apache.org>
+Date:   Mon Jun 11 16:17:06 2018 -0700
+
+    TEZ-3953: Restore ABI-compat for DAGClient for TEZ-3951 (Sergey Shelukhin via Gopal V)
+    
+    Signed-off-by: Gopal V <gopalv@apache.org>
+    --> not related to MR3 (tez-api)
+
+commit a0ea6e12225c04e02db7d2ba2e683de09e5fa9a5
+Author: Harish JP <harishjp@gmail.com>
+Date:   Mon Jun 11 18:57:22 2018 +0530
+
+    TEZ-3951. TezClient wait too long for the DAGClient for prewarm; tries to shut down the wrong DAG (Sergey Shelukhin via Harish Jaiprakash)
+    --> not related to MR3 (tez-api)
+
+commit 9058460f12043a96effb1bbc5fa019f9067b0c39
+Author: Kuhu Shukla <kshukla@yahoo-inc.com>
+Date:   Thu Jun 7 11:42:49 2018 -0500
+
+    TEZ-3944. TestTaskScheduler times-out on Hadoop3 (Jonathan Eagles viak kshukla)
+    --> not applicable
+
+commit 09102e517b2afa20add2de4cc018b8abbb66feb3
+Author: Jonathan Eagles <jeagles@yahoo-inc.com>
+Date:   Tue Jun 5 16:24:58 2018 -0500
+
+    TEZ-3938. Task attempts failing due to not making progress (Kuhu Shukla via jeagles)
+    --> not applicable
+
+commit e0ca8c9a9313e44ff3fd151fe42ba1ff8fb6cec9
+Author: Kuhu Shukla <kshukla@yahoo-inc.com>
+Date:   Tue Jun 5 15:29:48 2018 -0500
+
+    TEZ-3949. TestATSHistoryV15 is failing with hadoop3+ (Jonathan Eagles via kshukla)
+    --> not applicable
+
+commit b0eb9dc656ba42a2a9b67a043765ecec5bfd8cd5
+Author: Jonathan Eagles <jeagles@yahoo-inc.com>
+Date:   Mon Jun 4 13:43:27 2018 -0500
+
+    TEZ-3946. NoClassDefFoundError, org.apache.hadoop.mapred.ShuffleHandler. (Multiple tests with Hadoop3) (Eric Wohlstadter via jeagles)
+    --> not applicable
+
+commit 69423096659621b0c2528ee92c3af7e7b48cfc96
+Author: Kuhu Shukla <kshukla@yahoo-inc.com>
+Date:   Mon Jun 4 10:58:34 2018 -0500
+
+    TEZ-3948. Tez distribution broken with hadoop3 (Jonathan Eagles via kshukla)
+    --> not applicable
+
+commit 1a88da0221fb822e319ed81c8410143217336e4d
+Author: Jonathan Eagles <jeagles@yahoo-inc.com>
+Date:   Fri Jun 1 18:54:10 2018 -0500
+
+    TEZ-3929. Upgrade Jersey to 1.19 (Eric Wohlstadter via jeagles)
+    --> not applicable, jersey.version removed
+
+commit c6a09a1ff83b2dfd50893be2fe9b1db32cc928b1
+Author: Jonathan Eagles <jeagles@yahoo-inc.com>
+Date:   Fri Jun 1 18:42:24 2018 -0500
+
+    TEZ-3947. TestATSHistoryWithACLs fails with Hadoop3 and Jersey 1.19 (Eric Wohlstadter via jeagles)
+    --> not applicable
+
+commit 1e44ba768ddbef92a83aac64e80bd30fd1e2af89
+Author: Kuhu Shukla <kshukla@yahoo-inc.com>
+Date:   Fri Jun 1 15:49:44 2018 -0500
+
+    TEZ-3923. Move master to Hadoop 3+ and create separate 0.9.x line (Jonathan Eagles via kshukla)
+    --> already applied
+
+commit cf0302c429b1b24b75371374e6676376decc34b0
+Author: Jason Lowe <jlowe@apache.org>
+Date:   Tue May 29 14:23:03 2018 -0500
+
+    TEZ-3943. TezClient leaks DAGClient for prewarm (Sergey Shelukhin via jlowe)
+    --> applied, but not related to MR3
+
+commit f6624c1525c54f64bdf28996fc469fa5543df6af
+Author: Jason Lowe <jlowe@apache.org>
+Date:   Thu May 24 09:09:36 2018 -0500
+
+    TEZ-3939. Remove performance hit of precondition check in AM for register running task attempt (Jonathan Eagles via jlowe)
+    --> not applicable
+
+commit 7111078e98bddd26520a2f89cfc5c161f669ceea
+Author: Jason Lowe <jlowe@apache.org>
+Date:   Thu May 24 08:44:03 2018 -0500
+
+    TEZ-3940. Reduce time to convert TaskFinishedEvent to string (Jonathan Eagles via jlowe)
+    --> not applicable
+
+commit bf87a0fd1fc5fc2de907fc81f99ea26f18881593
+Author: Jonathan Eagles <jeagles@yahoo-inc.com>
+Date:   Tue May 22 17:03:55 2018 -0500
+
+    TEZ-3902. Upgrade to netty-3.10.5.Final.jar (Jason Lowe via jeagles)
+    --> not applicable (already adds netty-3.10.6)
+
+commit e72b0a23ab28ee4759aa5e328f5a19cecc020942
+Author: Jonathan Eagles <jeagles@yahoo-inc.com>
+Date:   Tue May 22 13:28:55 2018 -0500
+
+    TEZ-3935. DAG aware scheduler should release unassigned new containers rather than hold them (Jason Lowe via jeagles)
+    --> not applicable
+
+commit fd9c015750c320a9a70b917cf22f993cf144e89e
+Author: Jason Lowe <jlowe@apache.org>
+Date:   Mon May 21 09:32:08 2018 -0500
+
+    TEZ-3937. Empty partition BitSet to byte[] conversion creates one extra byte in rounding error (Jonathan Eagles via jlowe)
+    --> applied
+
+commit 1ae62421aa6c3d9131e1673615b1c94c8e7011aa
+Author: Jason Lowe <jlowe@apache.org>
+Date:   Mon May 14 13:17:43 2018 -0500
+
+    TEZ-3824. MRCombiner creates new JobConf copy per spill (Jonathan Eagles via jlowe)
+    --> applied
+
+commit 60645a8259c1551891ec5f5789e20466bd2fc794
+Author: Kuhu Shukla <kshukla@yahoo-inc.com>
+Date:   Thu May 10 16:38:16 2018 -0500
+
+    TEZ-3933. Remove sleep from test TestExceptionPropagation (Jonathan Eagles via kshukla)
+    --> not applicable
+
+commit d0abd3d54cbd864a388b7f1e66018c46db328e16
+Author: Vineet Garg <vgarg@apache.org>
+Date:   Wed May 9 12:02:15 2018 -0700
+
+    TEZ-3911: Optional min/max/avg aggr. task counters reported to HistoryLoggingService at final counter aggr (Vineet Garg, via Gopal V)
+    
+    Signed-off-by: Gopal V <gopalv@apache.org>
+    --> not applicable, related to TezCounters
+
+commit 72c458a431545565d38681862a883065f4efa44e
+Author: Jason Lowe <jlowe@apache.org>
+Date:   Wed May 9 10:25:32 2018 -0500
+
+    TEZ-3932. TaskSchedulerManager can throw NullPointerException during DAGAppMaster container cleanup race (Jonathan Eagles via jlowe)
+    --> not applicable
+
+commit 081a64f716a73a5f65c8d74e6ab729e57b0747bc
+Author: Kuhu Shukla <kshukla@yahoo-inc.com>
+Date:   Tue May 8 11:03:38 2018 -0500
+
+    TEZ-3931. TestExternalTezServices fails on Hadoop3 (Jonathan Eagles via kshukla)
+    --> not applicable
+
+commit 46bb527fcbcb82a6d7a2a4b8c5ce56438b4fbf2c
+Author: Jonathan Eagles <jeagles@yahoo-inc.com>
+Date:   Tue May 8 09:17:44 2018 -0500
+
+    TEZ-3930. TestDagAwareYarnTaskScheduler fails on Hadoop 3 (Jason Lowe via jeagles)
+    --> test code, not applicable
+
+commit bb2c42b7c5fbe465dbec78590cff0e0020b3a861
+Author: Kuhu Shukla <kshukla@yahoo-inc.com>
+Date:   Fri May 4 16:09:39 2018 -0500
+
+    TEZ-3927. TestReduceProcessor fails on Hadoop 3.x (Jonathan Eagles via kshukla)
+    --> test code, skip
+
+commit cf6ea5f62aa4a5957028e6c074a62747324abaa1
+Author: Kuhu Shukla <kshukla@yahoo-inc.com>
+Date:   Fri May 4 15:47:41 2018 -0500
+
+    TEZ-3924. TestDefaultSorter fails intermittently due random keys and interaction with RLE and partition collisions (Jonathan Eagles via kshukla)
+    --> test code, skip
+
+commit c5c26c655d43c1c6602e50d1bdf3a69e9b40fd50
+Author: Jonathan Eagles <jeagles@yahoo-inc.com>
+Date:   Wed May 2 12:46:12 2018 -0500
+
+    TEZ-3926. Changes to master for 0.10.x line and 0.9 release branch (jeagles)
+    --> unrelated to MR3
+
+commit fa6bc2acf1b548e481b236ab50903e0ed0269da4
+Author: Jason Lowe <jlowe@apache.org>
+Date:   Mon Apr 30 14:09:23 2018 -0500
+
+    TEZ-3914. Recovering a large DAG fails to size limit exceeded (Jonathan Eagles via jlowe)
+    --> not applicable
+
+commit 21cd0241776c46821c83a67aac2c979e405651b6
+Author: Jonathan Eagles <jeagles@yahoo-inc.com>
+Date:   Fri Apr 27 14:14:40 2018 -0500
+
+    Revert "TEZ-3914. Recovering a large DAG fails to size limit exceeded (Jonathan Eagles via jlowe)"
+    
+    This reverts commit ebc9f4f6dee1badeca39cac26c00818be3e4d77d.
+    --> not applicable
+
+commit 086d7bad24fcd74c61180353735297114c9974af
+Author: Jonathan Eagles <jeagles@yahoo-inc.com>
+Date:   Fri Apr 27 13:14:36 2018 -0500
+
+    TEZ-3873. A maven enforcer plugin dependency error in pom.xml (Jinjiang Ling via jeagles)
+    --> applied 
+
+commit 5bf3e2d45a84bcfa4f90b7f8b03b4ec8875bee57
+Author: Kuhu Shukla <kshukla@yahoo-inc.com>
+Date:   Fri Apr 27 11:25:01 2018 -0500
+
+    TEZ-3887. Tez Shuffle Handler should support Index Cache configuration (Jonathan Eagles via kshukla)
+    --> not applicable
+    introduces: INDEX_CACHE_MB = "tez.shuffle.indexcache.mb"
+    We can apply this patch to IndexCache.java of MR3.
+
+commit ebc9f4f6dee1badeca39cac26c00818be3e4d77d
+Author: Jason Lowe <jlowe@apache.org>
+Date:   Fri Apr 27 11:29:08 2018 -0500
+
+    TEZ-3914. Recovering a large DAG fails to size limit exceeded (Jonathan Eagles via jlowe)
+    --> not applicable
+
+commit 2e66f3cb2ef082889551f6a0830c7014317d9680
+Author: Kuhu Shukla <kshukla@yahoo-inc.com>
+Date:   Mon Apr 23 16:52:55 2018 -0500
+
+    TEZ-3817. DAGs can hang after more than one uncaught Exception during doTransition. (kshukla)
+    --> not applicable
+
+commit 24b872a7fc7a9bca11cbf4b5da80198386485547
+Author: Harish JP <harishjp@gmail.com>
+Date:   Fri Apr 20 13:41:37 2018 +0530
+
+    TEZ-3915. Create protobuf based history event logger. (Harish Jaiprakash, reviewed by Gunther Hagleitner)
+    --> do not apply because we do not need TEZ_HISTORY_LOGGING stuff
+
+commit 871ea80c04eccd6eb985fc2dd5cf46e0ecfc59cf
+Author: Jonathan Eagles <jeagles@yahoo-inc.com>
+Date:   Mon Apr 9 16:42:29 2018 -0500
+
+    TEZ-3913. Precommit build fails to post to JIRA (Jason Lowe via jeagles)
+    --> not applicable
+
+commit 9431ce6c358dbefa8973c2ebe4c0bed17645ddba
+Author: Jason Lowe <jlowe@apache.org>
+Date:   Mon Apr 9 16:36:53 2018 -0500
+
+    Revert "TEZ-3913. Precommit build fails to post to JIRA (Jason Lowe via jeagles)"
+    
+    This reverts commit 9b3f8c73d4268bfa04c2a1dc5cd5c027af888a06.
+    --> not applicable
+
+commit 9b3f8c73d4268bfa04c2a1dc5cd5c027af888a06
+Author: Jonathan Eagles <jeagles@yahoo-inc.com>
+Date:   Mon Apr 9 14:44:11 2018 -0500
+
+    TEZ-3913. Precommit build fails to post to JIRA (Jason Lowe via jeagles)
+    --> not applicable
+
+commit a030800d95f5409ef7269c5fd06775e0c8295aef
+Author: Kuhu Shukla <kshukla@yahoo-inc.com>
+Date:   Thu Apr 5 13:21:12 2018 -0500
+
+    Revert "TEZ-3902. Upgrade to netty-3.10.5.Final.jar (Jason Lowe via kshukla)"
+    
+    This reverts commit 55a6b9d5cbf7062ab1f440e9d03ffedfda017170.
+    --> not relevant because alrady upgraded to netty-3.10.6
+
+commit 55a6b9d5cbf7062ab1f440e9d03ffedfda017170
+Author: Kuhu Shukla <kshukla@yahoo-inc.com>
+Date:   Wed Apr 4 08:56:01 2018 -0500
+
+    TEZ-3902. Upgrade to netty-3.10.5.Final.jar (Jason Lowe via kshukla)
+    --> not relevant because alrady upgraded to netty-3.10.6
+
+commit dce57c83ab942e5698b7107bfa176e5efa35e269
+Author: Jonathan Eagles <jeagles@yahoo-inc.com>
+Date:   Tue Apr 3 12:45:20 2018 -0500
+
+    TEZ-3909. DAG can hang if vertex with no tasks is killed (Jason Lowe via jeagles)
+    --> not applicable
+
+commit 7f936f614914a456e3ace9ca5a5f0d218e7c7e01
+Author: Jason Lowe <jlowe@apache.org>
+Date:   Mon Mar 26 14:49:12 2018 -0500
+
+    TEZ-3907. Improve log message to include the location the writers decide to spill output (Kuhu Shukla via jlowe)
+    --> applied 
+
+commit 85bd772c427c0b38534bad3dbe300d5ce0395012
+Author: Eric Wohlstadter <ewohlstadter@hortonworks.com>
+Date:   Wed Mar 14 22:27:22 2018 -0700
+
+    TEZ-3905: Change BUILDING.TXT to minimum JDK 1.8 (Eric Wohlstadter via Gopal V)
+    
+    Signed-off-by: Gopal V <gopalv@apache.org>
+    --> applied 
+
+commit 75bc7c157682cc64eccfa4722226a8ac72161f17
+Author: Jason Lowe <jlowe@apache.org>
+Date:   Fri Mar 9 10:00:21 2018 -0600
+
+    TEZ-3874. NPE in TezClientUtils when "yarn.resourcemanager.zk-address" is present in Configuration. (Eric Wohlstadter via jlowe)
+    --> applied, but not related to MR3
+
+commit 82d73b380881ef8e7d6e6c963289c4f479bbea59
+Author: Eric Wohlstadter <ewohlstadter@hortonworks.com>
+Date:   Wed Mar 7 15:50:45 2018 -0800
+
+    TEZ-3892: getClient API for TezClient (Eric Wohlstadter via Gopal V)
+    
+    Signed-off-by: Gopal V <gopalv@apache.org>
+    --> applied, but irrelevant
+
+commit c34e46c73218bf21a0219f3004e20cbedaad92f4
+Author: Jason Lowe <jlowe@apache.org>
+Date:   Mon Mar 5 09:53:11 2018 -0600
+
+    TEZ-3897. Tez Local Mode hang for vertices with broadcast input. (Jonathan Eagles via jlowe)
+    --> not applicable
+
+commit bb40cf5b8a49833e13760a0ffe566092eb464d88
+Author: Eric Wohlstadter <ewohlstadter@hortonworks.com>
+Date:   Thu Feb 22 13:24:16 2018 -0800
+
+    TEZ-3888: Update Jetty to org.eclipse.jetty 9.x (Eric Wohlstadter, reviewed by Rohini Palaniswamy)
+    
+    Signed-off-by: Gopal V <gopalv@apache.org>
+    --> no need to apply (already upgraded to 9.3.24.v20180605)
+
+commit ff81cc4f809c8c3366e2c9318d68e78ddcf5c665
+Author: Jonathan Eagles <jeagles@yahoo-inc.com>
+Date:   Mon Feb 19 10:09:48 2018 -0600
+
+    TEZ-3898. TestTezCommonUtils fails when compiled against hadoop version >= 2.8 (Jason Lowe via jeagles)
+    --> no need to apply
+
+commit ab8b45eda1e8355125a56787e665db79aeec1f3c
+Author: Jonathan Eagles <jeagles@yahoo-inc.com>
+Date:   Fri Feb 16 13:57:42 2018 -0600
+
+    TEZ-3896. TestATSV15HistoryLoggingService#testNonSessionDomains is failing (Jason Lowe via jeagles)
+    --> not applicable
+
+commit 022df7218afbb2c940ddc4447246dea5a546c759
+Author: Jason Lowe <jlowe@apache.org>
+Date:   Wed Feb 14 10:14:34 2018 -0600
+
+    TEZ-3893. Tez Local Mode can hang for cases. (Jonathan Eagles via jlowe)
+    --> not applicable
+
+commit a1f2da8eb319218ff2a6dbe0f6de911336ac7e45
+Author: Kuhu Shukla <kshukla@yahoo-inc.com>
+Date:   Fri Feb 9 13:54:11 2018 -0600
+
+    TEZ-3894. Tez intermediate outputs implicitly rely on permissive umask for shuffle (Jason Lowe via kshukla)
+    --> applied
+
+commit 96c988cff7c3b6eb7cadf3c819aba4a10cbb0f12
+Author: Kuhu Shukla <kshukla@yahoo-inc.com>
+Date:   Tue Feb 6 10:36:46 2018 -0600
+
+    TEZ-3895. Missing name for local mode task scheduler service async request handler thread (Jonathan Eagles via kshukla)
+    --> not applicable
+
+commit a9b8bb5a6840a89844cd75ec86aab2b7457c8028
+Author: Jason Lowe <jlowe@apache.org>
+Date:   Thu Jan 25 09:35:33 2018 -0600
+
+    TEZ-3770. DAG-aware YARN task scheduler (jlowe)
+    --> not applicable
+
+commit 3c7640d710710740a96a9c524f27a8dde4cfc09f
+Author: Sergey Shelukhin <sershe@apache.org>
+Date:   Tue Jan 16 13:56:46 2018 -0800
+
+    TEZ-3880: Do not count rejected tasks as killed in vertex progress (Sergey Shelukhin, reviewed by Gunther Hagleitner)
+    
+    Signed-off-by: Gopal V <gopalv@apache.org>
+    --> not applicable
+
+commit f7feaa72b4fc42676b54e9581165439e9c6d3df7
+Author: Jonathan Eagles <jeagles@yahoo-inc.com>
+Date:   Tue Jan 16 11:22:10 2018 -0600
+
+    TEZ-3877. Delete unordered spill files once merge is done (Jason Lowe via jeagles)
+    --> applied
+
