@@ -35,6 +35,7 @@ import static org.mockito.Mockito.verify;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
+import java.io.InputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -51,9 +52,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.google.protobuf.ByteString;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.runtime.api.TaskFailureType;
 import org.apache.tez.runtime.api.events.VertexManagerEvent;
+import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.writers.UnorderedPartitionedKVWriter.SpillInfo;
 import org.apache.tez.runtime.library.shuffle.impl.ShuffleUserPayloads.VertexManagerEventPayloadProto;
 import org.apache.tez.runtime.library.utils.DATA_RANGE_IN_MB;
@@ -262,7 +265,7 @@ public class TestUnorderedPartitionedKVWriter {
   @Test(timeout = 10000)
   public void testMultipleSpillsWithSmallBuffer() throws IOException, InterruptedException {
     // numBuffers is much higher than available threads.
-    baseTest(200, 10, null, shouldCompress, 512, 0, 9600);
+    baseTest(200, 10, null, shouldCompress, 512, 0, 9600, false);
   }
 
   @Test(timeout = 10000)
@@ -278,7 +281,9 @@ public class TestUnorderedPartitionedKVWriter {
   @Test(timeout = 10000)
   public void testNoRecords_SinglePartition() throws IOException, InterruptedException {
     // skipBuffers
-    baseTest(0, 1, null, shouldCompress, -1, 0);
+    baseTest(0, 1, null, shouldCompress, -1, 0, 2048, false);
+    // Check with data via events
+    baseTest(0, 1, null, shouldCompress, -1, 0, 2048, true);
   }
 
   @Test(timeout = 10000)
@@ -486,6 +491,7 @@ public class TestUnorderedPartitionedKVWriter {
     assertEquals(numPartitions, cdme.getCount());
     DataMovementEventPayloadProto eventProto = DataMovementEventPayloadProto.parseFrom(
         ByteString.copyFrom(cdme.getUserPayload()));
+    assertFalse(eventProto.hasData());
     BitSet emptyPartitionBits = null;
     if (partitionsWithData.cardinality() != numPartitions) {
       assertTrue(eventProto.hasEmptyPartitions());
@@ -510,6 +516,10 @@ public class TestUnorderedPartitionedKVWriter {
     if (numRecordsWritten > 0) {
       assertTrue(localFs.exists(outputFilePath));
       assertTrue(localFs.exists(spillFilePath));
+      assertEquals("Incorrect output permissions", (short)0640,
+          localFs.getFileStatus(outputFilePath).getPermission().toShort());
+      assertEquals("Incorrect index permissions", (short)0640,
+          localFs.getFileStatus(spillFilePath).getPermission().toShort());
     } else {
       return;
     }
@@ -794,8 +804,14 @@ public class TestUnorderedPartitionedKVWriter {
     if (numRecordsWritten > 0) {
       int numSpills = kvWriter.numSpills.get();
       for (int i = 0; i < numSpills; i++) {
-        assertTrue(localFs.exists(taskOutput.getSpillFileForWrite(i, 10)));
-        assertTrue(localFs.exists(taskOutput.getSpillIndexFileForWrite(i, 10)));
+        Path outputFile = taskOutput.getSpillFileForWrite(i, 10);
+        Path indexFile = taskOutput.getSpillIndexFileForWrite(i, 10);
+        assertTrue(localFs.exists(outputFile));
+        assertTrue(localFs.exists(indexFile));
+        assertEquals("Incorrect output permissions", (short)0640,
+            localFs.getFileStatus(outputFile).getPermission().toShort());
+        assertEquals("Incorrect index permissions", (short)0640,
+            localFs.getFileStatus(indexFile).getPermission().toShort());
       }
     } else {
       return;
@@ -1042,6 +1058,13 @@ public class TestUnorderedPartitionedKVWriter {
         assertEquals(2, matcher.groupCount());
         assertEquals(uniqueId, matcher.group(1));
         assertTrue("spill id should be present in path component", matcher.group(2) != null);
+        Path outputPath = new Path(outputContext.getWorkDirs()[0],
+            "output/" + eventProto.getPathComponent() + "/" + Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING);
+        Path indexPath = outputPath.suffix(Constants.TEZ_RUNTIME_TASK_OUTPUT_INDEX_SUFFIX_STRING);
+        assertEquals("Incorrect output permissions", (short)0640,
+            localFs.getFileStatus(outputPath).getPermission().toShort());
+        assertEquals("Incorrect index permissions", (short)0640,
+            localFs.getFileStatus(indexPath).getPermission().toShort());
       } else {
         assertEquals(0, eventProto.getSpillId());
         if (outputRecordsCounter.getValue() > 0) {
@@ -1076,12 +1099,12 @@ public class TestUnorderedPartitionedKVWriter {
       boolean shouldCompress, int maxSingleBufferSizeBytes, int bufferMergePercent)
       throws IOException, InterruptedException {
     baseTest(numRecords, numPartitions, skippedPartitions, shouldCompress,
-        maxSingleBufferSizeBytes, bufferMergePercent, 2048);
+        maxSingleBufferSizeBytes, bufferMergePercent, 2048, false);
   }
 
   private void baseTest(int numRecords, int numPartitions, Set<Integer> skippedPartitions,
       boolean shouldCompress, int maxSingleBufferSizeBytes, int bufferMergePercent, int
-      availableMemory)
+      availableMemory, boolean dataViaEventEnabled)
           throws IOException, InterruptedException {
     PartitionerForTest partitioner = new PartitionerForTest();
     ApplicationId appId = ApplicationId.newInstance(10000000, 1);
@@ -1170,7 +1193,7 @@ public class TestUnorderedPartitionedKVWriter {
     long fileOutputBytes = fileOutputBytesCounter.getValue();
     if (numRecordsWritten > 0) {
       assertTrue(fileOutputBytes > 0);
-      if (!shouldCompress) {
+      if ((!shouldCompress) && (!dataViaEventEnabled)) {
         assertTrue(fileOutputBytes > outputRecordBytesCounter.getValue());
       }
     } else {
@@ -1243,33 +1266,53 @@ public class TestUnorderedPartitionedKVWriter {
       return;
     }
 
+    boolean isInMem= eventProto.getData().hasData();
     assertTrue(localFs.exists(outputFilePath));
-    assertTrue(localFs.exists(spillFilePath));
+    assertEquals("Incorrect output permissions", (short) 0640,
+            localFs.getFileStatus(outputFilePath).getPermission().toShort());
+    if( !isInMem ) {
+      assertTrue(localFs.exists(spillFilePath));
+      assertEquals("Incorrect index permissions", (short) 0640,
+              localFs.getFileStatus(spillFilePath).getPermission().toShort());
 
-    // verify no intermediate spill files have been left around
-    synchronized (kvWriter.spillInfoList) {
-      for (SpillInfo spill : kvWriter.spillInfoList) {
-        assertFalse("lingering intermediate spill file " + spill.outPath,
-            localFs.exists(spill.outPath));
+      // verify no intermediate spill files have been left around
+      synchronized (kvWriter.spillInfoList) {
+        for (SpillInfo spill : kvWriter.spillInfoList) {
+          assertFalse("lingering intermediate spill file " + spill.outPath,
+                  localFs.exists(spill.outPath));
+        }
       }
     }
 
     // Special case for 0 records.
-    TezSpillRecord spillRecord = new TezSpillRecord(spillFilePath, conf);
     DataInputBuffer keyBuffer = new DataInputBuffer();
     DataInputBuffer valBuffer = new DataInputBuffer();
     IntWritable keyDeser = new IntWritable();
     LongWritable valDeser = new LongWritable();
     for (int i = 0; i < numOutputs; i++) {
-      TezIndexRecord indexRecord = spillRecord.getIndex(i);
-      if (skippedPartitions != null && skippedPartitions.contains(i)) {
-        assertFalse("The Index Record for partition " + i + " should not have any data", indexRecord.hasData());
-        continue;
+      IFile.Reader reader = null;
+      InputStream inStream;
+      if (isInMem) {
+        // Read from in memory payload
+        int dataLoadSize = eventProto.getData().getData().size();
+        inStream = new ByteArrayInputStream(eventProto.getData().getData().toByteArray());
+        reader = new IFile.Reader(inStream, dataLoadSize, codec, null,
+                null, false, 0, -1);
+      } else {
+        TezSpillRecord spillRecord = new TezSpillRecord(spillFilePath, conf);
+        TezIndexRecord indexRecord = spillRecord.getIndex(i);
+        if (skippedPartitions != null && skippedPartitions.contains(i)) {
+          assertFalse("The Index Record for partition " + i + " should not have any data", indexRecord.hasData());
+          continue;
+        }
+
+        FSDataInputStream tmpStream = FileSystem.getLocal(conf).open(outputFilePath);
+        tmpStream.seek(indexRecord.getStartOffset());
+        inStream = tmpStream;
+        reader = new IFile.Reader(tmpStream, indexRecord.getPartLength(), codec, null,
+                null, false, 0, -1);
       }
-      FSDataInputStream inStream = FileSystem.getLocal(conf).open(outputFilePath);
-      inStream.seek(indexRecord.getStartOffset());
-      IFile.Reader reader = new IFile.Reader(inStream, indexRecord.getPartLength(), codec, null,
-          null, false, 0, -1);
+
       while (reader.nextRawKey(keyBuffer)) {
         reader.nextRawValue(valBuffer);
         keyDeser.readFields(keyBuffer);
@@ -1341,6 +1384,7 @@ public class TestUnorderedPartitionedKVWriter {
       boolean shouldCompress, int maxSingleBufferSizeBytes,
       Class<? extends Partitioner> partitionerClass) {
     Configuration conf = new Configuration(false);
+    conf.set(CommonConfigurationKeys.FS_PERMISSIONS_UMASK_KEY, "077");
     conf.setStrings(TezRuntimeFrameworkConfigs.LOCAL_DIRS, outputContext.getWorkDirs());
     conf.set(TezRuntimeConfiguration.TEZ_RUNTIME_KEY_CLASS, keyClass.getName());
     conf.set(TezRuntimeConfiguration.TEZ_RUNTIME_VALUE_CLASS, valClass.getName());
