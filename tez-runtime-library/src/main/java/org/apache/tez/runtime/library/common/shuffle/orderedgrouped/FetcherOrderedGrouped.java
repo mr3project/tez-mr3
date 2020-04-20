@@ -68,7 +68,6 @@ class FetcherOrderedGrouped implements Callable<Void> {
   private final TezCounter ioErrs;
   private final TezCounter wrongLengthErrs;
   private final TezCounter badIdErrs;
-  private final TezCounter wrongMapErrs;
   private final TezCounter wrongReduceErrs;
   private final FetchedInputAllocatorOrderedGrouped allocator;
   private final ShuffleScheduler scheduler;
@@ -78,7 +77,7 @@ class FetcherOrderedGrouped implements Callable<Void> {
   private final String localShuffleHost;
   private final int localShufflePort;
   private final String applicationId;
- private final int dagId;
+  private final int dagId;
   private final MapHost mapHost;
 
   private final int minPartition;
@@ -144,7 +143,6 @@ class FetcherOrderedGrouped implements Callable<Void> {
     this.ioErrs = ioErrsCounter;
     this.wrongLengthErrs = wrongLengthErrsCounter;
     this.badIdErrs = badIdErrsCounter;
-    this.wrongMapErrs = wrongMapErrsCounter;
     this.connectionErrs = connectionErrsCounter;
     this.wrongReduceErrs = wrongReduceErrsCounter;
     this.applicationId = applicationId;
@@ -380,11 +378,13 @@ class FetcherOrderedGrouped implements Callable<Void> {
       }
       ioErrs.increment(1);
       if (!connectSucceeded) {
-        LOG.warn("Failed to connect to " + host + " with " + remaining.size() + " inputs", ie);
+        LOG.warn(String.format("Failed to connect from %s to %s with %d inputs", localShuffleHost,
+            host, remaining.size()), ie);
         connectionErrs.increment(1);
       } else {
-        LOG.warn("Failed to verify reply after connecting to " + host + " with " + remaining.size()
-            + " inputs pending", ie);
+        LOG.warn(String.format(
+            "Failed to verify reply after connecting from %s to %s with %d inputs pending",
+            localShuffleHost, host, remaining.size()), ie);
       }
 
       // At this point, either the connection failed, or the initial header verification failed.
