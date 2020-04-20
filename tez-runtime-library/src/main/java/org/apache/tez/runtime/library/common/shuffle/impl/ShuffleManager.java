@@ -122,7 +122,7 @@ public class ShuffleManager implements FetcherCallback {
   private final AtomicInteger numFetchedSpills = new AtomicInteger(0);
 
   private final long startTime;
-  private long lastProgressTime;
+  // private long lastProgressTime;
   private long totalBytesShuffledTillNow;
 
   // Required to be held when manipulating pendingHosts
@@ -247,7 +247,7 @@ public class ShuffleManager implements FetcherCallback {
     this.schedulerCallable = new RunShuffleCallable(conf);
     
     this.startTime = System.currentTimeMillis();
-    this.lastProgressTime = startTime;
+    // this.lastProgressTime = startTime;
 
     String auxiliaryService = conf.get(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
         TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT);
@@ -586,12 +586,12 @@ public class ShuffleManager implements FetcherCallback {
           + fetchedInput.getType());
     }
     // Count irrespective of whether this is a copy of an already fetched input
-    lock.lock();
-    try {
-      lastProgressTime = System.currentTimeMillis();
-    } finally {
-      lock.unlock();
-    }
+    // lock.lock();
+    // try {
+    //   lastProgressTime = System.currentTimeMillis();
+    // } finally {
+    //   lock.unlock();
+    // }
 
     boolean committed = false;
     if (!completedInputSet.get(inputIdentifier)) {
@@ -694,7 +694,7 @@ public class ShuffleManager implements FetcherCallback {
     // Count irrespective of whether this is a copy of an already fetched input
     lock.lock();
     try {
-      lastProgressTime = System.currentTimeMillis();
+      // lastProgressTime = System.currentTimeMillis();
       inputContext.notifyProgress();
       if (!completedInputSet.get(inputIdentifier)) {
         fetchedInput.commit();
