@@ -30,14 +30,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingDeque;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
@@ -58,7 +51,6 @@ import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.tez.common.CallableWithNdc;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.TezUtilsInternal;
 import org.apache.tez.common.counters.TaskCounter;
@@ -85,7 +77,7 @@ import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils.FetchStatsLogger;
 
 import com.google.common.base.Objects;
-import com.google.common.base.Preconditions;
+import org.apache.tez.common.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.FutureCallback;
@@ -130,7 +122,7 @@ public class ShuffleManager implements FetcherCallback {
   private final AtomicInteger numFetchedSpills = new AtomicInteger(0);
 
   private final long startTime;
-  private long lastProgressTime;
+  // private long lastProgressTime;
   private long totalBytesShuffledTillNow;
 
   // Required to be held when manipulating pendingHosts
@@ -255,7 +247,7 @@ public class ShuffleManager implements FetcherCallback {
     this.schedulerCallable = new RunShuffleCallable(conf);
     
     this.startTime = System.currentTimeMillis();
-    this.lastProgressTime = startTime;
+    // this.lastProgressTime = startTime;
 
     String auxiliaryService = conf.get(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
         TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT);
@@ -308,7 +300,7 @@ public class ShuffleManager implements FetcherCallback {
     schedulerExecutor.shutdown();
   }
   
-  private class RunShuffleCallable extends CallableWithNdc<Void> {
+  private class RunShuffleCallable implements Callable<Void> {
 
     private final Configuration conf;
 
@@ -317,7 +309,7 @@ public class ShuffleManager implements FetcherCallback {
     }
 
     @Override
-    protected Void callInternal() throws Exception {
+    public Void call() throws Exception {
       while (!isShutdown.get() && numCompletedInputs.get() < numInputs) {
         lock.lock();
         try {
@@ -584,6 +576,52 @@ public class ShuffleManager implements FetcherCallback {
     }
   }
 
+  public void addCompletedInputWithData(
+      InputAttemptIdentifier srcAttemptIdentifier, FetchedInput fetchedInput)
+      throws IOException {
+    //InputIdentifier inputIdentifier = srcAttemptIdentifier.getInputIdentifier();
+    int inputIdentifier = srcAttemptIdentifier.getInputIdentifier();
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Received Data via Event: " + srcAttemptIdentifier + " to "
+          + fetchedInput.getType());
+    }
+    // Count irrespective of whether this is a copy of an already fetched input
+    // lock.lock();
+    // try {
+    //   lastProgressTime = System.currentTimeMillis();
+    // } finally {
+    //   lock.unlock();
+    // }
+
+    boolean committed = false;
+    if (!completedInputSet.get(inputIdentifier)) {
+      synchronized (completedInputSet) {
+        if (!completedInputSet.get(inputIdentifier)) {
+          fetchedInput.commit();
+          committed = true;
+          if (!srcAttemptIdentifier.canRetrieveInputInChunks()) {
+            registerCompletedInput(fetchedInput);
+          } else {
+            registerCompletedInputForPipelinedShuffle(srcAttemptIdentifier,
+                fetchedInput);
+          }
+        }
+      }
+    }
+    if (!committed) {
+      fetchedInput.abort(); // If this fails, the fetcher may attempt another
+      // abort.
+    } else {
+      lock.lock();
+      try {
+        // Signal the wakeLoop to check for termination.
+        wakeLoop.signal();
+      } finally {
+        lock.unlock();
+      }
+    }
+  }
+
   protected synchronized  void updateEventReceivedTime() {
     long relativeTime = System.currentTimeMillis() - startTime;
     if (firstEventReceived.getValue() == 0) {
@@ -656,7 +694,7 @@ public class ShuffleManager implements FetcherCallback {
     // Count irrespective of whether this is a copy of an already fetched input
     lock.lock();
     try {
-      lastProgressTime = System.currentTimeMillis();
+      // lastProgressTime = System.currentTimeMillis();
       inputContext.notifyProgress();
       if (!completedInputSet.get(inputIdentifier)) {
         fetchedInput.commit();

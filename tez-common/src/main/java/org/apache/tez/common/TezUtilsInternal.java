@@ -45,7 +45,6 @@ import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.log4j.Appender;
 import org.apache.tez.common.io.NonSyncByteArrayOutputStream;
 import org.apache.tez.dag.api.DagTypeConverters;
 import org.apache.tez.dag.records.TezDAGID;
@@ -71,20 +70,10 @@ public class TezUtilsInternal {
 
   public static ConfigurationProto readUserSpecifiedTezConfiguration(String baseDir) throws
       IOException {
-    FileInputStream confPBBinaryStream = null;
-    ConfigurationProto.Builder confProtoBuilder = ConfigurationProto.newBuilder();
-    try {
-      confPBBinaryStream =
-          new FileInputStream(new File(baseDir, TezConstants.TEZ_PB_BINARY_CONF_NAME));
-      confProtoBuilder.mergeFrom(confPBBinaryStream);
-    } finally {
-      if (confPBBinaryStream != null) {
-        confPBBinaryStream.close();
-      }
+    File confPBFile = new File(baseDir, TezConstants.TEZ_PB_BINARY_CONF_NAME);
+    try (FileInputStream fis = new FileInputStream(confPBFile)) {
+      return ConfigurationProto.parseFrom(fis);
     }
-
-    ConfigurationProto confProto = confProtoBuilder.build();
-    return confProto;
   }
 
   public static void addUserSpecifiedTezConfiguration(Configuration conf,
@@ -95,31 +84,6 @@ public class TezUtilsInternal {
       }
     }
   }
-//
-//  public static void addUserSpecifiedTezConfiguration(String baseDir, Configuration conf) throws
-//      IOException {
-//    FileInputStream confPBBinaryStream = null;
-//    ConfigurationProto.Builder confProtoBuilder = ConfigurationProto.newBuilder();
-//    try {
-//      confPBBinaryStream =
-//          new FileInputStream(new File(baseDir, TezConstants.TEZ_PB_BINARY_CONF_NAME));
-//      confProtoBuilder.mergeFrom(confPBBinaryStream);
-//    } finally {
-//      if (confPBBinaryStream != null) {
-//        confPBBinaryStream.close();
-//      }
-//    }
-//
-//    ConfigurationProto confProto = confProtoBuilder.build();
-//
-//    List<PlanKeyValuePair> kvPairList = confProto.getConfKeyValuesList();
-//    if (kvPairList != null && !kvPairList.isEmpty()) {
-//      for (PlanKeyValuePair kvPair : kvPairList) {
-//        conf.set(kvPair.getKey(), kvPair.getValue());
-//      }
-//    }
-//  }
-
 
   public static byte[] compressBytes(byte[] inBytes) throws IOException {
     StopWatch sw = new StopWatch().start();
@@ -194,31 +158,6 @@ public class TezUtilsInternal {
   public static void updateLoggers(String addend) throws FileNotFoundException {
 
     LOG.info("Redirecting log file based on addend: " + addend);
-
-    Appender appender = org.apache.log4j.Logger.getRootLogger().getAppender(
-        TezConstants.TEZ_CONTAINER_LOGGER_NAME);
-    if (appender != null) {
-      if (appender instanceof TezContainerLogAppender) {
-        TezContainerLogAppender claAppender = (TezContainerLogAppender) appender;
-        claAppender.setLogFileName(constructLogFileName(
-            TezConstants.TEZ_CONTAINER_LOG_FILE_NAME, addend));
-        claAppender.activateOptions();
-      } else {
-        LOG.warn("Appender is a " + appender.getClass() + "; require an instance of "
-            + TezContainerLogAppender.class.getName() + " to reconfigure the logger output");
-      }
-    } else {
-      LOG.warn("Not configured with appender named: " + TezConstants.TEZ_CONTAINER_LOGGER_NAME
-          + ". Cannot reconfigure logger output");
-    }
-  }
-
-  private static String constructLogFileName(String base, String addend) {
-    if (addend == null || addend.isEmpty()) {
-      return base;
-    } else {
-      return base + "_" + addend;
-    }
   }
 
   public static BitSet fromByteArray(byte[] bytes) {
@@ -238,7 +177,7 @@ public class TezUtilsInternal {
     if (bits == null) {
       return null;
     }
-    byte[] bytes = new byte[bits.length() / 8 + 1];
+    byte[] bytes = new byte[(bits.length() + 7) / 8];
     for (int i = 0; i < bits.length(); i++) {
       if (bits.get(i)) {
         bytes[(bytes.length) - (i / 8) - 1] |= 1 << (i % 8);

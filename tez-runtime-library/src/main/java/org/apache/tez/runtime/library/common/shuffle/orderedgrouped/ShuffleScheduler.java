@@ -31,19 +31,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.DelayQueue;
-import java.util.concurrent.Delayed;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
+import org.apache.tez.common.Preconditions;
 import com.google.common.collect.LinkedListMultimap;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Maps;
@@ -58,12 +52,13 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.http.HttpConnectionParams;
-import org.apache.tez.common.CallableWithNdc;
 import org.apache.tez.common.security.JobTokenSecretManager;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.tez.common.TezUtilsInternal;
 import org.apache.tez.common.counters.TaskCounter;
@@ -213,6 +208,7 @@ class ShuffleScheduler {
   private final int ifileReadAheadLength;
   private final CompressionCodec codec;
   private final Configuration conf;
+  private final RawLocalFileSystem localFs;
   private final boolean localDiskFetchEnabled;
   private final String localHostname;
   private final int shufflePort;
@@ -242,6 +238,7 @@ class ShuffleScheduler {
   private final boolean compositeFetch;
 
   private volatile Thread shuffleSchedulerThread = null;
+  private final int maxPenaltyTime;
 
   private long totalBytesShuffledTillNow = 0;
   private final DecimalFormat  mbpsFormat = new DecimalFormat("0.00");
@@ -263,6 +260,7 @@ class ShuffleScheduler {
                           String srcNameTrimmed) throws IOException {
     this.inputContext = inputContext;
     this.conf = conf;
+    this.localFs = (RawLocalFileSystem) FileSystem.getLocal(conf).getRaw();
     this.exceptionReporter = exceptionReporter;
     this.allocator = allocator;
     this.mergeManager = mergeManager;
@@ -412,6 +410,8 @@ class ShuffleScheduler {
     this.firstEventReceived = inputContext.getCounters().findCounter(TaskCounter.FIRST_EVENT_RECEIVED);
     this.lastEventReceived = inputContext.getCounters().findCounter(TaskCounter.LAST_EVENT_RECEIVED);
     this.compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
+    this.maxPenaltyTime = conf.getInt(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_HOST_PENALTY_TIME_LIMIT_MS,
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_HOST_PENALTY_TIME_LIMIT_MS_DEFAULT);
 
     pipelinedShuffleInfoEventsMap = Maps.newConcurrentMap();
     LOG.info("ShuffleScheduler running for sourceVertex: "
@@ -824,7 +824,8 @@ class ShuffleScheduler {
 
     long delay = (long) (INITIAL_PENALTY *
         Math.pow(PENALTY_GROWTH_RATE, failures));
-    penalties.add(new Penalty(host, delay));
+    long penaltyDelay = Math.min(delay, maxPenaltyTime);
+    penalties.add(new Penalty(host, penaltyDelay));
   }
 
   private int getFailureCount(InputAttemptIdentifier srcAttempt) {
@@ -1142,7 +1143,12 @@ class ShuffleScheduler {
       String path, int reduceId) {
     return pathToIdentifierMap.get(new PathPartition(path, reduceId));
   }
-  
+
+  @VisibleForTesting
+  DelayQueue<Penalty> getPenalties() {
+    return penalties;
+  }
+
   private synchronized boolean inputShouldBeConsumed(InputAttemptIdentifier id) {
     boolean isInputFinished = false;
     if (id instanceof CompositeInputAttemptIdentifier) {
@@ -1286,7 +1292,7 @@ class ShuffleScheduler {
   /**
    * A structure that records the penalty for a host.
    */
-  private static class Penalty implements Delayed {
+  static class Penalty implements Delayed {
     MapHost host;
     private long endTime;
     
@@ -1358,11 +1364,11 @@ class ShuffleScheduler {
     }
   }
 
-  private class ShuffleSchedulerCallable extends CallableWithNdc<Void> {
+  private class ShuffleSchedulerCallable implements Callable<Void> {
 
 
     @Override
-    protected Void callInternal() throws InterruptedException {
+    public Void call() throws InterruptedException {
       while (!isShutdown.get() && remainingMaps.get() > 0) {
         synchronized (ShuffleScheduler.this) {
           while ((runningFetchers.size() >= numFetchers || pendingHosts.isEmpty())
@@ -1460,7 +1466,7 @@ class ShuffleScheduler {
   FetcherOrderedGrouped constructFetcherForHost(MapHost mapHost) {
     return new FetcherOrderedGrouped(httpConnectionParams, ShuffleScheduler.this, allocator,
         exceptionReporter, jobTokenSecretManager, ifileReadAhead, ifileReadAheadLength,
-        codec, conf, localDiskFetchEnabled, localHostname, shufflePort, srcNameTrimmed, mapHost,
+        codec, conf, localFs, localDiskFetchEnabled, localHostname, shufflePort, srcNameTrimmed, mapHost,
         ioErrsCounter, wrongLengthErrsCounter, badIdErrsCounter, wrongMapErrsCounter,
         connectionErrsCounter, wrongReduceErrsCounter, applicationId, dagId, asyncHttp, sslShuffle,
         verifyDiskChecksum, compositeFetch);

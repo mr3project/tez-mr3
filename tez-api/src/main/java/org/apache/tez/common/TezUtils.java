@@ -20,15 +20,13 @@ package org.apache.tez.common;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.zip.Deflater;
-import java.util.zip.DeflaterOutputStream;
-import java.util.zip.InflaterInputStream;
+import java.util.Objects;
 
-import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
 
 import org.slf4j.Logger;
@@ -41,6 +39,8 @@ import org.apache.tez.dag.api.UserPayload;
 import org.apache.tez.dag.api.records.DAGProtos;
 import org.codehaus.jettison.json.JSONException;
 import org.codehaus.jettison.json.JSONObject;
+import org.xerial.snappy.SnappyInputStream;
+import org.xerial.snappy.SnappyOutputStream;
 
 /**
  * Utility methods for setting up a DAG. Has helpers for setting up log4j configuration, converting
@@ -74,10 +74,9 @@ public class TezUtils {
    * @throws java.io.IOException
    */
   public static ByteString createByteStringFromConf(Configuration conf) throws IOException {
-    Preconditions.checkNotNull(conf, "Configuration must be specified");
+    Objects.requireNonNull(conf, "Configuration must be specified");
     ByteString.Output os = ByteString.newOutput();
-    DeflaterOutputStream compressOs = new DeflaterOutputStream(os,
-        new Deflater(Deflater.BEST_SPEED));
+    SnappyOutputStream compressOs = new SnappyOutputStream(os);
     try {
       writeConfInPB(compressOs, conf);
     } finally {
@@ -97,7 +96,7 @@ public class TezUtils {
    * @throws java.io.IOException
    */
   public static UserPayload createUserPayloadFromConf(Configuration conf) throws IOException {
-    return UserPayload.create(createByteStringFromConf(conf).asReadOnlyByteBuffer());
+    return UserPayload.create(ByteBuffer.wrap(createByteStringFromConf(conf).toByteArray()));
   }
 
   /**
@@ -109,14 +108,13 @@ public class TezUtils {
    * @throws java.io.IOException
    */
   public static Configuration createConfFromByteString(ByteString byteString) throws IOException {
-    Preconditions.checkNotNull(byteString, "ByteString must be specified");
-    // SnappyInputStream uncompressIs = new
-    // SnappyInputStream(byteString.newInput());
-    InflaterInputStream uncompressIs = new InflaterInputStream(byteString.newInput());
-    DAGProtos.ConfigurationProto confProto = DAGProtos.ConfigurationProto.parseFrom(uncompressIs);
-    Configuration conf = new Configuration(false);
-    readConfFromPB(confProto, conf);
-    return conf;
+    Objects.requireNonNull(byteString, "ByteString must be specified");
+    try(SnappyInputStream uncompressIs = new SnappyInputStream(byteString.newInput());) {
+      DAGProtos.ConfigurationProto confProto = DAGProtos.ConfigurationProto.parseFrom(uncompressIs);
+      Configuration conf = new Configuration(false);
+      readConfFromPB(confProto, conf);
+      return conf;
+    }
   }
 
   /**
@@ -134,16 +132,8 @@ public class TezUtils {
 
 
   private static void writeConfInPB(OutputStream dos, Configuration conf) throws IOException {
-    DAGProtos.ConfigurationProto.Builder confProtoBuilder = DAGProtos.ConfigurationProto
-        .newBuilder();
-    Iterator<Map.Entry<String, String>> iter = conf.iterator();
-    while (iter.hasNext()) {
-      Map.Entry<String, String> entry = iter.next();
-      DAGProtos.PlanKeyValuePair.Builder kvp = DAGProtos.PlanKeyValuePair.newBuilder();
-      kvp.setKey(entry.getKey());
-      kvp.setValue(entry.getValue());
-      confProtoBuilder.addConfKeyValues(kvp);
-    }
+    DAGProtos.ConfigurationProto.Builder confProtoBuilder = DAGProtos.ConfigurationProto.newBuilder();
+    populateConfProtoFromEntries(conf, confProtoBuilder);
     DAGProtos.ConfigurationProto confProto = confProtoBuilder.build();
     confProto.writeTo(dos);
   }
@@ -167,7 +157,13 @@ public class TezUtils {
         Iterator<Entry<String, String>> iter = conf.iterator();
         while (iter.hasNext()) {
           Entry<String, String> entry = iter.next();
-          confJson.put(entry.getKey(), conf.get(entry.getKey()));
+          String key = entry.getKey();
+          String val = conf.get(entry.getKey());
+          if(val != null) {
+            confJson.put(key, val);
+          } else {
+            LOG.debug("null value in Configuration after replacement for key={}. Skipping.", key);
+          }
         }
         jsonObject.put(ATSConstants.CONFIG, confJson);
       }
@@ -179,6 +175,24 @@ public class TezUtils {
 
   public static String convertToHistoryText(Configuration conf) {
     return convertToHistoryText(null, conf);
+  }
+
+
+  /* Copy each Map.Entry with non-null value to DAGProtos.ConfigurationProto */
+  public static void populateConfProtoFromEntries(Iterable<Map.Entry<String, String>> params,
+                                              DAGProtos.ConfigurationProto.Builder confBuilder) {
+    for(Map.Entry<String, String> entry : params) {
+      String key = entry.getKey();
+      String val = entry.getValue();
+      if(val != null) {
+        DAGProtos.PlanKeyValuePair.Builder kvp = DAGProtos.PlanKeyValuePair.newBuilder();
+        kvp.setKey(key);
+        kvp.setValue(val);
+        confBuilder.addConfKeyValues(kvp);
+      } else {
+        LOG.debug("null value for key={}. Skipping.", key);
+      }
+    }
   }
 
 }

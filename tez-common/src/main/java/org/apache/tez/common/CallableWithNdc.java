@@ -17,26 +17,17 @@
  */
 package org.apache.tez.common;
 
-import java.util.Stack;
 import java.util.concurrent.Callable;
 
-import org.apache.log4j.NDC;
-
+// not used in Tez, but used in Hive
 public abstract class CallableWithNdc<T> implements Callable<T> {
-  private final Stack ndcStack;
 
   public CallableWithNdc() {
-    ndcStack = NDC.cloneStack();
   }
 
   @Override
   public final T call() throws Exception {
-    NDC.inherit(ndcStack);
-    try {
-      return callInternal();
-    } finally {
-      NDC.clear();
-    }
+    return callInternal();
   }
 
   protected abstract T callInternal() throws Exception;

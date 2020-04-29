@@ -21,11 +21,14 @@ package org.apache.tez.runtime.library.common.sort.impl;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Collections;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
+import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.OutputStatisticsReporter;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
 import org.slf4j.Logger;
@@ -61,18 +64,19 @@ import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.ShuffleHeade
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Writer;
 import org.apache.tez.runtime.library.common.task.local.output.TezTaskOutput;
 
-import com.google.common.base.Preconditions;
+import org.apache.tez.common.Preconditions;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
 public abstract class ExternalSorter {
 
   private static final Logger LOG = LoggerFactory.getLogger(ExternalSorter.class);
 
-  public void close() throws IOException {
+  public List<Event> close() throws IOException {
     spillFileIndexPaths.clear();
     spillFilePaths.clear();
     reportStatistics();
     outputContext.notifyProgress();
+    return Collections.emptyList();
   }
 
   public abstract void flush() throws IOException;
@@ -98,6 +102,7 @@ public abstract class ExternalSorter {
   protected final Combiner combiner;
   protected final Partitioner partitioner;
   protected final Configuration conf;
+  protected final RawLocalFileSystem localFs;
   protected final FileSystem rfs;
   protected final TezTaskOutput mapOutputFile;
   protected final int partitions;
@@ -167,6 +172,7 @@ public abstract class ExternalSorter {
       long initialMemoryAvailable) throws IOException {
     this.outputContext = outputContext;
     this.conf = conf;
+    this.localFs = (RawLocalFileSystem) FileSystem.getLocal(conf).getRaw();
     this.partitions = numOutputs;
     reportPartitionStats = ReportPartitionStats.fromString(
         conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_REPORT_PARTITION_STATS,

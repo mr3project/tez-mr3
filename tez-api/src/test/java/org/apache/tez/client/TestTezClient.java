@@ -38,6 +38,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.isNull;
 import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.atLeast;
@@ -87,9 +88,15 @@ import org.apache.tez.dag.api.client.DAGClient;
 import org.apache.tez.dag.api.client.rpc.DAGClientAMProtocolBlockingPB;
 import org.apache.tez.dag.api.client.rpc.DAGClientAMProtocolRPC.GetAMStatusRequestProto;
 import org.apache.tez.dag.api.client.rpc.DAGClientAMProtocolRPC.GetAMStatusResponseProto;
+import org.apache.tez.dag.api.client.rpc.DAGClientAMProtocolRPC.GetDAGStatusRequestProto;
+import org.apache.tez.dag.api.client.rpc.DAGClientAMProtocolRPC.GetDAGStatusResponseProto;
 import org.apache.tez.dag.api.client.rpc.DAGClientAMProtocolRPC.ShutdownSessionRequestProto;
 import org.apache.tez.dag.api.client.rpc.DAGClientAMProtocolRPC.SubmitDAGRequestProto;
 import org.apache.tez.dag.api.client.rpc.DAGClientAMProtocolRPC.TezAppMasterStatusProto;
+import org.apache.tez.dag.api.records.DAGProtos.ConfigurationProto;
+import org.apache.tez.dag.api.records.DAGProtos.DAGStatusProto;
+import org.apache.tez.dag.api.records.DAGProtos.DAGStatusStateProto;
+import org.apache.tez.dag.api.records.DAGProtos.ProgressProto;
 import org.apache.tez.serviceplugins.api.ServicePluginsDescriptor;
 import org.hamcrest.CoreMatchers;
 import org.junit.Assert;
@@ -168,12 +175,12 @@ public class TestTezClient {
   
   @Test (timeout = 5000)
   public void testTezclientApp() throws Exception {
-    testTezClient(false);
+    testTezClient(false, true);
   }
   
   @Test (timeout = 5000)
   public void testTezclientSession() throws Exception {
-    testTezClient(true);
+    testTezClient(true, true);
   }
 
   @Test (timeout = 5000)
@@ -238,8 +245,51 @@ public class TestTezClient {
       assertTrue(request.hasAdditionalAmResources());
     }
   }
+
+  @Test (timeout = 5000)
+  public void testGetClient() throws Exception {
+    /* BEGIN first TezClient usage without calling stop() */
+    TezClientForTest client = testTezClient(true, false);
+    /* END first TezClient usage without calling stop() */
+
+    /* BEGIN reuse of AM from new TezClient */
+    ArgumentCaptor<ApplicationSubmissionContext> captor = ArgumentCaptor.forClass(ApplicationSubmissionContext.class);
+    when(client.mockYarnClient.getApplicationReport(client.mockAppId).getYarnApplicationState())
+            .thenReturn(YarnApplicationState.RUNNING);
+
+    //Reuse existing appId from first TezClient
+    ApplicationId existingAppId = client.mockAppId;
+    TezClientForTest client2 = configureAndCreateTezClient(null, true,
+            client.amConfig.getTezConfiguration());
+    String mockLR1Name = "LR1";
+    Map<String, LocalResource> lrDAG = Collections.singletonMap(mockLR1Name, LocalResource
+            .newInstance(URL.newInstance("file", "localhost", 0, "/test1"), LocalResourceType.FILE,
+                    LocalResourceVisibility.PUBLIC, 1, 1));
+    Vertex vertex = Vertex.create("Vertex", ProcessorDescriptor.create("P"), 1,
+            Resource.newInstance(1, 1));
+    DAG dag = DAG.create("DAG").addVertex(vertex).addTaskLocalFiles(lrDAG);
+
+    //Bind TezClient to existing app and submit a dag
+    DAGClient dagClient = client2.getClient(existingAppId).submitDAG(dag);
+
+    assertTrue(dagClient.getExecutionContext().contains(existingAppId.toString()));
+    assertEquals(dagClient.getSessionIdentifierString(), existingAppId.toString());
+
+    // Validate request for new AM is not submitted to RM */
+    verify(client2.mockYarnClient, times(0)).submitApplication(captor.capture());
+
+    // Validate dag submission from second TezClient as normal */
+    verify(client2.sessionAmProxy, times(1)).submitDAG((RpcController)any(), (SubmitDAGRequestProto) any());
+
+    // Validate stop from new TezClient as normal */
+    client2.stop();
+    verify(client2.sessionAmProxy, times(1)).shutdownSession((RpcController) any(),
+            (ShutdownSessionRequestProto) any());
+    verify(client2.mockYarnClient, times(1)).stop();
+    /* END reuse of AM from new TezClient */
+  }
   
-  public void testTezClient(boolean isSession) throws Exception {
+  public TezClientForTest testTezClient(boolean isSession, boolean shouldStop) throws Exception {
     Map<String, LocalResource> lrs = Maps.newHashMap();
     String lrName1 = "LR1";
     lrs.put(lrName1, LocalResource.newInstance(URL.newInstance("file", "localhost", 0, "/test"),
@@ -343,13 +393,16 @@ public class TestTezClient {
       assertTrue(context.getAMContainerSpec().getLocalResources().containsKey(
           lrName2));
     }
-    
-    client.stop();
-    if (isSession) {
-      verify(client.sessionAmProxy, times(1)).shutdownSession((RpcController) any(),
-          (ShutdownSessionRequestProto) any());
+
+    if(shouldStop) {
+      client.stop();
+      if (isSession) {
+        verify(client.sessionAmProxy, times(1)).shutdownSession((RpcController) any(),
+                (ShutdownSessionRequestProto) any());
+      }
+      verify(client.mockYarnClient, times(1)).stop();
     }
-    verify(client.mockYarnClient, times(1)).stop();
+    return client;
   }
 
   @Test (timeout=5000)
@@ -358,7 +411,7 @@ public class TestTezClient {
     client.start();
 
     when(client.mockYarnClient.getApplicationReport(client.mockAppId).getYarnApplicationState())
-    .thenReturn(YarnApplicationState.RUNNING);
+        .thenReturn(YarnApplicationState.RUNNING);
     
     when(
         client.sessionAmProxy.getAMStatus((RpcController) any(), (GetAMStatusRequestProto) any()))
@@ -372,7 +425,19 @@ public class TestTezClient {
     SubmitDAGRequestProto proto = captor1.getValue();
     assertTrue(proto.getDAGPlan().getName().startsWith(TezConstants.TEZ_PREWARM_DAG_NAME_PREFIX));
 
+    setClientToReportStoppedDags(client);
     client.stop();
+  }
+
+  private void setClientToReportStoppedDags(TezClientForTest client) throws Exception {
+    when(client.mockYarnClient.getApplicationReport(client.mockAppId).getYarnApplicationState())
+      .thenReturn(YarnApplicationState.FINISHED);
+    when(client.sessionAmProxy.getDAGStatus(isNull(RpcController.class), any(GetDAGStatusRequestProto.class)))
+      .thenReturn(GetDAGStatusResponseProto.newBuilder().setDagStatus(DAGStatusProto.newBuilder()
+          .addDiagnostics("Diagnostics_0").setState(DAGStatusStateProto.DAG_SUCCEEDED)
+          .setDAGProgress(ProgressProto.newBuilder()
+                  .setFailedTaskCount(0).setKilledTaskCount(0).setRunningTaskCount(0)
+                  .setSucceededTaskCount(1).setTotalTaskCount(1).build()).build()).build());
   }
 
   @Test (timeout=30000)
@@ -459,6 +524,7 @@ public class TestTezClient {
     assertTrue("Time taken is not as expected",
         (endTime - startTime) <= timeout);
     verify(spyClient, times(2)).submitDAG(any(DAG.class));
+    setClientToReportStoppedDags(client);
     spyClient.stop();
     client.stop();
   }
@@ -880,5 +946,17 @@ public class TestTezClient {
       .thenReturn(YarnApplicationState.FAILED);
     Thread.sleep(3 * amHeartBeatTimeoutSecs * 1000);
     assertTrue(client.getAMKeepAliveService().isTerminated());
+  }
+
+  //See TEZ-3874
+  @Test(timeout = 5000)
+  public void testYarnZkDeprecatedConf() {
+    Configuration conf = new Configuration(false);
+    String val = "hostname:2181";
+    conf.set("yarn.resourcemanager.zk-address", val);
+
+    ConfigurationProto confProto = null;
+    //Test that Exception is not thrown by createFinalConfProtoForApp
+    TezClientUtils.createFinalConfProtoForApp(conf, null);
   }
 }

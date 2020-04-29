@@ -29,9 +29,7 @@ import org.apache.hadoop.yarn.api.records.LocalResource;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.tez.common.counters.TezCounters;
 import org.apache.tez.dag.api.TezException;
-import org.apache.tez.dag.api.client.DAGStatusBuilder;
 import org.apache.tez.dag.api.client.StatusGetOpts;
-import org.apache.tez.dag.api.client.VertexStatusBuilder;
 import org.apache.tez.dag.api.records.DAGProtos.DAGPlan;
 import org.apache.tez.common.security.ACLManager;
 import org.apache.tez.dag.records.TezDAGID;
@@ -46,8 +44,6 @@ public interface DAG extends DagInfo {
   TezDAGID getID();
   Map<String, LocalResource> getLocalResources();
   String getName();
-  DAGState getState();
-  DAGReport getReport();
 
   /**
    * Get all the counters of this DAG. This includes job-counters aggregated
@@ -78,11 +74,6 @@ public interface DAG extends DagInfo {
   Configuration getConf();
 
   DAGPlan getJobPlan();
-  DAGStatusBuilder getDAGStatus(Set<StatusGetOpts> statusOptions);
-  DAGStatusBuilder getDAGStatus(Set<StatusGetOpts> statusOptions, long timeout)
-      throws TezException;
-  VertexStatusBuilder getVertexStatus(String vertexName,
-                                      Set<StatusGetOpts> statusOptions);
 
   boolean isComplete();
 
@@ -93,8 +84,6 @@ public interface DAG extends DagInfo {
   Map<String, TezVertexID> getVertexNameIDMapping();
 
   long getStartTime();
-
-  StateChangeNotifier getStateChangeNotifier();
 
   org.apache.tez.dag.api.Vertex.VertexExecutionContext getDefaultExecutionContext();
 

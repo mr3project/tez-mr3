@@ -274,7 +274,7 @@ public class TestShuffleManager {
             }
             return mockFetcherResult;
           }
-        }).when(fetcher).callInternal();
+        }).when(fetcher).call();
       } catch (Exception e) {
         //ignore
       }
