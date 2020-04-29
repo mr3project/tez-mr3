@@ -70,7 +70,7 @@ import org.apache.tez.runtime.api.events.InputDataInformationEvent;
 import org.apache.tez.runtime.library.api.KeyValueReader;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 
-import com.google.common.base.Preconditions;
+import org.apache.tez.common.Preconditions;
 import com.google.common.collect.Lists;
 
 /**
@@ -490,8 +490,8 @@ public class MRInput extends MRInputBase {
               getContext());
         }
       } else {
-        TaskSplitMetaInfo[] allMetaInfo = MRInputUtils.readSplits(jobConf);
-        TaskSplitMetaInfo thisTaskMetaInfo = allMetaInfo[getContext().getTaskIndex()];
+        TaskSplitMetaInfo thisTaskMetaInfo = MRInputUtils.getSplits(jobConf,
+            getContext().getTaskIndex());
         TaskSplitIndex splitMetaInfo = new TaskSplitIndex(thisTaskMetaInfo.getSplitLocation(),
             thisTaskMetaInfo.getStartOffset());
         long splitLength = -1;

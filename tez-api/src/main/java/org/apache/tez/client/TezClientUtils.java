@@ -37,6 +37,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.Vector;
 import java.util.Map.Entry;
+import java.util.Objects;
 
 import com.google.common.base.Strings;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -84,7 +85,6 @@ import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.security.client.ClientToAMTokenIdentifier;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.util.Records;
-import org.apache.log4j.Level;
 import org.apache.tez.common.TezCommonUtils;
 import org.apache.tez.common.TezYARNUtils;
 import org.apache.tez.common.VersionInfo;
@@ -110,7 +110,6 @@ import org.apache.tez.dag.api.records.DAGProtos.PlanKeyValuePair;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
 
@@ -160,7 +159,7 @@ public class TezClientUtils {
   static boolean setupTezJarsLocalResources(TezConfiguration conf,
       Credentials credentials, Map<String, LocalResource> tezJarResources)
       throws IOException {
-    Preconditions.checkNotNull(credentials, "A non-null credentials object should be specified");
+    Objects.requireNonNull(credentials, "A non-null credentials object should be specified");
     boolean usingTezArchive = false;
 
     if (conf.getBoolean(TezConfiguration.TEZ_IGNORE_LIB_URIS, false)){
@@ -395,7 +394,7 @@ public class TezClientUtils {
   static Credentials setupDAGCredentials(DAG dag, Credentials sessionCredentials,
       Configuration conf) throws IOException {
 
-    Preconditions.checkNotNull(sessionCredentials);
+    Objects.requireNonNull(sessionCredentials);
     TezCommonUtils.logCredentials(LOG, sessionCredentials, "session");
 
     Credentials dagCredentials = new Credentials();
@@ -461,7 +460,7 @@ public class TezClientUtils {
       ServicePluginsDescriptor servicePluginsDescriptor, JavaOptsChecker javaOptsChecker)
       throws IOException, YarnException {
 
-    Preconditions.checkNotNull(sessionCreds);
+    Objects.requireNonNull(sessionCreds);
     TezConfiguration conf = amConfig.getTezConfiguration();
 
     FileSystem fs = TezClientUtils.ensureStagingDirExists(conf,
@@ -575,16 +574,19 @@ public class TezClientUtils {
     }
 
     // emit conf as PB file
-    ConfigurationProto finalConfProto = createFinalConfProtoForApp(tezConf,
-        servicePluginsDescriptor);
+    // don't overwrite existing conf, needed for TezClient.getClient() so existing containers have stable resource fingerprints
+    if(!binaryConfPath.getFileSystem(tezConf).exists(binaryConfPath)) {
+      ConfigurationProto finalConfProto = createFinalConfProtoForApp(tezConf,
+              servicePluginsDescriptor);
 
-    FSDataOutputStream amConfPBOutBinaryStream = null;
-    try {
-      amConfPBOutBinaryStream = TezCommonUtils.createFileForAM(fs, binaryConfPath);
-      finalConfProto.writeTo(amConfPBOutBinaryStream);
-    } finally {
-      if(amConfPBOutBinaryStream != null){
-        amConfPBOutBinaryStream.close();
+      FSDataOutputStream amConfPBOutBinaryStream = null;
+      try {
+        amConfPBOutBinaryStream = TezCommonUtils.createFileForAM(fs, binaryConfPath);
+        finalConfProto.writeTo(amConfPBOutBinaryStream);
+      } finally {
+        if (amConfPBOutBinaryStream != null) {
+          amConfPBOutBinaryStream.close();
+        }
       }
     }
 
@@ -656,14 +658,6 @@ public class TezClientUtils {
         TezClientUtils.createLocalResource(fs,
           binaryPath, LocalResourceType.FILE,
           LocalResourceVisibility.APPLICATION));
-
-      if (Level.DEBUG.isGreaterOrEqual(Level.toLevel(amLogLevel))) {
-        Path textPath = localizeDagPlanAsText(dagPB, fs, amConfig, strAppId, tezSysStagingPath);
-        amLocalResources.put(TezConstants.TEZ_PB_PLAN_TEXT_NAME,
-            TezClientUtils.createLocalResource(fs,
-                textPath, LocalResourceType.FILE,
-                LocalResourceVisibility.APPLICATION));
-      }
     }
 
     // Send the shuffle token as part of the AM launch context, so that the NM running the AM can
@@ -725,7 +719,7 @@ public class TezClientUtils {
   }
   
   static void maybeAddDefaultLoggingJavaOpts(String logLevel, List<String> vargs) {
-    Preconditions.checkNotNull(vargs);
+    Objects.requireNonNull(vargs);
     if (!vargs.isEmpty()) {
       for (String arg : vargs) {
         if (arg.contains(TezConstants.TEZ_ROOT_LOGGER_NAME)) {
@@ -804,10 +798,16 @@ public class TezClientUtils {
     assert amConf != null;
     ConfigurationProto.Builder builder = ConfigurationProto.newBuilder();
     for (Entry<String, String> entry : amConf) {
-      PlanKeyValuePair.Builder kvp = PlanKeyValuePair.newBuilder();
-      kvp.setKey(entry.getKey());
-      kvp.setValue(amConf.get(entry.getKey()));
-      builder.addConfKeyValues(kvp);
+      String key = entry.getKey();
+      String val = amConf.get(key);
+      if(val != null) {
+        PlanKeyValuePair.Builder kvp = PlanKeyValuePair.newBuilder();
+        kvp.setKey(key);
+        kvp.setValue(val);
+        builder.addConfKeyValues(kvp);
+      } else {
+        LOG.debug("null value in Configuration after replacement for key={}. Skipping.", key);
+      }
     }
 
     AMPluginDescriptorProto pluginDescriptorProto =

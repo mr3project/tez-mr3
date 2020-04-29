@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.Stack;
+import java.util.Objects;
 
 import org.apache.commons.collections4.BidiMap;
 import org.apache.commons.collections4.bidimap.DualLinkedHashBidiMap;
@@ -41,6 +42,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.tez.client.CallerContext;
 import org.apache.tez.common.JavaOptsChecker;
+import org.apache.tez.common.TezUtils;
 import org.apache.tez.dag.api.Vertex.VertexExecutionContext;
 import org.apache.tez.dag.api.records.DAGProtos;
 import org.apache.tez.serviceplugins.api.ServicePluginsDescriptor;
@@ -72,7 +74,7 @@ import org.apache.tez.dag.api.records.DAGProtos.PlanVertexType;
 import org.apache.tez.dag.api.records.DAGProtos.VertexPlan;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
+import org.apache.tez.common.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -127,7 +129,7 @@ public class DAG {
    * @return {@link DAG}
    */
   public synchronized DAG addTaskLocalFiles(Map<String, LocalResource> localFiles) {
-    Preconditions.checkNotNull(localFiles);
+    Objects.requireNonNull(localFiles);
     TezCommonUtils.addAdditionalLocalResources(localFiles, commonTaskLocalFiles, "DAG " + getName());
     return this;
   }
@@ -177,7 +179,7 @@ public class DAG {
    */
   @Deprecated
   public synchronized DAG setDAGInfo(String dagInfo) {
-    Preconditions.checkNotNull(dagInfo);
+    Objects.requireNonNull(dagInfo);
     this.dagInfo = dagInfo;
     return this;
   }
@@ -189,7 +191,7 @@ public class DAG {
    * @return {@link DAG}
    */
   public synchronized DAG setCallerContext(CallerContext callerContext) {
-    Preconditions.checkNotNull(callerContext);
+    Objects.requireNonNull(callerContext);
     this.callerContext = callerContext;
     return this;
   }
@@ -256,7 +258,7 @@ public class DAG {
    * @return {@link DAG}
    */
   public synchronized DAG addURIsForCredentials(Collection<URI> uris) {
-    Preconditions.checkNotNull(uris, "URIs cannot be null");
+    Objects.requireNonNull(uris, "URIs cannot be null");
     urisForCredentials.addAll(uris);
     return this;
   }
@@ -985,12 +987,7 @@ public class DAG {
 
       if (vertex.getConf()!= null && vertex.getConf().size() > 0) {
         ConfigurationProto.Builder confBuilder = ConfigurationProto.newBuilder();
-        for (Map.Entry<String, String> entry : vertex.getConf().entrySet()) {
-          PlanKeyValuePair.Builder keyValueBuilder = PlanKeyValuePair.newBuilder();
-          keyValueBuilder.setKey(entry.getKey());
-          keyValueBuilder.setValue(entry.getValue());
-          confBuilder.addConfKeyValues(keyValueBuilder);
-        }
+        TezUtils.populateConfProtoFromEntries(vertex.getConf().entrySet(), confBuilder);
         vertexBuilder.setVertexConf(confBuilder);
       }
 
@@ -1091,12 +1088,7 @@ public class DAG {
 
     ConfigurationProto.Builder confProtoBuilder = ConfigurationProto.newBuilder();
     if (!this.dagConf.isEmpty()) {
-      for (Entry<String, String> entry : this.dagConf.entrySet()) {
-        PlanKeyValuePair.Builder kvp = PlanKeyValuePair.newBuilder();
-        kvp.setKey(entry.getKey());
-        kvp.setValue(entry.getValue());
-        confProtoBuilder.addConfKeyValues(kvp);
-      }
+      TezUtils.populateConfProtoFromEntries(this.dagConf.entrySet(), confProtoBuilder);
     }
     // Copy historyLogLevel from tezConf into dagConf if its not overridden in dagConf.
     String logLevel = this.dagConf.get(TezConfiguration.TEZ_HISTORY_LOGGING_LOGLEVEL);

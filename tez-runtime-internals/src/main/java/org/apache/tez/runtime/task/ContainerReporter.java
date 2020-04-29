@@ -21,7 +21,6 @@ package org.apache.tez.runtime.task;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.tez.common.CallableWithNdc;
 import org.apache.tez.common.ContainerContext;
 import org.apache.tez.common.ContainerTask;
 import org.apache.tez.common.TezTaskUmbilicalProtocol;
@@ -33,7 +32,7 @@ import org.slf4j.LoggerFactory;
  * functionality is to poll for new tasks.
  * 
  */
-public class ContainerReporter extends CallableWithNdc<ContainerTask> {
+public class ContainerReporter implements Callable<ContainerTask> {
 
   private static final Logger LOG = LoggerFactory.getLogger(ContainerReporter.class);
 
@@ -52,7 +51,7 @@ public class ContainerReporter extends CallableWithNdc<ContainerTask> {
   }
 
   @Override
-  protected ContainerTask callInternal() throws Exception {
+  public ContainerTask call() throws Exception {
     ContainerTask containerTask = null;
     LOG.info("Attempting to fetch new task for container {}", containerContext.getContainerIdentifier());
     containerTask = umbilical.getTask(containerContext);

@@ -29,17 +29,18 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.tez.http.BaseHttpConnection;
 import org.apache.tez.http.HttpConnectionParams;
-import org.apache.tez.common.CallableWithNdc;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.counters.TezCounter;
@@ -54,7 +55,7 @@ import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 
 import com.google.common.annotations.VisibleForTesting;
 
-class FetcherOrderedGrouped extends CallableWithNdc<Void> {
+class FetcherOrderedGrouped implements Callable<Void> {
   
   private static final Logger LOG = LoggerFactory.getLogger(FetcherOrderedGrouped.class);
 
@@ -68,17 +69,17 @@ class FetcherOrderedGrouped extends CallableWithNdc<Void> {
   private final TezCounter ioErrs;
   private final TezCounter wrongLengthErrs;
   private final TezCounter badIdErrs;
-  private final TezCounter wrongMapErrs;
   private final TezCounter wrongReduceErrs;
   private final FetchedInputAllocatorOrderedGrouped allocator;
   private final ShuffleScheduler scheduler;
   private final ExceptionReporter exceptionReporter;
   private final int id;
   private final String logIdentifier;
+  private final RawLocalFileSystem localFs;
   private final String localShuffleHost;
   private final int localShufflePort;
   private final String applicationId;
- private final int dagId;
+  private final int dagId;
   private final MapHost mapHost;
 
   private final int minPartition;
@@ -115,6 +116,7 @@ class FetcherOrderedGrouped extends CallableWithNdc<Void> {
                                boolean ifileReadAhead, int ifileReadAheadLength,
                                CompressionCodec codec,
                                Configuration conf,
+                               RawLocalFileSystem localFs,
                                boolean localDiskFetchEnabled,
                                String localHostname,
                                int shufflePort,
@@ -144,7 +146,6 @@ class FetcherOrderedGrouped extends CallableWithNdc<Void> {
     this.ioErrs = ioErrsCounter;
     this.wrongLengthErrs = wrongLengthErrsCounter;
     this.badIdErrs = badIdErrsCounter;
-    this.wrongMapErrs = wrongMapErrsCounter;
     this.connectionErrs = connectionErrsCounter;
     this.wrongReduceErrs = wrongReduceErrsCounter;
     this.applicationId = applicationId;
@@ -160,6 +161,7 @@ class FetcherOrderedGrouped extends CallableWithNdc<Void> {
       this.codec = null;
     }
     this.conf = conf;
+    this.localFs = localFs;
     this.localShuffleHost = localHostname;
     this.localShufflePort = shufflePort;
 
@@ -187,7 +189,7 @@ class FetcherOrderedGrouped extends CallableWithNdc<Void> {
   }
 
   @Override
-  public Void callInternal() {
+  public Void call() {
     try {
       remaining = null; // Safety.
       fetchNext();
@@ -380,11 +382,13 @@ class FetcherOrderedGrouped extends CallableWithNdc<Void> {
       }
       ioErrs.increment(1);
       if (!connectSucceeded) {
-        LOG.warn("Failed to connect to " + host + " with " + remaining.size() + " inputs", ie);
+        LOG.warn(String.format("Failed to connect from %s to %s with %d inputs", localShuffleHost,
+            host, remaining.size()), ie);
         connectionErrs.increment(1);
       } else {
-        LOG.warn("Failed to verify reply after connecting to " + host + " with " + remaining.size()
-            + " inputs pending", ie);
+        LOG.warn(String.format(
+            "Failed to verify reply after connecting from %s to %s with %d inputs pending",
+            localShuffleHost, host, remaining.size()), ie);
       }
 
       // At this point, either the connection failed, or the initial header verification failed.
@@ -789,7 +793,7 @@ class FetcherOrderedGrouped extends CallableWithNdc<Void> {
       throws IOException {
     Path indexFile = getShuffleInputFileName(pathComponent,
         Constants.TEZ_RUNTIME_TASK_OUTPUT_INDEX_SUFFIX_STRING);
-    TezSpillRecord spillRecord = new TezSpillRecord(indexFile, conf);
+    TezSpillRecord spillRecord = new TezSpillRecord(indexFile, localFs);
     return spillRecord.getIndex(partitionId);
   }
 
