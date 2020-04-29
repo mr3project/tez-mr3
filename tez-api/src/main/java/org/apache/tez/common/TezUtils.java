@@ -29,7 +29,6 @@ import java.util.Objects;
 
 import com.google.protobuf.ByteString;
 
-import com.google.protobuf.CodedInputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -111,9 +110,7 @@ public class TezUtils {
   public static Configuration createConfFromByteString(ByteString byteString) throws IOException {
     Objects.requireNonNull(byteString, "ByteString must be specified");
     try(SnappyInputStream uncompressIs = new SnappyInputStream(byteString.newInput());) {
-      CodedInputStream in = CodedInputStream.newInstance(uncompressIs);
-      in.setSizeLimit(Integer.MAX_VALUE);
-      DAGProtos.ConfigurationProto confProto = DAGProtos.ConfigurationProto.parseFrom(in);
+      DAGProtos.ConfigurationProto confProto = DAGProtos.ConfigurationProto.parseFrom(uncompressIs);
       Configuration conf = new Configuration(false);
       readConfFromPB(confProto, conf);
       return conf;
