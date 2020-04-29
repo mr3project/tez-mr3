@@ -116,8 +116,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   WrappedBuffer currentBuffer;
   private final FileSystem rfs;
 
-  @VisibleForTesting
-  final List<SpillInfo> spillInfoList = Collections.synchronizedList(new ArrayList<SpillInfo>());
+  private final List<SpillInfo> spillInfoList = Collections
+      .synchronizedList(new ArrayList<SpillInfo>());
 
   private final ListeningExecutorService spillExecutor;
 
@@ -1137,24 +1137,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       if (out != null) {
         out.close();
       }
-      deleteIntermediateSpills();
     }
     finalSpillRecord.writeToFile(finalIndexPath, conf, localFs);
     fileOutputBytesCounter.increment(indexFileSizeEstimate);
     LOG.info(destNameTrimmed + ": " + "Finished final spill after merging : " + numSpills.get() + " spills");
-  }
-
-  private void deleteIntermediateSpills() {
-    // Delete the intermediate spill files
-    synchronized (spillInfoList) {
-      for (SpillInfo spill : spillInfoList) {
-        try {
-          rfs.delete(spill.outPath, false);
-        } catch (IOException e) {
-          LOG.warn("Unable to delete intermediate spill " + spill.outPath, e);
-        }
-      }
-    }
   }
 
   private void writeLargeRecord(final Object key, final Object value, final int partition)
@@ -1474,8 +1460,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     }
   }
 
-  @VisibleForTesting
-  static class SpillInfo {
+  private static class SpillInfo {
     final TezSpillRecord spillRecord;
     final Path outPath;
 
