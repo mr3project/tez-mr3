@@ -515,7 +515,7 @@ public class TestIFile {
       values.add(val);
     }
 
-    TezTaskOutputFiles tezTaskOutput = new TezTaskOutputFiles(defaultConf, "uniqueId", 1);
+    TezTaskOutputFiles tezTaskOutput = new TezTaskOutputFiles(defaultConf, "uniqueId", 1, null, 0);
     IFile.FileBackedInMemIFileWriter writer = new IFile.FileBackedInMemIFileWriter(defaultConf, localFs, tezTaskOutput,
         Text.class, IntWritable.class, codec, null, null,
         200);
@@ -538,7 +538,7 @@ public class TestIFile {
   // Basic test
   public void testFileBackedInMemIFileWriterWithSmallBuffer() throws IOException {
     List<KVPair> data = new ArrayList<>();
-    TezTaskOutputFiles tezTaskOutput = new TezTaskOutputFiles(defaultConf, "uniqueId", 1);
+    TezTaskOutputFiles tezTaskOutput = new TezTaskOutputFiles(defaultConf, "uniqueId", 1, null, 0);
     IFile.FileBackedInMemIFileWriter writer = new IFile.FileBackedInMemIFileWriter(defaultConf, localFs, tezTaskOutput,
         Text.class, IntWritable.class, codec, null, null,
         2);
@@ -572,7 +572,7 @@ public class TestIFile {
     }
 
     // Setting cache limit to 20. Actual data would be around 43 bytes, so it would spill over.
-    TezTaskOutputFiles tezTaskOutput = new TezTaskOutputFiles(defaultConf, "uniqueId", 1);
+    TezTaskOutputFiles tezTaskOutput = new TezTaskOutputFiles(defaultConf, "uniqueId", 1, null, 0);
     IFile.FileBackedInMemIFileWriter writer = new IFile.FileBackedInMemIFileWriter(defaultConf, localFs, tezTaskOutput,
         Text.class, IntWritable.class, codec, null, null,
         20);
@@ -604,7 +604,7 @@ public class TestIFile {
   public void testEmptyFileBackedInMemIFileWriter() throws IOException {
     List<KVPair> data = new ArrayList<>();
     TezTaskOutputFiles
-        tezTaskOutput = new TezTaskOutputFiles(defaultConf, "uniqueId", 1);
+        tezTaskOutput = new TezTaskOutputFiles(defaultConf, "uniqueId", 1, null, 0);
 
     IFile.FileBackedInMemIFileWriter writer = new IFile.FileBackedInMemIFileWriter(defaultConf, localFs, tezTaskOutput,
         Text.class, IntWritable.class, codec, null, null,

@@ -158,11 +158,13 @@ public class TezRuntimeUtils {
     Class<?> clazz = conf.getClass(Constants.TEZ_RUNTIME_TASK_OUTPUT_MANAGER,
         TezTaskOutputFiles.class);
     try {
-      Constructor<?> ctor = clazz.getConstructor(Configuration.class, String.class, int.class);
+      Constructor<?> ctor = clazz.getConstructor(Configuration.class, String.class, int.class, String.class, int.class);
       ctor.setAccessible(true);
       TezTaskOutput instance = (TezTaskOutput) ctor.newInstance(conf,
           outputContext.getUniqueIdentifier(),
-          outputContext.getDagIdentifier());
+          outputContext.getDagIdentifier(),
+          outputContext.getExecutionContext().getContainerId(),
+          outputContext.getTaskVertexIndex());
       return instance;
     } catch (Exception e) {
       throw new TezUncheckedException(

@@ -82,6 +82,8 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
   @VisibleForTesting
   boolean finalMergeEnabled;
 
+  private boolean compositeFetch;
+
   public OrderedPartitionedKVOutput(OutputContext outputContext, int numPhysicalOutputs) {
     super(outputContext, numPhysicalOutputs);
     deflater = TezCommonUtils.newBestCompressionDeflater();
@@ -105,6 +107,8 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
     sendEmptyPartitionDetails = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED,
         TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED_DEFAULT);
+
+    this.compositeFetch = ShuffleUtils.isTezShuffleHandler(this.conf);
 
     return Collections.emptyList();
   }
@@ -212,7 +216,8 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
       ShuffleUtils.generateEventOnSpill(eventList, finalMergeEnabled, isLastEvent,
           getContext(), 0, new TezSpillRecord(sorter.getFinalIndexFile(), localFs),
           getNumPhysicalOutputs(), sendEmptyPartitionDetails, getContext().getUniqueIdentifier(),
-          sorter.getPartitionStats(), sorter.reportDetailedPartitionStats(), auxiliaryService, deflater);
+          sorter.getPartitionStats(), sorter.reportDetailedPartitionStats(), auxiliaryService, deflater,
+          compositeFetch);
     }
     return eventList;
   }

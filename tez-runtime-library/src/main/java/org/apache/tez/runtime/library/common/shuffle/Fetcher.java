@@ -772,15 +772,8 @@ public class Fetcher implements Callable<FetchResult> {
   }
 
   private final String getMapOutputFile(String pathComponent) {
-    String outputPath = Constants.TEZ_RUNTIME_TASK_OUTPUT_DIR + Path.SEPARATOR +
-        pathComponent + Path.SEPARATOR +
-        Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING;
-
-    if(ShuffleUtils.isTezShuffleHandler(conf)) {
-      return Constants.DAG_PREFIX + this.dagIdentifier + Path.SEPARATOR +
-          outputPath;
-    }
-    return outputPath;
+    return ShuffleUtils.adjustPathComponent(compositeFetch, this.dagIdentifier, pathComponent) +
+      Path.SEPARATOR + Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING;
   }
 
   @VisibleForTesting
@@ -884,9 +877,9 @@ public class Fetcher implements Callable<FetchResult> {
           ShuffleHeader header = new ShuffleHeader();
           header.readFields(input);
           pathComponent = header.getMapId();
-          if (!pathComponent.startsWith(InputAttemptIdentifier.PATH_PREFIX)) {
+          if (!pathComponent.startsWith(InputAttemptIdentifier.PATH_PREFIX_MR3) && !pathComponent.startsWith(InputAttemptIdentifier.PATH_PREFIX)) {
             throw new IllegalArgumentException("Invalid map id: " + header.getMapId() + ", expected to start with " +
-                InputAttemptIdentifier.PATH_PREFIX + ", partition: " + header.getPartition()
+                InputAttemptIdentifier.PATH_PREFIX_MR3 + "/" + InputAttemptIdentifier.PATH_PREFIX + ", partition: " + header.getPartition()
                 + " while fetching " + inputAttemptIdentifier);
           }
 

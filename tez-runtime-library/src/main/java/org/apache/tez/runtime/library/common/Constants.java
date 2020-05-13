@@ -26,6 +26,7 @@ public class Constants {
   
   public static final String TEZ = "tez";
   public static final String DAG_PREFIX = "dag_";
+  public static final String VERTEX_PREFIX = "vertex_";
 
   public static final String MAP_OUTPUT_FILENAME_STRING = "file.out";
   public static final String MAP_OUTPUT_INDEX_SUFFIX_STRING = ".index";

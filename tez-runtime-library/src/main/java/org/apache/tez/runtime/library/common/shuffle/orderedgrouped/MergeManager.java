@@ -187,7 +187,9 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     this.mergedMapOutputsCounter = mergedMapOutputsCounter;
     this.mapOutputFile = new TezTaskOutputFiles(conf,
         inputContext.getUniqueIdentifier(),
-        inputContext.getDagIdentifier());
+        inputContext.getDagIdentifier(),
+        inputContext.getExecutionContext().getContainerId(),
+        inputContext.getTaskVertexIndex());
 
     this.localFS = localFS;
     this.rfs = ((LocalFileSystem)localFS).getRaw();

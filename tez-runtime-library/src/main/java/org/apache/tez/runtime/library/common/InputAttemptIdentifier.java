@@ -33,6 +33,7 @@ public class InputAttemptIdentifier {
   private final boolean shared;
 
   public static final String PATH_PREFIX = "attempt";
+  public static final String PATH_PREFIX_MR3 = "container";
 
   public enum SPILL_INFO {
     FINAL_MERGE_ENABLED, //Final merge is enabled at source
@@ -68,9 +69,9 @@ public class InputAttemptIdentifier {
     this.shared = shared;
     this.fetchTypeInfo = (byte)fetchTypeInfo.ordinal();
     this.spillEventId = spillEventId;
-    if (pathComponent != null && !pathComponent.startsWith(PATH_PREFIX)) {
+    if (pathComponent != null && !pathComponent.startsWith(PATH_PREFIX_MR3) && !pathComponent.startsWith(PATH_PREFIX)) {
       throw new TezUncheckedException(
-          "Path component must start with: " + PATH_PREFIX + " " + this);
+          "Path component must start with: " + PATH_PREFIX + "/" + PATH_PREFIX + " " + this);
     }
   }
 

@@ -131,7 +131,6 @@ public final class DefaultSorter extends ExternalSorter implements IndexedSortab
 
   public static final int MAX_IO_SORT_MB = 1800;
 
-
   public DefaultSorter(OutputContext outputContext, Configuration conf, int numOutputs,
       long initialMemoryAvailable) throws IOException {
     super(outputContext, conf, numOutputs, initialMemoryAvailable);
@@ -1173,7 +1172,8 @@ public final class DefaultSorter extends ExternalSorter implements IndexedSortab
     String pathComponent = (outputContext.getUniqueIdentifier() + "_" + index);
     ShuffleUtils.generateEventOnSpill(events, isFinalMergeEnabled(), isLastEvent,
         outputContext, index, spillRecord, partitions, sendEmptyPartitionDetails, pathComponent,
-        partitionStats, reportDetailedPartitionStats(), auxiliaryService, deflater);
+        partitionStats, reportDetailedPartitionStats(), auxiliaryService, deflater,
+        compositeFetch);
 
     LOG.info(outputContext.getDestinationVertexName() + ": " +
         "Adding spill event for spill (final update=" + isLastEvent + "), spillId=" + index);

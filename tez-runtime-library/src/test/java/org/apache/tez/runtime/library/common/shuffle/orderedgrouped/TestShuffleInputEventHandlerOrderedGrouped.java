@@ -82,7 +82,7 @@ public class TestShuffleInputEventHandlerOrderedGrouped {
     doReturn(applicationId).when(inputContext).getApplicationId();
     doReturn("sourceVertex").when(inputContext).getSourceVertexName();
     when(inputContext.getCounters()).thenReturn(new TezCounters());
-    ExecutionContext executionContext = new ExecutionContextImpl("localhost");
+    ExecutionContext executionContext = new ExecutionContextImpl("localhost", null, "dummy");
     doReturn(executionContext).when(inputContext).getExecutionContext();
     ByteBuffer shuffleBuffer = ByteBuffer.allocate(4).putInt(0, 4);
     doReturn(shuffleBuffer).when(inputContext).getServiceProviderMetaData(anyString());

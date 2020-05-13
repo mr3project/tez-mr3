@@ -200,6 +200,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   // When enabled, uses in-mem ifile writer
   private final boolean useCachedStream;
 
+  private final boolean compositeFetch;
+
   public UnorderedPartitionedKVWriter(OutputContext outputContext, Configuration conf,
       int numOutputs, long availableMemoryBytes) throws IOException {
     super(outputContext, conf, numOutputs);
@@ -233,6 +235,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
     this.useCachedStream = useCachedStreamConfig && (this.dataViaEventsEnabled && (numPartitions == 1)
         && !pipelinedShuffle);
+
+    this.compositeFetch = ShuffleUtils.isTezShuffleHandler(this.conf);
 
     if (availableMemoryBytes == 0) {
       Preconditions.checkArgument(((numPartitions == 1) && !pipelinedShuffle), "availableMemory "
@@ -921,7 +925,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       // Populate payload only if at least 1 partition has data
       payloadBuilder.setHost(host);
       payloadBuilder.setPort(getShufflePort());
-      payloadBuilder.setPathComponent(pathComponent);
+      payloadBuilder.setPathComponent(ShuffleUtils.expandPathComponent(outputContext, compositeFetch, pathComponent));
     }
 
     if (addSpillDetails) {

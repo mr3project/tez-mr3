@@ -464,11 +464,11 @@ class FetcherOrderedGrouped implements Callable<Void> {
           ShuffleHeader header = new ShuffleHeader();
           // TODO Review: Multiple header reads in case of status WAIT ?
           header.readFields(input);
-          if (!header.mapId.startsWith(InputAttemptIdentifier.PATH_PREFIX)) {
+          if (!header.mapId.startsWith(InputAttemptIdentifier.PATH_PREFIX_MR3) && !header.mapId.startsWith(InputAttemptIdentifier.PATH_PREFIX)) {
             if (!stopped) {
               badIdErrs.increment(1);
               LOG.warn("Invalid map id: " + header.mapId + ", expected to start with " +
-                  InputAttemptIdentifier.PATH_PREFIX + ", partition: " + header.forReduce);
+                  InputAttemptIdentifier.PATH_PREFIX_MR3 + "/" + InputAttemptIdentifier.PATH_PREFIX + ", partition: " + header.forReduce);
               return new InputAttemptIdentifier[]{getNextRemainingAttempt()};
             } else {
               if (LOG.isDebugEnabled()) {
@@ -780,12 +780,11 @@ class FetcherOrderedGrouped implements Callable<Void> {
       throws IOException {
     LocalDirAllocator localDirAllocator = new LocalDirAllocator(TezRuntimeFrameworkConfigs.LOCAL_DIRS);
     suffix = suffix != null ? suffix : "";
-    String outputPath = Constants.TEZ_RUNTIME_TASK_OUTPUT_DIR + Path.SEPARATOR +
-        pathComponent + Path.SEPARATOR +
-        Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING + suffix;
-    String pathFromLocalDir = getPathForLocalDir(outputPath);
+    String pathFromLocalDir =
+      ShuffleUtils.adjustPathComponent(compositeFetch, dagId, pathComponent) +
+        Path.SEPARATOR + Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING + suffix;
 
-    return localDirAllocator.getLocalPathToRead(pathFromLocalDir.toString(), conf);
+    return localDirAllocator.getLocalPathToRead(pathFromLocalDir, conf);
   }
 
   @VisibleForTesting
@@ -813,13 +812,6 @@ class FetcherOrderedGrouped implements Callable<Void> {
     for (InputAttemptIdentifier id : origlist) {
       remaining.put(id.toString(), id);
     }
-  }
-
-  private String getPathForLocalDir(String suffix) {
-    if(ShuffleUtils.isTezShuffleHandler(conf)) {
-      return Constants.DAG_PREFIX + dagId + Path.SEPARATOR + suffix;
-    }
-    return suffix;
   }
 }
 

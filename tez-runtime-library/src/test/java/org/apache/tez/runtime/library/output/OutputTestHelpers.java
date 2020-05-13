@@ -73,7 +73,7 @@ class OutputTestHelpers {
     doReturn(new TezCounters()).when(ctx).getCounters();
     OutputStatisticsReporter statsReporter = mock(OutputStatisticsReporter.class);
     doReturn(statsReporter).when(ctx).getStatisticsReporter();
-    doReturn(new ExecutionContextImpl("localhost")).when(ctx).getExecutionContext();
+    doReturn(new ExecutionContextImpl("localhost", null, "dummy")).when(ctx).getExecutionContext();
     return ctx;
   }
 }
