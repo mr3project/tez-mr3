@@ -40,11 +40,7 @@ import org.apache.tez.common.counters.TezCounters;
 import org.apache.tez.dag.api.EntityDescriptor;
 import org.apache.tez.dag.records.TezTaskAttemptID;
 import org.apache.tez.runtime.LogicalIOProcessorRuntimeTask;
-import org.apache.tez.runtime.api.TaskFailureType;
-import org.apache.tez.runtime.api.ExecutionContext;
-import org.apache.tez.runtime.api.MemoryUpdateCallback;
-import org.apache.tez.runtime.api.ObjectRegistry;
-import org.apache.tez.runtime.api.TaskContext;
+import org.apache.tez.runtime.api.*;
 import org.apache.tez.runtime.common.resources.MemoryDistributor;
 
 import org.apache.tez.common.Preconditions;
@@ -287,6 +283,10 @@ public abstract class TezTaskContextImpl implements TaskContext, Closeable {
   }
 
   public String getJobUserName() {
+    return null;
+  }
+
+  public ExecutorServiceUserGroupInformation getExecutorServiceUgi() {
     return null;
   }
 }
