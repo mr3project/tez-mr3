@@ -276,7 +276,7 @@ public class TestMROutput {
         umbilical,
         null,
         new HashMap<String, String>(),
-        HashMultimap.<String, String>create(), null, "", new ExecutionContextImpl("localhost"),
+        HashMultimap.<String, String>create(), null, "", new ExecutionContextImpl("localhost", null, "dummy"),
         Runtime.getRuntime().maxMemory(), true, new DefaultHadoopShim(), sharedExecutor);
   }
 

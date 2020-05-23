@@ -237,7 +237,7 @@ public class MapUtils {
         umbilical,
         serviceConsumerMetadata,
         envMap,
-        HashMultimap.<String, String>create(), null, "", new ExecutionContextImpl("localhost"),
+        HashMultimap.<String, String>create(), null, "",new ExecutionContextImpl("localhost", null, "dummy"),
         Runtime.getRuntime().maxMemory(), true, new DefaultHadoopShim(), sharedExecutor);
     return task;
   }

@@ -296,7 +296,8 @@ public class TestDefaultSorter {
       String pathComponent = (context.getUniqueIdentifier() + "_" + 0);
       ShuffleUtils.generateEventOnSpill(events, true, true, context, 0,
           sorter.indexCacheList.get(0), 0, true, pathComponent, sorter.getPartitionStats(),
-          sorter.reportDetailedPartitionStats(), auxService, TezCommonUtils.newBestCompressionDeflater());
+          sorter.reportDetailedPartitionStats(), auxService, TezCommonUtils.newBestCompressionDeflater(),
+          false);
 
       CompositeDataMovementEvent compositeDataMovementEvent =
           (CompositeDataMovementEvent) events.get(1);
@@ -570,7 +571,7 @@ public class TestDefaultSorter {
     TezCounters counters = new TezCounters();
 
     OutputContext context = mock(OutputContext.class);
-    ExecutionContext execContext = new ExecutionContextImpl("localhost");
+    ExecutionContext execContext = new ExecutionContextImpl("localhost", null, "dummy");
     doReturn(mock(OutputStatisticsReporter.class)).when(context).getStatisticsReporter();
     doReturn(execContext).when(context).getExecutionContext();
     doReturn(counters).when(context).getCounters();

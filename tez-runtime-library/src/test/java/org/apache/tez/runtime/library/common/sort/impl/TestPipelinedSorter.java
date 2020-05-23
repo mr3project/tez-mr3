@@ -913,7 +913,7 @@ public class TestPipelinedSorter {
       String uniqueId, String auxiliaryService) throws IOException {
     OutputContext outputContext = mock(OutputContext.class);
 
-    ExecutionContext execContext = new ExecutionContextImpl("localhost");
+    ExecutionContext execContext = new ExecutionContextImpl("localhost", null, "dummy");
 
     DataOutputBuffer serviceProviderMetaData = new DataOutputBuffer();
     serviceProviderMetaData.writeInt(80);

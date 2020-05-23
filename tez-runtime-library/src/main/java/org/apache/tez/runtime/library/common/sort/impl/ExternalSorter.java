@@ -31,6 +31,7 @@ import com.google.common.collect.Maps;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.OutputStatisticsReporter;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
+import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -168,6 +169,9 @@ public abstract class ExternalSorter {
   // How partition stats should be reported.
   final ReportPartitionStats reportPartitionStats;
 
+  protected final boolean physicalHostFetch;
+  protected final boolean compositeFetch;
+
   public ExternalSorter(OutputContext outputContext, Configuration conf, int numOutputs,
       long initialMemoryAvailable) throws IOException {
     this.outputContext = outputContext;
@@ -280,6 +284,11 @@ public abstract class ExternalSorter {
     this.sendEmptyPartitionDetails = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED,
         TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED_DEFAULT);
+
+    this.physicalHostFetch = conf.getBoolean(
+        TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH,
+        TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_DEFAULT);
+    this.compositeFetch = ShuffleUtils.isTezShuffleHandler(this.conf);
   }
 
   @VisibleForTesting

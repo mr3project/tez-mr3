@@ -248,7 +248,7 @@ public class TestOnFileUnorderedKVOutput {
         appAttemptNumber, tezUmbilical, dagName, taskVertexName, destinationVertexName,
         -1, taskAttemptID, 0, userPayload, runtimeTask,
         null, auxEnv, new MemoryDistributor(1, 1, conf) , outputDescriptor, null,
-        new ExecutionContextImpl("localhost"), 2048, new TezSharedExecutor(defaultConf));
+        new ExecutionContextImpl("localhost", null, "dummy"), 2048, new TezSharedExecutor(defaultConf));
     verify(runtimeTask, times(1)).addAndGetTezCounter(destinationVertexName);
     verify(runtimeTask, times(1)).getTaskStatistics();
     // verify output stats object got created

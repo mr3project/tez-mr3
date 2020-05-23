@@ -74,7 +74,7 @@ public class TestProcessorContext {
     ProcessorDescriptor processorDesc = mock(ProcessorDescriptor.class);
     InputReadyTracker inputReadyTracker = mock(InputReadyTracker.class);
     ObjectRegistry objectRegistry = new ObjectRegistryImpl();
-    ExecutionContext execContext = new ExecutionContextImpl("localhost");
+    ExecutionContext execContext = new ExecutionContextImpl("localhost", null, "dummy");
     long memAvailable = 10000l;
 
     TezProcessorContextImpl procContext =

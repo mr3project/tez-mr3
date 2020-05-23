@@ -29,4 +29,9 @@ public interface ExecutionContext {
    * @return the hostname
    */
   public String getHostName();
+
+  // null if physicalHost == hostName
+  public String getPhysicalHost();
+
+  public String getContainerId();
 }

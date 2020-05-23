@@ -273,4 +273,6 @@ public interface TaskContext {
   public ByteBuffer getSoftByteBuffer(int capacity);
 
   public String getJobUserName();
+
+  public ExecutorServiceUserGroupInformation getExecutorServiceUgi();
 }

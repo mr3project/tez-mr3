@@ -35,6 +35,7 @@ import java.util.zip.Deflater;
 import javax.annotation.Nullable;
 import javax.crypto.SecretKey;
 
+import org.apache.hadoop.fs.Path;
 import org.apache.tez.common.Preconditions;
 import com.google.common.primitives.Ints;
 import com.google.protobuf.ByteString;
@@ -45,6 +46,7 @@ import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.http.BaseHttpConnection;
 import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.events.DataMovementEvent;
+import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.TezRuntimeUtils;
 import org.apache.tez.runtime.library.utils.DATA_RANGE_IN_MB;
 import org.apache.tez.util.FastNumberFormat;
@@ -287,7 +289,8 @@ public class ShuffleUtils {
    */
   static ByteBuffer generateDMEPayload(boolean sendEmptyPartitionDetails,
       int numPhysicalOutputs, TezSpillRecord spillRecord, OutputContext context,
-      int spillId, boolean finalMergeEnabled, boolean isLastEvent, String pathComponent, String auxiliaryService, Deflater deflater)
+      int spillId, boolean finalMergeEnabled, boolean isLastEvent, String pathComponent, String auxiliaryService, Deflater deflater,
+      boolean compositeFetch)
       throws IOException {
     DataMovementEventPayloadProto.Builder payloadBuilder = DataMovementEventPayloadProto
         .newBuilder();
@@ -322,7 +325,7 @@ public class ShuffleUtils {
       payloadBuilder.setHost(host);
       payloadBuilder.setPort(shufflePort);
       //Path component is always 0 indexed
-      payloadBuilder.setPathComponent(pathComponent);
+      payloadBuilder.setPathComponent(expandPathComponent(context, compositeFetch, pathComponent));
     }
 
     if (!finalMergeEnabled) {
@@ -409,7 +412,8 @@ public class ShuffleUtils {
   public static void generateEventOnSpill(List<Event> eventList, boolean finalMergeEnabled,
       boolean isLastEvent, OutputContext context, int spillId, TezSpillRecord spillRecord,
       int numPhysicalOutputs, boolean sendEmptyPartitionDetails, String pathComponent,
-      @Nullable long[] partitionStats, boolean reportDetailedPartitionStats, String auxiliaryService, Deflater deflater)
+      @Nullable long[] partitionStats, boolean reportDetailedPartitionStats, String auxiliaryService, Deflater deflater,
+      boolean compositeFetch)
       throws IOException {
     Preconditions.checkArgument(eventList != null, "EventList can't be null");
 
@@ -427,7 +431,8 @@ public class ShuffleUtils {
 
     ByteBuffer payload = generateDMEPayload(sendEmptyPartitionDetails, numPhysicalOutputs,
         spillRecord, context, spillId,
-        finalMergeEnabled, isLastEvent, pathComponent, auxiliaryService, deflater);
+        finalMergeEnabled, isLastEvent, pathComponent, auxiliaryService, deflater,
+        compositeFetch);
 
     if (finalMergeEnabled || isLastEvent) {
       VertexManagerEvent vmEvent = generateVMEvent(context, partitionStats,
@@ -637,6 +642,25 @@ public class ShuffleUtils {
   public static String getTezShuffleHandlerServiceId(Configuration conf) {
     return conf.get(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
           TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT);
+  }
+
+  public static String adjustPathComponent(boolean compositeFetch, int dagIdentifier, String pathComponent) {
+    if(compositeFetch) {  // == isTezShuffleHandler
+      // pathComponent includes ${containerId}/${vertexId}/ in its prefix
+      return Constants.DAG_PREFIX + dagIdentifier + Path.SEPARATOR + pathComponent;
+    } else {
+      return Constants.TEZ_RUNTIME_TASK_OUTPUT_DIR + Path.SEPARATOR + pathComponent;
+    }
+  }
+
+  public static String expandPathComponent(OutputContext context, boolean compositeFetch, String pathComponent) {
+    if (compositeFetch) {
+      String containerId = context.getExecutionContext().getContainerId();
+      int vertexId = context.getTaskVertexIndex();
+      return containerId + Path.SEPARATOR + Constants.VERTEX_PREFIX + vertexId + Path.SEPARATOR + pathComponent;
+    } else {
+      return pathComponent;
+    }
   }
 }
 
