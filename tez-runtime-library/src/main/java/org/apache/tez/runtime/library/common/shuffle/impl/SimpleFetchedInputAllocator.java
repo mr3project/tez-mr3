@@ -69,14 +69,15 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
                                      String uniqueIdentifier, int dagID,
                                      Configuration conf,
                                      long maxTaskAvailableMemory,
-                                     long memoryAvailable) {
+                                     long memoryAvailable,
+                                     String containerId, int vertexId) {
     this.srcNameTrimmed = srcNameTrimmed;
     this.conf = conf;    
     this.maxAvailableTaskMemory = maxTaskAvailableMemory;
     this.initialMemoryAvailable = memoryAvailable;
     
     this.fileNameAllocator = new TezTaskOutputFiles(conf,
-        uniqueIdentifier, dagID);
+        uniqueIdentifier, dagID, containerId, vertexId);
     this.localDirAllocator = new LocalDirAllocator(TezRuntimeFrameworkConfigs.LOCAL_DIRS);
     
     // Setup configuration

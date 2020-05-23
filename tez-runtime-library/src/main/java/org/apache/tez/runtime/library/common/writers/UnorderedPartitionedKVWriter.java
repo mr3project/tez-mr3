@@ -22,6 +22,7 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.IntBuffer;
+import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
@@ -52,6 +53,7 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.tez.common.TezCommonUtils;
 import org.apache.tez.common.TezUtilsInternal;
 import org.apache.tez.common.counters.TaskCounter;
@@ -59,6 +61,7 @@ import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.common.io.NonSyncDataOutputStream;
 import org.apache.tez.runtime.api.Event;
+import org.apache.tez.runtime.api.ExecutorServiceUserGroupInformation;
 import org.apache.tez.runtime.api.TaskFailureType;
 import org.apache.tez.runtime.api.OutputContext;
 import org.apache.tez.runtime.api.events.CompositeDataMovementEvent;
@@ -200,6 +203,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   // When enabled, uses in-mem ifile writer
   private final boolean useCachedStream;
 
+  private final boolean compositeFetch;
+
   public UnorderedPartitionedKVWriter(OutputContext outputContext, Configuration conf,
       int numOutputs, long availableMemoryBytes) throws IOException {
     super(outputContext, conf, numOutputs);
@@ -233,6 +238,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
     this.useCachedStream = useCachedStreamConfig && (this.dataViaEventsEnabled && (numPartitions == 1)
         && !pipelinedShuffle);
+
+    this.compositeFetch = ShuffleUtils.isTezShuffleHandler(this.conf);
 
     if (availableMemoryBytes == 0) {
       Preconditions.checkArgument(((numPartitions == 1) && !pipelinedShuffle), "availableMemory "
@@ -921,7 +928,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       // Populate payload only if at least 1 partition has data
       payloadBuilder.setHost(host);
       payloadBuilder.setPort(getShufflePort());
-      payloadBuilder.setPathComponent(pathComponent);
+      payloadBuilder.setPathComponent(ShuffleUtils.expandPathComponent(outputContext, compositeFetch, pathComponent));
     }
 
     if (addSpillDetails) {
@@ -1136,11 +1143,47 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     } finally {
       if (out != null) {
         out.close();
+        // always call deleteIntermediateSpills() because it does not affect VertexRerun and fault-tolerance
+        deleteIntermediateSpills();
       }
     }
     finalSpillRecord.writeToFile(finalIndexPath, conf, localFs);
     fileOutputBytesCounter.increment(indexFileSizeEstimate);
     LOG.info(destNameTrimmed + ": " + "Finished final spill after merging : " + numSpills.get() + " spills");
+  }
+
+  private void deleteIntermediateSpills() {
+    // Delete the intermediate spill files
+    ExecutorServiceUserGroupInformation executorServiceUgi = outputContext.getExecutorServiceUgi();
+    ExecutorService executorService = executorServiceUgi.getExecutorService();
+    UserGroupInformation taskUgi = executorServiceUgi.getUgi();
+    executorService.submit(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          taskUgi.doAs(new PrivilegedExceptionAction<Void>() {
+            @Override
+            public Void run() {
+              synchronized (spillInfoList) {
+                for (SpillInfo spill : spillInfoList) {
+                  try {
+                    LOG.info("Deleting intermediate spill: " + spill.outPath);
+                    rfs.delete(spill.outPath, false);
+                  } catch (IOException e) {
+                    LOG.warn("Unable to delete intermediate spill " + spill.outPath, e);
+                  }
+                }
+              }
+              return null;
+            }
+          });
+        } catch (IOException e) {
+          LOG.warn("Error while deleting intermediate spills", e);
+        } catch (InterruptedException e) {
+          LOG.warn("Interrupted while deleting intermediate spills", e);
+        }
+      }
+    });
   }
 
   private void writeLargeRecord(final Object key, final Object value, final int partition)

@@ -92,7 +92,7 @@ public class TestLogicalIOProcessorRuntimeTask {
     TezSharedExecutor sharedExecutor = new TezSharedExecutor(tezConf);
     LogicalIOProcessorRuntimeTask lio1 = new LogicalIOProcessorRuntimeTask(task1, 0, tezConf, null,
         umbilical, serviceConsumerMetadata, new HashMap<String, String>(), startedInputsMap, null,
-        "", new ExecutionContextImpl("localhost"), Runtime.getRuntime().maxMemory(), true,
+        "", new ExecutionContextImpl("localhost", null, "dummy"), Runtime.getRuntime().maxMemory(), true,
         new DefaultHadoopShim(), sharedExecutor);
 
     try {
@@ -123,7 +123,7 @@ public class TestLogicalIOProcessorRuntimeTask {
     tezConf.setBoolean(TezConfiguration.TEZ_LOCAL_MODE, true);
     LogicalIOProcessorRuntimeTask lio2 = new LogicalIOProcessorRuntimeTask(task2, 0, tezConf, null,
         umbilical, serviceConsumerMetadata, new HashMap<String, String>(), startedInputsMap, null,
-        "", new ExecutionContextImpl("localhost"), Runtime.getRuntime().maxMemory(), true,
+        "", new ExecutionContextImpl("localhost", null, "dummy"), Runtime.getRuntime().maxMemory(), true,
         new DefaultHadoopShim(), sharedExecutor);
     try {
       lio2.initialize();
@@ -173,7 +173,7 @@ public class TestLogicalIOProcessorRuntimeTask {
     TezSharedExecutor sharedExecutor = new TezSharedExecutor(tezConf);
     LogicalIOProcessorRuntimeTask lio1 = new LogicalIOProcessorRuntimeTask(task1, 0, tezConf, null,
         umbilical, serviceConsumerMetadata, new HashMap<String, String>(), startedInputsMap, null,
-        "", new ExecutionContextImpl("localhost"), Runtime.getRuntime().maxMemory(), true,
+        "", new ExecutionContextImpl("localhost", null, "dummy"), Runtime.getRuntime().maxMemory(), true,
         new DefaultHadoopShim(), sharedExecutor);
 
     try {
