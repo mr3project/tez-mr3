@@ -154,8 +154,8 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
     }
     if (numDmeEvents.get() + numObsoletionEvents.get() > nextToLogEventCount.get()) {
       logProgress(false);
-      // Log every 50 events seen.
-      nextToLogEventCount.addAndGet(50);
+      // Log every 500 events seen.
+      nextToLogEventCount.addAndGet(500);
     }
   }
 

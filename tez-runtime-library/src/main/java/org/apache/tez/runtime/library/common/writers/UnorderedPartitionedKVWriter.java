@@ -1094,7 +1094,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       for (int i = 0; i < numPartitions; i++) {
         long segmentStart = out.getPos();
         if (numRecordsPerPartition[i] == 0) {
-          LOG.info(destNameTrimmed + ": " + "Skipping partition: " + i + " in final merge since it has no records");
+          if (LOG.isDebugEnabled()) {
+            LOG.debug(destNameTrimmed + ": " + "Skipping partition: " + i + " in final merge since it has no records");
+          }
           continue;
         }
         writer = new Writer(conf, out, keyClass, valClass, codec, null, null);

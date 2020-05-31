@@ -729,7 +729,7 @@ class ShuffleScheduler {
   private void logProgress() {
     int inputsDone = numInputs - remainingMaps.get();
     if (inputsDone > nextProgressLineEventCount.get() || inputsDone == numInputs || isShutdown.get()) {
-      nextProgressLineEventCount.addAndGet(50);
+      nextProgressLineEventCount.addAndGet(500);
       double mbs = (double) totalBytesShuffledTillNow / (1024 * 1024);
       long secsSinceStart = (System.currentTimeMillis() - startTime) / 1000 + 1;
 

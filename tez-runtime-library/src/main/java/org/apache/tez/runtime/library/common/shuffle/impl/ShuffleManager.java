@@ -1017,7 +1017,7 @@ public class ShuffleManager implements FetcherCallback {
     int inputsDone = numCompletedInputs.get();
 
     if (inputsDone > nextProgressLineEventCount.get() || inputsDone == numInputs) {
-      nextProgressLineEventCount.addAndGet(50);
+      nextProgressLineEventCount.addAndGet(500);
       double mbs = (double) totalBytesShuffledTillNow / (1024 * 1024);
       long secsSinceStart = (System.currentTimeMillis() - startTime) / 1000 + 1;
 

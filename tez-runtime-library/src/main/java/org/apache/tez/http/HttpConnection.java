@@ -233,10 +233,10 @@ public class HttpConnection extends BaseHttpConnection {
 
     // verify that replyHash is HMac of encHash
     SecureShuffleUtils.verifyReply(replyHash, encHash, jobTokenSecretMgr);
-    if (URL_LOG.isInfoEnabled()) {
+    if (URL_LOG.isDebugEnabled()) {
       // Following log statement will be used by tez-tool perf-analyzer for mapping attempt to NM
       // host
-      URL_LOG.info("for url=" + url + " sent hash and receievd reply " +
+      URL_LOG.debug("for url=" + url + " sent hash and receievd reply " +
           stopWatch.now(TimeUnit.MILLISECONDS) + " ms");
     } else {
       // Log summary.
