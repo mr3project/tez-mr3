@@ -1526,7 +1526,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT);
     ByteBuffer shuffleMetadata = outputContext
         .getServiceProviderMetaData(auxiliaryService);
-    int shufflePort = ShuffleUtils.deserializeShuffleProviderMetaData(shuffleMetadata);
+    int[] shufflePorts = ShuffleUtils.deserializeShuffleProviderMetaData(shuffleMetadata);
+    int numShufflePorts = shufflePorts.length;
+    int shufflePort = shufflePorts[outputContext.getTaskIndex() % numShufflePorts];
+    LOG.info(outputContext.getUniqueIdentifier() + " uses shuffle port: " + shufflePort);
     return shufflePort;
   }
 

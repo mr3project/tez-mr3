@@ -211,7 +211,6 @@ class ShuffleScheduler {
   private final RawLocalFileSystem localFs;
   private final boolean localDiskFetchEnabled;
   private final String localHostname;
-  private final int shufflePort;
   private final String applicationId;
   private final int dagId;
   private final boolean asyncHttp;
@@ -335,9 +334,6 @@ class ShuffleScheduler {
     this.localHostname = inputContext.getExecutionContext().getHostName();
     String auxiliaryService = conf.get(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
         TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT);
-    final ByteBuffer shuffleMetadata =
-        inputContext.getServiceProviderMetaData(auxiliaryService);
-    this.shufflePort = ShuffleUtils.deserializeShuffleProviderMetaData(shuffleMetadata);
 
     this.referee = new Referee();
     // Counters used by the ShuffleScheduler
@@ -1466,7 +1462,7 @@ class ShuffleScheduler {
   FetcherOrderedGrouped constructFetcherForHost(MapHost mapHost) {
     return new FetcherOrderedGrouped(httpConnectionParams, ShuffleScheduler.this, allocator,
         exceptionReporter, jobTokenSecretManager, ifileReadAhead, ifileReadAheadLength,
-        codec, conf, localFs, localDiskFetchEnabled, localHostname, shufflePort, srcNameTrimmed, mapHost,
+        codec, conf, localFs, localDiskFetchEnabled, localHostname, srcNameTrimmed, mapHost,
         ioErrsCounter, wrongLengthErrsCounter, badIdErrsCounter, wrongMapErrsCounter,
         connectionErrsCounter, wrongReduceErrsCounter, applicationId, dagId, asyncHttp, sslShuffle,
         verifyDiskChecksum, compositeFetch);

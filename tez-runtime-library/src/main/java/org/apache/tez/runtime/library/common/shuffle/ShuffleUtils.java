@@ -110,7 +110,7 @@ public class ShuffleUtils {
     return TezCommonUtils.convertJobTokenToBytes(jobToken);
   }
 
-  public static int deserializeShuffleProviderMetaData(ByteBuffer meta)
+  public static int[] deserializeShuffleProviderMetaData(ByteBuffer meta)
       throws IOException {
     return TezRuntimeUtils.deserializeShuffleProviderMetaData(meta);
   }
@@ -321,7 +321,10 @@ public class ShuffleUtils {
       String host = context.getExecutionContext().getHostName();
       ByteBuffer shuffleMetadata = context
           .getServiceProviderMetaData(auxiliaryService);
-      int shufflePort = ShuffleUtils.deserializeShuffleProviderMetaData(shuffleMetadata);
+      int[] shufflePorts = ShuffleUtils.deserializeShuffleProviderMetaData(shuffleMetadata);
+      int numShufflePorts = shufflePorts.length;
+      int shufflePort = shufflePorts[context.getTaskIndex() % numShufflePorts];
+      LOG.info(context.getUniqueIdentifier() + " uses shuffle port: " + shufflePort);
       payloadBuilder.setHost(host);
       payloadBuilder.setPort(shufflePort);
       //Path component is always 0 indexed

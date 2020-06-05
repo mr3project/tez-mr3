@@ -166,7 +166,6 @@ public class ShuffleManager implements FetcherCallback {
   private final RawLocalFileSystem localFs;
   private final Path[] localDisks;
   private final String localhostName;
-  private final int shufflePort;
 
   private final TezCounter shufflePhaseTime;
   private final TezCounter firstEventReceived;
@@ -266,9 +265,6 @@ public class ShuffleManager implements FetcherCallback {
     this.localDisks = Iterables.toArray(
         localDirAllocator.getAllLocalPathsToRead(".", conf), Path.class);
     this.localhostName = inputContext.getExecutionContext().getHostName();
-    final ByteBuffer shuffleMetaData =
-        inputContext.getServiceProviderMetaData(auxiliaryService);
-    this.shufflePort = ShuffleUtils.deserializeShuffleProviderMetaData(shuffleMetaData);
 
     /**
      * Setting to very high val can lead to Http 400 error. Cap it to 75; every attempt id would
@@ -433,7 +429,7 @@ public class ShuffleManager implements FetcherCallback {
       httpConnectionParams, inputManager, inputContext.getApplicationId(), inputContext.getDagIdentifier(),
         jobTokenSecretMgr, srcNameTrimmed, conf, localFs, localDirAllocator,
         lockDisk, localDiskFetchEnabled, sharedFetchEnabled,
-        localhostName, shufflePort, asyncHttp, verifyDiskChecksum, compositeFetch);
+        localhostName, asyncHttp, verifyDiskChecksum, compositeFetch);
 
     if (codec != null) {
       fetcherBuilder.setCompressionParameters(codec);

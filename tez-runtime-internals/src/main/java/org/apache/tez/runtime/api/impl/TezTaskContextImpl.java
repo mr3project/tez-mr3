@@ -201,6 +201,16 @@ public abstract class TezTaskContextImpl implements TaskContext, Closeable {
   }
 
   @Override
+  public int appendServiceProviderMetaData(String serviceName, ByteBuffer metaData) {
+    return 0;
+  }
+
+  @Override
+  public scala.Tuple2<scala.Int, scala.Int> getDaemonShuffleHandlerUsePort() {
+    return null;
+  }
+
+  @Override
   public void requestInitialMemory(long size, MemoryUpdateCallback callbackHandler) {
     // Nulls allowed since all IOs have to make this call.
     if (callbackHandler == null) {

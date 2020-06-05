@@ -252,13 +252,18 @@ public class TezRuntimeUtils {
     }
   }
 
-  public static int deserializeShuffleProviderMetaData(ByteBuffer meta)
+  public static int[] deserializeShuffleProviderMetaData(ByteBuffer meta)
       throws IOException {
     DataInputByteBuffer in = new DataInputByteBuffer();
     try {
       in.reset(meta);
-      int port = in.readInt();
-      return port;
+      int numPorts = in.getLength() / 4;
+      int[] ports = new int[numPorts];
+      for (int i = 0; i < numPorts; i++) {
+        int port = in.readInt();
+        ports[i] = port;
+      }
+      return ports;
     } finally {
       in.close();
     }
