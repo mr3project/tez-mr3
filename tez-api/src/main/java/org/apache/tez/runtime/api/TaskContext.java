@@ -195,6 +195,7 @@ public interface TaskContext {
   public void setServiceProviderMetaData(String serviceName, ByteBuffer metaData);
 
   public int appendServiceProviderMetaData(String serviceName, ByteBuffer metaData);
+  public int consumeServiceProviderMetaData(String service);
 
   public scala.Tuple2<java.lang.Integer, java.lang.Integer> getDaemonShuffleHandlerUsePort();
 

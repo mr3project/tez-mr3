@@ -206,6 +206,11 @@ public abstract class TezTaskContextImpl implements TaskContext, Closeable {
   }
 
   @Override
+  public int consumeServiceProviderMetaData(String service) {
+    return 0;
+  }
+
+  @Override
   public scala.Tuple2<java.lang.Integer, java.lang.Integer> getDaemonShuffleHandlerUsePort() {
     return null;
   }
