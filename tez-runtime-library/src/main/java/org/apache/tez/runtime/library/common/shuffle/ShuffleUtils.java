@@ -29,6 +29,7 @@ import java.text.DecimalFormat;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.Deflater;
 
@@ -77,6 +78,8 @@ public class ShuffleUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(ShuffleUtils.class);
   private static final long MB = 1024l * 1024l;
+
+  private static AtomicInteger shufflePortIndex = new AtomicInteger(0);
 
   static final ThreadLocal<DecimalFormat> MBPS_FORMAT =
       new ThreadLocal<DecimalFormat>() {
@@ -331,8 +334,7 @@ public class ShuffleUtils {
       ByteBuffer shuffleMetadata = context
           .getServiceProviderMetaData(auxiliaryService);
       int[] shufflePorts = ShuffleUtils.deserializeShuffleProviderMetaData(shuffleMetadata);
-      int numShufflePorts = shufflePorts.length;
-      int shufflePort = shufflePorts[context.getTaskIndex() % numShufflePorts];
+      int shufflePort = shufflePorts[shufflePortIndex.getAndIncrement() % shufflePorts.length];
       LOG.info(context.getUniqueIdentifier() + " uses shuffle port: " + shufflePort);
       payloadBuilder.setHost(host);
       payloadBuilder.setPort(shufflePort);
