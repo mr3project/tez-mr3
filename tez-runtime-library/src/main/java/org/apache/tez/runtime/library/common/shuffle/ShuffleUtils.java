@@ -115,6 +115,15 @@ public class ShuffleUtils {
     return TezRuntimeUtils.deserializeShuffleProviderMetaData(meta);
   }
 
+  public static boolean containsPort(int[] localPorts, int remotePort) {
+    for (int i = 0; i < localPorts.length; i++) {
+      if (localPorts[i] == remotePort) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   public static void shuffleToMemory(byte[] shuffleData,
       InputStream input, int decompressedLength, int compressedLength,
       CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLength,

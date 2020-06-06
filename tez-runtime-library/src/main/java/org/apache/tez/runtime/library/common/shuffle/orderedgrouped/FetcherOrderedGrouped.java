@@ -77,6 +77,7 @@ class FetcherOrderedGrouped implements Callable<Void> {
   private final String logIdentifier;
   private final RawLocalFileSystem localFs;
   private final String localShuffleHost;
+  private final int[] localShufflePorts;
   private final String applicationId;
   private final int dagId;
   private final MapHost mapHost;
@@ -118,6 +119,7 @@ class FetcherOrderedGrouped implements Callable<Void> {
                                RawLocalFileSystem localFs,
                                boolean localDiskFetchEnabled,
                                String localHostname,
+                               int[] shufflePorts,
                                String srcNameTrimmed,
                                MapHost mapHost,
                                TezCounter ioErrsCounter,
@@ -161,6 +163,7 @@ class FetcherOrderedGrouped implements Callable<Void> {
     this.conf = conf;
     this.localFs = localFs;
     this.localShuffleHost = localHostname;
+    this.localShufflePorts = shufflePorts;
 
     this.localDiskFetchEnabled = localDiskFetchEnabled;
     this.sslShuffle = sslShuffle;
@@ -173,7 +176,8 @@ class FetcherOrderedGrouped implements Callable<Void> {
   @VisibleForTesting
   protected void fetchNext() throws InterruptedException, IOException {
     try {
-      if (localDiskFetchEnabled && mapHost.getHost().equals(localShuffleHost)) {
+      if (localDiskFetchEnabled && mapHost.getHost().equals(localShuffleHost) &&
+          ShuffleUtils.containsPort(localShufflePorts, mapHost.getPort())) {
         setupLocalDiskFetch(mapHost);
       } else {
         // Shuffle
