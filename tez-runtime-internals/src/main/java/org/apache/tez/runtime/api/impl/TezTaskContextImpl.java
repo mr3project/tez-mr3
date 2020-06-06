@@ -206,7 +206,7 @@ public abstract class TezTaskContextImpl implements TaskContext, Closeable {
   }
 
   @Override
-  public scala.Tuple2<scala.Int, scala.Int> getDaemonShuffleHandlerUsePort() {
+  public scala.Tuple2<java.lang.Integer, java.lang.Integer> getDaemonShuffleHandlerUsePort() {
     return null;
   }
 
