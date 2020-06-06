@@ -104,8 +104,6 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
   private final static int APPROX_HEADER_LENGTH = 150;
 
-  private static AtomicInteger shufflePortIndex = new AtomicInteger(0);
-
   // Maybe setup a separate statistics class which can be shared between the
   // buffer and the main path instead of having multiple arrays.
 
@@ -929,7 +927,11 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     if (emptyPartitions.cardinality() != numPartitions) {
       // Populate payload only if at least 1 partition has data
       payloadBuilder.setHost(host);
-      payloadBuilder.setPort(getShufflePort());
+      int[] shufflePorts = getShufflePort();
+      payloadBuilder.setNumPorts(shufflePorts.length);
+      for (int i = 0; i < shufflePorts.length; i++) {
+        payloadBuilder.addPorts(shufflePorts[i]);
+      }
       payloadBuilder.setPathComponent(ShuffleUtils.expandPathComponent(outputContext, compositeFetch, pathComponent));
     }
 
@@ -1523,15 +1525,13 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   }
 
   @VisibleForTesting
-  int getShufflePort() throws IOException {
+  int[] getShufflePort() throws IOException {
     String auxiliaryService = conf.get(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
         TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT);
     ByteBuffer shuffleMetadata = outputContext
         .getServiceProviderMetaData(auxiliaryService);
     int[] shufflePorts = ShuffleUtils.deserializeShuffleProviderMetaData(shuffleMetadata);
-    int shufflePort = shufflePorts[shufflePortIndex.getAndIncrement() % shufflePorts.length];
-    LOG.info(outputContext.getUniqueIdentifier() + " uses shuffle port: " + shufflePort);
-    return shufflePort;
+    return shufflePorts;
   }
 
   @InterfaceAudience.Private

@@ -79,8 +79,6 @@ public class ShuffleUtils {
   private static final Logger LOG = LoggerFactory.getLogger(ShuffleUtils.class);
   private static final long MB = 1024l * 1024l;
 
-  private static AtomicInteger shufflePortIndex = new AtomicInteger(0);
-
   static final ThreadLocal<DecimalFormat> MBPS_FORMAT =
       new ThreadLocal<DecimalFormat>() {
         @Override
@@ -275,7 +273,11 @@ public class ShuffleUtils {
       sb.append("hasEmptyPartitions: ").append(dmProto.hasEmptyPartitions()).append(", ");
     }
     sb.append("host: " + dmProto.getHost()).append(", ");
-    sb.append("port: " + dmProto.getPort()).append(", ");
+    int numPorts = dmProto.getNumPorts();
+    sb.append("ports: ");
+    for (int i = 0; i < numPorts; i++) {
+      sb.append(dmProto.getPorts(i)).append(", ");
+    }
     sb.append("pathComponent: " + dmProto.getPathComponent()).append(", ");
     sb.append("runDuration: " + dmProto.getRunDuration()).append(", ");
     sb.append("hasDataInEvent: " + dmProto.hasData());
@@ -333,11 +335,12 @@ public class ShuffleUtils {
       String host = context.getExecutionContext().getHostName();
       ByteBuffer shuffleMetadata = context
           .getServiceProviderMetaData(auxiliaryService);
-      int[] shufflePorts = ShuffleUtils.deserializeShuffleProviderMetaData(shuffleMetadata);
-      int shufflePort = shufflePorts[shufflePortIndex.getAndIncrement() % shufflePorts.length];
-      LOG.info(context.getUniqueIdentifier() + " uses shuffle port: " + shufflePort);
       payloadBuilder.setHost(host);
-      payloadBuilder.setPort(shufflePort);
+      int[] shufflePorts = ShuffleUtils.deserializeShuffleProviderMetaData(shuffleMetadata);
+      payloadBuilder.setNumPorts(shufflePorts.length);
+      for (int i = 0; i < shufflePorts.length; i++) {
+        payloadBuilder.addPorts(shufflePorts[i]);
+      }
       //Path component is always 0 indexed
       payloadBuilder.setPathComponent(expandPathComponent(context, compositeFetch, pathComponent));
     }

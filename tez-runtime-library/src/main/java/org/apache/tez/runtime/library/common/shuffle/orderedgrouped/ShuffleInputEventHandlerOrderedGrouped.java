@@ -49,6 +49,8 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
   
   private static final Logger LOG = LoggerFactory.getLogger(ShuffleInputEventHandlerOrderedGrouped.class);
 
+  private static AtomicInteger shufflePortIndex = new AtomicInteger(0);
+
   private final ShuffleScheduler scheduler;
   private final InputContext inputContext;
   private final boolean compositeFetch;
@@ -169,8 +171,9 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
         throw new TezUncheckedException("Unable to set the empty partition to succeeded", e);
       }
     }
-
-    scheduler.addKnownMapOutput(StringInterner.weakIntern(shufflePayload.getHost()), shufflePayload.getPort(),
+    int numPorts = shufflePayload.getNumPorts();
+    int port = shufflePayload.getPorts(Math.abs(shufflePortIndex.incrementAndGet()) % numPorts);
+    scheduler.addKnownMapOutput(StringInterner.weakIntern(shufflePayload.getHost()), port,
         partitionId, srcAttemptIdentifier);
   }
 
@@ -205,7 +208,9 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
       }
     }
 
-    scheduler.addKnownMapOutput(StringInterner.weakIntern(shufflePayload.getHost()), shufflePayload.getPort(),
+    int numPorts = shufflePayload.getNumPorts();
+    int port = shufflePayload.getPorts(Math.abs(shufflePortIndex.incrementAndGet()) % numPorts);
+    scheduler.addKnownMapOutput(StringInterner.weakIntern(shufflePayload.getHost()), port,
         partitionId, compositeInputAttemptIdentifier);
   }
 
