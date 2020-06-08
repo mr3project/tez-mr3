@@ -171,8 +171,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
         throw new TezUncheckedException("Unable to set the empty partition to succeeded", e);
       }
     }
-    int numPorts = shufflePayload.getNumPorts();
-    int port = shufflePayload.getPorts(Math.abs(shufflePortIndex.incrementAndGet()) % numPorts);
+    int port = getShufflePort(shufflePayload);
     scheduler.addKnownMapOutput(StringInterner.weakIntern(shufflePayload.getHost()), port,
         partitionId, srcAttemptIdentifier);
   }
@@ -208,10 +207,19 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
       }
     }
 
-    int numPorts = shufflePayload.getNumPorts();
-    int port = shufflePayload.getPorts(Math.abs(shufflePortIndex.incrementAndGet()) % numPorts);
+    int port = getShufflePort(shufflePayload);
     scheduler.addKnownMapOutput(StringInterner.weakIntern(shufflePayload.getHost()), port,
         partitionId, compositeInputAttemptIdentifier);
+  }
+
+  private int getShufflePort(DataMovementEventPayloadProto shufflePayload) {
+    if (inputContext.useShuffleHandlerProcessOnK8s()) {
+      int numPorts = scheduler.localShufflePorts.length;
+      return scheduler.localShufflePorts[Math.abs(shufflePortIndex.incrementAndGet()) % numPorts];
+    } else {
+      int numPorts = shufflePayload.getNumPorts();
+      return shufflePayload.getPorts(Math.abs(shufflePortIndex.incrementAndGet()) % numPorts);
+    }
   }
 
   private void processTaskFailedEvent(InputFailedEvent ifEvent) {

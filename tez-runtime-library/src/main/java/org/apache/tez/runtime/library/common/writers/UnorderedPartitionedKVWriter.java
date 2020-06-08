@@ -927,11 +927,16 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     if (emptyPartitions.cardinality() != numPartitions) {
       // Populate payload only if at least 1 partition has data
       payloadBuilder.setHost(host);
-      int[] shufflePorts = getShufflePort();
-      payloadBuilder.setNumPorts(shufflePorts.length);
-      for (int i = 0; i < shufflePorts.length; i++) {
-        payloadBuilder.addPorts(shufflePorts[i]);
+
+      // if useShuffleHandlerProcessOnK8s == true, the consumer can retrieve ports from InputContext
+      if (!outputContext.useShuffleHandlerProcessOnK8s()) {
+        int[] shufflePorts = getShufflePort();
+        payloadBuilder.setNumPorts(shufflePorts.length);
+        for (int i = 0; i < shufflePorts.length; i++) {
+          payloadBuilder.addPorts(shufflePorts[i]);
+        }
       }
+
       payloadBuilder.setPathComponent(ShuffleUtils.expandPathComponent(outputContext, compositeFetch, pathComponent));
     }
 
@@ -1528,8 +1533,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   int[] getShufflePort() throws IOException {
     String auxiliaryService = conf.get(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
         TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT);
-    ByteBuffer shuffleMetadata = outputContext
-        .getServiceProviderMetaData(auxiliaryService);
+    ByteBuffer shuffleMetadata = outputContext.getServiceProviderMetaData(auxiliaryService);
     int[] shufflePorts = ShuffleUtils.deserializeShuffleProviderMetaData(shuffleMetadata);
     return shufflePorts;
   }

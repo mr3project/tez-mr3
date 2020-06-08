@@ -273,7 +273,7 @@ public class ShuffleUtils {
       sb.append("hasEmptyPartitions: ").append(dmProto.hasEmptyPartitions()).append(", ");
     }
     sb.append("host: " + dmProto.getHost()).append(", ");
-    int numPorts = dmProto.getNumPorts();
+    int numPorts = dmProto.hasNumPorts() ? dmProto.getNumPorts() : 0;
     sb.append("ports: ");
     for (int i = 0; i < numPorts; i++) {
       sb.append(dmProto.getPorts(i)).append(", ");
@@ -333,14 +333,18 @@ public class ShuffleUtils {
 
     if (!sendEmptyPartitionDetails || outputGenerated) {
       String host = context.getExecutionContext().getHostName();
-      ByteBuffer shuffleMetadata = context
-          .getServiceProviderMetaData(auxiliaryService);
       payloadBuilder.setHost(host);
-      int[] shufflePorts = ShuffleUtils.deserializeShuffleProviderMetaData(shuffleMetadata);
-      payloadBuilder.setNumPorts(shufflePorts.length);
-      for (int i = 0; i < shufflePorts.length; i++) {
-        payloadBuilder.addPorts(shufflePorts[i]);
+
+      // if useShuffleHandlerProcessOnK8s == true, the consumer can retrieve ports from InputContext
+      if (!context.useShuffleHandlerProcessOnK8s()) {
+        ByteBuffer shuffleMetadata = context.getServiceProviderMetaData(auxiliaryService);
+        int[] shufflePorts = ShuffleUtils.deserializeShuffleProviderMetaData(shuffleMetadata);
+        payloadBuilder.setNumPorts(shufflePorts.length);
+        for (int i = 0; i < shufflePorts.length; i++) {
+          payloadBuilder.addPorts(shufflePorts[i]);
+        }
       }
+
       //Path component is always 0 indexed
       payloadBuilder.setPathComponent(expandPathComponent(context, compositeFetch, pathComponent));
     }

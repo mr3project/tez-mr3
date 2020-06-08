@@ -211,7 +211,7 @@ class ShuffleScheduler {
   private final RawLocalFileSystem localFs;
   private final boolean localDiskFetchEnabled;
   private final String localHostname;
-  private final int[] localShufflePorts;
+  public final int[] localShufflePorts;
   private final String applicationId;
   private final int dagId;
   private final boolean asyncHttp;

@@ -216,6 +216,11 @@ public abstract class TezTaskContextImpl implements TaskContext, Closeable {
   }
 
   @Override
+  public boolean useShuffleHandlerProcessOnK8s() {
+    return false;
+  }
+
+  @Override
   public void requestInitialMemory(long size, MemoryUpdateCallback callbackHandler) {
     // Nulls allowed since all IOs have to make this call.
     if (callbackHandler == null) {

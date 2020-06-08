@@ -166,7 +166,7 @@ public class ShuffleManager implements FetcherCallback {
   private final RawLocalFileSystem localFs;
   private final Path[] localDisks;
   private final String localhostName;
-  private final int[] localShufflePorts;
+  public final int[] localShufflePorts;
 
   private final TezCounter shufflePhaseTime;
   private final TezCounter firstEventReceived;
