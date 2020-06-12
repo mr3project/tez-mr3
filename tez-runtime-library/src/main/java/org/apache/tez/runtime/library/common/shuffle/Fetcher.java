@@ -191,6 +191,8 @@ public class Fetcher implements Callable<FetchResult> {
 
   private final boolean verifyDiskChecksum;
 
+  private final boolean localFetchComparePort;
+
   private final boolean isDebugEnabled = LOG.isDebugEnabled();
 
   private Fetcher(FetcherCallback fetcherCallback, HttpConnectionParams params,
@@ -202,7 +204,8 @@ public class Fetcher implements Callable<FetchResult> {
                   boolean localDiskFetchEnabled,
                   boolean sharedFetchEnabled,
                   String localHostname,
-                  int[] localShufflePorts, boolean asyncHttp, boolean verifyDiskChecksum, boolean compositeFetch) {
+                  int[] localShufflePorts, boolean asyncHttp, boolean verifyDiskChecksum, boolean compositeFetch,
+                  boolean localFetchComparePort) {
     this.asyncHttp = asyncHttp;
     this.verifyDiskChecksum = verifyDiskChecksum;
     this.fetcherCallback = fetcherCallback;
@@ -226,6 +229,8 @@ public class Fetcher implements Callable<FetchResult> {
     this.localHostname = localHostname;
     this.localShufflePorts = localShufflePorts;
     this.compositeFetch = compositeFetch;
+
+    this.localFetchComparePort = localFetchComparePort;
 
     try {
       if (this.sharedFetchEnabled) {
@@ -278,7 +283,8 @@ public class Fetcher implements Callable<FetchResult> {
 
     HostFetchResult hostFetchResult;
 
-    if (localDiskFetchEnabled && host.equals(localHostname) && ShuffleUtils.containsPort(localShufflePorts, port)) {
+    if (localDiskFetchEnabled && host.equals(localHostname) &&
+        (!localFetchComparePort || ShuffleUtils.containsPort(localShufflePorts, port))) {
       hostFetchResult = setupLocalDiskFetch();
     } else if (multiplex) {
       hostFetchResult = doSharedFetch();
@@ -1139,7 +1145,7 @@ public class Fetcher implements Callable<FetchResult> {
         boolean asyncHttp, boolean verifyDiskChecksum, boolean compositeFetch) {
       this.fetcher = new Fetcher(fetcherCallback, params, inputManager, appId, dagIdentifier,
           jobTokenSecretMgr, srcNameTrimmed, conf, null, null, null, localDiskFetchEnabled,
-          false, localHostname, shufflePort, asyncHttp, verifyDiskChecksum, compositeFetch);
+          false, localHostname, shufflePort, asyncHttp, verifyDiskChecksum, compositeFetch, false);
     }
 
     public FetcherBuilder(FetcherCallback fetcherCallback,
@@ -1148,11 +1154,12 @@ public class Fetcher implements Callable<FetchResult> {
         Configuration conf, RawLocalFileSystem localFs,
         LocalDirAllocator localDirAllocator, Path lockPath,
         boolean localDiskFetchEnabled, boolean sharedFetchEnabled,
-        String localHostname, int[] localShufflePorts, boolean asyncHttp, boolean verifyDiskChecksum, boolean compositeFetch) {
+        String localHostname, int[] localShufflePorts, boolean asyncHttp, boolean verifyDiskChecksum, boolean compositeFetch,
+        boolean localFetchComparePort) {
       this.fetcher = new Fetcher(fetcherCallback, params, inputManager, appId, dagIdentifier,
           jobTokenSecretMgr, srcNameTrimmed, conf, localFs, localDirAllocator,
           lockPath, localDiskFetchEnabled, sharedFetchEnabled, localHostname, localShufflePorts, asyncHttp,
-          verifyDiskChecksum, compositeFetch);
+          verifyDiskChecksum, compositeFetch, localFetchComparePort);
     }
 
     public FetcherBuilder setHttpConnectionParameters(HttpConnectionParams httpParams) {

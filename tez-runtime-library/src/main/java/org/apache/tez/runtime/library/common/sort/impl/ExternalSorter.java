@@ -169,7 +169,7 @@ public abstract class ExternalSorter {
   // How partition stats should be reported.
   final ReportPartitionStats reportPartitionStats;
 
-  protected final boolean physicalHostFetch;
+  // protected final boolean physicalHostFetch;  // TODO: currently unused
   protected final boolean compositeFetch;
 
   public ExternalSorter(OutputContext outputContext, Configuration conf, int numOutputs,
@@ -285,9 +285,9 @@ public abstract class ExternalSorter {
         TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED,
         TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED_DEFAULT);
 
-    this.physicalHostFetch = conf.getBoolean(
-        TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH,
-        TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_DEFAULT);
+    // this.physicalHostFetch = conf.getBoolean(
+    //     TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH,
+    //     TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_DEFAULT);
     this.compositeFetch = ShuffleUtils.isTezShuffleHandler(this.conf);
   }
 

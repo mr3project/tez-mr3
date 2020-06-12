@@ -104,7 +104,7 @@ class FetcherOrderedGrouped implements Callable<Void> {
   volatile BaseHttpConnection httpConnection;
   private final boolean asyncHttp;
   private final boolean compositeFetch;
-
+  private final boolean localFetchComparePort;
 
   // Initiative value is 0, which means it hasn't retried yet.
   private long retryStartTime = 0;
@@ -133,7 +133,7 @@ class FetcherOrderedGrouped implements Callable<Void> {
                                boolean asyncHttp,
                                boolean sslShuffle,
                                boolean verifyDiskChecksum,
-                               boolean compositeFetch) {
+                               boolean compositeFetch, boolean localFetchComparePort) {
     this.scheduler = scheduler;
     this.allocator = allocator;
     this.exceptionReporter = exceptionReporter;
@@ -169,6 +169,7 @@ class FetcherOrderedGrouped implements Callable<Void> {
     this.sslShuffle = sslShuffle;
     this.verifyDiskChecksum = verifyDiskChecksum;
     this.compositeFetch = compositeFetch;
+    this.localFetchComparePort = localFetchComparePort;
 
     this.logIdentifier = "fetcher [" + srcNameTrimmed + "] #" + id;
   }
@@ -177,7 +178,7 @@ class FetcherOrderedGrouped implements Callable<Void> {
   protected void fetchNext() throws InterruptedException, IOException {
     try {
       if (localDiskFetchEnabled && mapHost.getHost().equals(localShuffleHost) &&
-          ShuffleUtils.containsPort(localShufflePorts, mapHost.getPort())) {
+          (!localFetchComparePort || ShuffleUtils.containsPort(localShufflePorts, mapHost.getPort()))) {
         setupLocalDiskFetch(mapHost);
       } else {
         // Shuffle

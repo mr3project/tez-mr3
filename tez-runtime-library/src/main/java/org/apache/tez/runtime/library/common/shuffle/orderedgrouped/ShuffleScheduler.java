@@ -210,6 +210,7 @@ class ShuffleScheduler {
   private final Configuration conf;
   private final RawLocalFileSystem localFs;
   private final boolean localDiskFetchEnabled;
+  private final boolean localFetchComparePort;
   private final String localHostname;
   public final int[] localShufflePorts;
   private final String applicationId;
@@ -289,6 +290,9 @@ class ShuffleScheduler {
     localDiskFetchEnabled = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH,
         TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_DEFAULT);
+    localFetchComparePort = conf.getBoolean(
+        TezRuntimeConfiguration.TEZ_RUNTIME_LOCAL_FETCH_COMPARE_PORT,
+        TezRuntimeConfiguration.TEZ_RUNTIME_LOCAL_FETCH_COMPARE_PORT_DEFAULT);
 
     this.minFailurePerHost = conf.getInt(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MIN_FAILURES_PER_HOST,
@@ -1469,7 +1473,7 @@ class ShuffleScheduler {
         codec, conf, localFs, localDiskFetchEnabled, localHostname, localShufflePorts, srcNameTrimmed, mapHost,
         ioErrsCounter, wrongLengthErrsCounter, badIdErrsCounter, wrongMapErrsCounter,
         connectionErrsCounter, wrongReduceErrsCounter, applicationId, dagId, asyncHttp, sslShuffle,
-        verifyDiskChecksum, compositeFetch);
+        verifyDiskChecksum, compositeFetch, localFetchComparePort);
   }
 
   private class FetchFutureCallback implements FutureCallback<Void> {
