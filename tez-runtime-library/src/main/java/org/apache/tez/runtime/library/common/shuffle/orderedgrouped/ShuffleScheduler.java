@@ -210,8 +210,9 @@ class ShuffleScheduler {
   private final Configuration conf;
   private final RawLocalFileSystem localFs;
   private final boolean localDiskFetchEnabled;
+  private final boolean localFetchComparePort;
   private final String localHostname;
-  private final int shufflePort;
+  public final int[] localShufflePorts;
   private final String applicationId;
   private final int dagId;
   private final boolean asyncHttp;
@@ -289,6 +290,9 @@ class ShuffleScheduler {
     localDiskFetchEnabled = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH,
         TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_DEFAULT);
+    localFetchComparePort = conf.getBoolean(
+        TezRuntimeConfiguration.TEZ_RUNTIME_LOCAL_FETCH_COMPARE_PORT,
+        TezRuntimeConfiguration.TEZ_RUNTIME_LOCAL_FETCH_COMPARE_PORT_DEFAULT);
 
     this.minFailurePerHost = conf.getInt(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MIN_FAILURES_PER_HOST,
@@ -337,7 +341,7 @@ class ShuffleScheduler {
         TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT);
     final ByteBuffer shuffleMetadata =
         inputContext.getServiceProviderMetaData(auxiliaryService);
-    this.shufflePort = ShuffleUtils.deserializeShuffleProviderMetaData(shuffleMetadata);
+    this.localShufflePorts = ShuffleUtils.deserializeShuffleProviderMetaData(shuffleMetadata);
 
     this.referee = new Referee();
     // Counters used by the ShuffleScheduler
@@ -729,7 +733,7 @@ class ShuffleScheduler {
   private void logProgress() {
     int inputsDone = numInputs - remainingMaps.get();
     if (inputsDone > nextProgressLineEventCount.get() || inputsDone == numInputs || isShutdown.get()) {
-      nextProgressLineEventCount.addAndGet(50);
+      nextProgressLineEventCount.addAndGet(500);
       double mbs = (double) totalBytesShuffledTillNow / (1024 * 1024);
       long secsSinceStart = (System.currentTimeMillis() - startTime) / 1000 + 1;
 
@@ -1466,10 +1470,10 @@ class ShuffleScheduler {
   FetcherOrderedGrouped constructFetcherForHost(MapHost mapHost) {
     return new FetcherOrderedGrouped(httpConnectionParams, ShuffleScheduler.this, allocator,
         exceptionReporter, jobTokenSecretManager, ifileReadAhead, ifileReadAheadLength,
-        codec, conf, localFs, localDiskFetchEnabled, localHostname, shufflePort, srcNameTrimmed, mapHost,
+        codec, conf, localFs, localDiskFetchEnabled, localHostname, localShufflePorts, srcNameTrimmed, mapHost,
         ioErrsCounter, wrongLengthErrsCounter, badIdErrsCounter, wrongMapErrsCounter,
         connectionErrsCounter, wrongReduceErrsCounter, applicationId, dagId, asyncHttp, sslShuffle,
-        verifyDiskChecksum, compositeFetch);
+        verifyDiskChecksum, compositeFetch, localFetchComparePort);
   }
 
   private class FetchFutureCallback implements FutureCallback<Void> {

@@ -59,7 +59,7 @@ import org.mockito.stubbing.Answer;
 public class TestFetcher {
   private static final String SHUFFLE_INPUT_FILE_PREFIX = "shuffle_input_file_";
   private static String HOST = "localhost";
-  private static int PORT = 41;
+  private static int[] PORT = new int[]{41};
 
   @Test(timeout = 3000)
   public void testLocalFetchModeSetting() throws Exception {
@@ -75,10 +75,10 @@ public class TestFetcher {
     Fetcher.FetcherBuilder builder = new Fetcher.FetcherBuilder(fetcherCallback, null, null,
         ApplicationId.newInstance(0, 1), 1, null, "fetcherTest", conf, ENABLE_LOCAL_FETCH, HOST,
         PORT, false, true, false);
-    builder.assignWork(HOST, PORT, 0, 1, Arrays.asList(srcAttempts));
+    builder.assignWork(HOST, PORT[0], 0, 1, Arrays.asList(srcAttempts));
     Fetcher fetcher = spy(builder.build());
 
-    FetchResult fr = new FetchResult(HOST, PORT, 0, 1, Arrays.asList(srcAttempts));
+    FetchResult fr = new FetchResult(HOST, PORT[0], 0, 1, Arrays.asList(srcAttempts));
     Fetcher.HostFetchResult hfr = new Fetcher.HostFetchResult(fr, srcAttempts, false);
     doReturn(hfr).when(fetcher).setupLocalDiskFetch();
     doReturn(null).when(fetcher).doHttpFetch();
@@ -93,7 +93,7 @@ public class TestFetcher {
     builder = new Fetcher.FetcherBuilder(fetcherCallback, null, null,
         ApplicationId.newInstance(0, 1), -1, null, "fetcherTest", conf, ENABLE_LOCAL_FETCH, HOST,
         PORT, false, true, false);
-    builder.assignWork(HOST + "_OTHER", PORT, 0, 1, Arrays.asList(srcAttempts));
+    builder.assignWork(HOST + "_OTHER", PORT[0], 0, 1, Arrays.asList(srcAttempts));
     fetcher = spy(builder.build());
 
     doReturn(null).when(fetcher).setupLocalDiskFetch();
@@ -109,7 +109,7 @@ public class TestFetcher {
     builder = new Fetcher.FetcherBuilder(fetcherCallback, null, null,
         ApplicationId.newInstance(0, 1), -1, null, "fetcherTest", conf, ENABLE_LOCAL_FETCH, HOST,
         PORT, false, true, false);
-    builder.assignWork(HOST, PORT + 1, 0, 1, Arrays.asList(srcAttempts));
+    builder.assignWork(HOST, PORT[0] + 1, 0, 1, Arrays.asList(srcAttempts));
     fetcher = spy(builder.build());
 
     doReturn(null).when(fetcher).setupLocalDiskFetch();
@@ -126,7 +126,7 @@ public class TestFetcher {
     builder = new Fetcher.FetcherBuilder(fetcherCallback, null, null,
         ApplicationId.newInstance(0, 1), 1, null, "fetcherTest", conf, DISABLE_LOCAL_FETCH, HOST,
         PORT, false, true, false);
-    builder.assignWork(HOST, PORT, 0, 1, Arrays.asList(srcAttempts));
+    builder.assignWork(HOST, PORT[0], 0, 1, Arrays.asList(srcAttempts));
     fetcher = spy(builder.build());
 
     doReturn(null).when(fetcher).setupLocalDiskFetch();
@@ -168,7 +168,7 @@ public class TestFetcher {
     }
     ArrayList<InputAttemptIdentifier> list = new ArrayList<InputAttemptIdentifier>();
     list.addAll(Arrays.asList(srcAttempts));
-    builder.assignWork(HOST, PORT, partition, 1, list);
+    builder.assignWork(HOST, PORT[0], partition, 1, list);
     Fetcher fetcher = spy(builder.build());
     for(CompositeInputAttemptIdentifier compositeInputAttemptIdentifier : srcAttempts) {
       for(int i=0;i<compositeInputAttemptIdentifier.getInputIdentifierCount();i++) {
@@ -293,7 +293,7 @@ public class TestFetcher {
     Fetcher.FetcherBuilder builder = new Fetcher.FetcherBuilder(callback, null, null,
         ApplicationId.newInstance(0, 1), 1, null, "fetcherTest", conf, true, HOST, PORT,
         false, true, false);
-    builder.assignWork(HOST, PORT, partition, 1, Arrays.asList(srcAttempts));
+    builder.assignWork(HOST, PORT[0], partition, 1, Arrays.asList(srcAttempts));
     Fetcher fetcher = spy(builder.build());
     fetcher.populateRemainingMap(new LinkedList<InputAttemptIdentifier>(Arrays.asList(srcAttempts)));
     Assert.assertTrue(expectedSrcAttempts.length == fetcher.srcAttemptsRemaining.size());

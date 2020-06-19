@@ -146,7 +146,9 @@ public class AsyncHttpConnection extends BaseHttpConnection {
     Request request = rb.setUrl(url.toString()).build();
 
     //for debugging
-    LOG.debug("Request url={}, encHash={}, id={}", url, encHash);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Request url={}, encHash={}, id={}", url, encHash);
+    }
 
     try {
       //Blocks calling thread until it receives headers, but have the option to defer response body
@@ -166,7 +168,9 @@ public class AsyncHttpConnection extends BaseHttpConnection {
     //verify the response
     int rc = response.getStatusCode();
     if (rc != HttpURLConnection.HTTP_OK) {
-      LOG.debug("Request url={}, id={}", response.getUri());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Request url={}, id={}", response.getUri());
+      }
       throw new IOException("Got invalid response code " + rc + " from "
           + url + ": " + response.getStatusText());
     }
@@ -188,12 +192,16 @@ public class AsyncHttpConnection extends BaseHttpConnection {
     if (replyHash == null) {
       throw new IOException("security validation of TT Map output failed");
     }
-    LOG.debug("url={};encHash={};replyHash={}", msgToEncode, encHash, replyHash);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("url={};encHash={};replyHash={}", msgToEncode, encHash, replyHash);
+    }
 
     // verify that replyHash is HMac of encHash
     SecureShuffleUtils.verifyReply(replyHash, encHash, jobTokenSecretMgr);
     //Following log statement will be used by tez-tool perf-analyzer for mapping attempt to NM host
-    LOG.info("for url={} sent hash and receievd reply {} ms", url, stopWatch.now(TimeUnit.MILLISECONDS));
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("for url={} sent hash and receievd reply {} ms", url, stopWatch.now(TimeUnit.MILLISECONDS));
+    }
   }
 
   /**

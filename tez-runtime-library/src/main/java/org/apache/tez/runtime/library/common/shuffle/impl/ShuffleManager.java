@@ -136,6 +136,7 @@ public class ShuffleManager implements FetcherCallback {
   private final JobTokenSecretManager jobTokenSecretMgr;
   private final CompressionCodec codec;
   private final boolean localDiskFetchEnabled;
+  private final boolean localFetchComparePort;
   private final boolean sharedFetchEnabled;
   private final boolean verifyDiskChecksum;
   private final boolean compositeFetch;
@@ -166,7 +167,7 @@ public class ShuffleManager implements FetcherCallback {
   private final RawLocalFileSystem localFs;
   private final Path[] localDisks;
   private final String localhostName;
-  private final int shufflePort;
+  public final int[] localShufflePorts;
 
   private final TezCounter shufflePhaseTime;
   private final TezCounter firstEventReceived;
@@ -199,6 +200,8 @@ public class ShuffleManager implements FetcherCallback {
     this.inputManager = inputAllocator;
     this.localDiskFetchEnabled = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH,
         TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_DEFAULT);
+    this.localFetchComparePort = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_LOCAL_FETCH_COMPARE_PORT,
+        TezRuntimeConfiguration.TEZ_RUNTIME_LOCAL_FETCH_COMPARE_PORT_DEFAULT);
     this.sharedFetchEnabled = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_SHARED_FETCH,
         TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_SHARED_FETCH_DEFAULT);
     this.verifyDiskChecksum = conf.getBoolean(
@@ -268,7 +271,7 @@ public class ShuffleManager implements FetcherCallback {
     this.localhostName = inputContext.getExecutionContext().getHostName();
     final ByteBuffer shuffleMetaData =
         inputContext.getServiceProviderMetaData(auxiliaryService);
-    this.shufflePort = ShuffleUtils.deserializeShuffleProviderMetaData(shuffleMetaData);
+    this.localShufflePorts = ShuffleUtils.deserializeShuffleProviderMetaData(shuffleMetaData);
 
     /**
      * Setting to very high val can lead to Http 400 error. Cap it to 75; every attempt id would
@@ -433,7 +436,7 @@ public class ShuffleManager implements FetcherCallback {
       httpConnectionParams, inputManager, inputContext.getApplicationId(), inputContext.getDagIdentifier(),
         jobTokenSecretMgr, srcNameTrimmed, conf, localFs, localDirAllocator,
         lockDisk, localDiskFetchEnabled, sharedFetchEnabled,
-        localhostName, shufflePort, asyncHttp, verifyDiskChecksum, compositeFetch);
+        localhostName, localShufflePorts, asyncHttp, verifyDiskChecksum, compositeFetch, localFetchComparePort);
 
     if (codec != null) {
       fetcherBuilder.setCompressionParameters(codec);
@@ -1017,7 +1020,7 @@ public class ShuffleManager implements FetcherCallback {
     int inputsDone = numCompletedInputs.get();
 
     if (inputsDone > nextProgressLineEventCount.get() || inputsDone == numInputs) {
-      nextProgressLineEventCount.addAndGet(50);
+      nextProgressLineEventCount.addAndGet(500);
       double mbs = (double) totalBytesShuffledTillNow / (1024 * 1024);
       long secsSinceStart = (System.currentTimeMillis() - startTime) / 1000 + 1;
 

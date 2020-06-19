@@ -192,7 +192,14 @@ public interface TaskContext {
   @Nullable
   public ByteBuffer getServiceProviderMetaData(String serviceName);
   
-  public void setServiceProviderMetaData(String serviceName, ByteBuffer metaData); 
+  public void setServiceProviderMetaData(String serviceName, ByteBuffer metaData);
+
+  public int appendServiceProviderMetaData(String serviceName, ByteBuffer metaData);
+  public int consumeServiceProviderMetaData(String service);
+
+  public scala.Tuple2<java.lang.Integer, java.lang.Integer> getDaemonShuffleHandlerUsePort();
+
+  public boolean useShuffleHandlerProcessOnK8s();
 
   /**
    * Request a specific amount of memory during initialization
