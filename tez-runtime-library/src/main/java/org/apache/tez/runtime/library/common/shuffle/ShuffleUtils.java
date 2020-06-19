@@ -29,6 +29,7 @@ import java.text.DecimalFormat;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.Deflater;
 
@@ -110,9 +111,18 @@ public class ShuffleUtils {
     return TezCommonUtils.convertJobTokenToBytes(jobToken);
   }
 
-  public static int deserializeShuffleProviderMetaData(ByteBuffer meta)
+  public static int[] deserializeShuffleProviderMetaData(ByteBuffer meta)
       throws IOException {
     return TezRuntimeUtils.deserializeShuffleProviderMetaData(meta);
+  }
+
+  public static boolean containsPort(int[] localPorts, int remotePort) {
+    for (int i = 0; i < localPorts.length; i++) {
+      if (localPorts[i] == remotePort) {
+        return true;
+      }
+    }
+    return false;
   }
 
   public static void shuffleToMemory(byte[] shuffleData,
@@ -263,7 +273,11 @@ public class ShuffleUtils {
       sb.append("hasEmptyPartitions: ").append(dmProto.hasEmptyPartitions()).append(", ");
     }
     sb.append("host: " + dmProto.getHost()).append(", ");
-    sb.append("port: " + dmProto.getPort()).append(", ");
+    int numPorts = dmProto.hasNumPorts() ? dmProto.getNumPorts() : 0;
+    sb.append("ports: ");
+    for (int i = 0; i < numPorts; i++) {
+      sb.append(dmProto.getPorts(i)).append(", ");
+    }
     sb.append("pathComponent: " + dmProto.getPathComponent()).append(", ");
     sb.append("runDuration: " + dmProto.getRunDuration()).append(", ");
     sb.append("hasDataInEvent: " + dmProto.hasData());
@@ -319,11 +333,18 @@ public class ShuffleUtils {
 
     if (!sendEmptyPartitionDetails || outputGenerated) {
       String host = context.getExecutionContext().getHostName();
-      ByteBuffer shuffleMetadata = context
-          .getServiceProviderMetaData(auxiliaryService);
-      int shufflePort = ShuffleUtils.deserializeShuffleProviderMetaData(shuffleMetadata);
       payloadBuilder.setHost(host);
-      payloadBuilder.setPort(shufflePort);
+
+      // if useShuffleHandlerProcessOnK8s == true, the consumer can retrieve ports from InputContext
+      if (!context.useShuffleHandlerProcessOnK8s()) {
+        ByteBuffer shuffleMetadata = context.getServiceProviderMetaData(auxiliaryService);
+        int[] shufflePorts = ShuffleUtils.deserializeShuffleProviderMetaData(shuffleMetadata);
+        payloadBuilder.setNumPorts(shufflePorts.length);
+        for (int i = 0; i < shufflePorts.length; i++) {
+          payloadBuilder.addPorts(shufflePorts[i]);
+        }
+      }
+
       //Path component is always 0 indexed
       payloadBuilder.setPathComponent(expandPathComponent(context, compositeFetch, pathComponent));
     }

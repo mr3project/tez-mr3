@@ -927,7 +927,16 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     if (emptyPartitions.cardinality() != numPartitions) {
       // Populate payload only if at least 1 partition has data
       payloadBuilder.setHost(host);
-      payloadBuilder.setPort(getShufflePort());
+
+      // if useShuffleHandlerProcessOnK8s == true, the consumer can retrieve ports from InputContext
+      if (!outputContext.useShuffleHandlerProcessOnK8s()) {
+        int[] shufflePorts = getShufflePort();
+        payloadBuilder.setNumPorts(shufflePorts.length);
+        for (int i = 0; i < shufflePorts.length; i++) {
+          payloadBuilder.addPorts(shufflePorts[i]);
+        }
+      }
+
       payloadBuilder.setPathComponent(ShuffleUtils.expandPathComponent(outputContext, compositeFetch, pathComponent));
     }
 
@@ -1094,7 +1103,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       for (int i = 0; i < numPartitions; i++) {
         long segmentStart = out.getPos();
         if (numRecordsPerPartition[i] == 0) {
-          LOG.info(destNameTrimmed + ": " + "Skipping partition: " + i + " in final merge since it has no records");
+          if (LOG.isDebugEnabled()) {
+            LOG.debug(destNameTrimmed + ": " + "Skipping partition: " + i + " in final merge since it has no records");
+          }
           continue;
         }
         writer = new Writer(conf, out, keyClass, valClass, codec, null, null);
@@ -1519,13 +1530,12 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   }
 
   @VisibleForTesting
-  int getShufflePort() throws IOException {
+  int[] getShufflePort() throws IOException {
     String auxiliaryService = conf.get(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
         TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT);
-    ByteBuffer shuffleMetadata = outputContext
-        .getServiceProviderMetaData(auxiliaryService);
-    int shufflePort = ShuffleUtils.deserializeShuffleProviderMetaData(shuffleMetadata);
-    return shufflePort;
+    ByteBuffer shuffleMetadata = outputContext.getServiceProviderMetaData(auxiliaryService);
+    int[] shufflePorts = ShuffleUtils.deserializeShuffleProviderMetaData(shuffleMetadata);
+    return shufflePorts;
   }
 
   @InterfaceAudience.Private

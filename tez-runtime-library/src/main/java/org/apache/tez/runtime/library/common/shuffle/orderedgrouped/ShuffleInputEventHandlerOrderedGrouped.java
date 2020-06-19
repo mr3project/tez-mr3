@@ -49,6 +49,8 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
   
   private static final Logger LOG = LoggerFactory.getLogger(ShuffleInputEventHandlerOrderedGrouped.class);
 
+  private static AtomicInteger shufflePortIndex = new AtomicInteger(0);
+
   private final ShuffleScheduler scheduler;
   private final InputContext inputContext;
   private final boolean compositeFetch;
@@ -138,8 +140,8 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
     }
     if (numDmeEvents.get() + numObsoletionEvents.get() > nextToLogEventCount.get()) {
       logProgress(false);
-      // Log every 50 events seen.
-      nextToLogEventCount.addAndGet(50);
+      // Log every 500 events seen.
+      nextToLogEventCount.addAndGet(500);
     }
   }
 
@@ -169,14 +171,18 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
         throw new TezUncheckedException("Unable to set the empty partition to succeeded", e);
       }
     }
-
-    scheduler.addKnownMapOutput(StringInterner.weakIntern(shufflePayload.getHost()), shufflePayload.getPort(),
+    int port = getShufflePort(shufflePayload);
+    scheduler.addKnownMapOutput(StringInterner.weakIntern(shufflePayload.getHost()), port,
         partitionId, srcAttemptIdentifier);
   }
 
-  private void processCompositeRoutedDataMovementEvent(CompositeRoutedDataMovementEvent crdmEvent, DataMovementEventPayloadProto shufflePayload, BitSet emptyPartitionsBitSet) throws IOException {
+  private void processCompositeRoutedDataMovementEvent(
+      CompositeRoutedDataMovementEvent crdmEvent,
+      DataMovementEventPayloadProto shufflePayload,
+      BitSet emptyPartitionsBitSet) throws IOException {
     int partitionId = crdmEvent.getSourceIndex();
-    CompositeInputAttemptIdentifier compositeInputAttemptIdentifier = constructInputAttemptIdentifier(crdmEvent.getTargetIndex(), crdmEvent.getCount(), crdmEvent.getVersion(), shufflePayload);
+    CompositeInputAttemptIdentifier compositeInputAttemptIdentifier =
+        constructInputAttemptIdentifier(crdmEvent.getTargetIndex(), crdmEvent.getCount(), crdmEvent.getVersion(), shufflePayload);
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("DME srcIdx: " + partitionId + ", targetIdx: " + crdmEvent.getTargetIndex() + ", count:" + crdmEvent.getCount()
@@ -205,8 +211,19 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
       }
     }
 
-    scheduler.addKnownMapOutput(StringInterner.weakIntern(shufflePayload.getHost()), shufflePayload.getPort(),
+    int port = getShufflePort(shufflePayload);
+    scheduler.addKnownMapOutput(StringInterner.weakIntern(shufflePayload.getHost()), port,
         partitionId, compositeInputAttemptIdentifier);
+  }
+
+  private int getShufflePort(DataMovementEventPayloadProto shufflePayload) {
+    if (inputContext.useShuffleHandlerProcessOnK8s()) {
+      int numPorts = scheduler.localShufflePorts.length;
+      return scheduler.localShufflePorts[Math.abs(shufflePortIndex.incrementAndGet()) % numPorts];
+    } else {
+      int numPorts = shufflePayload.getNumPorts();
+      return shufflePayload.getPorts(Math.abs(shufflePortIndex.incrementAndGet()) % numPorts);
+    }
   }
 
   private void processTaskFailedEvent(InputFailedEvent ifEvent) {

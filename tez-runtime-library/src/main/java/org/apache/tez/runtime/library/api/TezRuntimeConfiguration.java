@@ -517,6 +517,10 @@ public class TezRuntimeConfiguration {
   public static final String TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH = TEZ_RUNTIME_PREFIX + "optimize.local.fetch";
   public static final boolean TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_DEFAULT = true;
 
+  @ConfigurationProperty(type = "boolean")
+  public static final String TEZ_RUNTIME_LOCAL_FETCH_COMPARE_PORT = TEZ_RUNTIME_PREFIX + "local.fetch.compare.port";
+  public static final boolean TEZ_RUNTIME_LOCAL_FETCH_COMPARE_PORT_DEFAULT = true;
+
   /**
    * Expert level setting. Enable pipelined shuffle in ordered outputs and in unordered
    * partitioned outputs. In ordered cases, it works with PipelinedSorter.
@@ -642,6 +646,7 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_SUPPORT_IN_MEM_FILE);
     tezRuntimeKeys.add(TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS);
     tezRuntimeKeys.add(TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH);
+    tezRuntimeKeys.add(TEZ_RUNTIME_LOCAL_FETCH_COMPARE_PORT);
     tezRuntimeKeys.add(TEZ_RUNTIME_OPTIMIZE_SHARED_FETCH);
     tezRuntimeKeys.add(TEZ_RUNTIME_CONVERT_USER_PAYLOAD_TO_HISTORY_TEXT);
     tezRuntimeKeys.add(TEZ_RUNTIME_SORTER_CLASS);

@@ -57,7 +57,9 @@ import com.google.protobuf.InvalidProtocolBufferException;
 public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
 
   private static final Logger LOG = LoggerFactory.getLogger(ShuffleInputEventHandlerImpl.class);
-  
+
+  private static AtomicInteger shufflePortIndex = new AtomicInteger(0);
+
   private final ShuffleManager shuffleManager;
   //TODO: unused. Consider removing later?
   private final FetchedInputAllocator inputAllocator;
@@ -154,8 +156,8 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
     }
     if (numDmeEvents.get() + numObsoletionEvents.get() > nextToLogEventCount.get()) {
       logProgress(false);
-      // Log every 50 events seen.
-      nextToLogEventCount.addAndGet(50);
+      // Log every 500 events seen.
+      nextToLogEventCount.addAndGet(500);
     }
   }
 
@@ -170,8 +172,6 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
 
   private void processDataMovementEvent(DataMovementEvent dme, DataMovementEventPayloadProto shufflePayload, BitSet emptyPartitionsBitSet) throws IOException {
     int srcIndex = dme.getSourceIndex();
-
-    String hostIdentifier = shufflePayload.getHost() + ":" + shufflePayload.getPort();
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("DME srcIdx: " + srcIndex + ", targetIndex: " + dme.getTargetIndex()
@@ -196,9 +196,11 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
     CompositeInputAttemptIdentifier srcAttemptIdentifier = constructInputAttemptIdentifier(dme.getTargetIndex(), 1, dme.getVersion(),
         shufflePayload, (useSharedInputs && srcIndex == 0));
 
+    int port = getShufflePort(shufflePayload);
     if (shufflePayload.hasData()) {
       DataProto dataProto = shufflePayload.getData();
 
+      String hostIdentifier = shufflePayload.getHost() + ":" + port;
       FetchedInput fetchedInput =
           inputAllocator.allocate(dataProto.getRawLength(),
               dataProto.getCompressedLength(), srcAttemptIdentifier);
@@ -207,7 +209,7 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
 
       LOG.debug("Payload via DME : " + srcAttemptIdentifier);
     } else {
-      shuffleManager.addKnownInput(shufflePayload.getHost(), shufflePayload.getPort(),
+      shuffleManager.addKnownInput(shufflePayload.getHost(), port,
               srcAttemptIdentifier, srcIndex);
     }
   }
@@ -239,7 +241,10 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
     }
   }
 
-  private void processCompositeRoutedDataMovementEvent(CompositeRoutedDataMovementEvent crdme, DataMovementEventPayloadProto shufflePayload, BitSet emptyPartitionsBitSet) throws IOException {
+  private void processCompositeRoutedDataMovementEvent(
+      CompositeRoutedDataMovementEvent crdme,
+      DataMovementEventPayloadProto shufflePayload,
+      BitSet emptyPartitionsBitSet) throws IOException {
     int partitionId = crdme.getSourceIndex();
     if (LOG.isDebugEnabled()) {
       LOG.debug("DME srcIdx: " + partitionId + ", targetIndex: " + crdme.getTargetIndex() + ", count:" + crdme.getCount()
@@ -274,7 +279,18 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
     CompositeInputAttemptIdentifier srcAttemptIdentifier = constructInputAttemptIdentifier(crdme.getTargetIndex(), crdme.getCount(), crdme.getVersion(),
         shufflePayload, (useSharedInputs && partitionId == 0));
 
-    shuffleManager.addKnownInput(shufflePayload.getHost(), shufflePayload.getPort(), srcAttemptIdentifier, partitionId);
+    int port = getShufflePort(shufflePayload);
+    shuffleManager.addKnownInput(shufflePayload.getHost(), port, srcAttemptIdentifier, partitionId);
+  }
+
+  private int getShufflePort(DataMovementEventPayloadProto shufflePayload) {
+    if (inputContext.useShuffleHandlerProcessOnK8s()) {
+      int numPorts = shuffleManager.localShufflePorts.length;
+      return shuffleManager.localShufflePorts[Math.abs(shufflePortIndex.incrementAndGet()) % numPorts];
+    } else {
+      int numPorts = shufflePayload.getNumPorts();
+      return shufflePayload.getPorts(Math.abs(shufflePortIndex.incrementAndGet()) % numPorts);
+    }
   }
 
   private void processInputFailedEvent(InputFailedEvent ife) {
