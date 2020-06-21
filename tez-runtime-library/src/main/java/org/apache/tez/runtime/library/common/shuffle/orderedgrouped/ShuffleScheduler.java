@@ -418,19 +418,20 @@ class ShuffleScheduler {
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_HOST_PENALTY_TIME_LIMIT_MS_DEFAULT);
 
     pipelinedShuffleInfoEventsMap = Maps.newConcurrentMap();
-    LOG.info("ShuffleScheduler running for sourceVertex: "
-        + inputContext.getSourceVertexName() + " with configuration: "
-        + ", maxFailedUniqueFetches=" + maxFailedUniqueFetches
-        + ", abortFailureLimit=" + abortFailureLimit
-        + ", maxTaskOutputAtOnce=" + maxTaskOutputAtOnce
-        + ", numFetchers=" + numFetchers
-        + ", hostFailureFraction=" + hostFailureFraction
-        + ", minFailurePerHost=" + minFailurePerHost
-        + ", maxAllowedFailedFetchFraction=" + maxAllowedFailedFetchFraction
-        + ", maxStallTimeFraction=" + maxStallTimeFraction
-        + ", minReqProgressFraction=" + minReqProgressFraction
-        + ", checkFailedFetchSinceLastCompletion=" + checkFailedFetchSinceLastCompletion
-    );
+    LOG.info("ShuffleScheduler running for sourceVertex: " + inputContext.getSourceVertexName()
+        + ", numFetchers=" + numFetchers);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("maxFailedUniqueFetches=" + maxFailedUniqueFetches
+          + ", abortFailureLimit=" + abortFailureLimit
+          + ", maxTaskOutputAtOnce=" + maxTaskOutputAtOnce
+          + ", hostFailureFraction=" + hostFailureFraction
+          + ", minFailurePerHost=" + minFailurePerHost
+          + ", maxAllowedFailedFetchFraction=" + maxAllowedFailedFetchFraction
+          + ", maxStallTimeFraction=" + maxStallTimeFraction
+          + ", minReqProgressFraction=" + minReqProgressFraction
+          + ", checkFailedFetchSinceLastCompletion=" + checkFailedFetchSinceLastCompletion
+      );
+    }
   }
 
   public void start() throws Exception {

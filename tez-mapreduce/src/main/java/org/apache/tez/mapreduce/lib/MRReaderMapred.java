@@ -170,6 +170,8 @@ public class MRReaderMapred extends MRReader {
       this.incrementalConf.setLong(JobContext.MAP_INPUT_START, fileSplit.getStart());
       this.incrementalConf.setLong(JobContext.MAP_INPUT_PATH, fileSplit.getLength());
     }
-    LOG.info("Processing split: " + inputSplit);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Processing split: " + inputSplit);
+    }
   }
 }

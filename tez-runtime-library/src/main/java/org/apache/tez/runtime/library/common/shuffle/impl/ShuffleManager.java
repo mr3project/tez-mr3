@@ -285,13 +285,16 @@ public class ShuffleManager implements FetcherCallback {
 
     shuffleInfoEventsMap = new ConcurrentHashMap<Integer, ShuffleEventInfo>();
 
-    LOG.info(srcNameTrimmed + ": numInputs=" + numInputs + ", compressionCodec="
-        + (codec == null ? "NoCompressionCodec" : codec.getClass().getName()) + ", numFetchers="
-        + numFetchers + ", ifileBufferSize=" + ifileBufferSize + ", ifileReadAheadEnabled="
-        + ifileReadAhead + ", ifileReadAheadLength=" + ifileReadAheadLength +", "
-        + "localDiskFetchEnabled=" + localDiskFetchEnabled + ", "
-        + "sharedFetchEnabled=" + sharedFetchEnabled + ", "
-        + httpConnectionParams.toString() + ", maxTaskOutputAtOnce=" + maxTaskOutputAtOnce);
+    LOG.info(srcNameTrimmed + ": numInputs=" + numInputs + ", numFetchers=" + numFetchers);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("compressionCodec="
+          + (codec == null ? "NoCompressionCodec" : codec.getClass().getName())
+          + ", ifileBufferSize=" + ifileBufferSize + ", ifileReadAheadEnabled="
+          + ifileReadAhead + ", ifileReadAheadLength=" + ifileReadAheadLength +", "
+          + "localDiskFetchEnabled=" + localDiskFetchEnabled + ", "
+          + "sharedFetchEnabled=" + sharedFetchEnabled + ", "
+          + httpConnectionParams.toString() + ", maxTaskOutputAtOnce=" + maxTaskOutputAtOnce);
+    }
   }
 
   public void run() throws IOException {
