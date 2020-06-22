@@ -734,14 +734,17 @@ class ShuffleScheduler {
   private void logProgress() {
     int inputsDone = numInputs - remainingMaps.get();
     if (inputsDone > nextProgressLineEventCount.get() || inputsDone == numInputs || isShutdown.get()) {
-      nextProgressLineEventCount.addAndGet(500);
+      nextProgressLineEventCount.addAndGet(1000);
       double mbs = (double) totalBytesShuffledTillNow / (1024 * 1024);
       long secsSinceStart = (System.currentTimeMillis() - startTime) / 1000 + 1;
 
       double transferRate = mbs / secsSinceStart;
-      LOG.info("copy(" + inputsDone + " (spillsFetched=" + numFetchedSpills + ") of " + numInputs +
-          ". Transfer rate (CumulativeDataFetched/TimeSinceInputStarted)) "
-          + mbpsFormat.format(transferRate) + " MB/s)");
+      StringBuilder s = new StringBuilder();
+      s.append("copy=" + inputsDone);
+      s.append(", numFetchedSpills=" + numFetchedSpills);
+      s.append(", numInputs=" + numInputs);
+      s.append(", transfer rate (MB/s) = " + mbpsFormat.format(transferRate));  // CumulativeDataFetched/TimeSinceInputStarted
+      LOG.info(s.toString());
     }
   }
 
