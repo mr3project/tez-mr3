@@ -501,7 +501,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     } else {
       // Update overall stats
       final int filledBufferCount = filledBuffers.size();
-      if (LOG.isDebugEnabled() || (filledBufferCount % 10) == 0) {
+      if (LOG.isDebugEnabled() || (filledBufferCount > 0 && (filledBufferCount % 10) == 0)) {
         LOG.info(destNameTrimmed + ": " + "Moving to next buffer. Total filled buffers: " + filledBufferCount);
       }
       updateGlobalStats(currentBuffer);

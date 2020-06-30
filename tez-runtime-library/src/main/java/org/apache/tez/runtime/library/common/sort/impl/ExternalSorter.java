@@ -210,14 +210,15 @@ public abstract class ExternalSorter {
     serializationFactory = new SerializationFactory(this.conf);
     keySerializer = serializationFactory.getSerializer(keyClass);
     valSerializer = serializationFactory.getSerializer(valClass);
-    LOG.info(outputContext.getDestinationVertexName() + " using: "
-        + "memoryMb=" + assignedMb
-        + ", keySerializerClass=" + keyClass
-        + ", valueSerializerClass=" + valSerializer
-        + ", comparator=" + (RawComparator) ConfigUtils.getIntermediateOutputKeyComparator(conf)
-        + ", partitioner=" + conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_PARTITIONER_CLASS)
-        + ", serialization=" + conf.get(CommonConfigurationKeys.IO_SERIALIZATIONS_KEY)
-        + ", reportPartitionStats=" + reportPartitionStats);
+    LOG.info(outputContext.getDestinationVertexName() + ", memoryMb=" + assignedMb);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("keySerializerClass=" + keyClass
+          + ", valueSerializerClass=" + valSerializer
+          + ", comparator=" + (RawComparator) ConfigUtils.getIntermediateOutputKeyComparator(conf)
+          + ", partitioner=" + conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_PARTITIONER_CLASS)
+          + ", serialization=" + conf.get(CommonConfigurationKeys.IO_SERIALIZATIONS_KEY)
+          + ", reportPartitionStats=" + reportPartitionStats);
+    }
 
     //    counters    
     mapOutputByteCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_BYTES);

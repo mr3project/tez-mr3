@@ -163,11 +163,13 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
 
   @Override
   public void logProgress(boolean updateOnClose) {
-    LOG.info(inputContext.getSourceVertexName() + ": "
-        + "numDmeEventsSeen=" + numDmeEvents.get()
-        + ", numDmeEventsSeenWithNoData=" + numDmeEventsNoData.get()
-        + ", numObsoletionEventsSeen=" + numObsoletionEvents.get()
-        + (updateOnClose == true ? ", updateOnClose" : ""));
+    StringBuilder s = new StringBuilder();
+    s.append(inputContext.getSourceVertexName());
+    s.append(", numDmeEventsSeen=" + numDmeEvents.get());
+    s.append(", numDmeEventsSeenWithNoData=" + numDmeEventsNoData.get());
+    s.append(", numObsoletionEventsSeen=" + numObsoletionEvents.get());
+    s.append(updateOnClose == true ? ", updateOnClose" : "");
+    LOG.info(s.toString());
   }
 
   private void processDataMovementEvent(DataMovementEvent dme, DataMovementEventPayloadProto shufflePayload, BitSet emptyPartitionsBitSet) throws IOException {
