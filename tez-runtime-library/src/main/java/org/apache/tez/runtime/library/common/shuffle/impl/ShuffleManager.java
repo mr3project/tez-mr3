@@ -285,13 +285,16 @@ public class ShuffleManager implements FetcherCallback {
 
     shuffleInfoEventsMap = new ConcurrentHashMap<Integer, ShuffleEventInfo>();
 
-    LOG.info(srcNameTrimmed + ": numInputs=" + numInputs + ", compressionCodec="
-        + (codec == null ? "NoCompressionCodec" : codec.getClass().getName()) + ", numFetchers="
-        + numFetchers + ", ifileBufferSize=" + ifileBufferSize + ", ifileReadAheadEnabled="
-        + ifileReadAhead + ", ifileReadAheadLength=" + ifileReadAheadLength +", "
-        + "localDiskFetchEnabled=" + localDiskFetchEnabled + ", "
-        + "sharedFetchEnabled=" + sharedFetchEnabled + ", "
-        + httpConnectionParams.toString() + ", maxTaskOutputAtOnce=" + maxTaskOutputAtOnce);
+    LOG.info(srcNameTrimmed + ": numInputs=" + numInputs + ", numFetchers=" + numFetchers);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("compressionCodec="
+          + (codec == null ? "NoCompressionCodec" : codec.getClass().getName())
+          + ", ifileBufferSize=" + ifileBufferSize + ", ifileReadAheadEnabled="
+          + ifileReadAhead + ", ifileReadAheadLength=" + ifileReadAheadLength +", "
+          + "localDiskFetchEnabled=" + localDiskFetchEnabled + ", "
+          + "sharedFetchEnabled=" + sharedFetchEnabled + ", "
+          + httpConnectionParams.toString() + ", maxTaskOutputAtOnce=" + maxTaskOutputAtOnce);
+    }
   }
 
   public void run() throws IOException {
@@ -1020,16 +1023,17 @@ public class ShuffleManager implements FetcherCallback {
     int inputsDone = numCompletedInputs.get();
 
     if (inputsDone > nextProgressLineEventCount.get() || inputsDone == numInputs) {
-      nextProgressLineEventCount.addAndGet(500);
+      nextProgressLineEventCount.addAndGet(1000);
       double mbs = (double) totalBytesShuffledTillNow / (1024 * 1024);
       long secsSinceStart = (System.currentTimeMillis() - startTime) / 1000 + 1;
 
       double transferRate = mbs / secsSinceStart;
-      LOG.info("copy(" + inputsDone + " (spillsFetched=" + numFetchedSpills.get() + ") of " +
-          numInputs +
-          ". Transfer rate (CumulativeDataFetched/TimeSinceInputStarted)) "
-          + mbpsFormat.format(transferRate) + " MB/s)");
-
+      StringBuilder s = new StringBuilder();
+      s.append("copy=" + inputsDone);
+      s.append(", numFetchedSpills=" + numFetchedSpills);
+      s.append(", numInputs=" + numInputs);
+      s.append(", transfer rate (MB/s) = " + mbpsFormat.format(transferRate));  // CumulativeDataFetched/TimeSinceInputStarted
+      LOG.info(s.toString());
     }
   }
 

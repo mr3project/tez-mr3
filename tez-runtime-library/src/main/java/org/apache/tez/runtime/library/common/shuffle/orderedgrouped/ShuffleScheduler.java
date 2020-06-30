@@ -418,19 +418,20 @@ class ShuffleScheduler {
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_HOST_PENALTY_TIME_LIMIT_MS_DEFAULT);
 
     pipelinedShuffleInfoEventsMap = Maps.newConcurrentMap();
-    LOG.info("ShuffleScheduler running for sourceVertex: "
-        + inputContext.getSourceVertexName() + " with configuration: "
-        + ", maxFailedUniqueFetches=" + maxFailedUniqueFetches
-        + ", abortFailureLimit=" + abortFailureLimit
-        + ", maxTaskOutputAtOnce=" + maxTaskOutputAtOnce
-        + ", numFetchers=" + numFetchers
-        + ", hostFailureFraction=" + hostFailureFraction
-        + ", minFailurePerHost=" + minFailurePerHost
-        + ", maxAllowedFailedFetchFraction=" + maxAllowedFailedFetchFraction
-        + ", maxStallTimeFraction=" + maxStallTimeFraction
-        + ", minReqProgressFraction=" + minReqProgressFraction
-        + ", checkFailedFetchSinceLastCompletion=" + checkFailedFetchSinceLastCompletion
-    );
+    LOG.info("ShuffleScheduler running for sourceVertex: " + inputContext.getSourceVertexName()
+        + ", numFetchers=" + numFetchers);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("maxFailedUniqueFetches=" + maxFailedUniqueFetches
+          + ", abortFailureLimit=" + abortFailureLimit
+          + ", maxTaskOutputAtOnce=" + maxTaskOutputAtOnce
+          + ", hostFailureFraction=" + hostFailureFraction
+          + ", minFailurePerHost=" + minFailurePerHost
+          + ", maxAllowedFailedFetchFraction=" + maxAllowedFailedFetchFraction
+          + ", maxStallTimeFraction=" + maxStallTimeFraction
+          + ", minReqProgressFraction=" + minReqProgressFraction
+          + ", checkFailedFetchSinceLastCompletion=" + checkFailedFetchSinceLastCompletion
+      );
+    }
   }
 
   public void start() throws Exception {
@@ -733,14 +734,17 @@ class ShuffleScheduler {
   private void logProgress() {
     int inputsDone = numInputs - remainingMaps.get();
     if (inputsDone > nextProgressLineEventCount.get() || inputsDone == numInputs || isShutdown.get()) {
-      nextProgressLineEventCount.addAndGet(500);
+      nextProgressLineEventCount.addAndGet(1000);
       double mbs = (double) totalBytesShuffledTillNow / (1024 * 1024);
       long secsSinceStart = (System.currentTimeMillis() - startTime) / 1000 + 1;
 
       double transferRate = mbs / secsSinceStart;
-      LOG.info("copy(" + inputsDone + " (spillsFetched=" + numFetchedSpills + ") of " + numInputs +
-          ". Transfer rate (CumulativeDataFetched/TimeSinceInputStarted)) "
-          + mbpsFormat.format(transferRate) + " MB/s)");
+      StringBuilder s = new StringBuilder();
+      s.append("copy=" + inputsDone);
+      s.append(", numFetchedSpills=" + numFetchedSpills);
+      s.append(", numInputs=" + numInputs);
+      s.append(", transfer rate (MB/s) = " + mbpsFormat.format(transferRate));  // CumulativeDataFetched/TimeSinceInputStarted
+      LOG.info(s.toString());
     }
   }
 
