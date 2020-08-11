@@ -418,8 +418,8 @@ class ShuffleScheduler {
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_HOST_PENALTY_TIME_LIMIT_MS_DEFAULT);
 
     pipelinedShuffleInfoEventsMap = Maps.newConcurrentMap();
-    LOG.info("ShuffleScheduler running for sourceVertex: " + inputContext.getSourceVertexName()
-        + ", numFetchers=" + numFetchers);
+    LOG.info("ShuffleScheduler running for sourceVertex: {}, numFetchers={}",
+        inputContext.getSourceVertexName(), numFetchers);
     if (LOG.isDebugEnabled()) {
       LOG.debug("maxFailedUniqueFetches=" + maxFailedUniqueFetches
           + ", abortFailureLimit=" + abortFailureLimit
@@ -480,8 +480,7 @@ class ShuffleScheduler {
           referee.interrupt();
           referee.join();
         } catch (InterruptedException e) {
-          LOG.warn(
-              "Interrupted while shutting down referee. Ignoring and continuing shutdown");
+          LOG.warn("Interrupted while shutting down referee. Ignoring and continuing shutdown");
           Thread.currentThread().interrupt();
         } catch (Exception e) {
           LOG.warn(
@@ -496,9 +495,8 @@ class ShuffleScheduler {
         fetcherExecutor.shutdownNow();
       }
       long endTime = System.currentTimeMillis();
-      LOG.info("Shutting down fetchers for input: {}, shutdown timetaken: {} ms, "
-              + "hasFetcherExecutorStopped: {}", srcNameTrimmed,
-          (endTime - startTime), hasFetcherExecutorStopped());
+      LOG.info("Shutting down fetchers for input: {}, shutdown timetaken: {} ms, hasFetcherExecutorStopped: {}",
+          srcNameTrimmed, (endTime - startTime), hasFetcherExecutorStopped());
     }
   }
 
@@ -655,7 +653,7 @@ class ShuffleScheduler {
 
       if (remainingMaps.get() == 0) {
         notifyAll(); // Notify the getHost() method.
-        LOG.info("All inputs fetched for input vertex : " + inputContext.getSourceVertexName());
+        LOG.info("All inputs fetched for input vertex: " + inputContext.getSourceVertexName());
       }
 
       // update the status
@@ -862,12 +860,10 @@ class ShuffleScheduler {
 
   // Notify AM
   private void informAM(InputAttemptIdentifier srcAttempt) {
-    LOG.info(
-        srcNameTrimmed + ": " + "Reporting fetch failure for InputIdentifier: "
-            + srcAttempt + " taskAttemptIdentifier: " + TezRuntimeUtils
-            .getTaskAttemptIdentifier(inputContext.getSourceVertexName(),
-                srcAttempt.getInputIdentifier(),
-                srcAttempt.getAttemptNumber()) + " to AM.");
+    LOG.info("{}: Reporting fetch failure for InputIdentifier: {} taskAttemptIdentifier: {} to AM.",
+        srcNameTrimmed, srcAttempt,
+        TezRuntimeUtils.getTaskAttemptIdentifier(
+            inputContext.getSourceVertexName(), srcAttempt.getInputIdentifier(), srcAttempt.getAttemptNumber()));
     List<Event> failedEvents = Lists.newArrayListWithCapacity(1);
     failedEvents.add(InputReadErrorEvent.create(
         "Fetch failure for " + TezRuntimeUtils
@@ -906,12 +902,8 @@ class ShuffleScheduler {
       }
     }
 
-    LOG.info(logContext + ", numUniqueHosts=" + numUniqueHosts
-        + ", hostFailureThreshold=" + threshold
-        + ", hostFailuresCount=" + hostFailures.size()
-        + ", hosts crossing threshold=" + total
-        + ", reducerFetchIssues=" + failedAcrossNodes
-      );
+    LOG.info("{}, numUniqueHosts={}, hostFailureThreshold={}, hostFailuresCount={}, hosts crossing threshold={}, reducerFetchIssues={}",
+        logContext, numUniqueHosts, threshold, hostFailures.size(), total, failedAcrossNodes);
 
     return failedAcrossNodes;
   }
@@ -985,11 +977,8 @@ class ShuffleScheduler {
                     failedShufflesSinceLastCompletion + remainingMaps.get()))
                     < maxAllowedFailedFetchFraction);
 
-            LOG.info(logContext + ", fetcherHealthy=" + fetcherHealthy
-                + ", failedShufflesSinceLastCompletion="
-                + failedShufflesSinceLastCompletion
-                + ", remainingMaps=" + remainingMaps.get()
-            );
+            LOG.info("{}, fetcherHealthy={}, failedShufflesSinceLastCompletion={}, remainingMaps={}",
+                logContext, fetcherHealthy, failedShufflesSinceLastCompletion, remainingMaps.get());
           }
         }
       }
@@ -1034,13 +1023,13 @@ class ShuffleScheduler {
         failureCounts.size() == (numInputs - doneMaps))
         && !fetcherHealthy
         && (!reducerProgressedEnough || reducerStalled)) {
-      String errorMsg = (srcNameTrimmed + ": "
-          + "Shuffle failed with too many fetch failures and insufficient progress!"
-          + "failureCounts=" + failureCounts.size()
-          + ", pendingInputs=" + (numInputs - doneMaps)
-          + ", fetcherHealthy=" + fetcherHealthy
-          + ", reducerProgressedEnough=" + reducerProgressedEnough
-          + ", reducerStalled=" + reducerStalled);
+      String errorMsg = (new StringBuilder(srcNameTrimmed))
+          .append(": Shuffle failed with too many fetch failures and insufficient progress!")
+          .append(" failureCounts=").append(failureCounts.size())
+          .append(", pendingInputs=").append(numInputs - doneMaps)
+          .append(", fetcherHealthy=").append(fetcherHealthy)
+          .append(", reducerProgressedEnough=").append(reducerProgressedEnough)
+          .append(", reducerStalled=").append(reducerStalled).toString();
       LOG.error(errorMsg);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Host failures=" + hostFailures.keySet());
@@ -1085,7 +1074,7 @@ class ShuffleScheduler {
   
   public void obsoleteInput(InputAttemptIdentifier srcAttempt) {
     // The incoming srcAttempt does not contain a path component.
-    LOG.info(srcNameTrimmed + ": " + "Adding obsolete input: " + srcAttempt);
+    LOG.info("{}: Adding obsolete input: {}", srcNameTrimmed, srcAttempt);
     ShuffleEventInfo eventInfo = pipelinedShuffleInfoEventsMap.get(srcAttempt.getInputIdentifier());
 
     //Pipelined shuffle case (where pipelinedShuffleInfoEventsMap gets populated).
@@ -1224,10 +1213,8 @@ class ShuffleScheduler {
           if (oldId.getAttemptNumber() < id.getAttemptNumber()) {
             //remove existing identifier
             oldIdIterator.remove();
-            LOG.warn("Old Src for InputIndex: " + inputNumber + " with attemptNumber: "
-                + oldId.getAttemptNumber()
-                + " was not determined to be invalid. Ignoring it for now in favour of "
-                + id.getAttemptNumber());
+            LOG.warn("Old Src for InputIndex: {} with attemptNumber: {} was not determined to be invalid. Ignoring it for now in favour of {}",
+                inputNumber, oldId.getAttemptNumber(), id.getAttemptNumber());
             addIdentifierToList = true;
             break;
           }
@@ -1385,9 +1372,7 @@ class ShuffleScheduler {
               waitAndNotifyProgress();
             } catch (InterruptedException e) {
               if (isShutdown.get()) {
-                LOG.info(srcNameTrimmed + ": " +
-                    "Interrupted while waiting for fetchers to complete" +
-                    "and hasBeenShutdown. Breaking out of ShuffleSchedulerCallable loop");
+                LOG.info(srcNameTrimmed + ": Interrupted while waiting for fetchers to complete and hasBeenShutdown. Breaking out of ShuffleSchedulerCallable loop");
                 Thread.currentThread().interrupt();
                 break;
               } else {
@@ -1409,8 +1394,7 @@ class ShuffleScheduler {
           mergeManager.waitForShuffleToMergeMemory();
         } catch (InterruptedException e) {
           if (isShutdown.get()) {
-            LOG.info(srcNameTrimmed + ": " +
-                "Interrupted while waiting for merge to complete and hasBeenShutdown. Breaking out of ShuffleSchedulerCallable loop");
+            LOG.info(srcNameTrimmed + ": Interrupted while waiting for merge to complete and hasBeenShutdown. Breaking out of ShuffleSchedulerCallable loop");
             Thread.currentThread().interrupt();
             break;
           } else {
@@ -1428,8 +1412,7 @@ class ShuffleScheduler {
                 mapHost = getHost();  // Leads to a wait.
               } catch (InterruptedException e) {
                 if (isShutdown.get()) {
-                  LOG.info(srcNameTrimmed + ": " +
-                      "Interrupted while waiting for host and hasBeenShutdown. Breaking out of ShuffleSchedulerCallable loop");
+                  LOG.info(srcNameTrimmed + ": Interrupted while waiting for host and hasBeenShutdown. Breaking out of ShuffleSchedulerCallable loop");
                   Thread.currentThread().interrupt();
                   break;
                 } else {
@@ -1502,7 +1485,7 @@ class ShuffleScheduler {
     public void onSuccess(Void result) {
       fetcherOrderedGrouped.shutDown();
       if (isShutdown.get()) {
-        LOG.info(srcNameTrimmed + ": " + "Already shutdown. Ignoring fetch complete");
+        LOG.info(srcNameTrimmed + ": Already shutdown. Ignoring fetch complete");
       } else {
         doBookKeepingForFetcherComplete();
       }
@@ -1512,9 +1495,9 @@ class ShuffleScheduler {
     public void onFailure(Throwable t) {
       fetcherOrderedGrouped.shutDown();
       if (isShutdown.get()) {
-        LOG.info(srcNameTrimmed + ": " + "Already shutdown. Ignoring fetch complete");
+        LOG.info(srcNameTrimmed + ": Already shutdown. Ignoring fetch complete");
       } else {
-        LOG.error(srcNameTrimmed + ": " + "Fetcher failed with error", t);
+        LOG.error(srcNameTrimmed + ": Fetcher failed with error", t);
         exceptionReporter.reportException(t);
         doBookKeepingForFetcherComplete();
       }

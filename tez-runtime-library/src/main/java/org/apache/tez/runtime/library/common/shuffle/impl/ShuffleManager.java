@@ -285,7 +285,7 @@ public class ShuffleManager implements FetcherCallback {
 
     shuffleInfoEventsMap = new ConcurrentHashMap<Integer, ShuffleEventInfo>();
 
-    LOG.info(srcNameTrimmed + ": numInputs=" + numInputs + ", numFetchers=" + numFetchers);
+    LOG.info("{}: numInputs={}, numFetchers={}", srcNameTrimmed, numInputs, numFetchers);
     if (LOG.isDebugEnabled()) {
       LOG.debug("compressionCodec="
           + (codec == null ? "NoCompressionCodec" : codec.getClass().getName())
@@ -336,7 +336,7 @@ public class ShuffleManager implements FetcherCallback {
         }
 
         if (LOG.isDebugEnabled()) {
-          LOG.debug(srcNameTrimmed + ": " + "NumCompletedInputs: " + numCompletedInputs);
+          LOG.debug(srcNameTrimmed + ": NumCompletedInputs: " + numCompletedInputs);
         }
         if (numCompletedInputs.get() < numInputs && !isShutdown.get()) {
           lock.lock();
@@ -349,7 +349,7 @@ public class ShuffleManager implements FetcherCallback {
                 inputHost = pendingHosts.take();
               } catch (InterruptedException e) {
                 if (isShutdown.get()) {
-                  LOG.info(srcNameTrimmed + ": " + "Interrupted and hasBeenShutdown, Breaking out of ShuffleScheduler Loop");
+                  LOG.info(srcNameTrimmed + ": Interrupted and hasBeenShutdown, Breaking out of ShuffleScheduler Loop");
                   Thread.currentThread().interrupt();
                   break;
                 } else {
@@ -357,15 +357,14 @@ public class ShuffleManager implements FetcherCallback {
                 }
               }
               if (LOG.isDebugEnabled()) {
-                LOG.debug(srcNameTrimmed + ": " + "Processing pending host: " +
+                LOG.debug(srcNameTrimmed + ": Processing pending host: " +
                     inputHost.toDetailedString());
               }
               if (inputHost.getNumPendingPartitions() > 0 && !isShutdown.get()) {
                 Fetcher fetcher = constructFetcherForHost(inputHost, conf);
                 runningFetchers.add(fetcher);
                 if (isShutdown.get()) {
-                  LOG.info(srcNameTrimmed + ": " + "hasBeenShutdown," +
-                      "Breaking out of ShuffleScheduler Loop");
+                  LOG.info(srcNameTrimmed + ": hasBeenShutdown, Breaking out of ShuffleScheduler Loop");
                   break;
                 }
                 ListenableFuture<FetchResult> future = fetcherExecutor
@@ -388,7 +387,7 @@ public class ShuffleManager implements FetcherCallback {
         }
       }
       shufflePhaseTime.setValue(System.currentTimeMillis() - startTime);
-      LOG.info(srcNameTrimmed + ": " + "Shutting down FetchScheduler, Was Interrupted: " + Thread.currentThread().isInterrupted());
+      LOG.info(srcNameTrimmed + ": Shutting down FetchScheduler, Was Interrupted: " + Thread.currentThread().isInterrupted());
       if (!fetcherExecutor.isShutdown()) {
         fetcherExecutor.shutdownNow();
       }
@@ -548,8 +547,7 @@ public class ShuffleManager implements FetcherCallback {
     try {
       boolean added = pendingHosts.offer(host);
       if (!added) {
-        String errorMessage = "Unable to add host: " +
-            host.getIdentifier() + " to pending queue";
+        String errorMessage = "Unable to add host: " + host.getIdentifier() + " to pending queue";
         LOG.error(errorMessage);
         throw new TezUncheckedException(errorMessage);
       }
@@ -842,8 +840,8 @@ public class ShuffleManager implements FetcherCallback {
   @Override
   public void fetchFailed(String host,
       InputAttemptIdentifier srcAttemptIdentifier, boolean connectFailed) {
-    LOG.info(srcNameTrimmed + ": Fetch failed for src: InputIdentifier: "
-        + srcAttemptIdentifier + ", connectFailed: " + connectFailed);
+    LOG.info("{}: Fetch failed for src: InputIdentifier: {}, connectFailed: {}",
+        srcNameTrimmed, srcAttemptIdentifier, connectFailed);
     failedShufflesCounter.increment(1);
     inputContext.notifyProgress();
     if (srcAttemptIdentifier == null) {
@@ -893,12 +891,11 @@ public class ShuffleManager implements FetcherCallback {
     if (Thread.currentThread().isInterrupted()) {
       //TODO: need to cleanup all FetchedInput (DiskFetchedInput, LocalDisFetchedInput), lockFile
       //As of now relying on job cleanup (when all directories would be cleared)
-      LOG.info(srcNameTrimmed + ": " + "Thread interrupted. Need to cleanup the local dirs");
+      LOG.info(srcNameTrimmed + ": Thread interrupted. Need to cleanup the local dirs");
     }
     if (!isShutdown.getAndSet(true)) {
       // Shut down any pending fetchers
-      LOG.info("Shutting down pending fetchers on source" + srcNameTrimmed + ": "
-          + runningFetchers.size());
+      LOG.info("Shutting down pending fetchers on source {}: {}", srcNameTrimmed, runningFetchers.size());
       lock.lock();
       try {
         wakeLoop.signal(); // signal the fetch-scheduler
@@ -1042,17 +1039,19 @@ public class ShuffleManager implements FetcherCallback {
 
     @Override
     public void onSuccess(Void result) {
-      LOG.info(srcNameTrimmed + ": " + "Scheduler thread completed");
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(srcNameTrimmed + ": Scheduler thread completed");
+      }
     }
 
     @Override
     public void onFailure(Throwable t) {
       if (isShutdown.get()) {
         if (LOG.isDebugEnabled()) {
-          LOG.debug(srcNameTrimmed + ": " + "Already shutdown. Ignoring error: " + t);
+          LOG.debug(srcNameTrimmed + ": Already shutdown. Ignoring error: " + t);
         }
       } else {
-        LOG.error(srcNameTrimmed + ": " + "Scheduler failed with error: ", t);
+        LOG.error(srcNameTrimmed + ": Scheduler failed with error: ", t);
         inputContext.reportFailure(TaskFailureType.NON_FATAL, t, "Shuffle Scheduler Failed");
       }
     }
@@ -1107,10 +1106,10 @@ public class ShuffleManager implements FetcherCallback {
       fetcher.shutdown();
       if (isShutdown.get()) {
         if (LOG.isDebugEnabled()) {
-          LOG.debug(srcNameTrimmed + ": " + "Already shutdown. Ignoring error from fetcher: " + t);
+          LOG.debug(srcNameTrimmed + ": Already shutdown. Ignoring error from fetcher: " + t);
         }
       } else {
-        LOG.error(srcNameTrimmed + ": " + "Fetcher failed with error: ", t);
+        LOG.error(srcNameTrimmed + ": Fetcher failed with error: ", t);
         shuffleError = t;
         inputContext.reportFailure(TaskFailureType.NON_FATAL, t, "Fetch failed");
         doBookKeepingForFetcherComplete();
