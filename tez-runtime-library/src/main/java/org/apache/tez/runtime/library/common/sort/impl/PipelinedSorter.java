@@ -204,23 +204,20 @@ public class PipelinedSorter extends ExternalSorter {
     buffers = Lists.newArrayListWithCapacity(maxNumberOfBlocks);
     allocateSpace(); //Allocate the first block
     if (!lazyAllocateMem) {
-      LOG.info("Pre allocating rest of memory buffers upfront");
+      // LOG.info("Pre allocating rest of memory buffers upfront");
       while(allocateSpace() != null);
     }
 
     initialSetupLogLine.append("#blocks=").append(maxNumberOfBlocks);
     initialSetupLogLine.append(", maxMemUsage=").append(maxMemLimit);
-    initialSetupLogLine.append(", lazyAllocateMem=").append(
-        lazyAllocateMem);
+    initialSetupLogLine.append(", lazyAllocateMem=").append(lazyAllocateMem);
     initialSetupLogLine.append(", useSoftReference=").append(useSoftReference);
     initialSetupLogLine.append(", minBlockSize=").append(MIN_BLOCK_SIZE);
     initialSetupLogLine.append(", initial BLOCK_SIZE=").append(buffers.get(0).capacity());
     initialSetupLogLine.append(", finalMergeEnabled=").append(isFinalMergeEnabled());
     initialSetupLogLine.append(", pipelinedShuffle=").append(pipelinedShuffle);
     initialSetupLogLine.append(", sendEmptyPartitions=").append(sendEmptyPartitionDetails);
-    initialSetupLogLine.append(", ").append(TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB).append(
-        "=").append(
-        sortmb);
+    initialSetupLogLine.append(", ").append(TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB).append("=").append(sortmb);
 
     Preconditions.checkState(buffers.size() > 0, "At least one buffer needs to be present");
     LOG.info(initialSetupLogLine.toString());
@@ -261,9 +258,9 @@ public class PipelinedSorter extends ExternalSorter {
       if (bufferFromCache != null) {
         bufferFromCache.clear();
         space = bufferFromCache;
-        LOG.info("reusing ByteBuffer from soft cache: " + sizeWithoutMeta + " " + space.capacity());
+        LOG.info("Reusing ByteBuffer from soft cache: {} {}",sizeWithoutMeta, space.capacity());
       } else {
-        LOG.info("creating a new ByteBuffer: " + sizeWithoutMeta);
+        LOG.info("Creating a new ByteBuffer: " + sizeWithoutMeta);
         space = ByteBuffer.allocate(sizeWithoutMeta);
       }
     } else {
@@ -274,18 +271,17 @@ public class PipelinedSorter extends ExternalSorter {
     bufferIndex++;
 
     Preconditions.checkState(buffers.size() <= maxNumberOfBlocks,
-        "Number of blocks " + buffers.size()
-            + " is exceeding  " + maxNumberOfBlocks);
+        buffers.size() + " exceeds " + maxNumberOfBlocks);
 
-    LOG.info("Newly allocated block size=" + size
-        + ", index=" + bufferIndex
-        + ", Number of buffers=" + buffers.size()
-        + ", currentAllocatableMemory=" + currentAllocatableMemory
-        + ", currentBufferSize=" + space.capacity()
-        + ", total=" + (availableMemoryMb << 20));
+    StringBuilder allocLog = new StringBuilder("Newly allocated block size=" + size);
+    allocLog.append(", index=").append(bufferIndex);
+    allocLog.append(", Number of buffers=").append(buffers.size());
+    allocLog.append(", currentAllocatableMemory=").append(currentAllocatableMemory);
+    allocLog.append(", currentBufferSize=").append(space.capacity());
+    allocLog.append(", total=").append(availableMemoryMb << 20);
+    LOG.info(allocLog.toString());
     return space;
   }
-
 
   @VisibleForTesting
   int computeBlockSize(long availableMem, long maxAllocatedMemory) {
@@ -372,7 +368,7 @@ public class PipelinedSorter extends ExternalSorter {
     } else {
       // queue up the sort
       SortTask task = new SortTask(span, sorter);
-      LOG.debug("Submitting span={} for sort", span.toString());
+      // LOG.debug("Submitting span={} for sort", span.toString());
       Future<SpanIterator> future = sortmaster.submit(task);
       merger.add(future);
       span = newSpan;
@@ -391,8 +387,8 @@ public class PipelinedSorter extends ExternalSorter {
         reportDetailedPartitionStats(), auxiliaryService, deflater,
         compositeFetch);
     outputContext.sendEvents(events);
-    LOG.info(outputContext.getDestinationVertexName() +
-        ": Added spill event for spill (final update=false), spillId=" + (numSpills - 1));
+    LOG.info("{}: Added spill event for spill (final update=false), spillId={}",
+        outputContext.getDestinationVertexName(), (numSpills - 1));
   }
 
   @Override
@@ -509,8 +505,8 @@ public class PipelinedSorter extends ExternalSorter {
     }
 
     try {
-      LOG.info(outputContext.getDestinationVertexName() + ": Spilling to " + filename.toString() +
-          ", indexFilename=" + indexFilename);
+      LOG.info("{}: Spilling to {}, indexFilename={}",
+          outputContext.getDestinationVertexName(), filename.toString(), indexFilename);
       for (int i = 0; i < partitions; ++i) {
         if (isThreadInterrupted()) {
           return;
@@ -595,7 +591,7 @@ public class PipelinedSorter extends ExternalSorter {
       if (!SPILL_FILE_PERMS.equals(SPILL_FILE_PERMS.applyUMask(FsPermission.getUMask(conf)))) {
         rfs.setPermission(filename, SPILL_FILE_PERMS);
       }
-      LOG.info(outputContext.getDestinationVertexName() + ": Spilling to " + filename.toString());
+      LOG.info("{}: Spilling to {}", outputContext.getDestinationVertexName(), filename.toString());
       for (int i = 0; i < partitions; ++i) {
         if (isThreadInterrupted()) {
           return false;
@@ -664,8 +660,8 @@ public class PipelinedSorter extends ExternalSorter {
         cleanup();
       }
       sortmaster.shutdownNow();
-      LOG.info(outputContext.getDestinationVertexName() + ": Thread interrupted, cleaned up stale data, sorter threads shutdown=" + sortmaster
-          .isShutdown() + ", terminated=" + sortmaster.isTerminated());
+      LOG.info("{}: Thread interrupted, cleaned up stale data, sorter threads shutdown={}, terminated={}",
+          outputContext.getDestinationVertexName(), sortmaster.isShutdown(), sortmaster.isTerminated());
       return true;
     }
     return false;
@@ -702,7 +698,7 @@ public class PipelinedSorter extends ExternalSorter {
 
       if (useSoftReference) {
         for (ByteBuffer buffer: buffers) {
-          LOG.info("adding soft ByteBuffer: " + buffer.capacity());
+          LOG.info("Adding soft ByteBuffer: " + buffer.capacity());
           outputContext.addSoftByteBuffer(buffer);
         }
       }
@@ -736,7 +732,8 @@ public class PipelinedSorter extends ExternalSorter {
               sendEmptyPartitionDetails, pathComponent, partitionStats,
               reportDetailedPartitionStats(), auxiliaryService, deflater,
               compositeFetch);
-          LOG.info(outputContext.getDestinationVertexName() + ": Adding spill event for spill (final update=" + isLastEvent + "), spillId=" + i);
+          LOG.info("{}: Adding spill event for spill (final update={}), spillId={}",
+              outputContext.getDestinationVertexName(), isLastEvent, i);
         }
         return;
       }
@@ -964,8 +961,8 @@ public class PipelinedSorter extends ExternalSorter {
       }
       ByteBuffer reserved = source.duplicate();
       reserved.mark();
-      LOG.info(outputContext.getDestinationVertexName() + ": " + "reserved.remaining()=" +
-          reserved.remaining() + ", reserved.metasize=" + metasize);
+      LOG.info("{}: reserved.remaining()={}, reserved.metasize={}",
+          outputContext.getDestinationVertexName(), reserved.remaining(), metasize);
       reserved.position(metasize);
       kvbuffer = reserved.slice();
       reserved.flip();
@@ -986,8 +983,8 @@ public class PipelinedSorter extends ExternalSorter {
       if(length() > 1) {
         sorter.sort(this, 0, length(), progressable);
       }
-      LOG.info(outputContext.getDestinationVertexName() + ": " + "done sorting span=" + index + ", length=" + length() + ", "
-          + "time=" + (System.currentTimeMillis() - start));
+      LOG.info("{}: done sorting span={}, length={}, time={}",
+          outputContext.getDestinationVertexName(), index, length(), System.currentTimeMillis() - start);
       return new SpanIterator((SortSpan)this);
     }
 
@@ -1062,8 +1059,9 @@ public class PipelinedSorter extends ExternalSorter {
         }
         newSpan = new SortSpan(remaining, items, perItem, newComparator);
         newSpan.index = index+1;
-        LOG.info(String.format(outputContext.getDestinationVertexName() + ": " + "New Span%d.length = %d, perItem = %d", newSpan.index, newSpan
-            .length(), perItem) + ", counter:" + mapOutputRecordCounter.getValue());
+        LOG.info("{}, counter:{}",
+            String.format(outputContext.getDestinationVertexName() + ": New Span%d.length = %d, perItem = %d", newSpan.index, newSpan.length(), perItem),
+            mapOutputRecordCounter.getValue());
         return newSpan;
       }
       return null;
@@ -1089,8 +1087,8 @@ public class PipelinedSorter extends ExternalSorter {
         //Check if we can get the next Buffer from the main buffer list
         ByteBuffer space = allocateSpace();
         if (space != null) {
-          LOG.info(outputContext.getDestinationVertexName() + ": " + "Getting memory from next block in the list, recordsWritten=" +
-              mapOutputRecordCounter.getValue());
+          LOG.info("{}: Getting memory from next block in the list, recordsWritten={}",
+              outputContext.getDestinationVertexName(), mapOutputRecordCounter.getValue());
           reinit = true;
           return space;
         }
@@ -1423,7 +1421,7 @@ public class PipelinedSorter extends ExternalSorter {
             total += sp.span.length();
             eq += sp.span.getEq();
         }
-        LOG.info(outputContext.getDestinationVertexName() + ": " + "Heap = " + sb.toString());
+        LOG.info(outputContext.getDestinationVertexName() + ": Heap = " + sb.toString());
         return true;
       } catch(ExecutionException e) {
         LOG.error("Heap size={}, total={}, eq={}, partition={}, gallop={}, totalItr={},"

@@ -124,11 +124,13 @@ public class WeightedScalingMemoryDistributor implements InitialMemoryAllocator 
     long totalJvmMem = Runtime.getRuntime().maxMemory();
     double ratio = totalRequested / (double) totalJvmMem;
 
-    LOG.info("Scaling Requests. NumRequests: " + numRequests + ", numScaledRequests: "
-        + numRequestsScaled + ", TotalRequested: " + totalRequested + ", TotalRequestedScaled: "
-        + totalScaledRequest + ", TotalJVMHeap: " + totalJvmMem + ", TotalAvailable: "
-        + availableForAllocation + ", TotalRequested/TotalJVMHeap:"
-        + new DecimalFormat("0.00").format(ratio));
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Scaling Requests. NumRequests: " + numRequests + ", numScaledRequests: "
+          + numRequestsScaled + ", TotalRequested: " + totalRequested + ", TotalRequestedScaled: "
+          + totalScaledRequest + ", TotalJVMHeap: " + totalJvmMem + ", TotalAvailable: "
+          + availableForAllocation + ", TotalRequested/TotalJVMHeap:"
+          + new DecimalFormat("0.00").format(ratio));
+    }
 
     int numInputRequestsScaled = 0;
     int numOutputRequestsScaled = 0;
@@ -202,7 +204,9 @@ public class WeightedScalingMemoryDistributor implements InitialMemoryAllocator 
         long newTotal = Math.min(allocations.get(i) + additional, request.requestSize);
         // TODO Later - If requestedSize is used, the difference could be allocated to others.
         allocations.set(i, newTotal);
-        LOG.debug("Adding {} to {} total={}", additional, request.componentClassname, newTotal);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Adding {} to {} total={}", additional, request.componentClassname, newTotal);
+        }
       }
     }
   }
@@ -314,9 +318,11 @@ public class WeightedScalingMemoryDistributor implements InitialMemoryAllocator 
 
     double reserveFraction = initialReserveFraction + additionalReserveFraction;
     Preconditions.checkState(reserveFraction <= 1.0d);
-    LOG.info("InitialReservationFraction=" + initialReserveFraction
-        + ", AdditionalReservationFractionForIOs=" + additionalReserveFraction
-        + ", finalReserveFractionUsed=" + reserveFraction);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("InitialReservationFraction=" + initialReserveFraction
+          + ", AdditionalReservationFractionForIOs=" + additionalReserveFraction
+          + ", finalReserveFractionUsed=" + reserveFraction);
+    }
     return reserveFraction;
   }
 

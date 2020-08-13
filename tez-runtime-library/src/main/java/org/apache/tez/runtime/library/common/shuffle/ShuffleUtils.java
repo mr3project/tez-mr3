@@ -139,8 +139,8 @@ public class ShuffleUtils {
       }
     } catch (InternalError | Exception e) {
       // Close the streams
-      LOG.info("Failed to read data to memory for " + identifier + ". len=" + compressedLength +
-          ", decomp=" + decompressedLength + ". ExceptionMessage=" + e.getMessage());
+      LOG.info("Failed to read data to memory for {}. len={}, decomp={}. ExceptionMessage={}",
+          identifier, compressedLength, decompressedLength, e.getMessage());
       ioCleanup(input);
       if (e instanceof InternalError) {
         // The codec for lz0,lz4,snappy,bz2,etc. throw java.lang.InternalError
@@ -188,8 +188,8 @@ public class ShuffleUtils {
       output.close();
     } catch (IOException ioe) {
       // Close the streams
-      LOG.info("Failed to read data to disk for " + identifier + ". len=" + compressedLength +
-          ", decomp=" + decompressedLength + ". ExceptionMessage=" + ioe.getMessage());
+      LOG.info("Failed to read data to disk for {}. len={}, decomp={}. ExceptionMessage={}",
+          identifier, compressedLength, decompressedLength, ioe.getMessage());
       ioCleanup(input, output);
       // Re-throw
       throw ioe;
@@ -325,9 +325,8 @@ public class ShuffleUtils {
             TezCommonUtils.compressByteArrayToByteString(
                 TezUtilsInternal.toByteArray(emptyPartitionDetails), deflater);
         payloadBuilder.setEmptyPartitions(emptyPartitionsBytesString);
-        LOG.info("EmptyPartition bitsetSize=" + emptyPartitionDetails.cardinality() + ", numOutputs="
-            + numPhysicalOutputs + ", emptyPartitions=" + emptyPartitions
-            + ", compressedSize=" + emptyPartitionsBytesString.size());
+        LOG.info("EmptyPartition bitsetSize={}, numOutputs={}, emptyPartitions={}, compressedSize={}",
+            emptyPartitionDetails.cardinality(), numPhysicalOutputs, emptyPartitions, emptyPartitionsBytesString.size());
       }
     }
 
