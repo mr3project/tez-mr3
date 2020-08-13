@@ -460,9 +460,8 @@ public class MRInput extends MRInputBase {
     getContext().inputIsReady();
     this.splitInfoViaEvents = jobConf.getBoolean(MRJobConfig.MR_TEZ_SPLITS_VIA_EVENTS,
         MRJobConfig.MR_TEZ_SPLITS_VIA_EVENTS_DEFAULT);
-    LOG.info(getContext().getSourceVertexName() + " using newmapreduce API=" + useNewApi +
-        ", split via event=" + splitInfoViaEvents + ", numPhysicalInputs=" +
-        getNumPhysicalInputs());
+    LOG.info("{} using newmapreduce API={}, split via event={}, numPhysicalInputs={}",
+        getContext().getSourceVertexName(), useNewApi, splitInfoViaEvents, getNumPhysicalInputs());
     initializeInternal();
     return null;
   }
@@ -525,7 +524,9 @@ public class MRInput extends MRInputBase {
     } finally {
       rrLock.unlock();
     }
-    LOG.info("Initialized MRInput: " + getContext().getSourceVertexName());
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Initialized MRInput: " + getContext().getSourceVertexName());
+    }
   }
 
   /**

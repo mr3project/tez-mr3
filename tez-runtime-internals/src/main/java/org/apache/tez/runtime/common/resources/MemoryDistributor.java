@@ -96,10 +96,8 @@ public class MemoryDistributor {
     this.numTotalOutputs = numTotalOutputs;
     this.totalJvmMemory = totalMemory;
     this.requestList = Collections.synchronizedList(new LinkedList<RequestorInfo>());
-    LOG.info("InitialMemoryDistributor (isEnabled=" + isEnabled + ") invoked with: numInputs="
-        + numTotalInputs + ", numOutputs=" + numTotalOutputs
-        + ", JVM.maxFree=" + totalJvmMemory
-        + ", allocatorClassName=" + allocatorClassName);
+    LOG.info("InitialMemoryDistributor (isEnabled={}): numInputs={}, numOutputs={}, JVM.maxFree={}, allocatorClassName={}",
+        isEnabled, numTotalInputs, numTotalOutputs, totalJvmMemory, allocatorClassName);
   }
 
   public MemoryDistributor(int numTotalInputs, int numTotalOutputs, Configuration conf) {
@@ -123,7 +121,9 @@ public class MemoryDistributor {
     Preconditions.checkState(numInputsSeen.get() == numTotalInputs, "All inputs are expected to ask for memory");
     Preconditions.checkState(numOutputsSeen.get() == numTotalOutputs, "All outputs are expected to ask for memory");
 
-    logInitialRequests(requestList);
+    if (LOG.isDebugEnabled()) {
+      logInitialRequests(requestList);
+    }
 
     Iterable<InitialMemoryRequestContext> requestContexts = Iterables.transform(requestList,
         new Function<RequestorInfo, InitialMemoryRequestContext>() {
@@ -145,7 +145,9 @@ public class MemoryDistributor {
       allocations = allocator.assignMemory(totalJvmMemory, numTotalInputs, numTotalOutputs,
           Iterables.unmodifiableIterable(requestContexts));
       validateAllocations(allocations, requestList.size());
-      logFinalAllocations(allocations, requestList);
+      if (LOG.isDebugEnabled()) {
+        logFinalAllocations(allocations, requestList);
+      }
     }
 
     // Making the callbacks directly for now, instead of spawning threads. The
@@ -155,7 +157,7 @@ public class MemoryDistributor {
     for (RequestorInfo rInfo : requestList) {
       long allocated = allocatedIter.next();
       if (LOG.isDebugEnabled()) {
-        LOG.info("Informing: " + rInfo.getRequestContext().getComponentType() + ", "
+        LOG.debug("Informing: " + rInfo.getRequestContext().getComponentType() + ", "
             + rInfo.getRequestContext().getComponentVertexName() + ", "
             + rInfo.getRequestContext().getComponentClassName() + ": requested="
             + rInfo.getRequestContext().getRequestedSize() + ", allocated=" + allocated);
@@ -282,7 +284,7 @@ public class MemoryDistributor {
           sb.append(", ");
         }
       }
-      LOG.info("InitialRequests=" + sb.toString());
+      LOG.debug("InitialRequests=" + sb.toString());
     }
   }
 
@@ -304,7 +306,7 @@ public class MemoryDistributor {
           sb.append(", ");
         }
       }
-      LOG.info("Allocations=" + sb.toString());
+      LOG.debug("Allocations=" + sb.toString());
     }
   }
 

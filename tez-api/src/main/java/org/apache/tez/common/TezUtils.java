@@ -133,7 +133,7 @@ public class TezUtils {
 
   private static void writeConfInPB(OutputStream dos, Configuration conf) throws IOException {
     DAGProtos.ConfigurationProto.Builder confProtoBuilder = DAGProtos.ConfigurationProto.newBuilder();
-    populateConfProtoFromEntries(conf, confProtoBuilder);
+    populateConfProtoFromEntriesWithVarExpansion(conf, confProtoBuilder);
     DAGProtos.ConfigurationProto confProto = confProtoBuilder.build();
     confProto.writeTo(dos);
   }
@@ -177,6 +177,21 @@ public class TezUtils {
     return convertToHistoryText(null, conf);
   }
 
+  private static void populateConfProtoFromEntriesWithVarExpansion(Configuration conf,
+      DAGProtos.ConfigurationProto.Builder confBuilder) {
+    for(Map.Entry<String, String> entry : conf) {
+      String key = entry.getKey();
+      String val = conf.get(key);   // automatically expands variables
+      if(val != null) {
+        DAGProtos.PlanKeyValuePair.Builder kvp = DAGProtos.PlanKeyValuePair.newBuilder();
+        kvp.setKey(key);
+        kvp.setValue(val);
+        confBuilder.addConfKeyValues(kvp);
+      } else {
+        LOG.debug("null value for key={}. Skipping.", key);
+      }
+    }
+  }
 
   /* Copy each Map.Entry with non-null value to DAGProtos.ConfigurationProto */
   public static void populateConfProtoFromEntries(Iterable<Map.Entry<String, String>> params,
