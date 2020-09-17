@@ -1368,6 +1368,11 @@
       <id>aws</id>
       <dependencies>
         <dependency>
+          <groupId>com.amazonaws</groupId>
+          <artifactId>aws-java-sdk-bundle</artifactId>
+          <version>1.11.793</version>
+        </dependency>
+        <dependency>
           <groupId>org.apache.hadoop</groupId>
           <artifactId>hadoop-cloud-storage</artifactId>
           <scope>runtime</scope>
