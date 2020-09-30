@@ -243,6 +243,10 @@
         <version>${hadoop.version}</version>
         <exclusions>
           <exclusion>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpclient</artifactId>
+          </exclusion>
+          <exclusion>
             <!-- exclude because it is not needed for test-local MR3/master -->
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
@@ -375,6 +379,10 @@
         <version>${hadoop.version}</version>
         <exclusions>
           <exclusion>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpclient</artifactId>
+          </exclusion>
+          <exclusion>
             <groupId>org.apache.curator</groupId>
             <artifactId>curator-client</artifactId>
           </exclusion>
@@ -399,6 +407,10 @@
         <type>test-jar</type>
         <scope>test</scope>
         <exclusions>
+          <exclusion>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpclient</artifactId>
+          </exclusion>
           <exclusion>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
