@@ -234,7 +234,7 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
               dataProto.getData().newInput(), dataProto.getRawLength(),
               dataProto.getCompressedLength(),
               codec, ifileReadAhead, ifileReadAheadLength, LOG,
-              fetchedInput.getInputAttemptIdentifier());
+              fetchedInput.getInputAttemptIdentifier(), inputContext);
       break;
     case WAIT:
     default:

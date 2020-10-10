@@ -19,6 +19,9 @@
 package org.apache.tez.runtime.api;
 
 import org.apache.hadoop.classification.InterfaceAudience.Public;
+import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.hadoop.io.compress.Compressor;
+import org.apache.hadoop.io.compress.Decompressor;
 
 /**
  * Context handle for the Input to initialize itself.
@@ -53,4 +56,7 @@ public interface InputContext extends TaskContext {
    * @return {@link InputStatisticsReporter}
    */
   public InputStatisticsReporter getStatisticsReporter();
+
+  public Decompressor getDecompressor(CompressionCodec codec);
+  public void returnDecompressor(Class<? extends Compressor> compressorType, Decompressor decompressor);
 }

@@ -1460,7 +1460,7 @@ class ShuffleScheduler {
         codec, conf, localFs, localDiskFetchEnabled, localHostname, localShufflePorts, srcNameTrimmed, mapHost,
         ioErrsCounter, wrongLengthErrsCounter, badIdErrsCounter, wrongMapErrsCounter,
         connectionErrsCounter, wrongReduceErrsCounter, applicationId, dagId, asyncHttp, sslShuffle,
-        verifyDiskChecksum, compositeFetch, localFetchComparePort);
+        verifyDiskChecksum, compositeFetch, localFetchComparePort, inputContext);
   }
 
   private class FetchFutureCallback implements FutureCallback<Void> {
