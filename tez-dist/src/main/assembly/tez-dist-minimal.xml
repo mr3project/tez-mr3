@@ -41,18 +41,15 @@
             <outputDirectory>/lib</outputDirectory>
             <useTransitiveDependencies>false</useTransitiveDependencies>
             <excludes>
-              <exclude>*:*:test-jar</exclude>
               <exclude>org.apache.hadoop:hadoop-annotations</exclude>
               <exclude>org.apache.hadoop:hadoop-auth</exclude>
               <exclude>org.apache.hadoop:hadoop-common</exclude>
-              <exclude>org.apache.hadoop:hadoop-hdfs</exclude>
               <exclude>org.apache.hadoop:hadoop-yarn-api</exclude>
               <exclude>org.apache.hadoop:hadoop-yarn-client</exclude>
               <exclude>org.apache.hadoop:hadoop-yarn-common</exclude>
               <exclude>org.apache.hadoop:hadoop-mapreduce-client-core</exclude>
               <exclude>org.apache.hadoop:hadoop-mapreduce-client-common</exclude>
               <exclude>org.apache.hadoop:hadoop-mapreduce-client-common</exclude>
-              <exclude>com.sun.jersey:jersey-client</exclude>
               <exclude>org.apache.tez:*</exclude>
               <exclude>com.datamonad.mr3:*</exclude>
             </excludes>

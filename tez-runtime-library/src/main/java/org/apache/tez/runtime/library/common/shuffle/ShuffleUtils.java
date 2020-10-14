@@ -46,6 +46,7 @@ import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.http.BaseHttpConnection;
 import org.apache.tez.http.HttpConnectionParams;
+import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.api.events.DataMovementEvent;
 import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.TezRuntimeUtils;
@@ -128,10 +129,10 @@ public class ShuffleUtils {
   public static void shuffleToMemory(byte[] shuffleData,
       InputStream input, int decompressedLength, int compressedLength,
       CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLength,
-      Logger LOG, InputAttemptIdentifier identifier) throws IOException {
+      Logger LOG, InputAttemptIdentifier identifier, InputContext inputContext) throws IOException {
     try {
       IFile.Reader.readToMemory(shuffleData, input, compressedLength, codec,
-          ifileReadAhead, ifileReadAheadLength);
+          ifileReadAhead, ifileReadAheadLength, inputContext);
       // metrics.inputBytes(shuffleData.length);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Read " + shuffleData.length + " bytes from input for "

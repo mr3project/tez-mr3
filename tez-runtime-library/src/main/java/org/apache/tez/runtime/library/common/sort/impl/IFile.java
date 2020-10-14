@@ -30,6 +30,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.hadoop.io.BoundedByteArrayOutputStream;
+import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.library.common.task.local.output.TezTaskOutput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -812,7 +813,7 @@ public class IFile {
      * @throws IOException
      */
     public static void readToMemory(byte[] buffer, InputStream in, int compressedLength,
-        CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLength)
+        CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLength, InputContext inputContext)
         throws IOException {
       boolean isCompressed = IFile.Reader.isCompressedFlagEnabled(in);
       IFileInputStream checksumIn = new IFileInputStream(in,
@@ -821,7 +822,11 @@ public class IFile {
       in = checksumIn;
       Decompressor decompressor = null;
       if (isCompressed && codec != null) {
-        decompressor = CodecPool.getDecompressor(codec);
+        if (inputContext != null) {
+          decompressor = inputContext.getDecompressor(codec);
+        } else {
+          decompressor = CodecPool.getDecompressor(codec);
+        }
         if (decompressor != null) {
           decompressor.reset();
           in = codec.createInputStream(checksumIn, decompressor);
@@ -855,7 +860,11 @@ public class IFile {
       } finally {
         if (decompressor != null) {
           decompressor.reset();
-          CodecPool.returnDecompressor(decompressor);
+          if (inputContext != null) {
+            inputContext.returnDecompressor(codec.getCompressorType(), decompressor);
+          } else {
+            CodecPool.returnDecompressor(decompressor);
+          }
         }
       }
     }

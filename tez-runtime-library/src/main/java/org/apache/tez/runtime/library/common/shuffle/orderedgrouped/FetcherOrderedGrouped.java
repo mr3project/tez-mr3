@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.tez.http.BaseHttpConnection;
 import org.apache.tez.http.HttpConnectionParams;
+import org.apache.tez.runtime.api.InputContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -106,6 +107,8 @@ class FetcherOrderedGrouped implements Callable<Void> {
   private final boolean compositeFetch;
   private final boolean localFetchComparePort;
 
+  private final InputContext inputContext;
+
   // Initiative value is 0, which means it hasn't retried yet.
   private long retryStartTime = 0;
 
@@ -133,7 +136,7 @@ class FetcherOrderedGrouped implements Callable<Void> {
                                boolean asyncHttp,
                                boolean sslShuffle,
                                boolean verifyDiskChecksum,
-                               boolean compositeFetch, boolean localFetchComparePort) {
+                               boolean compositeFetch, boolean localFetchComparePort, InputContext inputContext) {
     this.scheduler = scheduler;
     this.allocator = allocator;
     this.exceptionReporter = exceptionReporter;
@@ -170,6 +173,7 @@ class FetcherOrderedGrouped implements Callable<Void> {
     this.verifyDiskChecksum = verifyDiskChecksum;
     this.compositeFetch = compositeFetch;
     this.localFetchComparePort = localFetchComparePort;
+    this.inputContext = inputContext;
 
     this.logIdentifier = "fetcher [" + srcNameTrimmed + "] #" + id;
   }
@@ -568,7 +572,7 @@ class FetcherOrderedGrouped implements Callable<Void> {
         if (mapOutput.getType() == Type.MEMORY) {
           ShuffleUtils.shuffleToMemory(mapOutput.getMemory(), input,
               (int) decompressedLength, (int) compressedLength, codec, ifileReadAhead,
-              ifileReadAheadLength, LOG, mapOutput.getAttemptIdentifier());
+              ifileReadAheadLength, LOG, mapOutput.getAttemptIdentifier(), inputContext);
         } else if (mapOutput.getType() == Type.DISK) {
           ShuffleUtils.shuffleToDisk(mapOutput.getDisk(), host.getHostIdentifier(),
               input, compressedLength, decompressedLength, LOG,

@@ -438,7 +438,7 @@ public class ShuffleManager implements FetcherCallback {
       httpConnectionParams, inputManager, inputContext.getApplicationId(), inputContext.getDagIdentifier(),
         jobTokenSecretMgr, srcNameTrimmed, conf, localFs, localDirAllocator,
         lockDisk, localDiskFetchEnabled, sharedFetchEnabled,
-        localhostName, localShufflePorts, asyncHttp, verifyDiskChecksum, compositeFetch, localFetchComparePort);
+        localhostName, localShufflePorts, asyncHttp, verifyDiskChecksum, compositeFetch, localFetchComparePort, inputContext);
 
     if (codec != null) {
       fetcherBuilder.setCompressionParameters(codec);
