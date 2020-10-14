@@ -40,7 +40,6 @@
             <scope>runtime</scope>
             <outputDirectory>/lib</outputDirectory>
             <excludes>
-              <exclude>*:*:test-jar</exclude>
               <exclude>org.apache.tez:*</exclude>
               <exclude>com.datamonad.mr3:*</exclude>
             </excludes>

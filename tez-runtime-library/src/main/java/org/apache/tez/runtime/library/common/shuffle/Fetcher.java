@@ -46,6 +46,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.tez.http.BaseHttpConnection;
 import org.apache.tez.http.HttpConnectionParams;
+import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -195,6 +196,8 @@ public class Fetcher implements Callable<FetchResult> {
 
   private final boolean isDebugEnabled = LOG.isDebugEnabled();
 
+  private final InputContext inputContext;
+
   private Fetcher(FetcherCallback fetcherCallback, HttpConnectionParams params,
                   FetchedInputAllocator inputManager, ApplicationId appId, int dagIdentifier,
                   JobTokenSecretManager jobTokenSecretManager, String srcNameTrimmed, Configuration conf,
@@ -205,7 +208,7 @@ public class Fetcher implements Callable<FetchResult> {
                   boolean sharedFetchEnabled,
                   String localHostname,
                   int[] localShufflePorts, boolean asyncHttp, boolean verifyDiskChecksum, boolean compositeFetch,
-                  boolean localFetchComparePort) {
+                  boolean localFetchComparePort, InputContext inputContext) {
     this.asyncHttp = asyncHttp;
     this.verifyDiskChecksum = verifyDiskChecksum;
     this.fetcherCallback = fetcherCallback;
@@ -231,6 +234,8 @@ public class Fetcher implements Callable<FetchResult> {
     this.compositeFetch = compositeFetch;
 
     this.localFetchComparePort = localFetchComparePort;
+
+    this.inputContext = inputContext;
 
     try {
       if (this.sharedFetchEnabled) {
@@ -980,7 +985,7 @@ public class Fetcher implements Callable<FetchResult> {
           ShuffleUtils.shuffleToMemory(((MemoryFetchedInput) fetchedInput).getBytes(),
               input, (int) decompressedLength, (int) compressedLength, codec,
               ifileReadAhead, ifileReadAheadLength, LOG,
-              fetchedInput.getInputAttemptIdentifier());
+              fetchedInput.getInputAttemptIdentifier(), inputContext);
         } else if (fetchedInput.getType() == Type.DISK) {
           ShuffleUtils.shuffleToDisk(((DiskFetchedInput) fetchedInput).getOutputStream(),
               (host + ":" + port), input, compressedLength, decompressedLength, LOG,
@@ -1140,26 +1145,16 @@ public class Fetcher implements Callable<FetchResult> {
 
     public FetcherBuilder(FetcherCallback fetcherCallback,
         HttpConnectionParams params, FetchedInputAllocator inputManager,
-        ApplicationId appId, int dagIdentifier,  JobTokenSecretManager jobTokenSecretMgr, String srcNameTrimmed,
-        Configuration conf, boolean localDiskFetchEnabled, String localHostname, int[] shufflePort,
-        boolean asyncHttp, boolean verifyDiskChecksum, boolean compositeFetch) {
-      this.fetcher = new Fetcher(fetcherCallback, params, inputManager, appId, dagIdentifier,
-          jobTokenSecretMgr, srcNameTrimmed, conf, null, null, null, localDiskFetchEnabled,
-          false, localHostname, shufflePort, asyncHttp, verifyDiskChecksum, compositeFetch, false);
-    }
-
-    public FetcherBuilder(FetcherCallback fetcherCallback,
-        HttpConnectionParams params, FetchedInputAllocator inputManager,
         ApplicationId appId, int dagIdentifier, JobTokenSecretManager jobTokenSecretMgr, String srcNameTrimmed,
         Configuration conf, RawLocalFileSystem localFs,
         LocalDirAllocator localDirAllocator, Path lockPath,
         boolean localDiskFetchEnabled, boolean sharedFetchEnabled,
         String localHostname, int[] localShufflePorts, boolean asyncHttp, boolean verifyDiskChecksum, boolean compositeFetch,
-        boolean localFetchComparePort) {
+        boolean localFetchComparePort, InputContext inputContext) {
       this.fetcher = new Fetcher(fetcherCallback, params, inputManager, appId, dagIdentifier,
           jobTokenSecretMgr, srcNameTrimmed, conf, localFs, localDirAllocator,
           lockPath, localDiskFetchEnabled, sharedFetchEnabled, localHostname, localShufflePorts, asyncHttp,
-          verifyDiskChecksum, compositeFetch, localFetchComparePort);
+          verifyDiskChecksum, compositeFetch, localFetchComparePort, inputContext);
     }
 
     public FetcherBuilder setHttpConnectionParameters(HttpConnectionParams httpParams) {
