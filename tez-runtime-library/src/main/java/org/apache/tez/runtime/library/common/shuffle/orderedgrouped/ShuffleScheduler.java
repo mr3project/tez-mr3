@@ -387,10 +387,10 @@ class ShuffleScheduler {
     if (conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCHER_USE_SHARED_POOL,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCHER_USE_SHARED_POOL_DEFAULT)) {
       fetcherRawExecutor = inputContext.createTezFrameworkExecutorService(numFetchers,
-          "Fetcher_O {" + srcNameTrimmed + "} #%d");
+          inputContext.getUniqueIdentifier() + " Fetcher_O {" + srcNameTrimmed + "} #%d");
     } else {
       fetcherRawExecutor = Executors.newFixedThreadPool(numFetchers, new ThreadFactoryBuilder()
-          .setDaemon(true).setNameFormat("Fetcher_O {" + srcNameTrimmed + "} #%d").build());
+          .setDaemon(true).setNameFormat(inputContext.getUniqueIdentifier() + " Fetcher_O {" + srcNameTrimmed + "} #%d").build());
     }
     this.fetcherExecutor = MoreExecutors.listeningDecorator(fetcherRawExecutor);
 
@@ -746,21 +746,25 @@ class ShuffleScheduler {
     }
   }
 
-  public synchronized void copyFailed(InputAttemptIdentifier srcAttempt,
+  public void copyFailed(InputAttemptIdentifier srcAttempt,
                                       MapHost host,
                                       boolean readError,
                                       boolean connectError,
                                       boolean isLocalFetch) {
     failedShuffleCounter.increment(1);
     inputContext.notifyProgress();
-    int failures = incrementAndGetFailureAttempt(srcAttempt);
+    int failures;
 
-    if (!isLocalFetch) {
-      /**
-       * Track the number of failures that has happened since last completion.
-       * This gets reset on a successful copy.
-       */
-      failedShufflesSinceLastCompletion++;
+    synchronized (this) {
+      failures = incrementAndGetFailureAttempt(srcAttempt);
+
+      if (!isLocalFetch) {
+        /**
+         * Track the number of failures that has happened since last completion.
+         * This gets reset on a successful copy.
+         */
+        failedShufflesSinceLastCompletion++;
+      }
     }
 
     /**
@@ -776,11 +780,12 @@ class ShuffleScheduler {
     // Even if isObsoleteInputAttemptIdentifier(srcAttempt) returns true, we should call informAM.
     //Inform AM. In case producer needs to be restarted, it is handled at AM.
     if (shouldInformAM) {
+      // informAM() does not need synchronized(this)
       informAM(srcAttempt);
     }
 
     // If readError == false and connectError == false, we do not send InputReadError. If
-    // FetcherOrdereGrouped repeatedly fails to read srcAttempt, isShuffleHealthy() eventually fails the
+    // FetcherOrderedGrouped repeatedly fails to read srcAttempt, isShuffleHealthy() eventually fails the
     // current RuntimeTask, blaming the consumer.
 
     //Restart consumer in case shuffle is not healthy
@@ -791,6 +796,7 @@ class ShuffleScheduler {
     penalizeHost(host, failures);
   }
 
+  // not inside synchronized(this)
   private boolean isAbortLimitExceedFor(InputAttemptIdentifier srcAttempt) {
     int attemptFailures = getFailureCount(srcAttempt);
     if (attemptFailures >= abortFailureLimit) {
@@ -814,7 +820,7 @@ class ShuffleScheduler {
     return false;
   }
 
-  private void penalizeHost(MapHost host, int failures) {
+  private synchronized void penalizeHost(MapHost host, int failures) {
     host.penalize();
 
     HostPort hostPort = new HostPort(host.getHost(), host.getPort());
@@ -834,7 +840,7 @@ class ShuffleScheduler {
     penalties.add(new Penalty(host, penaltyDelay));
   }
 
-  private int getFailureCount(InputAttemptIdentifier srcAttempt) {
+  private synchronized int getFailureCount(InputAttemptIdentifier srcAttempt) {
     IntWritable failureCount = failureCounts.get(srcAttempt);
     return (failureCount == null) ? 0 : failureCount.get();
   }
@@ -866,10 +872,10 @@ class ShuffleScheduler {
             inputContext.getSourceVertexName(), srcAttempt.getInputIdentifier(), srcAttempt.getAttemptNumber()));
     List<Event> failedEvents = Lists.newArrayListWithCapacity(1);
     failedEvents.add(InputReadErrorEvent.create(
-        "Fetch failure for " + TezRuntimeUtils
+        "Ordered: Fetch failure for " + TezRuntimeUtils
             .getTaskAttemptIdentifier(inputContext.getSourceVertexName(),
                 srcAttempt.getInputIdentifier(),
-                srcAttempt.getAttemptNumber()) + " to jobtracker.",
+                srcAttempt.getAttemptNumber()),
         srcAttempt.getInputIdentifier(),
         srcAttempt.getAttemptNumber()));
 
@@ -986,59 +992,71 @@ class ShuffleScheduler {
     return fetcherHealthy;
   }
 
+  // not inside synchronized(this)
   boolean isShuffleHealthy(InputAttemptIdentifier srcAttempt) {
 
     if (isAbortLimitExceedFor(srcAttempt)) {
       return false;
     }
 
-    final float MIN_REQUIRED_PROGRESS_PERCENT = minReqProgressFraction;
-    final float MAX_ALLOWED_STALL_TIME_PERCENT = maxStallTimeFraction;
+    String errorMsg = null;
+    boolean result;
 
-    int doneMaps = numInputs - remainingMaps.get();
+    synchronized (this) {
+      final float MIN_REQUIRED_PROGRESS_PERCENT = minReqProgressFraction;
+      final float MAX_ALLOWED_STALL_TIME_PERCENT = maxStallTimeFraction;
 
-    String logContext = "srcAttempt=" + srcAttempt.toString();
-    boolean fetcherHealthy = isFetcherHealthy(logContext);
-    
-    // check if the reducer has progressed enough
-    boolean reducerProgressedEnough =
-      (((float)doneMaps / numInputs)
-          >= MIN_REQUIRED_PROGRESS_PERCENT);
+      int doneMaps = numInputs - remainingMaps.get();
 
-    // check if the reducer is stalled for a long time
-    // duration for which the reducer is stalled
-    int stallDuration =
-      (int)(System.currentTimeMillis() - lastProgressTime);
-    
-    // duration for which the reducer ran with progress
-    int shuffleProgressDuration =
-      (int)(lastProgressTime - startTime);
+      String logContext = "srcAttempt=" + srcAttempt.toString();
+      boolean fetcherHealthy = isFetcherHealthy(logContext);
 
-    boolean reducerStalled = (shuffleProgressDuration > 0) &&
-      (((float)stallDuration / shuffleProgressDuration)
-          >= MAX_ALLOWED_STALL_TIME_PERCENT);
+      // check if the reducer has progressed enough
+      boolean reducerProgressedEnough =
+        (((float)doneMaps / numInputs)
+            >= MIN_REQUIRED_PROGRESS_PERCENT);
 
-    // kill if not healthy and has insufficient progress
-    if ((failureCounts.size() >= maxFailedUniqueFetches ||
-        failureCounts.size() == (numInputs - doneMaps))
-        && !fetcherHealthy
-        && (!reducerProgressedEnough || reducerStalled)) {
-      String errorMsg = (new StringBuilder(srcNameTrimmed))
-          .append(": Shuffle failed with too many fetch failures and insufficient progress!")
-          .append(" failureCounts=").append(failureCounts.size())
-          .append(", pendingInputs=").append(numInputs - doneMaps)
-          .append(", fetcherHealthy=").append(fetcherHealthy)
-          .append(", reducerProgressedEnough=").append(reducerProgressedEnough)
-          .append(", reducerStalled=").append(reducerStalled).toString();
-      LOG.error(errorMsg);
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Host failures=" + hostFailures.keySet());
+      // check if the reducer is stalled for a long time
+      // duration for which the reducer is stalled
+      int stallDuration =
+        (int)(System.currentTimeMillis() - lastProgressTime);
+
+      // duration for which the reducer ran with progress
+      int shuffleProgressDuration =
+        (int)(lastProgressTime - startTime);
+
+      boolean reducerStalled = (shuffleProgressDuration > 0) &&
+        (((float)stallDuration / shuffleProgressDuration)
+            >= MAX_ALLOWED_STALL_TIME_PERCENT);
+
+      // kill if not healthy and has insufficient progress
+      if ((failureCounts.size() >= maxFailedUniqueFetches ||
+          failureCounts.size() == (numInputs - doneMaps))
+          && !fetcherHealthy
+          && (!reducerProgressedEnough || reducerStalled)) {
+        errorMsg = (new StringBuilder(srcNameTrimmed))
+            .append(": Shuffle failed with too many fetch failures and insufficient progress!")
+            .append(" failureCounts=").append(failureCounts.size())
+            .append(", pendingInputs=").append(numInputs - doneMaps)
+            .append(", fetcherHealthy=").append(fetcherHealthy)
+            .append(", reducerProgressedEnough=").append(reducerProgressedEnough)
+            .append(", reducerStalled=").append(reducerStalled).toString();
+        LOG.error(errorMsg);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Host failures=" + hostFailures.keySet());
+        }
+        result = false;
+      } else {
+        result = true;
       }
-      // Shuffle knows how to deal with failures post shutdown via the onFailure hook
-      exceptionReporter.reportException(new IOException(errorMsg));
-      return false;
     }
-    return true;
+
+    if (!result) {
+      // Shuffle knows how to deal with failures post shutdown via the onFailure hook
+      // reportException() should be called outside synchronized(this)
+      exceptionReporter.reportException(new IOException(errorMsg));
+    }
+    return result;
   }
 
   public synchronized void addKnownMapOutput(String inputHostName,

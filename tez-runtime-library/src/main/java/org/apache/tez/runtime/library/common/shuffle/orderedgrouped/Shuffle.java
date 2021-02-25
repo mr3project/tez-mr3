@@ -393,6 +393,8 @@ public class Shuffle implements ExceptionReporter {
     }
   }
 
+  // the caller should not hold synchronized(ShuffleScheduler.this) because cleanupShuffleSchedulerIgnoreErrors()
+  // may call ShuffleScheduler.close(), which may call Referee.join() while Referee is waiting for ShuffleScheduler.this.
   @Private
   @Override
   public synchronized void reportException(Throwable t) {

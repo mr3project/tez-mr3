@@ -237,10 +237,10 @@ public class ShuffleManager implements FetcherCallback {
     if (conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCHER_USE_SHARED_POOL,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCHER_USE_SHARED_POOL_DEFAULT)) {
       fetcherRawExecutor = inputContext.createTezFrameworkExecutorService(numFetchers,
-          "Fetcher_B {" + srcNameTrimmed + "} #%d");
+          inputContext.getUniqueIdentifier() + " Fetcher_B {" + srcNameTrimmed + "} #%d");
     } else {
       fetcherRawExecutor = Executors.newFixedThreadPool(numFetchers, new ThreadFactoryBuilder()
-          .setDaemon(true).setNameFormat("Fetcher_B {" + srcNameTrimmed + "} #%d").build());
+          .setDaemon(true).setNameFormat(inputContext.getUniqueIdentifier() + " Fetcher_B {" + srcNameTrimmed + "} #%d").build());
     }
     this.fetcherExecutor = MoreExecutors.listeningDecorator(fetcherRawExecutor);
 
@@ -856,7 +856,7 @@ public class ShuffleManager implements FetcherCallback {
         return;
       }
       InputReadErrorEvent readError = InputReadErrorEvent.create(
-          "Fetch failure while fetching from "
+          "Unordered: Fetch failure while fetching from "
               + TezRuntimeUtils.getTaskAttemptIdentifier(
               inputContext.getSourceVertexName(),
               srcAttemptIdentifier.getInputIdentifier(),
