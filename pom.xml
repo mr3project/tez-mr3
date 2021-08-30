@@ -773,6 +773,11 @@
         <artifactId>leveldbjni-all</artifactId>
         <version>1.8</version>
       </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-distcp</artifactId>
+        <version>${hadoop.version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 
