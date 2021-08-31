@@ -58,33 +58,7 @@ public class TezConfiguration extends Configuration {
   private static Map<String, Scope> PropertyScope = new HashMap<String, Scope>();
 
   static {
-    Configuration.addDeprecation("tez.am.counters.max.keys", TezConfiguration.TEZ_COUNTERS_MAX);
-    Configuration.addDeprecation("tez.am.counters.groups.max.keys",
-        TezConfiguration.TEZ_COUNTERS_MAX_GROUPS);
-    Configuration.addDeprecation("tez.am.counters.name.max.keys",
-        TezConfiguration.TEZ_COUNTERS_COUNTER_NAME_MAX_LENGTH);
-    Configuration.addDeprecation("tez.am.counters.group-name.max.keys",
-        TezConfiguration.TEZ_COUNTERS_GROUP_NAME_MAX_LENGTH);
-
-    Configuration.addDeprecation("tez.task.scale.task.memory.enabled",
-        TezConfiguration.TEZ_TASK_SCALE_MEMORY_ENABLED);
-    Configuration.addDeprecation("tez.task.scale.task.memory.allocator.class",
-        TezConfiguration.TEZ_TASK_SCALE_MEMORY_ALLOCATOR_CLASS);
-    Configuration.addDeprecation("tez.task.scale.task.memory.reserve-fraction",
-        TezConfiguration.TEZ_TASK_SCALE_MEMORY_RESERVE_FRACTION);
-    Configuration
-        .addDeprecation("tez.task.scale.task.memory.additional-reservation.fraction.per-io",
-            TezConfiguration.TEZ_TASK_SCALE_MEMORY_ADDITIONAL_RESERVATION_FRACTION_PER_IO);
-    Configuration.addDeprecation("tez.task.scale.task.memory.additional-reservation.fraction.max",
-        TezConfiguration.TEZ_TASK_SCALE_MEMORY_ADDITIONAL_RESERVATION_FRACTION_MAX);
-    Configuration.addDeprecation("tez.task.scale.task.memory.ratios",
-        TezConfiguration.TEZ_TASK_SCALE_MEMORY_WEIGHTED_RATIOS);
-
-    Configuration.addDeprecation("tez.task.max-events-per-heartbeat.max",
-        TezConfiguration.TEZ_TASK_MAX_EVENTS_PER_HEARTBEAT);
-
     setupConfigurationScope(TezConfiguration.class);
-
   }
 
   static void setupConfigurationScope(Class<?> clazz) {
@@ -131,16 +105,6 @@ public class TezConfiguration extends Configuration {
   public static final String TEZ_TASK_PREFIX = TEZ_PREFIX + "task.";
 
   /**
-   * Boolean value. If true then Tez will try to automatically delete temporary job 
-   * artifacts that it creates within the specified staging dir. Does not affect any user data.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type = "boolean")
-  public static final String TEZ_AM_STAGING_SCRATCH_DATA_AUTO_DELETE = TEZ_AM_PREFIX +
-      "staging.scratch-data.auto-delete";
-  public static final boolean TEZ_AM_STAGING_SCRATCH_DATA_AUTO_DELETE_DEFAULT = true;
-
-  /**
    * String value. Specifies the name of the shuffle auxiliary service.
    */
   @ConfigurationScope(Scope.AM)
@@ -166,30 +130,6 @@ public class TezConfiguration extends Configuration {
   @ConfigurationScope(Scope.AM)
   @ConfigurationProperty
   public static final String TEZ_CREDENTIALS_PATH = TEZ_PREFIX + "credentials.path";
-
-  /**
-   * Boolean value. If true then Tez will add the ApplicationMaster credentials
-   * to all task credentials.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="boolean")
-  public static final String TEZ_AM_CREDENTIALS_MERGE = TEZ_AM_PREFIX
-      + "credentials-merge";
-  public static boolean TEZ_AM_CREDENTIALS_MERGE_DEFAULT = true;
-
-  @Private
-  @ConfigurationScope(Scope.AM)
-  public static final String TEZ_AM_USE_CONCURRENT_DISPATCHER = TEZ_AM_PREFIX
-      + "use.concurrent-dispatcher";
-  @Private
-  public static boolean TEZ_AM_USE_CONCURRENT_DISPATCHER_DEFAULT = false;
-  
-  @Private
-  @ConfigurationScope(Scope.AM)
-  public static final String TEZ_AM_CONCURRENT_DISPATCHER_CONCURRENCY = TEZ_AM_PREFIX
-      + "concurrent-dispatcher.concurrency";
-  @Private
-  public static final int TEZ_AM_CONCURRENT_DISPATCHER_CONCURRENCY_DEFAULT = 10;
 
   /**
    * Boolean value. Execution mode for the Tez application. True implies session mode. If the client
@@ -224,81 +164,6 @@ public class TezConfiguration extends Configuration {
   @ConfigurationProperty
   public static final String TEZ_AM_LOG_LEVEL = TEZ_AM_PREFIX + "log.level";
   public static final String TEZ_AM_LOG_LEVEL_DEFAULT = "INFO";
-
-  /**
-   * Root Logging level passed to the Tez tasks.
-   *
-   * Simple configuration: Set the log level for all loggers.
-   *   e.g. INFO
-   *   This sets the log level to INFO for all loggers.
-   *
-   * Advanced configuration: Set the log level for all classes, along with a different level for some.
-   *   e.g. DEBUG;org.apache.hadoop.ipc=INFO;org.apache.hadoop.security=INFO
-   *   This sets the log level for all loggers to DEBUG, expect for the
-   *   org.apache.hadoop.ipc and org.apache.hadoop.security, which are set to INFO
-   *
-   * Note: The global log level must always be the first parameter.
-   *   DEBUG;org.apache.hadoop.ipc=INFO;org.apache.hadoop.security=INFO is valid
-   *   org.apache.hadoop.ipc=INFO;org.apache.hadoop.security=INFO is not valid
-   * */
-  @ConfigurationScope(Scope.VERTEX)
-  @ConfigurationProperty
-  public static final String TEZ_TASK_LOG_LEVEL = TEZ_TASK_PREFIX + "log.level";
-  public static final String TEZ_TASK_LOG_LEVEL_DEFAULT = "INFO";
-
-  /**
-   * double value. Represents ratio of unique failed outputs / number of consumer
-   * tasks. When this condition or value mentioned in {@link
-   * #TEZ_TASK_MAX_ALLOWED_OUTPUT_FAILURES} is met, task would be declared as failed by AM.
-   *
-   * Expert level setting.
-   */
-  @ConfigurationScope(Scope.AM)
-  public static final String TEZ_TASK_MAX_ALLOWED_OUTPUT_FAILURES_FRACTION =
-      TEZ_TASK_PREFIX + "max.allowed.output.failures.fraction";
-  public static final double TEZ_TASK_MAX_ALLOWED_OUTPUT_FAILURES_FRACTION_DEFAULT = 0.1;
-
-  /**
-   * Int value. Represents maximum allowed unique failures after which a task would be
-   * declared as failed by AM. When this condition or the threshold mentioned in {@link
-   * #TEZ_TASK_MAX_ALLOWED_OUTPUT_FAILURES_FRACTION} is met, task would be relaunched by AM.
-   *
-   * Expert level setting.
-   */
-  @ConfigurationScope(Scope.AM)
-  public static final String TEZ_TASK_MAX_ALLOWED_OUTPUT_FAILURES =
-      TEZ_TASK_PREFIX + "max.allowed.output.failures";
-  public static final int TEZ_TASK_MAX_ALLOWED_OUTPUT_FAILURES_DEFAULT = 10;
-
-  /**
-   * int value. Represents the maximum time in seconds for which a consumer attempt can report 
-   * a read error against its producer attempt, after which the producer attempt will be re-run 
-   * to re-generate the output. There are other heuristics which determine the retry and mainly 
-   * try to guard against a flurry of re-runs due to intermittent read errors 
-   * (due to network issues). This configuration puts a time limit on those heuristics to ensure
-   * jobs dont hang indefinitely due to lack of closure in those heuristics 
-   *
-   * Expert level setting.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  public static final String TEZ_AM_MAX_ALLOWED_TIME_FOR_TASK_READ_ERROR_SEC =
-      TEZ_AM_PREFIX + "max.allowed.time-sec.for-read-error";
-  public static final int TEZ_AM_MAX_ALLOWED_TIME_FOR_TASK_READ_ERROR_SEC_DEFAULT = 300;
-
-  /**
-   * Boolean value. Determines when the final outputs to data sinks are committed. Commit is an
-   * output specific operation and typically involves making the output visible for consumption. 
-   * If the config is true, then the outputs are committed at the end of DAG completion after all 
-   * constituent vertices have completed. If false, outputs for each vertex are committed after that 
-   * vertex succeeds. Depending on the desired output visibility and downstream consumer dependencies
-   * this value must be appropriately chosen. Defaults to the safe choice of true.
-   */
-  @ConfigurationScope(Scope.DAG)
-  @ConfigurationProperty(type="boolean")
-  public static final String TEZ_AM_COMMIT_ALL_OUTPUTS_ON_DAG_SUCCESS =
-      TEZ_AM_PREFIX + "commit-all-outputs-on-dag-success";
-  public static final boolean TEZ_AM_COMMIT_ALL_OUTPUTS_ON_DAG_SUCCESS_DEFAULT = true;
 
   /**
    * Boolean value. Determine whether to log history events per dag
@@ -442,13 +307,6 @@ public class TezConfiguration extends Configuration {
       "cancel.delegation.tokens.on.completion";
   public static final boolean TEZ_CANCEL_DELEGATION_TOKENS_ON_COMPLETION_DEFAULT = true;
 
-  @Private
-  @Unstable
-  @ConfigurationScope(Scope.DAG)
-  public static final String TEZ_AM_ONE_TO_ONE_ROUTING_USE_ON_DEMAND_ROUTING =
-      TEZ_AM_PREFIX + "one-to-one.routing.use.on-demand-routing";
-  public static final boolean TEZ_AM_ONE_TO_ONE_ROUTING_USE_ON_DEMAND_ROUTING_DEFAULT = false;
-
   /**
    * Int value. The number of threads used to listen to task heartbeat requests.
    * Expert level setting.
@@ -506,59 +364,6 @@ public class TezConfiguration extends Configuration {
       TEZ_PREFIX + "counters.group-name.max-length";
   public static final int TEZ_COUNTERS_GROUP_NAME_MAX_LENGTH_DEFAULT = 256;
 
-  @Unstable
-  /**
-   * Boolean value. Enable speculative execution of slower tasks. This can help reduce job latency 
-   * when some tasks are running slower due bad/slow machines
-   */
-  @ConfigurationScope(Scope.VERTEX)  // TODO Verify the vertex speculation, TEZ-1788
-  @ConfigurationProperty(type="boolean")
-  public static final String TEZ_AM_SPECULATION_ENABLED = TEZ_AM_PREFIX + "speculation.enabled";
-  public static final boolean TEZ_AM_SPECULATION_ENABLED_DEFAULT = false;
-  
-  /**
-   * Float value. Specifies how many standard deviations away from the mean task execution time 
-   * should be considered as an outlier/slow task.
-   */
-  @Unstable
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="float")
-  public static final String TEZ_AM_LEGACY_SPECULATIVE_SLOWTASK_THRESHOLD =
-                                     TEZ_AM_PREFIX + "legacy.speculative.slowtask.threshold";
-
-  /**
-   * Long value. Specifies the timeout after which tasks on a single task vertex must be speculated.
-   * A negative value means not to use timeout for speculation of single task vertices.
-   */
-  @Unstable
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="long")
-  public static final String TEZ_AM_LEGACY_SPECULATIVE_SINGLE_TASK_VERTEX_TIMEOUT =
-                                     TEZ_AM_PREFIX + "legacy.speculative.single.task.vertex.timeout";
-  public static final long TEZ_AM_LEGACY_SPECULATIVE_SINGLE_TASK_VERTEX_TIMEOUT_DEFAULT = -1;
-
-  /**
-   * Int value. Upper limit on the number of threads user to launch containers in the app
-   * master. Expert level setting. 
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  public static final String TEZ_AM_CONTAINERLAUNCHER_THREAD_COUNT_LIMIT =
-    TEZ_AM_PREFIX + "containerlauncher.thread-count-limit";
-
-  public static final int TEZ_AM_CONTAINERLAUNCHER_THREAD_COUNT_LIMIT_DEFAULT = 
-    500;
-
-
-  /**
-   * Int value. Specifies the number of task failures on a node before the node is considered faulty.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  public static final String TEZ_AM_MAX_TASK_FAILURES_PER_NODE = TEZ_AM_PREFIX
-      + "maxtaskfailures.per.node";
-  public static final int TEZ_AM_MAX_TASK_FAILURES_PER_NODE_DEFAULT = 10;
-
   /**
    * Int value. Specifies the number of times the app master can be launched in order to recover 
    * from app master failure. Typically app master failures are non-recoverable. This parameter 
@@ -572,46 +377,6 @@ public class TezConfiguration extends Configuration {
   public static final int TEZ_AM_MAX_APP_ATTEMPTS_DEFAULT = 2;
 
   /**
-   * Int value. The maximum number of attempts that can run concurrently for a given vertex.
-   * Setting <=0 implies no limit
-   */
-  @ConfigurationScope(Scope.VERTEX)
-  @ConfigurationProperty(type="integer")
-  public static final String TEZ_AM_VERTEX_MAX_TASK_CONCURRENCY =
-      TEZ_AM_PREFIX + "vertex.max-task-concurrency";
-  public static final int TEZ_AM_VERTEX_MAX_TASK_CONCURRENCY_DEFAULT = -1;
-
-  /**
-   * Int value. The maximum number of attempts that can fail for a particular task before the task is failed. 
-   * This does not count killed attempts. Task failure results in DAG failure.
-   */
-  @ConfigurationScope(Scope.VERTEX)
-  @ConfigurationProperty(type="integer")
-  public static final String TEZ_AM_TASK_MAX_FAILED_ATTEMPTS =
-      TEZ_AM_PREFIX + "task.max.failed.attempts";
-  public static final int TEZ_AM_TASK_MAX_FAILED_ATTEMPTS_DEFAULT = 4;
-
-  /**
-   * Boolean value. Specifies whether a re-scheduled attempt of a task, caused by previous
-   * failures gets higher priority
-   */
-  @ConfigurationScope(Scope.VERTEX)
-  @ConfigurationProperty(type="boolean")
-  public static final String TEZ_AM_TASK_RESCHEDULE_HIGHER_PRIORITY =
-      TEZ_AM_PREFIX + "task.reschedule.higher.priority";
-  public static final boolean TEZ_AM_TASK_RESCHEDULE_HIGHER_PRIORITY_DEFAULT=true;
-
-  /**
-   * Boolean value. Specifies whether a re-scheduled attempt of a task, caused by previous
-   * failure get relaxed locality
-   */
-  @ConfigurationScope(Scope.VERTEX)
-  @ConfigurationProperty(type="boolean")
-  public static final String TEZ_AM_TASK_RESCHEDULE_RELAXED_LOCALITY =
-      TEZ_AM_PREFIX + "task.reschedule.relaxed.locality";
-  public static final boolean TEZ_AM_TASK_RESCHEDULE_RELAXED_LOCALITY_DEFAULT=true;
-
-  /**
    * Boolean value. Enabled blacklisting of nodes of nodes that are considered faulty. These nodes 
    * will not be used to execute tasks.
    */
@@ -622,47 +387,6 @@ public class TezConfiguration extends Configuration {
   public static final boolean TEZ_AM_NODE_BLACKLISTING_ENABLED_DEFAULT = true;
   
   /**
-   * Int value. Specifies the percentage of nodes in the cluster that may be considered faulty.
-   * This limits the number of nodes that are blacklisted in an effort to minimize the effects of 
-   * temporary surges in failures (e.g. due to network outages). 
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  public static final String TEZ_AM_NODE_BLACKLISTING_IGNORE_THRESHOLD = TEZ_AM_PREFIX
-      + "node-blacklisting.ignore-threshold-node-percent";
-  public static final int TEZ_AM_NODE_BLACKLISTING_IGNORE_THRESHOLD_DEFAULT = 33;
-
-  /**
-   * Boolean value. Enable task rescheduling for node updates.
-   * When enabled the task scheduler will reschedule task attempts that
-   * are associated with an unhealthy node to avoid potential data transfer
-   * errors from downstream tasks.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="boolean")
-  public static final String TEZ_AM_NODE_UNHEALTHY_RESCHEDULE_TASKS =
-      TEZ_AM_PREFIX + "node-unhealthy-reschedule-tasks";
-  public static final boolean
-    TEZ_AM_NODE_UNHEALTHY_RESCHEDULE_TASKS_DEFAULT = false;
-
-  /** Int value. Number of threads to handle client RPC requests. Expert level setting.*/
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  public static final String TEZ_AM_CLIENT_THREAD_COUNT =
-      TEZ_AM_PREFIX + "client.am.thread-count";
-  public static final int TEZ_AM_CLIENT_THREAD_COUNT_DEFAULT = 2;
-  
-  /**
-   * String value. Range of ports that the AM can use when binding for client connections. Leave blank
-   * to use all possible ports. Expert level setting. It's hadoop standard range configuration.
-   * For example 50000-50050,50100-50200
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty
-  public static final String TEZ_AM_CLIENT_AM_PORT_RANGE =
-      TEZ_AM_PREFIX + "client.am.port-range";
-
-  /**
    * String value. Range of ports that the AM can use when binding for task connections. Leave blank
    * to use all possible ports. Expert level setting. It's hadoop standard range configuration.
    * For example 50000-50050,50100-50200
@@ -670,15 +394,6 @@ public class TezConfiguration extends Configuration {
   @ConfigurationScope(Scope.AM)
   public static final String TEZ_AM_TASK_AM_PORT_RANGE =
       TEZ_AM_PREFIX + "task.am.port-range";
-
-  /**
-   * String value. The class to be used for DAG Scheduling. Expert level setting.
-   */
-  @ConfigurationScope(Scope.DAG)
-  @ConfigurationProperty
-  public static final String TEZ_AM_DAG_SCHEDULER_CLASS = TEZ_AM_PREFIX + "dag.scheduler.class";
-  public static final String TEZ_AM_DAG_SCHEDULER_CLASS_DEFAULT =
-      "org.apache.tez.dag.app.dag.impl.DAGSchedulerNaturalOrder";
 
   /** Int value. The amount of memory in MB to be used by the AppMaster */
   @ConfigurationScope(Scope.AM)
@@ -693,23 +408,6 @@ public class TezConfiguration extends Configuration {
   public static final String TEZ_AM_RESOURCE_CPU_VCORES = TEZ_AM_PREFIX
       + "resource.cpu.vcores";
   public static final int TEZ_AM_RESOURCE_CPU_VCORES_DEFAULT = 1;
-
-  /** Boolean value. Instructs AM to delete Dag directory upon completion */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="boolean")
-  public static final String TEZ_AM_DAG_CLEANUP_ON_COMPLETION = TEZ_AM_PREFIX
-      + "dag.cleanup.on.completion";
-  public static final boolean TEZ_AM_DAG_CLEANUP_ON_COMPLETION_DEFAULT = false;
-
-  /**
-   * Int value. Upper limit on the number of threads used to delete DAG directories on nodes.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  public static final String TEZ_AM_DAG_CLEANUP_THREAD_COUNT_LIMIT =
-      TEZ_AM_PREFIX + "dag.deletion.thread-count-limit";
-
-  public static final int TEZ_AM_DAG_CLEANUP_THREAD_COUNT_LIMIT_DEFAULT = 10;
 
   /** Int value. The amount of memory in MB to be used by tasks. This applies to all tasks across
    * all vertices. Setting it to the same value for all tasks is helpful for container reuse and 
@@ -729,61 +427,6 @@ public class TezConfiguration extends Configuration {
       + "resource.cpu.vcores";
   public static final int TEZ_TASK_RESOURCE_CPU_VCORES_DEFAULT = 1; 
 
-  /**
-   * Int value. The maximum heartbeat interval between the AM and RM in milliseconds
-   * Increasing this reduces the communication between the AM and the RM and can
-   * help in scaling up. Expert level setting.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  public static final String TEZ_AM_RM_HEARTBEAT_INTERVAL_MS_MAX = TEZ_AM_PREFIX
-      + "am-rm.heartbeat.interval-ms.max";
-  public static final int TEZ_AM_RM_HEARTBEAT_INTERVAL_MS_MAX_DEFAULT = 1000;
-
-  /**
-   * Int value. The maximum amount of time, in milliseconds, to wait before a task asks an
-   * AM for another task. Increasing this can help improve app master scalability for a large 
-   * number of concurrent tasks. Expert level setting.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  public static final String TEZ_TASK_GET_TASK_SLEEP_INTERVAL_MS_MAX = TEZ_TASK_PREFIX
-      + "get-task.sleep.interval-ms.max";
-  public static final int TEZ_TASK_GET_TASK_SLEEP_INTERVAL_MS_MAX_DEFAULT = 200;
-
-  /**
-   * Int value. The maximum heartbeat interval, in milliseconds, between the app master and tasks. 
-   * Increasing this can help improve app master scalability for a large number of concurrent tasks.
-   * Expert level setting.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  public static final String TEZ_TASK_AM_HEARTBEAT_INTERVAL_MS = TEZ_TASK_PREFIX
-      + "am.heartbeat.interval-ms.max";
-  public static final int TEZ_TASK_AM_HEARTBEAT_INTERVAL_MS_DEFAULT = 100;
-
-  /**
-   * Int value. Interval, in milliseconds, after which counters are sent to AM in heartbeat from 
-   * tasks. This reduces the amount of network traffice between AM and tasks to send high-volume 
-   * counters. Improves AM scalability. Expert level setting.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  public static final String TEZ_TASK_AM_HEARTBEAT_COUNTER_INTERVAL_MS = TEZ_TASK_PREFIX
-      + "am.heartbeat.counter.interval-ms.max";
-  public static final int TEZ_TASK_AM_HEARTBEAT_COUNTER_INTERVAL_MS_DEFAULT =
-      4000;
-
-  /**
-   * Int value. Maximum number of of events to fetch from the AM by the tasks in a single heartbeat.
-   * Expert level setting. Expert level setting.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  public static final String TEZ_TASK_MAX_EVENTS_PER_HEARTBEAT = TEZ_TASK_PREFIX
-      + "max-events-per-heartbeat";
-  public static final int TEZ_TASK_MAX_EVENTS_PER_HEARTBEAT_DEFAULT = 500;
-  
   /**
    * Int value. Maximum number of pending task events before a task will stop
    * asking for more events in the task heartbeat.
@@ -818,20 +461,6 @@ public class TezConfiguration extends Configuration {
   public static final boolean TEZ_TASK_INITIALIZE_PROCESSOR_IO_SERIALLY_DEFAULT = false;
 
   /**
-   * Long value. Interval, in milliseconds, within which any of the tasks Input/Processor/Output 
-   * components need to make successive progress notifications. If the progress is not notified 
-   * for this interval then the task will be considered hung and terminated.
-   * The value for this config should be larger than {@link TezConfiguration#TASK_HEARTBEAT_TIMEOUT_MS} 
-   * and larger than 2 times the value of {@link TezConfiguration#TEZ_TASK_AM_HEARTBEAT_INTERVAL_MS}.
-   * A config value <=0 disables this.
-   */
-  @ConfigurationScope(Scope.VERTEX)
-  @ConfigurationProperty
-  public static final String TEZ_TASK_PROGRESS_STUCK_INTERVAL_MS = TEZ_TASK_PREFIX + 
-    "progress.stuck.interval-ms";
-  public static final long TEZ_TASK_PROGRESS_STUCK_INTERVAL_MS_DEFAULT = -1;
-
-  /**
    * Whether to generate counters per IO or not. Enabling this will rename
    * CounterGroups / CounterNames to making them unique per Vertex +
    * Src|Destination
@@ -844,27 +473,6 @@ public class TezConfiguration extends Configuration {
       + "generate.counters.per.io";
   @Private
   public static final boolean TEZ_TASK_GENERATE_COUNTERS_PER_IO_DEFAULT = false;
-
-  /**
-   * Int value. Time interval, in milliseconds, within which a task must heartbeat to the app master
-   * before its considered lost.
-   * Expert level setting.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  public static final String TASK_HEARTBEAT_TIMEOUT_MS = TEZ_TASK_PREFIX + "timeout-ms";
-
-  public static final int TASK_HEARTBEAT_TIMEOUT_MS_DEFAULT = 5 * 60 * 1000;
-
-  /**
-   * Int value. Time interval, in milliseconds, between checks for lost tasks.
-   * Expert level setting.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  public static final String TASK_HEARTBEAT_TIMEOUT_CHECK_MS = TEZ_TASK_PREFIX + "heartbeat.timeout.check-ms";
-
-  public static final int TASK_HEARTBEAT_TIMEOUT_CHECK_MS_DEFAULT = 30 * 1000;
 
   /**
    * Whether to scale down memory requested by each component if the total
@@ -1282,67 +890,6 @@ public class TezConfiguration extends Configuration {
   @ConfigurationScope(Scope.AM)
   public static final String TEZ_AM_APPLICATION_PRIORITY = TEZ_PREFIX + "am.application.priority";
 
-  @Unstable
-  /**
-   * Boolean value. Generate debug artifacts like DAG plan in text format.
-   */
-  @ConfigurationScope(Scope.DAG)
-  @ConfigurationProperty(type="boolean")
-  public static final String TEZ_GENERATE_DEBUG_ARTIFACTS =
-      TEZ_PREFIX + "generate.debug.artifacts";
-  public static final boolean TEZ_GENERATE_DEBUG_ARTIFACTS_DEFAULT = false;
-
-  /**
-   * Set of tasks for which specific launch command options need to be added.
-   * Format: "vertexName[csv of task ids];vertexName[csv of task ids].."
-   * Valid e.g:
-   * v[0,1,2]  - Additional launch-cmd options for tasks 0,1,2 of vertex v
-   * v[1,2,3];v2[5,6,7] - Additional launch-cmd options specified for tasks of vertices v and v2.
-   * v[1:5,20,30];v2[2:5,60,7] - Additional launch-cmd options for 1,2,3,4,5,20,30 of vertex v; 2,
-   * 3,4,5,60,7 of vertex v2
-   * Partial ranges like :5, 1: are not supported.
-   * v[] - Additional launch-cmd options for all tasks in vertex v
-   */
-  @Unstable
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty
-  public static final String TEZ_TASK_SPECIFIC_LAUNCH_CMD_OPTS_LIST = TEZ_PREFIX + "task-specific" +
-      ".launch.cmd-opts.list";
-
-  /**
-   * Additional launch command options to be added for specific tasks.
-   * __VERTEX_NAME__ and __TASK_INDEX__ can be specified, which would be replaced at
-   * runtime by vertex name and task index.
-   * e.g tez.task-specific.launch.cmd-opts=
-   * "-agentpath:libpagent.so,dir=/tmp/__VERTEX_NAME__/__TASK_INDEX__"
-   */
-  @Unstable
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty
-  public static final String TEZ_TASK_SPECIFIC_LAUNCH_CMD_OPTS = TEZ_PREFIX + "task-specific" +
-      ".launch.cmd-opts";
-
-  /**
-   * Task specific log level.
-   *
-   * Simple configuration: Set the log level for all loggers.
-   *   e.g. INFO
-   *   This sets the log level to INFO for all loggers.
-   *
-   * Advanced configuration: Set the log level for all classes, along with a different level for some.
-   *   e.g. DEBUG;org.apache.hadoop.ipc=INFO;org.apache.hadoop.security=INFO
-   *   This sets the log level for all loggers to DEBUG, expect for the
-   *   org.apache.hadoop.ipc and org.apache.hadoop.security, which are set to INFO
-   *
-   * Note: The global log level must always be the first parameter.
-   *   DEBUG;org.apache.hadoop.ipc=INFO;org.apache.hadoop.security=INFO is valid
-   *   org.apache.hadoop.ipc=INFO;org.apache.hadoop.security=INFO is not valid
-   * */
-  @Unstable
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty
-  public static final String TEZ_TASK_SPECIFIC_LOG_LEVEL = TEZ_PREFIX + "task-specific" + ".log.level";
-
   /**
    * String value that is a class name.
    * Specify the class to use for logging history data.
@@ -1352,9 +899,6 @@ public class TezConfiguration extends Configuration {
   @ConfigurationProperty
   public static final String TEZ_HISTORY_LOGGING_SERVICE_CLASS =
       TEZ_PREFIX + "history.logging.service.class";
-
-  public static final String TEZ_HISTORY_LOGGING_SERVICE_CLASS_DEFAULT =
-      "org.apache.tez.dag.history.logging.impl.SimpleHistoryLoggingService";
 
   /**
    * Enum value. Config to limit the type of events published to the history logging service.
@@ -1367,126 +911,6 @@ public class TezConfiguration extends Configuration {
       TEZ_PREFIX + "history.logging.log.level";
 
   /**
-   * List of comma separated enum values. Specifies the list of task attempt termination causes,
-   * which have to be suppressed from being logged to ATS. The valid filters are defined in the
-   * enum TaskAttemptTerminationCause. The filters are applied only if tez.history.logging.log.level
-   * is set to TASK_ATTEMPT.
-   */
-  @ConfigurationScope(Scope.DAG)
-  @ConfigurationProperty
-  public static final String TEZ_HISTORY_LOGGING_TASKATTEMPT_FILTERS =
-      TEZ_PREFIX + "history.logging.taskattempt-filters";
-
-  /**
-   * Comma separated list of Integers. These are the values that were set for the config value
-   * for {@value #TEZ_HISTORY_LOGGING_TIMELINE_NUM_DAGS_PER_GROUP}. The older values are required so
-   * that the groupIds generated previously will continue to be generated by the plugin. If an older
-   * value is not present then the UI may not show information for DAGs which were created
-   * with a different grouping value.
-   *
-   * Note: Do not add too many values here as it will affect the performance of Yarn Timeline
-   * Server/Tez UI due to the need to scan for more log files.
-   */
-  @Private
-  @Unstable
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty
-  public static final String TEZ_HISTORY_LOGGING_TIMELINE_CACHE_PLUGIN_OLD_NUM_DAGS_PER_GROUP =
-      TEZ_PREFIX + "history.logging.timeline-cache-plugin.old-num-dags-per-group";
-
-  /**
-   * Integer value. Number of DAGs to be grouped together. This is used by the history logging
-   * service to generate groupIds such that numDagsPerGroup will have same groupId in a given
-   * session. If the value is set to 1 then we disable grouping. This config is used to control the
-   * number of DAGs written into one log file, and hence controls number of files created in
-   * the Filesystem used by YARN Timeline.
-   */
-  @Private
-  @Unstable
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  public static final String TEZ_HISTORY_LOGGING_TIMELINE_NUM_DAGS_PER_GROUP =
-      TEZ_PREFIX + "history.logging.timeline.num-dags-per-group";
-  public static final int TEZ_HISTORY_LOGGING_TIMELINE_NUM_DAGS_PER_GROUP_DEFAULT = 1;
-
-  /**
-   * String value. The directory into which history data will be written. This defaults to the 
-   * container logging directory. This is relevant only when SimpleHistoryLoggingService is being
-   * used for {@link TezConfiguration#TEZ_HISTORY_LOGGING_SERVICE_CLASS}
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty
-  public static final String TEZ_SIMPLE_HISTORY_LOGGING_DIR =
-      TEZ_PREFIX + "simple.history.logging.dir";
-
-  /**
-   * Int value. Maximum errors allowed while logging history data. After crossing this limit history
-   * logging gets disabled. The job continues to run after this.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  public static final String TEZ_SIMPLE_HISTORY_LOGGING_MAX_ERRORS =
-      TEZ_PREFIX + "simple.history.max.errors";
-  public static final int TEZ_SIMPLE_HISTORY_LOGGING_MAX_ERRORS_DEFAULT = 10;
-
-  /**
-   * Int value. Time, in milliseconds, to wait while flushing YARN ATS data during shutdown.
-   * Expert level setting.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="long")
-  public static final String YARN_ATS_EVENT_FLUSH_TIMEOUT_MILLIS =
-      TEZ_PREFIX + "yarn.ats.event.flush.timeout.millis";
-  public static final long YARN_ATS_EVENT_FLUSH_TIMEOUT_MILLIS_DEFAULT =
-      -1;
-
-  /**
-   * Int value. Max no. of events to send in a single batch to ATS.
-   * Expert level setting.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  public static final String YARN_ATS_MAX_EVENTS_PER_BATCH =
-      TEZ_PREFIX + "yarn.ats.max.events.per.batch";
-  public static final int YARN_ATS_MAX_EVENTS_PER_BATCH_DEFAULT = 5;
-
-  /**
-   * Boolean value. Default true.
-   * Whether to fix the history url if it has not been configured correctly i.e. it does not have a
-   * scheme in the value. By default, the url will be prepended with a scheme (http) if there is
-   * none present.
-   */
-  @Private
-  @ConfigurationScope(Scope.AM)
-  public static final String TEZ_AM_UI_HISTORY_URL_SCHEME_CHECK_ENABLED =
-      TEZ_PREFIX + "am.ui.history.url.scheme.check.enabled";
-  public static final boolean TEZ_AM_UI_HISTORY_URL_SCHEME_CHECK_ENABLED_DEFAULT = true;
-
-
-  /**
-   * Int value. Time, in milliseconds, to wait for an event before sending a batch to ATS.
-   * Expert level setting.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  public static final String YARN_ATS_MAX_POLLING_TIME_PER_EVENT = TEZ_PREFIX
-      + "yarn.ats.max.polling.time.per.event.millis";
-  public static final int YARN_ATS_MAX_POLLING_TIME_PER_EVENT_DEFAULT = 10;
-
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="boolean")
-  public static final String YARN_ATS_ACL_DOMAINS_AUTO_CREATE = TEZ_PREFIX
-      + "yarn.ats.acl.domains.auto-create";
-  public static final boolean YARN_ATS_ACL_DOMAINS_AUTO_CREATE_DEFAULT = true;
-
-  @ConfigurationScope(Scope.AM)
-  public static final String YARN_ATS_ACL_SESSION_DOMAIN_ID = TEZ_PREFIX
-      + "yarn.ats.acl.session.domain.id";
-  @ConfigurationScope(Scope.DAG)
-  public static final String YARN_ATS_ACL_DAG_DOMAIN_ID = TEZ_PREFIX
-      + "yarn.ats.acl.dag.domain.id";
-
-  /**
    * Boolean value. Enable recovery of DAGs. This allows a restarted app master to recover the 
    * incomplete DAGs from the previous instance of the app master.
    */
@@ -1495,34 +919,6 @@ public class TezConfiguration extends Configuration {
   public static final String DAG_RECOVERY_ENABLED =
       TEZ_PREFIX + "dag.recovery.enabled";
   public static final boolean DAG_RECOVERY_ENABLED_DEFAULT = true;
-
-  /**
-   * Int value. Size in bytes for the IO buffer size while processing the recovery file.
-   * Expert level setting.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  public static final String DAG_RECOVERY_FILE_IO_BUFFER_SIZE =
-      TEZ_PREFIX + "dag.recovery.io.buffer.size";
-  public static final int DAG_RECOVERY_FILE_IO_BUFFER_SIZE_DEFAULT = 8192;
-
-  /**
-   * Int value. Number of recovery events to buffer before flushing them to the recovery log.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  public static final String DAG_RECOVERY_MAX_UNFLUSHED_EVENTS =
-      TEZ_PREFIX + "dag.recovery.max.unflushed.events";
-  public static final int DAG_RECOVERY_MAX_UNFLUSHED_EVENTS_DEFAULT = 100;
-
-  /**
-   * Int value. Interval, in seconds, between flushing recovery data to the recovery log.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  public static final String DAG_RECOVERY_FLUSH_INTERVAL_SECS =
-      TEZ_PREFIX + "dag.recovery.flush.interval.secs";
-  public static final int DAG_RECOVERY_FLUSH_INTERVAL_SECS_DEFAULT = 30;
 
   /**
    *  Boolean value. Enable local mode execution in Tez. Enables tasks to run in the same process as
@@ -1536,21 +932,6 @@ public class TezConfiguration extends Configuration {
   public static final boolean TEZ_LOCAL_MODE_DEFAULT = false;
 
   /**
-   *  Tez AM Inline Mode flag. Not valid till Tez-684 get checked-in
-   */
-  @Private
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="boolean")
-  public static final String TEZ_AM_INLINE_TASK_EXECUTION_ENABLED =
-    TEZ_AM_PREFIX + "inline.task.execution.enabled";
-
-  /**
-   *  Tez AM Inline Mode flag. Not valid till Tez-684 get checked-in
-   */
-  @Private
-  public static final boolean TEZ_AM_INLINE_TASK_EXECUTION_ENABLED_DEFAULT = false;
-
-  /**
    * Int value.
    * The maximium number of tasks running in parallel within the app master process.
    */
@@ -1558,8 +939,6 @@ public class TezConfiguration extends Configuration {
   @ConfigurationProperty(type="integer")
   public static final String TEZ_AM_INLINE_TASK_EXECUTION_MAX_TASKS =
     TEZ_AM_PREFIX + "inline.task.execution.max-tasks";
-
-  public static final int TEZ_AM_INLINE_TASK_EXECUTION_MAX_TASKS_DEFAULT = 1;
 
   // ACLs related configuration
   // Format supports a comma-separated list of users and groups with the users and groups separated
@@ -1606,72 +985,6 @@ public class TezConfiguration extends Configuration {
   @ConfigurationScope(Scope.AM)
   @ConfigurationProperty
   public static final String TEZ_AM_MODIFY_ACLS = TEZ_AM_PREFIX + "modify-acls";
-
-  /**
-   * Boolean value.
-   * Disable version check between client and AM/DAG. Default false.
-   */
-  @Private
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="boolean")
-  public static final String TEZ_AM_DISABLE_CLIENT_VERSION_CHECK = TEZ_AM_PREFIX
-      + "disable.client-version-check";
-  public static final boolean TEZ_AM_DISABLE_CLIENT_VERSION_CHECK_DEFAULT = false;
-
-  /**
-   * Boolean value.
-   * Allow disabling of Timeline Domains even if Timeline is being used.
-   */
-  @Private
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="boolean")
-  public static final String TEZ_AM_ALLOW_DISABLED_TIMELINE_DOMAINS = TEZ_PREFIX
-      + "allow.disabled.timeline-domains";
-  public static final boolean TEZ_AM_ALLOW_DISABLED_TIMELINE_DOMAINS_DEFAULT = false;
-
-  /**
-   * String value
-   * Tez UI URL template for the application.
-   * Expert level setting.
-   *
-   * The AM will redirect the user to the Tez UI via this url. Template supports the following
-   * parameters to be replaced with the actual runtime information:
-   *
-   *   __APPLICATION_ID__ : Replaces this with application ID
-   *   __HISTORY_URL_BASE__: replaces this with TEZ_HISTORY_URL_BASE
-   *
-   *   For example, "http://uihost:9001/#/tez-app/__APPLICATION_ID__/ will be replaced to
-   *   http://uihost:9001/#/tez-app/application_1421880306565_0001/
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty
-  public static final String TEZ_AM_TEZ_UI_HISTORY_URL_TEMPLATE = TEZ_AM_PREFIX
-      + "tez-ui.history-url.template";
-  public static final String TEZ_AM_TEZ_UI_HISTORY_URL_TEMPLATE_DEFAULT =
-      "__HISTORY_URL_BASE__/#/tez-app/__APPLICATION_ID__";
-
-  /**
-   * String value
-   * Tez-UI Url base. This gets replaced in the TEZ_AM_TEZ_UI_HISTORY_URL_TEMPLATE
-   * ex http://ui-host:9001 or if its hosted with a prefix http://ui-host:9001/~user
-   * if the ui is hosted on the default port (80 for http and 443 for https), the port should not
-   * be specified.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty
-  public static final String TEZ_HISTORY_URL_BASE = TEZ_PREFIX
-      + "tez-ui.history-url.base";
-
-  /**
-   * String value
-   * Allow disabling of the Tez AM webservice. If set to false the Tez-UI wont show progress
-   * updates for running application.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="boolean")
-  public static final String TEZ_AM_WEBSERVICE_ENABLE = TEZ_AM_PREFIX
-      + "tez-ui.webservice.enable";
-  public static final boolean TEZ_AM_WEBSERVICE_ENABLE_DEFAULT = true;
 
   // TODO only validate property here, value can also be validated if necessary
   public static void validateProperty(String property, Scope usedScope) {
@@ -1779,48 +1092,6 @@ public class TezConfiguration extends Configuration {
   @ConfigurationProperty(type="int")
   public static final String TEZ_IPC_PAYLOAD_RESERVED_BYTES = TEZ_PREFIX + "ipc.payload.reserved.bytes";
   public static final int TEZ_IPC_PAYLOAD_RESERVED_BYTES_DEFAULT = 5 * 1024 * 1024;
-
-  // for Recovery Test
-  @Private
-  @ConfigurationScope(Scope.TEST)
-  public static final String TEZ_AM_RECOVERY_SERVICE_CLASS =
-      TEZ_PREFIX + "test.recovery-service-class";
-  @Private
-  public static final String TEZ_AM_RECOVERY_SERVICE_CLASS_DEFAULT = "org.apache.tez.dag.history.recovery.RecoveryService";
-
-  /**
-   * String value that is a class name.
-   * Specify the class to use for Deletion tracking.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty
-  public static final String TEZ_AM_DELETION_TRACKER_CLASS =
-      TEZ_AM_PREFIX + "deletion.tracker.class";
-
-  public static final String TEZ_AM_DELETION_TRACKER_CLASS_DEFAULT =
-      "org.apache.tez.dag.app.launcher.DeletionTrackerImpl";
-
-  /**
-   * Boolean value. Default false.
-   * By default, configured values for the Summary Entity Types for Timeline will
-   * not be respected and be overridden by the Timeline History Service.
-   */
-  @Private
-  @ConfigurationScope(Scope.AM)
-  public static final String TEZ_AM_ATS_V15_OVERRIDE_SUMMARY_TYPES =
-      TEZ_PREFIX + "am.ats.v15.override.summary-types";
-  public static final boolean TEZ_AM_ATS_V15_OVERRIDE_SUMMARY_TYPES_DEFAULT = true;
-
-   /**
-    * Integer value in milliseconds. Default value is 5000 milliseconds.
-    * The time for which the AM waits after the final DAG completes or when shutdown is invoked
-    * before completing shutdown. This allows a client to retrieve any required info directly from
-    * the AM on completion of a DAG.
-    */
-   @Private
-   @ConfigurationScope(Scope.AM)
-   public static final String TEZ_AM_SLEEP_TIME_BEFORE_EXIT_MILLIS =
-       TEZ_AM_PREFIX + "sleep.time.before.exit.millis";
 
   /**
    * String value. Determines what JVM properties will be logged for debugging purposes
