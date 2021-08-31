@@ -48,51 +48,8 @@ public class DeprecatedKeys {
  
   static {
     populateMRToTezRuntimeParamMap();
-    populateMRToDagParamMap();
-    addDeprecatedKeys();
   }
 
-  private static void populateMRToDagParamMap() {
-    // TODO Default value handling.
-    mrParamToDAGParamMap.put(MRJobConfig.MR_AM_TASK_LISTENER_THREAD_COUNT,
-        TezConfiguration.TEZ_AM_TASK_LISTENER_THREAD_COUNT);
-    
-    mrParamToDAGParamMap.put(MRJobConfig.MAX_TASK_FAILURES_PER_TRACKER,
-        TezConfiguration.TEZ_AM_MAX_TASK_FAILURES_PER_NODE);
-    mrParamToDAGParamMap.put(MRJobConfig.MR_AM_JOB_NODE_BLACKLISTING_ENABLE,
-        TezConfiguration.TEZ_AM_NODE_BLACKLISTING_ENABLED);
-    mrParamToDAGParamMap.put(
-        MRJobConfig.MR_AM_IGNORE_BLACKLISTING_BLACKLISTED_NODE_PERECENT,
-        TezConfiguration.TEZ_AM_NODE_BLACKLISTING_IGNORE_THRESHOLD);
-
-    mrParamToDAGParamMap.put(MRJobConfig.QUEUE_NAME,
-      TezConfiguration.TEZ_QUEUE_NAME);
-
-    // Counter replacement will work in this manner, as long as TezCounters
-    // extends MRCounters and is used directly by the Mapper/Reducer.
-    // When these counters are eventually translated over to MRCounters, this
-    // may break.
-    // Framework counters, like FILESYSTEM will likely be incompatible since
-    // they enum key belongs to a different package.
-    mrParamToDAGParamMap.put(MRJobConfig.COUNTERS_MAX_KEY,
-      TezConfiguration.TEZ_COUNTERS_MAX);
-    mrParamToDAGParamMap.put(MRJobConfig.COUNTER_GROUPS_MAX_KEY,
-        TezConfiguration.TEZ_COUNTERS_MAX_GROUPS);
-    mrParamToDAGParamMap.put(MRJobConfig.COUNTER_NAME_MAX_KEY,
-        TezConfiguration.TEZ_COUNTERS_COUNTER_NAME_MAX_LENGTH);
-    mrParamToDAGParamMap.put(MRJobConfig.COUNTER_GROUP_NAME_MAX_KEY,
-      TezConfiguration.TEZ_COUNTERS_GROUP_NAME_MAX_LENGTH);
-    mrParamToDAGParamMap.put(MRJobConfig.TASK_TIMEOUT,
-        TezConfiguration.TASK_HEARTBEAT_TIMEOUT_MS);
-    mrParamToDAGParamMap.put(MRJobConfig.JOB_TAGS,
-        TezConfiguration.TEZ_APPLICATION_TAGS);
-    mrParamToDAGParamMap.put(MRJobConfig.MAPREDUCE_JOB_USER_CLASSPATH_FIRST,
-        TezConfiguration.TEZ_USER_CLASSPATH_FIRST);
-  }
-
-  // TODO TEZAM4 Sometime, make sure this gets loaded by default. Instead of the current initialization in MRAppMaster, TezChild.
-  // Maybe define in an TEZConfiguration / TEZ JobConf variant.
-  
   public static void init() {
   }
   
@@ -163,9 +120,6 @@ public class DeprecatedKeys {
     registerMRToRuntimeKeyTranslation(MRJobConfig.MAPREDUCE_JOB_USER_CLASSPATH_FIRST, TezConfiguration.TEZ_USER_CLASSPATH_FIRST);
   }
   
-  private static void addDeprecatedKeys() {
-  }
-
   private static void registerMRToRuntimeKeyTranslation(String mrKey,
       String tezKey) {
     mrParamToTezRuntimeParamMap.put(mrKey, tezKey);
