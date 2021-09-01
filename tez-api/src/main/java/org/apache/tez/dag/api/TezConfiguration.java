@@ -145,49 +145,6 @@ public class TezConfiguration extends Configuration {
   public static final boolean TEZ_AM_SESSION_MODE_DEFAULT = false;
 
   /**
-   * Root Logging level passed to the Tez app master.
-   *
-   * Simple configuration: Set the log level for all loggers.
-   *   e.g. INFO
-   *   This sets the log level to INFO for all loggers.
-   *
-   * Advanced configuration: Set the log level for all classes, along with a different level for some.
-   *   e.g. DEBUG;org.apache.hadoop.ipc=INFO;org.apache.hadoop.security=INFO
-   *   This sets the log level for all loggers to DEBUG, expect for the
-   *   org.apache.hadoop.ipc and org.apache.hadoop.security, which are set to INFO
-   *
-   * Note: The global log level must always be the first parameter.
-   *   DEBUG;org.apache.hadoop.ipc=INFO;org.apache.hadoop.security=INFO is valid
-   *   org.apache.hadoop.ipc=INFO;org.apache.hadoop.security=INFO is not valid
-   * */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty
-  public static final String TEZ_AM_LOG_LEVEL = TEZ_AM_PREFIX + "log.level";
-  public static final String TEZ_AM_LOG_LEVEL_DEFAULT = "INFO";
-
-  /**
-   * Boolean value. Determine whether to log history events per dag
-   */
-  @ConfigurationScope(Scope.DAG)
-  @Private
-  public static final String TEZ_DAG_HISTORY_LOGGING_ENABLED =
-      TEZ_PREFIX + "dag.history.logging.enabled";
-  public static final boolean TEZ_DAG_HISTORY_LOGGING_ENABLED_DEFAULT = true;
-
-  /**
-   * String value. Command line options which will be prepended to {@link #TEZ_AM_LAUNCH_CMD_OPTS}
-   * during the launch of the AppMaster process. This property will typically be configured to
-   * include default options meant to be used by all jobs in a cluster. If required, the values can
-   * be overridden per job.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty
-  public static final String TEZ_AM_LAUNCH_CLUSTER_DEFAULT_CMD_OPTS =
-      TEZ_AM_PREFIX + "launch.cluster-default.cmd-opts";
-  public static final String TEZ_AM_LAUNCH_CLUSTER_DEFAULT_CMD_OPTS_DEFAULT =
-      "-server -Djava.net.preferIPv4Stack=true -Dhadoop.metrics.log.level=WARN";
-
-  /**
    * String value. Command line options provided during the launch of the Tez
    * AppMaster process. Its recommended to not set any Xmx or Xms in these launch opts so that
    * Tez can determine them automatically.
@@ -246,19 +203,6 @@ public class TezConfiguration extends Configuration {
     "PATH=%PATH%;%HADOOP_COMMON_HOME%\\bin":
     "LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HADOOP_COMMON_HOME/lib/native/";
 
-  /**
-   * String value. Env settings will be merged with {@link #TEZ_AM_LAUNCH_ENV}
-   * during the launch of the AppMaster process. This property will typically be configured to
-   * include default system env meant to be used by all jobs in a cluster. If required, the values can
-   * be appended to per job.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty
-  public static final String TEZ_AM_LAUNCH_CLUSTER_DEFAULT_ENV =
-      TEZ_AM_PREFIX + "launch.cluster-default.env";
-  public static final String TEZ_AM_LAUNCH_CLUSTER_DEFAULT_ENV_DEFAULT =
-      NATIVE_LIB_PARAM_DEFAULT;
-
   /** String value. Env settings for the Tez AppMaster process.
    * Should be specified as a comma-separated of key-value pairs where each pair
    * is defined as KEY=VAL
@@ -299,13 +243,6 @@ public class TezConfiguration extends Configuration {
   public static final String TEZ_TASK_LAUNCH_ENV = TEZ_TASK_PREFIX
       + "launch.env";
   public static final String TEZ_TASK_LAUNCH_ENV_DEFAULT = "";
-
-  @Private
-  @ConfigurationScope(Scope.DAG)
-  @ConfigurationProperty(type="boolean")
-  public static final String TEZ_CANCEL_DELEGATION_TOKENS_ON_COMPLETION = TEZ_PREFIX +
-      "cancel.delegation.tokens.on.completion";
-  public static final boolean TEZ_CANCEL_DELEGATION_TOKENS_ON_COMPLETION_DEFAULT = true;
 
   /**
    * Int value. The number of threads used to listen to task heartbeat requests.
@@ -620,79 +557,6 @@ public class TezConfiguration extends Configuration {
 
 
   /**
-   * Boolean value. Configuration to specify whether container should be reused across tasks.
-   * This improves performance by not incurring recurring launch overheads.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="boolean")
-  public static final String TEZ_AM_CONTAINER_REUSE_ENABLED = TEZ_AM_PREFIX
-      + "container.reuse.enabled";
-  public static final boolean TEZ_AM_CONTAINER_REUSE_ENABLED_DEFAULT = true;
-
-  /**
-   * Boolean value. Whether to reuse containers for rack local tasks. Active only if reuse is
-   * enabled.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="boolean")
-  public static final String TEZ_AM_CONTAINER_REUSE_RACK_FALLBACK_ENABLED =
-      TEZ_AM_PREFIX + "container.reuse.rack-fallback.enabled";
-  public static final boolean
-      TEZ_AM_CONTAINER_REUSE_RACK_FALLBACK_ENABLED_DEFAULT = true;
-
-  /**
-   * Boolean value. Whether to reuse containers for non-local tasks. Active only if reuse is
-   * enabled. Turning this on can severely affect locality and can be bad for jobs with high data 
-   * volume being read from the primary data sources.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="boolean")
-  public static final String TEZ_AM_CONTAINER_REUSE_NON_LOCAL_FALLBACK_ENABLED =
-      TEZ_AM_PREFIX + "container.reuse.non-local-fallback.enabled";
-  public static final boolean
-      TEZ_AM_CONTAINER_REUSE_NON_LOCAL_FALLBACK_ENABLED_DEFAULT = false;
-
-  /**
-   * Int value. The amount of time to wait before assigning a container to the next level
-   * of locality. NODE -> RACK -> NON_LOCAL. Delay scheduling parameter. Expert level setting.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="long")
-  public static final String
-      TEZ_AM_CONTAINER_REUSE_LOCALITY_DELAY_ALLOCATION_MILLIS =
-      TEZ_AM_PREFIX + "container.reuse.locality.delay-allocation-millis";
-  public static final long
-    TEZ_AM_CONTAINER_REUSE_LOCALITY_DELAY_ALLOCATION_MILLIS_DEFAULT = 250l;
-
-  /**
-   * Int value. The minimum amount of time to hold on to a container that is idle. Only active when 
-   * reuse is enabled. Set to -1 to never release idle containers (not recommended). 
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  public static final String TEZ_AM_CONTAINER_IDLE_RELEASE_TIMEOUT_MIN_MILLIS =
-    TEZ_AM_PREFIX + "container.idle.release-timeout-min.millis";
-  public static final long
-    TEZ_AM_CONTAINER_IDLE_RELEASE_TIMEOUT_MIN_MILLIS_DEFAULT = 5000l;  
-
-  /**
-   * Int value. The maximum amount of time to hold on to a container if no task can be
-   * assigned to it immediately. Only active when reuse is enabled. The value
-   * must be +ve and >=
-   * TezConfiguration#TEZ_AM_CONTAINER_IDLE_RELEASE_TIMEOUT_MIN_MILLIS.
-   * Containers will have an expire time set to a random value between
-   * TezConfiguration#TEZ_AM_CONTAINER_IDLE_RELEASE_TIMEOUT_MIN_MILLIS &&
-   * TezConfiguration#TEZ_AM_CONTAINER_IDLE_RELEASE_TIMEOUT_MAX_MILLIS. This 
-   * creates a graceful reduction in the amount of idle resources held
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="long")
-  public static final String TEZ_AM_CONTAINER_IDLE_RELEASE_TIMEOUT_MAX_MILLIS =
-      TEZ_AM_PREFIX + "container.idle.release-timeout-max.millis";
-  public static final long
-    TEZ_AM_CONTAINER_IDLE_RELEASE_TIMEOUT_MAX_MILLIS_DEFAULT = 10000l;
-  
-  /**
    * Int value. The minimum number of containers that will be held in session mode. Not active in 
    * non-session mode. Enables an idle session (not running any DAG) to hold on to a minimum number
    * of containers to provide fast response times for the next DAG.
@@ -702,61 +566,6 @@ public class TezConfiguration extends Configuration {
   public static final String TEZ_AM_SESSION_MIN_HELD_CONTAINERS =
       TEZ_AM_PREFIX + "session.min.held-containers";
   public static final int TEZ_AM_SESSION_MIN_HELD_CONTAINERS_DEFAULT = 0;
-
-  /**
-   * Boolean value. Allow/disable logging for all dags in a session   
-   */
-  @Private
-  @ConfigurationScope(Scope.AM)
-  public static final String TEZ_AM_HISTORY_LOGGING_ENABLED =
-      TEZ_AM_PREFIX + "history.logging.enabled";
-  public static final boolean TEZ_AM_HISTORY_LOGGING_ENABLED_DEFAULT = true;
-
-  /**
-   * Int value. Specifies the percentage of tasks eligible to be preempted that
-   * will actually be preempted in a given round of Tez internal preemption.
-   * This slows down preemption and gives more time for free resources to be
-   * allocated by the cluster (if any) and gives more time for preemptable tasks
-   * to finish. Valid values are 0-100. Higher values will preempt quickly at
-   * the cost of losing work. Setting to 0 turns off preemption. Expert level
-   * setting.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  public static final String TEZ_AM_PREEMPTION_PERCENTAGE =
-      TEZ_AM_PREFIX + "preemption.percentage";
-  public static final int TEZ_AM_PREEMPTION_PERCENTAGE_DEFAULT = 10;
-
-  /**
-   * Float value. Specifies the allowable percentage in the range 0.0-100.0f of task
-   * failures per vertex that will allow the vertex to succeed with failures.
-   */
-  @ConfigurationScope(Scope.VERTEX)
-  public static final String TEZ_VERTEX_FAILURES_MAXPERCENT =
-          "tez.vertex.failures.maxpercent";
-  public static final float TEZ_VERTEX_FAILURES_MAXPERCENT_DEFAULT = 0.0f;
-  /**
-   * Int value. The number of RM heartbeats to wait after preempting running tasks before preempting
-   * more running tasks. After preempting a task, we need to wait at least 1 heartbeat so that the 
-   * RM can act on the released resources and assign new ones to us. Expert level setting.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  public static final String TEZ_AM_PREEMPTION_HEARTBEATS_BETWEEN_PREEMPTIONS =
-      TEZ_AM_PREFIX + "preemption.heartbeats-between-preemptions";
-  public static final int TEZ_AM_PREEMPTION_HEARTBEATS_BETWEEN_PREEMPTIONS_DEFAULT = 3;
-
-  /**
-   * Int value. Time (in millisecs) that an unsatisfied request will wait before preempting other
-   * resources. In rare cases, the cluster says there are enough free resources but does not end 
-   * up getting enough on a node to actually assign it to the job. This configuration tries to put 
-   * a deadline on such wait to prevent indefinite job hangs.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  public static final String TEZ_AM_PREEMPTION_MAX_WAIT_TIME_MS =
-      TEZ_AM_PREFIX + "preemption.max.wait-time-ms";
-  public static final int TEZ_AM_PREEMPTION_MAX_WAIT_TIME_MS_DEFAULT = 60*1000; // 60s
 
   /**
    * String value to a file path.
@@ -878,19 +687,6 @@ public class TezConfiguration extends Configuration {
       TEZ_PREFIX + "session.";
 
   /**
-   * Int value. Time (in seconds) to wait for AM to come up when trying to submit a DAG
-   * from the client. Only relevant in session mode. If the cluster is busy and cannot launch the 
-   * AM then this timeout may be hit. In those case, using non-session mode is recommended if 
-   * applicable. Otherwise increase the timeout (set to -1 for infinity. Not recommended)
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  public static final String TEZ_SESSION_CLIENT_TIMEOUT_SECS =
-      TEZ_SESSION_PREFIX + "client.timeout.secs";
-  public static final int TEZ_SESSION_CLIENT_TIMEOUT_SECS_DEFAULT =
-      120;
-
-  /**
    * Int value. Time (in seconds) for which the Tez AM should wait for a DAG to be submitted before
    * shutting down. Only relevant in session mode. Any negative value will disable this check and
    * allow the AM to hang around forever in idle mode.
@@ -910,30 +706,6 @@ public class TezConfiguration extends Configuration {
   public static final String TEZ_QUEUE_NAME = TEZ_PREFIX + "queue.name";
 
   /**
-   * String value. Tags for the job that will be passed to YARN at submission
-   * time. Queries to YARN for applications can filter on these tags.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty
-  public static final String TEZ_APPLICATION_TAGS = TEZ_PREFIX + "application.tags";
-
-  /**
-   * String value. The job priority of submitted application.
-   */
-  @ConfigurationScope(Scope.AM)
-  public static final String TEZ_AM_APPLICATION_PRIORITY = TEZ_PREFIX + "am.application.priority";
-
-  /**
-   * String value that is a class name.
-   * Specify the class to use for logging history data.
-   * To disable, set this to "org.apache.tez.dag.history.logging.impl.DevNullHistoryLoggingService"
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty
-  public static final String TEZ_HISTORY_LOGGING_SERVICE_CLASS =
-      TEZ_PREFIX + "history.logging.service.class";
-
-  /**
    * Enum value. Config to limit the type of events published to the history logging service.
    * The valid log levels are defined in the enum {@link HistoryLogLevel}. The default value is
    * defined in {@link HistoryLogLevel#DEFAULT}.
@@ -942,16 +714,6 @@ public class TezConfiguration extends Configuration {
   @ConfigurationProperty
   public static final String TEZ_HISTORY_LOGGING_LOGLEVEL =
       TEZ_PREFIX + "history.logging.log.level";
-
-  /**
-   * Boolean value. Enable recovery of DAGs. This allows a restarted app master to recover the 
-   * incomplete DAGs from the previous instance of the app master.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="boolean")
-  public static final String DAG_RECOVERY_ENABLED =
-      TEZ_PREFIX + "dag.recovery.enabled";
-  public static final boolean DAG_RECOVERY_ENABLED_DEFAULT = true;
 
   /**
    *  Boolean value. Enable local mode execution in Tez. Enables tasks to run in the same process as
@@ -1040,16 +802,6 @@ public class TezConfiguration extends Configuration {
   }
 
   /**
-   * Long value
-   * Status Poll interval in Milliseconds used when getting DAG status with timeout.
-   */
-  @ConfigurationScope(Scope.DAG)
-  @ConfigurationProperty(type="long")
-  public static final String TEZ_DAG_STATUS_POLLINTERVAL_MS = TEZ_PREFIX
-      + "dag.status.pollinterval-ms";
-  public static final long TEZ_DAG_STATUS_POLLINTERVAL_MS_DEFAULT = 500;
-
-  /**
    * Long value.
    * Time to wait (in seconds) for apps to complete on MiniTezCluster shutdown.
    */
@@ -1059,72 +811,6 @@ public class TezConfiguration extends Configuration {
   public static final String TEZ_TEST_MINI_CLUSTER_APP_WAIT_ON_SHUTDOWN_SECS =
       TEZ_PREFIX + "test.minicluster.app.wait.on.shutdown.secs";
   public static final long TEZ_TEST_MINI_CLUSTER_APP_WAIT_ON_SHUTDOWN_SECS_DEFAULT = 30;
-
-  /**
-   * Long value
-   * Time to wait (in milliseconds) for yarn app's diagnotics is available
-   * Workaround for YARN-2560
-   */
-  @Private
-  @ConfigurationScope(Scope.CLIENT)
-  @ConfigurationProperty(type="long")
-  public static final String TEZ_CLIENT_DIAGNOSTICS_WAIT_TIMEOUT_MS =
-      TEZ_PREFIX + "client.diagnostics.wait.timeout-ms";
-  @Private
-  public static final long TEZ_CLIENT_DIAGNOSTICS_WAIT_TIMEOUT_MS_DEFAULT = 3*1000;
-
-  /**
-   * String value.
-   * Ability to provide a different implementation to check/verify java opts defined
-   * for vertices/tasks.
-   * Class has to be an instance of JavaOptsChecker
-   */
-  @Private
-  @ConfigurationScope(Scope.CLIENT)
-  @ConfigurationProperty
-  public static final String TEZ_CLIENT_JAVA_OPTS_CHECKER_CLASS =
-      TEZ_PREFIX + "java.opts.checker.class";
-
-  /**
-   * Boolean value. Default true.
-   * Ability to disable the Java Opts Checker
-   */
-  @Private
-  @ConfigurationScope(Scope.CLIENT)
-  @ConfigurationProperty(type="boolean")
-  public static final String TEZ_CLIENT_JAVA_OPTS_CHECKER_ENABLED =
-      TEZ_PREFIX + "java.opts.checker.enabled";
-  public static final boolean TEZ_CLIENT_JAVA_OPTS_CHECKER_ENABLED_DEFAULT = true;
-
-  /**
-   * Long value. Time interval, in milliseconds, for client to wait during client-requested
-   * AM shutdown before issuing a hard kill to the RM for this application.
-   * Expert level setting.
-   */
-  @ConfigurationScope(Scope.CLIENT)
-  @ConfigurationProperty(type="long")
-  public static final String TEZ_CLIENT_HARD_KILL_TIMEOUT_MS = TEZ_PREFIX + "client.timeout-ms";
-  public static final long TEZ_CLIENT_HARD_KILL_TIMEOUT_MS_DEFAULT = 30 * 1000L;
-
-  /**
-   * Boolean value. Backwards compatibility setting. Changes TezClient stop to be a
-   * synchronous call waiting until AM is in a final state before returning to the user.
-   * Expert level setting.
-   */
-  @ConfigurationScope(Scope.CLIENT)
-  @ConfigurationProperty(type="boolean")
-  public static final String TEZ_CLIENT_ASYNCHRONOUS_STOP = TEZ_PREFIX + "client.asynchronous-stop";
-  public static final boolean TEZ_CLIENT_ASYNCHRONOUS_STOP_DEFAULT = true;
-
-  /**
-   * Int value. SubmitDAGPlanRequest cannot be larger than Max IPC message size minus this number; otherwise, it will
-   * be serialized to HDFS and we transfer the path to server. Server will deserialize the request from HDFS.
-   */
-  @Private
-  @ConfigurationScope(Scope.CLIENT)
-  @ConfigurationProperty(type="int")
-  public static final String TEZ_IPC_PAYLOAD_RESERVED_BYTES = TEZ_PREFIX + "ipc.payload.reserved.bytes";
-  public static final int TEZ_IPC_PAYLOAD_RESERVED_BYTES_DEFAULT = 5 * 1024 * 1024;
 
   /**
    * String value. Determines what JVM properties will be logged for debugging purposes

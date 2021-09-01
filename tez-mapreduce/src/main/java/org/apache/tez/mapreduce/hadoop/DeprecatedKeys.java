@@ -125,11 +125,6 @@ public class DeprecatedKeys {
     mrParamToTezRuntimeParamMap.put(mrKey, tezKey);
   }
   
-  @SuppressWarnings("unused")
-  private static void _(String mrKey, String tezKey) {
-    Configuration.addDeprecation(mrKey, tezKey);
-  }
-
   public static Map<String, String> getMRToDAGParamMap() {
     return Collections.unmodifiableMap(mrParamToDAGParamMap);
   }

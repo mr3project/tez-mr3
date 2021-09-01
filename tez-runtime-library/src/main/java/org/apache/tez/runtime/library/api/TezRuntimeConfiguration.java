@@ -64,12 +64,6 @@ public class TezRuntimeConfiguration {
   private static final List<String> allowedPrefixes = new ArrayList<String>();
   private static List<String> unmodifiableAllowedPrefixes;
 
-
-  static {
-    Configuration.addDeprecation("tez.runtime.sort.threads",
-        TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_SORT_THREADS);
-  }
-
   /**
    * Configuration key to enable/disable IFile readahead.
    */
