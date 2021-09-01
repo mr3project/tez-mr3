@@ -428,6 +428,39 @@ public class TezConfiguration extends Configuration {
   public static final int TEZ_TASK_RESOURCE_CPU_VCORES_DEFAULT = 1; 
 
   /**
+   * Int value. The maximum heartbeat interval, in milliseconds, between the app master and tasks.
+   * Increasing this can help improve app master scalability for a large number of concurrent tasks.
+   * Expert level setting.
+   */
+  @ConfigurationScope(Scope.AM)
+  @ConfigurationProperty(type="integer")
+  public static final String TEZ_TASK_AM_HEARTBEAT_INTERVAL_MS = TEZ_TASK_PREFIX
+      + "am.heartbeat.interval-ms.max";
+  public static final int TEZ_TASK_AM_HEARTBEAT_INTERVAL_MS_DEFAULT = 100;
+
+  /**
+   * Int value. Interval, in milliseconds, after which counters are sent to AM in heartbeat from
+   * tasks. This reduces the amount of network traffice between AM and tasks to send high-volume
+   * counters. Improves AM scalability. Expert level setting.
+   */
+  @ConfigurationScope(Scope.AM)
+  @ConfigurationProperty(type="integer")
+  public static final String TEZ_TASK_AM_HEARTBEAT_COUNTER_INTERVAL_MS = TEZ_TASK_PREFIX
+      + "am.heartbeat.counter.interval-ms.max";
+  public static final int TEZ_TASK_AM_HEARTBEAT_COUNTER_INTERVAL_MS_DEFAULT =
+      4000;
+
+  /**
+   * Int value. Maximum number of events to fetch from the AM by the tasks in a single heartbeat.
+   * Expert level setting. Expert level setting.
+   */
+  @ConfigurationScope(Scope.AM)
+  @ConfigurationProperty(type="integer")
+  public static final String TEZ_TASK_MAX_EVENTS_PER_HEARTBEAT = TEZ_TASK_PREFIX
+      + "max-events-per-heartbeat";
+  public static final int TEZ_TASK_MAX_EVENTS_PER_HEARTBEAT_DEFAULT = 500;
+
+  /**
    * Int value. Maximum number of pending task events before a task will stop
    * asking for more events in the task heartbeat.
    * Expert level setting.

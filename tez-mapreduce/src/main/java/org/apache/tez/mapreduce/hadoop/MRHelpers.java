@@ -75,35 +75,6 @@ public class MRHelpers {
     convertVertexConfToTez(conf, preferTez);
   }
 
-
-  /**
-   * Update the provided configuration to use the new API (mapreduce) or the old API (mapred) based
-   * on the configured InputFormat, OutputFormat, Partitioner etc. Also ensures that keys not
-   * required by a particular mode are not present. </p>
-   *
-   * This method should be invoked after completely setting up the configuration. </p>
-   *
-   * Defaults to using the new API if relevant keys are not present.
-   *
-   */
-  public static void configureMRApiUsage(Configuration conf) {
-    String oldMapperClass = "mapred.mapper.class";
-    conf.setBooleanIfUnset("mapred.mapper.new-api", conf.get(oldMapperClass) == null);
-    try {
-      if (conf.getBoolean("mapred.mapper.new-api", false)) {
-        String mode = "new map API";
-        ensureNotSet(conf, "mapred.input.format.class", mode);
-        ensureNotSet(conf, oldMapperClass, mode);
-      } else {
-        String mode = "map compatability";
-        ensureNotSet(conf, MRJobConfig.INPUT_FORMAT_CLASS_ATTR, mode);
-        ensureNotSet(conf, MRJobConfig.MAP_CLASS_ATTR, mode);
-      }
-    } catch (IOException e) {
-      throw new TezUncheckedException(e);
-    }
-  }
-
   private static void convertVertexConfToTez(Configuration vertexConf, boolean preferTez) {
     setStageKeysFromBaseConf(vertexConf, vertexConf, "unknown");
     processDirectConversion(vertexConf, preferTez);

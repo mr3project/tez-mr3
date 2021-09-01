@@ -24,28 +24,18 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
-import org.apache.hadoop.yarn.security.client.ClientToAMTokenIdentifier;
-import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.tez.common.JavaOptsChecker;
 import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.dag.api.TezConstants;
 import org.apache.tez.dag.api.TezException;
-import org.apache.tez.dag.api.client.rpc.DAGClientAMProtocolBlockingPB;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.InetSocketAddress;
 import java.net.URI;
-import java.security.PrivilegedExceptionAction;
 import java.util.List;
 
 @Private
@@ -93,37 +83,6 @@ public class TezClientUtils {
         + ApplicationConstants.LOG_DIR_EXPANSION_VAR);
     vargs.add("-D" + TezConstants.TEZ_ROOT_LOGGER_NAME + "=" + logLevel
         + "," + TezConstants.TEZ_CONTAINER_LOGGER_NAME);
-  }
-
-  @Private
-  public static DAGClientAMProtocolBlockingPB getAMProxy(final Configuration conf, String amHost,
-      int amRpcPort, org.apache.hadoop.yarn.api.records.Token clientToAMToken) throws IOException {
-
-    final InetSocketAddress serviceAddr = NetUtils.createSocketAddrForHost(amHost, amRpcPort);
-    UserGroupInformation userUgi = UserGroupInformation.createRemoteUser(UserGroupInformation
-        .getCurrentUser().getUserName());
-    if (clientToAMToken != null) {
-      Token<ClientToAMTokenIdentifier> token = ConverterUtils.convertFromYarn(clientToAMToken,
-          serviceAddr);
-      userUgi.addToken(token);
-    }
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Connecting to Tez AM at " + serviceAddr);
-    }
-    DAGClientAMProtocolBlockingPB proxy = null;
-    try {
-      proxy = userUgi.doAs(new PrivilegedExceptionAction<DAGClientAMProtocolBlockingPB>() {
-        @Override
-        public DAGClientAMProtocolBlockingPB run() throws IOException {
-          RPC.setProtocolEngine(conf, DAGClientAMProtocolBlockingPB.class, ProtobufRpcEngine.class);
-          return (DAGClientAMProtocolBlockingPB) RPC.getProxy(DAGClientAMProtocolBlockingPB.class,
-              0, serviceAddr, conf);
-        }
-      });
-    } catch (InterruptedException e) {
-      throw new IOException("Failed to connect to AM", e);
-    }
-    return proxy;
   }
 
   public static byte[] getResourceSha(URI uri, Configuration conf) throws IOException {
