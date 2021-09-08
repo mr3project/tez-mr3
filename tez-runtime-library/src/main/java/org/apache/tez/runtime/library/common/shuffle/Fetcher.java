@@ -582,6 +582,7 @@ public class Fetcher implements Callable<FetchResult> {
         LOG.warn(String.format(
             "Fetch Failure while connecting from %s to: %s:%d, attempt: %s Informing ShuffleManager: ",
             localHostname, host, port, firstAttempt), e);
+        // no need to apply TEZ-4174 because we send InputReadError regardless of connectFailed (see ShuffleManager.fetchFailed())
         return new HostFetchResult(new FetchResult(host, port, partition, partitionCount, srcAttemptsRemaining.values()),
             new InputAttemptIdentifier[] { firstAttempt }, false);
       }
