@@ -30,14 +30,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.hadoop.io.BoundedByteArrayOutputStream;
-import org.apache.tez.runtime.library.common.TezRuntimeUtils;
 import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.library.common.task.local.output.TezTaskOutput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -45,6 +43,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.tez.runtime.library.utils.BufferUtils;
+import org.apache.tez.runtime.library.utils.CodecUtils;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.io.compress.CodecPool;
@@ -831,7 +830,8 @@ public class IFile {
         }
         if (decompressor != null) {
           decompressor.reset();
-          in = getDecompressedInputStreamWithBufferSize(codec, checksumIn, decompressor, compressedLength);
+          in = CodecUtils.getDecompressedInputStreamWithBufferSize(codec, checksumIn, decompressor,
+              compressedLength);
         } else {
           LOG.warn("Could not obtain decompressor from CodecPool");
           in = checksumIn;
@@ -869,24 +869,6 @@ public class IFile {
           }
         }
       }
-    }
-
-    private static InputStream getDecompressedInputStreamWithBufferSize(CompressionCodec codec,
-        IFileInputStream checksumIn, Decompressor decompressor, int compressedLength)
-        throws IOException {
-      String bufferSizeProp = TezRuntimeUtils.getBufferSizeProperty(codec);
-
-      if (bufferSizeProp != null) {
-        Configurable configurableCodec = (Configurable) codec;
-        Configuration conf = configurableCodec.getConf();
-
-        int bufSize = Math.min(compressedLength, DEFAULT_BUFFER_SIZE);
-        LOG.trace("buffer size was set according to min(compressedLength, {}): {}={}",
-            DEFAULT_BUFFER_SIZE, bufferSizeProp, bufSize);
-        conf.setInt(bufferSizeProp, bufSize);
-      }
-
-      return codec.createInputStream(checksumIn, decompressor);
     }
 
     /**
