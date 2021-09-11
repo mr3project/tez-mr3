@@ -717,6 +717,9 @@ public class IFile {
     protected int currentValueLength;
     long startPos;
 
+    private CompressionCodec codec;
+    private InputContext inputContext;
+
     /**
      * Construct an IFile Reader.
      *
@@ -733,7 +736,7 @@ public class IFile {
                   int ifileReadAheadLength, int bufferSize) throws IOException {
       this(fs.open(file), fs.getFileStatus(file).getLen(), codec,
           readsCounter, bytesReadCounter, ifileReadAhead,
-          ifileReadAheadLength, bufferSize);
+          ifileReadAheadLength, bufferSize, null);
     }
 
     /**
@@ -750,10 +753,10 @@ public class IFile {
         CompressionCodec codec,
         TezCounter readsCounter, TezCounter bytesReadCounter,
         boolean readAhead, int readAheadLength,
-        int bufferSize) throws IOException {
+        int bufferSize, InputContext inputContext) throws IOException {
       this(in, ((in != null) ? (length - HEADER.length) : length), codec,
           readsCounter, bytesReadCounter, readAhead, readAheadLength,
-          bufferSize, ((in != null) ? isCompressedFlagEnabled(in) : false));
+          bufferSize, inputContext, ((in != null) ? isCompressedFlagEnabled(in) : false));
       if (in != null && bytesReadCounter != null) {
         bytesReadCounter.increment(IFile.HEADER.length);
       }
@@ -773,12 +776,18 @@ public class IFile {
                   CompressionCodec codec,
                   TezCounter readsCounter, TezCounter bytesReadCounter,
                   boolean readAhead, int readAheadLength,
-                  int bufferSize, boolean isCompressed) throws IOException {
+                  int bufferSize, InputContext inputContext, boolean isCompressed) throws IOException {
       if (in != null) {
         checksumIn = new IFileInputStream(in, length, readAhead,
             readAheadLength/* , isCompressed */);
         if (isCompressed && codec != null) {
-          decompressor = CodecUtils.getDecompressor(codec);
+          if (inputContext != null) {
+            this.codec = codec;
+            this.inputContext = inputContext;
+            decompressor = inputContext.getDecompressor(codec);
+          } else {
+            decompressor = CodecUtils.getDecompressor(codec);
+          }
           if (decompressor != null) {
             this.in = CodecUtils.createInputStream(codec, checksumIn, decompressor);
           } else {
@@ -1097,7 +1106,11 @@ public class IFile {
       // Return the decompressor
       if (decompressor != null) {
         decompressor.reset();
-        CodecPool.returnDecompressor(decompressor);
+        if (inputContext != null) {
+          inputContext.returnDecompressor(codec.getCompressorType(), decompressor);
+        } else {
+          CodecPool.returnDecompressor(decompressor);
+        }
         decompressor = null;
       }
     }

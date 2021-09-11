@@ -403,7 +403,7 @@ public class TezMerger {
       FSDataInputStream in = fs.open(file);
       in.seek(segmentOffset);
       reader = new Reader(in, segmentLength, codec, readsCounter, bytesReadCounter, ifileReadAhead,
-          ifileReadAheadLength, bufferSize);
+          ifileReadAheadLength, bufferSize, null);
     }
 
     @Override

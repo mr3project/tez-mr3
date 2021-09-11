@@ -225,7 +225,7 @@ public class UnorderedKVReader<K, V> extends KeyValueReader {
     } else {
       return new IFile.Reader(fetchedInput.getInputStream(),
           fetchedInput.getSize(), codec, null, null, ifileReadAhead,
-          ifileReadAheadLength, ifileBufferSize);
+          ifileReadAheadLength, ifileBufferSize, context);
     }
   }
 }

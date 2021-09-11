@@ -1116,7 +1116,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     public RawKVIteratorReader(TezRawKeyValueIterator kvIter, long size)
         throws IOException {
       super(null, size, null, spilledRecordsCounter, null, ifileReadAhead,
-          ifileReadAheadLength, ifileBufferSize);
+          ifileReadAheadLength, ifileBufferSize, inputContext);
       this.kvIter = kvIter;
       this.size = size;
     }
