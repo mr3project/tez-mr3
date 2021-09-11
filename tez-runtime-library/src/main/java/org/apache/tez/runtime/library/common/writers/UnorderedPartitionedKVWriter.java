@@ -1129,6 +1129,12 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
               IFile.Reader reader = new IFile.Reader(in, indexRecord.getPartLength(), codec, null,
                   additionalSpillBytesReadCounter, ifileReadAhead, ifileReadAheadLength,
                   ifileBufferSize);
+              // reader.close() may not be called if the following while{} block throws IOException.
+              // In this case, reader.decompressor is not returned to the pool.
+              // However, this is not memory leak because reader is eventually garbage collected, at which point
+              // reader.decompressor is also garbage collected. It is just that reader.decompressor is not reused.
+              // Note that reader.close() itself may throw IOException and reader.decompressor may not be returned to the pool.
+              // For the same reason, this not memory leak because reader.decompressor is eventually garbage collected.
               while (reader.nextRawKey(keyBufferIFile)) {
                 // TODO Inefficient. If spills are not compressed, a direct copy should be possible
                 // given the current IFile format. Also exteremely inefficient for large records,
