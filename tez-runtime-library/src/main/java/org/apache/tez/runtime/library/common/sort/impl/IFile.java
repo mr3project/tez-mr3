@@ -30,6 +30,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.hadoop.io.BoundedByteArrayOutputStream;
+import org.apache.tez.runtime.api.DecompressorPool;
 import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.library.common.task.local.output.TezTaskOutput;
 import org.slf4j.Logger;
@@ -718,7 +719,7 @@ public class IFile {
     long startPos;
 
     private CompressionCodec codec;
-    private InputContext inputContext;
+    private DecompressorPool inputOutputContext;
 
     /**
      * Construct an IFile Reader.
@@ -753,10 +754,10 @@ public class IFile {
         CompressionCodec codec,
         TezCounter readsCounter, TezCounter bytesReadCounter,
         boolean readAhead, int readAheadLength,
-        int bufferSize, InputContext inputContext) throws IOException {
+        int bufferSize, DecompressorPool inputOutputContext) throws IOException {
       this(in, ((in != null) ? (length - HEADER.length) : length), codec,
           readsCounter, bytesReadCounter, readAhead, readAheadLength,
-          bufferSize, inputContext, ((in != null) ? isCompressedFlagEnabled(in) : false));
+          bufferSize, inputOutputContext, ((in != null) ? isCompressedFlagEnabled(in) : false));
       if (in != null && bytesReadCounter != null) {
         bytesReadCounter.increment(IFile.HEADER.length);
       }
@@ -776,15 +777,15 @@ public class IFile {
                   CompressionCodec codec,
                   TezCounter readsCounter, TezCounter bytesReadCounter,
                   boolean readAhead, int readAheadLength,
-                  int bufferSize, InputContext inputContext, boolean isCompressed) throws IOException {
+                  int bufferSize, DecompressorPool inputOutputContext, boolean isCompressed) throws IOException {
       if (in != null) {
         checksumIn = new IFileInputStream(in, length, readAhead,
             readAheadLength/* , isCompressed */);
         if (isCompressed && codec != null) {
-          if (inputContext != null) {
+          if (inputOutputContext != null) {
             this.codec = codec;
-            this.inputContext = inputContext;
-            decompressor = inputContext.getDecompressor(codec);
+            this.inputOutputContext = inputOutputContext;
+            decompressor = inputOutputContext.getDecompressor(codec);
           } else {
             decompressor = CodecUtils.getDecompressor(codec);
           }
@@ -1106,8 +1107,8 @@ public class IFile {
       // Return the decompressor
       if (decompressor != null) {
         decompressor.reset();
-        if (inputContext != null) {
-          inputContext.returnDecompressor(codec.getCompressorType(), decompressor);
+        if (inputOutputContext != null) {
+          inputOutputContext.returnDecompressor(codec.getCompressorType(), decompressor);
         } else {
           CodecPool.returnDecompressor(decompressor);
         }

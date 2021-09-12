@@ -1128,7 +1128,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
               in.seek(indexRecord.getStartOffset());
               IFile.Reader reader = new IFile.Reader(in, indexRecord.getPartLength(), codec, null,
                   additionalSpillBytesReadCounter, ifileReadAhead, ifileReadAheadLength,
-                  ifileBufferSize, null);
+                  ifileBufferSize, outputContext);
               // reader.close() may not be called if the following while{} block throws IOException.
               // In this case, reader.decompressor is not returned to the pool.
               // However, this is not memory leak because reader is eventually garbage collected, at which point

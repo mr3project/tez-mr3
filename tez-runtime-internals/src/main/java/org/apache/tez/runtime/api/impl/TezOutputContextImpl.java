@@ -29,6 +29,9 @@ import javax.annotation.Nullable;
 
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.hadoop.io.compress.Compressor;
+import org.apache.hadoop.io.compress.Decompressor;
 import org.apache.tez.common.TezExecutors;
 import org.apache.tez.common.counters.TezCounters;
 import org.apache.tez.dag.api.OutputDescriptor;
@@ -171,4 +174,9 @@ public class TezOutputContextImpl extends TezTaskContextImpl
       LOG.debug("Cleared TezOutputContextImpl related information");
     }
   }
+
+  @Override
+  public Decompressor getDecompressor(CompressionCodec codec) { return null; }
+  @Override
+  public void returnDecompressor(Class<? extends Compressor> compressorType, Decompressor decompressor) {}
 }
