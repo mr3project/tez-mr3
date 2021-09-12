@@ -99,7 +99,7 @@ public class ConfigUtils {
     if (theClass != null)
       return ReflectionUtils.newInstance(theClass, conf);
     return WritableComparator.get(getIntermediateOutputKeyClass(conf).asSubclass(
-        WritableComparable.class));
+        WritableComparable.class), conf);
   }
 
   public static <K> RawComparator<K> getIntermediateInputKeyComparator(Configuration conf) {
@@ -109,7 +109,7 @@ public class ConfigUtils {
     if (theClass != null)
       return ReflectionUtils.newInstance(theClass, conf);
     return WritableComparator.get(getIntermediateInputKeyClass(conf).asSubclass(
-        WritableComparable.class));
+        WritableComparable.class), conf);
   }
 
   
