@@ -111,6 +111,8 @@ public class PipelinedSorter extends ExternalSorter {
   //Maintain a list of ByteBuffers
   @VisibleForTesting
   final List<ByteBuffer> buffers;
+  @VisibleForTesting
+  List<Integer> bufferUsage;
   final int maxNumberOfBlocks;
   private int bufferIndex = -1;
   private final int MIN_BLOCK_SIZE;
@@ -202,6 +204,7 @@ public class PipelinedSorter extends ExternalSorter {
     capacity = totalCapacityWithoutMeta;
 
     buffers = Lists.newArrayListWithCapacity(maxNumberOfBlocks);
+    bufferUsage = Lists.newArrayListWithCapacity(maxNumberOfBlocks);
     allocateSpace(); //Allocate the first block
     if (!lazyAllocateMem) {
       // LOG.info("Pre allocating rest of memory buffers upfront");
@@ -269,6 +272,7 @@ public class PipelinedSorter extends ExternalSorter {
 
     buffers.add(space);
     bufferIndex++;
+    bufferUsage.add(0);
 
     Preconditions.checkState(buffers.size() <= maxNumberOfBlocks,
         buffers.size() + " exceeds " + maxNumberOfBlocks);
@@ -348,8 +352,9 @@ public class PipelinedSorter extends ExternalSorter {
       if (pipelinedShuffle && ret) {
         sendPipelinedShuffleEvents();
       }
-      //safe to reset bufferIndex to 0;
-      bufferIndex = 0;
+      // Use the next buffer
+      bufferIndex = (bufferIndex + 1) % buffers.size();
+      bufferUsage.set(bufferIndex, bufferUsage.get(bufferIndex) + 1);
       int items = 1024*1024;
       int perItem = 16;
       if(span.length() != 0) {
