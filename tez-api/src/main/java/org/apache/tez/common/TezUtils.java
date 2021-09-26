@@ -145,38 +145,6 @@ public class TezUtils {
     }
   }
 
-  public static String convertToHistoryText(String description, Configuration conf) {
-    // Add a version if this serialization is changed
-    JSONObject jsonObject = new JSONObject();
-    try {
-      if (description != null && !description.isEmpty()) {
-        jsonObject.put(ATSConstants.DESC, description);
-      }
-      if (conf != null) {
-        JSONObject confJson = new JSONObject();
-        Iterator<Entry<String, String>> iter = conf.iterator();
-        while (iter.hasNext()) {
-          Entry<String, String> entry = iter.next();
-          String key = entry.getKey();
-          String val = conf.get(entry.getKey());
-          if(val != null) {
-            confJson.put(key, val);
-          } else {
-            LOG.debug("null value in Configuration after replacement for key={}. Skipping.", key);
-          }
-        }
-        jsonObject.put(ATSConstants.CONFIG, confJson);
-      }
-    } catch (JSONException e) {
-      throw new TezUncheckedException("Error when trying to convert description/conf to JSON", e);
-    }
-    return jsonObject.toString();
-  }
-
-  public static String convertToHistoryText(Configuration conf) {
-    return convertToHistoryText(null, conf);
-  }
-
   private static void populateConfProtoFromEntriesWithVarExpansion(Configuration conf,
       DAGProtos.ConfigurationProto.Builder confBuilder) {
     for(Map.Entry<String, String> entry : conf) {
