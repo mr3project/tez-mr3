@@ -188,10 +188,6 @@ public class UnorderedKVInputConfig {
 
   @InterfaceAudience.Private
   String toHistoryText() {
-    if (conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_CONVERT_USER_PAYLOAD_TO_HISTORY_TEXT,
-        TezRuntimeConfiguration.TEZ_RUNTIME_CONVERT_USER_PAYLOAD_TO_HISTORY_TEXT_DEFAULT)) {
-      return TezUtils.convertToHistoryText(conf);
-    }
     return null;
   }
 

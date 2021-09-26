@@ -56,6 +56,7 @@ Date:   Mon Apr 13 09:20:10 2020 -0500
 
     TEZ-4142. TezUtils.createConfFromByteString on Configuration larger than 32MB throws com.google.protobuf.CodedInputStream exception
     --> applied
+    --> reverted
 
 commit b5b432bf05d5b902d66c19d5b693bb620c577390
 Author: Jonathan Eagles <jeagles@apache.org>
@@ -1383,4 +1384,5 @@ Date:   Tue Jan 16 11:22:10 2018 -0600
 
     TEZ-3877. Delete unordered spill files once merge is done (Jason Lowe via jeagles)
     --> applied
+    --> reverted
 

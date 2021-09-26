@@ -294,10 +294,6 @@ public class MRInput extends MRInputBase {
           InputInitializerDescriptor.create(MRInputSplitDistributor.class.getName()),
           inputSplitInfo.getNumTasks(), credentials,
           VertexLocationHint.create(inputSplitInfo.getTaskLocationHints()), null);
-      if (conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_CONVERT_USER_PAYLOAD_TO_HISTORY_TEXT,
-          TezRuntimeConfiguration.TEZ_RUNTIME_CONVERT_USER_PAYLOAD_TO_HISTORY_TEXT_DEFAULT)) {
-        ds.getInputDescriptor().setHistoryText(TezUtils.convertToHistoryText(conf));
-      }
 
       return ds;
     }
@@ -315,11 +311,6 @@ public class MRInput extends MRInputBase {
       DataSourceDescriptor ds = DataSourceDescriptor
           .create(InputDescriptor.create(inputClassName).setUserPayload(payload),
               customInitializerDescriptor, null);
-
-      if (conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_CONVERT_USER_PAYLOAD_TO_HISTORY_TEXT,
-          TezRuntimeConfiguration.TEZ_RUNTIME_CONVERT_USER_PAYLOAD_TO_HISTORY_TEXT_DEFAULT)) {
-        ds.getInputDescriptor().setHistoryText(TezUtils.convertToHistoryText(conf));
-      }
 
       if (uris != null) {
         ds.addURIsForCredentials(uris);
@@ -339,11 +330,6 @@ public class MRInput extends MRInputBase {
       DataSourceDescriptor ds = DataSourceDescriptor.create(
           InputDescriptor.create(inputClassName).setUserPayload(payload),
           InputInitializerDescriptor.create(MRInputAMSplitGenerator.class.getName()), null);
-
-      if (conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_CONVERT_USER_PAYLOAD_TO_HISTORY_TEXT,
-          TezRuntimeConfiguration.TEZ_RUNTIME_CONVERT_USER_PAYLOAD_TO_HISTORY_TEXT_DEFAULT)) {
-        ds.getInputDescriptor().setHistoryText(TezUtils.convertToHistoryText(conf));
-      }
 
       if (uris != null) {
         ds.addURIsForCredentials(uris);

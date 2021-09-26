@@ -232,10 +232,6 @@ public class MROutput extends AbstractLogicalOutput {
           OutputDescriptor.create(outputClassName).setUserPayload(createUserPayload()),
           (doCommit ? OutputCommitterDescriptor.create(
               MROutputCommitter.class.getName()) : null), null);
-      if (conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_CONVERT_USER_PAYLOAD_TO_HISTORY_TEXT,
-          TezRuntimeConfiguration.TEZ_RUNTIME_CONVERT_USER_PAYLOAD_TO_HISTORY_TEXT_DEFAULT)) {
-        ds.getOutputDescriptor().setHistoryText(TezUtils.convertToHistoryText(conf));
-      }
 
       if (uris != null) {
         ds.addURIsForCredentials(uris);
