@@ -1111,7 +1111,7 @@ class ShuffleScheduler {
       }
       IOException exception = new IOException(srcAttempt + " is marked as obsoleteInput, but it "
           + "exists in shuffleInfoEventMap. Some data could have been already merged "
-          + "to memory/disk outputs.  Failing the fetch early. eventInfo:" + eventInfo.toString());
+          + "to memory/disk outputs. Failing the fetch early. eventInfo:" + eventInfo.toString());
       String message = "Got obsolete event. Killing self as attempt's data could have been consumed";
       killSelf(exception, message);
       return;
