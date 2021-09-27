@@ -1,3 +1,958 @@
+commit c875b8216fa6c236230a04c8cdbdc25c38e7ef61
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Thu Aug 26 21:46:23 2021 +0200
+
+    TEZ-4332: Change ASF logo on Tez webpage according to recent guidelines (#148)
+    --> unnecessary
+
+commit 0ccf440e64e73646a14ee7366833eb274a3533c9
+Author: jteagles <jeagles@gmail.com>
+Date:   Thu Aug 26 09:14:29 2021 -0500
+
+    TEZ-4329. Import external tez component em-table (#146)
+    
+    
+    Co-authored-by: Sreenath Somarajapuram <sree@apache.org>
+    --> unnecessary
+
+commit e2c4ee0842e43e67e4d1dadc8308b427b24aadee
+Author: jteagles <jeagles@gmail.com>
+Date:   Tue Aug 24 10:13:15 2021 -0500
+
+    TEZ-4328. Import external tez component em-helpers (#145)
+    
+    Co-authored-by: Sreenath Somarajapuram <sree@apache.org>
+    --> unnecessary
+
+commit 8c97365325b9667178537a454bc150cc5ce9b981
+Author: Takanobu Asanuma <tasanuma@apache.org>
+Date:   Thu Aug 19 19:42:24 2021 +0900
+
+    TEZ-4323: Jetty jars were removed from dist package with TEZ-4114 (#140) (Takanobu Asanuma reviewed by Jonathan Turner Eagles)
+    --> do not apply because we already exclude jetty
+
+commit fc63c04039c17ca05107f515023d6d627fc302d8
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Tue Aug 10 23:02:40 2021 +0200
+
+    TEZ-4293: Use Tez credentials for CI (#141)
+    --> unnecessary
+
+commit f56075c552dd3c41f8d812d595882eed22f98537
+Author: belugabehr <12578579+belugabehr@users.noreply.github.com>
+Date:   Mon Aug 9 16:05:13 2021 -0400
+
+    TEZ-4321: Do Not Wrap Singleton Collections (#138)
+    --> okay
+
+commit 3f541d06f4aad0e1ad051bec273a05a678fd7776
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Mon Aug 9 08:24:34 2021 +0200
+
+    TEZ-4231: Fix multiple history parser and event converter issues (#123) (Laszlo Bodor reviewed by Rajesh Balamohan)
+    --> unnecessary
+
+commit 464d86d8ffd5ee8e3bd7a4d48ab64b10e3db36b0
+Author: Igor Dvorzhak <idv@google.com>
+Date:   Fri Jul 9 09:03:24 2021 -0700
+
+    TEZ-4214. Upgrade RoaringBitmap version to 0.7.45 (#74)
+    --> unnecessary yet
+
+commit b31501d9b7f2cc8f4cc4283bd285dc48609dc77b
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Thu Jul 1 00:38:57 2021 +0200
+
+    TEZ-4125: Upgrade to Hadoop 3.2.x (#126)
+    --> unnecessary yet
+
+commit 8f3044c9dc0f46c113c4d404c1b5fd4e317dc91b
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Wed Jun 30 21:32:53 2021 +0200
+
+    TEZ-4314: Fix some plugin versions in site generation (#131)
+    --> unnecessary
+
+commit 47a59abba5a44570eff61639d53689518569cab2
+Author: belugabehr <12578579+belugabehr@users.noreply.github.com>
+Date:   Wed Jun 30 12:01:06 2021 -0400
+
+    TEZ-4267: Remove Superfluous Code from DAGAppMaster (#90)
+    
+    * TEZ-4267: Remove Superfluous Code from DAGAppMaster
+    
+    * Remove superfluous variable
+    
+    * Remove superfluous comment
+    
+    Co-authored-by: David Mollitor <david.mollitor@cloudera.com>
+    --> unnecessary
+
+commit 4684d06bef7898c6de4c6286c9f62cf2be3dcf92
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Wed Jun 30 17:21:57 2021 +0200
+
+    TEZ-4313: Apache Tez Release 0.10.1 (#134)
+    --> unnecessary
+
+commit 5eeccf0e318e22cdcbbe202a9f554f93d138c207
+Author: belugabehr <12578579+belugabehr@users.noreply.github.com>
+Date:   Wed Jun 30 11:11:09 2021 -0400
+
+    TEZ-4308: Add Whitespace in ShuffleScheduler Error Message (#122)
+    --> unnecessary
+
+commit 984d09c4d37fe7b73d63bf0ce9d2de7c34bdd735
+Author: belugabehr <12578579+belugabehr@users.noreply.github.com>
+Date:   Wed Jun 30 10:48:30 2021 -0400
+
+    TEZ-4275: Use Google Guava Intern Facility (#95)
+    
+    * TEZ-4275: Use Google Guava Intern Facility
+    
+    * Also add hint for running finalization
+    
+    * Use Guava String Intern implementation
+    
+    * Fix checkstyle, white-space issues
+    
+    * Remove GC hint
+    
+    Co-authored-by: David Mollitor <david.mollitor@cloudera.com>
+    --> currently Tez-MR3 uses guava-19.0.jar.
+    --> apply to the files that are used in MR3 Tez runtime:
+      tez-common/src/main/java/org/apache/tez/util/StringInterner.java
+      tez-runtime-library/src/main/java/org/apache/tez/runtime/library/common/shuffle/orderedgrouped/ShuffleInputEventHandlerOrderedGrouped.java
+
+commit 26b86e7646021c3bdf1e54a7ee225f46397eba42
+Author: Kuhu Shukla <kshukla@apache.org>
+Date:   Mon Jun 28 10:15:42 2021 -0500
+
+    TEZ-3918. Setting tez.task.log.level does not work
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> not related
+
+commit d443ae2b30fae8a80c98e9e16ec98313ae14dca1
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Tue Jun 22 22:43:08 2021 +0200
+
+    TEZ-4298: ShuffleHandler is not source compatible with Hadoop 3.3.0 (#129)
+    --> not necessary yet because ShuffleHandler uses Netty 3
+
+commit 0af54dfa5fb114712efc1bdbcca32bb673bc53ef
+Author: Ramesh Kumar Thangarajan <rameshkumar@cloudera.com>
+Date:   Thu May 20 16:41:32 2021 +0200
+
+    TEZ-4309: TezUtils.addToConfFromByteString throws com.google.protobuf.CodedInputStream exception (Ramesh Kumar Thangarajan via László Bodor)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> not applied
+    --> apply TEZ-4142 instead if 'Configuration larger than 32MB throws com.google.protobuf.CodedInputStream exception' actually occurs
+
+commit 4d379149bcdd0c0097f366d9a01e6a9907410ac6
+Author: Kishen Das <kishen.das@gmail.com>
+Date:   Thu May 20 07:36:20 2021 -0700
+
+    TEZ-4305: Check StreamCapabilities before using HFLUSH from ProtoMessageWriter (#120) (Kishen Das reviewed by Laszlo Bodor and Harish JP)
+    
+    Co-authored-by: Kishen Das <kishen@cloudera.com>
+    --> not related: we do not use hflush()
+
+commit 867e4d205f129e198668daf94d0eb000e04c0e8c
+Author: Harish Jaiprakash <harishjp@users.noreply.github.com>
+Date:   Wed May 19 01:49:07 2021 +0530
+
+    TEZ-4296 - Use listStatusIterator instead of listStatus in DatePartitionedLogger (#124)
+    
+    Co-authored-by: Harish JP <hjp@cloudera.com>
+    --> not related
+
+commit 01847814d32aac6b77a6810ea25d6780fb94b257
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Fri Apr 23 11:43:31 2021 +0200
+
+    TEZ-4157: ShuffleHandler: upgrade to Netty4 and remove Netty3 dependency from tez (#118) (Laszlo Bodor reviewed by Ashutosh Chauhan, Jonathan Turner Eagles)
+    --> to be implemented in MR3 Tez runtime
+    --> left as a TODO
+
+commit aea070714cd464a7403bf13164eb841f3f791f20
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Thu Apr 15 07:58:33 2021 +0200
+
+    TEZ-4279: Add vertexId into vertex status for dag clients (#101) (Laszlo Bodor reviewed by Ashutosh Chauhan)
+    --> not related
+
+commit 2b671d6211ad8bdebaa16889bf4f1f4121c4f1f9
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Mon Apr 5 11:55:20 2021 +0200
+
+    TEZ-4299: Default java opts cause jdk11 to fail (#116) (Laszlo Bodor reviewed by Jonathan Turner Eagles)
+    --> we do not support JDK 11 yet
+
+commit 2dcbe0bca22be89a797acd5f2228d91c4c112069
+Author: jacobtolar <accounts@sheckel.net>
+Date:   Fri Mar 5 09:44:09 2021 -0600
+
+    fix typo: missing space (#59)
+    
+    I'm happy to file a JIRA if necessary; I wasn't sure if that was useful or not for a 1-character change. :)
+    
+    The log message looks like this currently:
+    
+    ```
+    2020-02-10 20:12:58,267 [INFO] [Dispatcher thread {Central}] |node.AMNodeImpl|: Attempt failedon node: ...
+    ```
+    --> not related
+
+commit 2fefe4a6b16bea8f02169ec2e2a6e89575440328
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Thu Feb 18 17:35:19 2021 +0100
+
+    TEZ-4291: Fancy precommit report on PR (#112)
+    --> not related
+
+commit 70623f0d8e9de3c59b61c10abe5442bfd8f66e2c
+Author: belugabehr <12578579+belugabehr@users.noreply.github.com>
+Date:   Wed Feb 17 16:47:00 2021 -0500
+
+    TEZ-4289: Remove Dependency on commons-math (#110)
+    
+    * TEZ-4289: Remove Dependency on commons-math
+    
+    * Remove stray reference to commons-math
+    
+    * Fix checkstyle and missing parenthesis
+    --> applied, but commons-math3-3.1.1.jar is still included (also the case in Tez)
+
+commit 3089d478f70f139139fea68028712d5fc32012d1
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Sun Feb 14 20:10:05 2021 +0100
+
+    TEZ-4286: Consider sending fewer emails from github to dev@tez.apache.org (#107) (Laszlo Bodor reviewed by Jonathan Turner Eagles)
+    --> not related
+
+commit 7d32807d858dad37bb31637eb04a80c8436f605a
+Author: Jonathan Eagles <jeagles@apache.org>
+Date:   Sat Feb 13 22:56:28 2021 -0600
+
+    TEZ-4025. javadoc compilation is broken in jdk11 (review by Bodor Laszlo)
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> not related
+
+commit b4152fc85316eb95a4f8a6b2e41a151a89f772da
+Author: belugabehr <12578579+belugabehr@users.noreply.github.com>
+Date:   Fri Feb 12 12:55:37 2021 -0500
+
+    TEZ-4288: Upgrade SLF4J to 1.7.30 (#109)
+    --> we already use slf4j 1.7.30
+
+commit f9c96b2be3d1ff0b81ab397984f99b85cdcf7047
+Author: Jonathan Eagles <jeagles@apache.org>
+Date:   Fri Feb 12 10:48:35 2021 -0600
+
+    TEZ-4241. UI: containerLogs testWrapper test fails (review by Bodor Laszlo)
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> TEZ-UI
+
+commit 29495f39a5a55064f3d6bbf6e523f79cbe7e06bf
+Author: Jonathan Turner Eagles <jeagles@apache.org>
+Date:   Fri Feb 12 17:21:36 2021 +0100
+
+    TEZ-4259: Create Jenkinsfile for use with tez-multibranch (github yetus integration) (Jonathan Turner Eagles reviewed by Laszlo Bodor)
+    --> not related
+
+commit f88aa6f21980ba85160b6338515efc54e974c267
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Fri Feb 12 16:28:48 2021 +0100
+
+    TEZ-4290: Dockerfile improvements (#111) (Laszlo Bodor reviewed by Jonathan Turner Eagles)
+    --> not related
+
+commit a42e1700e6020eab43d42abbfc649a50798a1e92
+Author: Roman <lknrmn@gmail.com>
+Date:   Wed Feb 10 22:35:13 2021 +0300
+
+    TEZ-3966: Fix config file mime type  (#26)
+    
+    * Fix file mime type, to avoid error when "X-Content-Type-Options: nosniff" header enabled
+    
+    * Update ember-cli-build.js to include only 'configs.js'
+    --> TEZ-UI
+
+commit 851e9d8b5efa962dc879cf6507de7cb495cfdad5
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Tue Feb 9 18:55:32 2021 +0100
+
+    TEZ-4278: Show PR link in Jira (#99)
+    --> not related
+
+commit 84b5bd6e7dfb554ed3a4e9a3642f6cfbb0bb9df7
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Tue Feb 9 10:51:56 2021 +0100
+
+    TEZ-4282: Possible NPE in LocalClient after TEZ-4236 (#103) (Laszlo Bodor reviewed by Panagiotis Garefalakis, Ashutosh Chauhan)
+    --> not related
+
+commit 1847817c2a92f26b5e9aa71c250f4559a564bf0a
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Mon Feb 8 21:29:49 2021 +0100
+
+    TEZ-4281: dag_*_priority.dot files should go into a valid log directory (#102) (Laszlo Bodor reviewed by Rajesh Balamohan)
+    --> not related
+
+commit cd0548631dd10be5f0d6c13d295f2726d180d239
+Author: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+Date:   Mon Feb 8 20:21:39 2021 +0100
+
+    TEZ-4273: Clear off staging files when TezYarnClient is unable to submit applications (Rajesh Balamohan via László Bodor) - addendum test fix
+    --> to be implemented in MR3
+
+commit 601d1f3578e50d7212477cd3919e9ccc7cf117cf
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Mon Feb 8 19:34:34 2021 +0100
+
+    TEZ-4283: Docker fails to build on master - upgrade to nodejs10 (#104)
+    --> not related
+
+commit 26759e06bd3a9317fe439d7ad81b60e1dabc932e
+Author: Rajesh Balamohan <rbalamohan@apache.org>
+Date:   Mon Feb 8 09:44:22 2021 +0100
+
+    TEZ-4273: Clear off staging files when TezYarnClient is unable to submit applications (Rajesh Balamohan via László Bodor)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> to be implemented in MR3
+
+commit 73bcabd2bca2536bf4f3673443a8dcdaaf79a4eb
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Mon Feb 1 11:33:19 2021 +0100
+
+    TEZ-4277: AsyncDispatcher can hang on serviceStop if the eventhandling thread is in BLOCKED state (#97) (Laszlo Bodor reviewed by Rajesh Balamohan)
+    
+    TEZ-4277: AsyncDispatcher can hang on serviceStop if the eventhandling thread is in BLOCKED state
+    --> not related
+
+commit 0d3b428ecbd5b3c240191a6d1907010aa549c189
+Author: belugabehr <12578579+belugabehr@users.noreply.github.com>
+Date:   Thu Jan 28 16:53:24 2021 -0500
+
+    TEZ-4266: Make Tez Inherit From Apache POM (#89)
+    --> unnecessary
+
+commit 61a28c75c3885f0a043d304091c2a303dde5b617
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Thu Jan 28 22:17:32 2021 +0100
+
+    TEZ-4236: DAGClientServer is not really needed to be started/used in local mode (László Bodor reviewed by Ashutosh Chauhan)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> not related
+
+commit 41ff94583e6433402e2a7cc183269d2582f0302f
+Author: belugabehr <12578579+belugabehr@users.noreply.github.com>
+Date:   Thu Jan 28 15:33:42 2021 -0500
+
+    TEZ-4269: Re-Work Threadpool in DAGAppMaster (#92)
+    --> not related
+
+commit 033ba916099acd46e51a99bc839469864a950f45
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Thu Jan 28 10:16:39 2021 +0100
+
+    TEZ-4240: Remove SHA-256 from Tez (László Bodor reviewed by Jonathan Turner Eagles)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> not related 
+
+commit 04597c7b591917bbe995a9e182c3be60e33816c9
+Author: Rajesh Balamohan <rbalamohan@apache.org>
+Date:   Thu Jan 28 05:20:25 2021 +0530
+
+    TEZ-3985: Correctness: Throw a clear exception for DMEs sent during cleanup (Contributed by Jaume M, reviewed by Rajesh Balamohan, Ashutosh Chauhan)
+    --> not directly related to MR3; MR3 implements the logic in RuntimeTask.closeLogicalInputOutput().
+
+commit 7374b69ed6c4af4e7c9127f1b05473c2166abf6d
+Author: belugabehr <12578579+belugabehr@users.noreply.github.com>
+Date:   Mon Jan 25 17:44:11 2021 -0500
+
+    TEZ-4268: Buffer File Read of TEZ AM Local Resources PB File (#91)
+    --> not related
+
+commit 7c71780ae6546ea5a1703d25675c1f8f94f384e6
+Author: Marton Bod <mbod@cloudera.com>
+Date:   Mon Jan 25 11:27:24 2021 +0100
+
+    TEZ-4264: Make vertex id available from MROutputCommitter (Marton Bod via László Bodor)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> applied
+
+commit f481d3899dceda668b74d993cd37f72da3009127
+Author: Eric Badger <ebadger@verizonmedia.com>
+Date:   Fri Jan 22 16:48:15 2021 -0600
+
+    TEZ-4265. Tez UI doesn't show Load Counters button if any of the Dags have them
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> not related
+
+commit c2d48a688e041e2b5689d26908a7de7d135bff3e
+Author: belugabehr <12578579+belugabehr@users.noreply.github.com>
+Date:   Wed Jan 20 15:53:15 2021 -0500
+
+    TEZ-4095: Review of Debug Logging (#87)
+    --> no need
+
+commit fb81c11583ea7c31978e2417e0e31f4a141dd7a7
+Author: Lewis John McGibbney <lewis.mcgibbney@gmail.com>
+Date:   Fri Jan 15 16:08:49 2021 -0600
+
+    TEZ-4261. Fix Javadoc warnings
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> not related
+
+commit 979bf5d7d7a1d3d66839e330388d3c9ec975b1c3
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Fri Jan 15 10:08:50 2021 -0600
+
+    TEZ-3706. add option to skip Tez UI build
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> not related
+
+commit 849e1d7694cdfd2432d631830940bc95c6f26ead
+Author: Lewis John McGibbney <lewis.mcgibbney@gmail.com>
+Date:   Fri Dec 11 09:42:25 2020 -0600
+
+    TEZ-4258. Fix travisci build (addendum 1)
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> not related
+
+commit 1f1a177ef70b6e4fba514a02e027fe3b071117e4
+Author: Lewis John McGibbney <lewis.mcgibbney@gmail.com>
+Date:   Thu Dec 10 23:13:01 2020 -0600
+
+    TEZ-4258. Fix travisci build
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> not related
+
+commit b2a05115dcce28a2b188435b445b6d7e43103ab1
+Author: Mustafa İman <mustafaiman@gmail.com>
+Date:   Mon Dec 7 22:40:07 2020 +0100
+
+    TEZ-4253: Revert TEZ-4170 (Mustafa İman via Attila Magyar, Ashutosh Chauhan)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> not related
+
+commit 51953a67641392eb5cf4b2c4fb035baab0badf27
+Author: Rajesh Balamohan <rbalamohan@apache.org>
+Date:   Mon Dec 7 12:35:26 2020 -0800
+
+    TEZ-4256 : Reduce key comparisons in reducer side (Rajesh Balamohan via Gopal V)
+    
+    Signed-off-by: Ashutosh Chauhan <hashutosh@apache.org>
+    --> applied
+
+commit dadc09f5a44c1cb61af00efecb3d27b92c92aa8f
+Author: Rajesh Balamohan <rbalamohan@apache.org>
+Date:   Wed Dec 2 03:58:42 2020 +0530
+
+    TEZ-4244: Consider using RawLocalFileSystem in LocalDiskFetchedInput (Rajesh Balamohan reviewed by László Bodor)
+    --> applied
+
+commit 938d6a105c398531774a8c341dc851b7ceee4eeb
+Author: Rajesh Balamohan <rbalamohan@apache.org>
+Date:   Tue Nov 24 13:10:15 2020 +0530
+
+    TEZ-4251: Acquiring locks for getInputVertices and getOutputVertices is not consistent (Krisztian Kasa reviewed by Rajesh Balamohan)
+    --> not related
+
+commit 989d286d09cac7c4e4c5a0e06dd75ea5a6f15478
+Author: Marton Bod <mbod@cloudera.com>
+Date:   Sat Nov 21 07:45:38 2020 +0100
+
+    TEZ-4248: MRReaderMapred should propagate properties based on config (Marton Bod via László Bodor)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> applied, necessary for Hive 4 (not Hive 3)
+
+commit 4c339011383b0501e8080729c015ef642b7a2bbc
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Wed Nov 11 14:58:24 2020 +0100
+
+    TEZ-4237: Upgrade async-http-client-1.9.40 due to CVE-2017-14063 (László Bodor reviewed by Ashutosh Chauhan)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> applied
+
+commit 6c53307adb0ec1e31d3c20ab599f38e6df449300
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Thu Oct 22 09:13:46 2020 +0200
+
+    TEZ-4243: Changes for 0.10.0 release (László Bodor reviewed by Jonathan Turner Eagles)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> not related
+
+commit 970d46b5f8be72cc9abf1769f8c7c80307737fc5
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Wed Oct 14 17:24:57 2020 +0200
+
+    TEZ-4070: SSLFactory not closed in DAGClientTimelineImpl caused native memory issues (László Bodor reviewed by Jonathan Turner Eagles)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> not related
+
+commit 16a0050909ac5928a131ede8ffdb9a4d12c82cf7
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Tue Oct 13 07:48:36 2020 +0200
+
+    TEZ-4229: Improve TezLocalCacheManager to use configured root directory (László Bodor reviewed by Panagiotis Garefalakis, Ashutosh Chauhan)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> not related
+
+commit 6e9c1b2d605f3a4197a5185cab81cc66d13a1437
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Tue Oct 6 12:00:17 2020 +0200
+
+    TEZ-4238: Check null mrReader in MRInput.close (László Bodor reviewed by Hadoop QA, Jonathan Turner Eagles, Hadoop QA)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> already partially applied
+
+commit 629714afd692770d64aed73f6e48b7b46838a592
+Author: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+Date:   Mon Sep 28 08:28:53 2020 +0200
+
+    TEZ-4233: Map task should be blamed earlier for local fetch failures (Laszlo Bdoor reviewed by Rajesh Balamohan)
+    --> not related
+    --> because in Hive-MR3, ContainerWorker Pod does not retain its name when it gets restarted, and we have our own way of handling fetch failures
+
+commit 1fba8f71a0f496e1fcb67a223fb32b389bdfb2e0
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Tue Sep 8 18:43:23 2020 +0200
+
+    TEZ-4230: LocalContainerLauncher can kill task future too early, causing app hang (László Bodor reviewed by Jonathan Turner Eagles)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> not related
+
+commit 79048f9e44cc41154a3d741090053a0b0e6f21b0
+Author: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+Date:   Tue Sep 1 12:42:10 2020 +0200
+
+    TEZ-4228: TezClassLoader should be used in TezChild and for Configuration objects
+    --> not related
+
+commit d90b1042e97993eb103f161b40e523638e317f9a
+Author: Jonathan Turner Eagles <jeagles@apache.org>
+Date:   Thu Aug 27 14:57:59 2020 +0200
+
+    TEZ-3645: Reuse SerializationFactory while sorting, merging, and writing IFiles (Jonathan Turner Eagles reviewed by Rajesh Balamohan, Laszlo Bodor)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> applied
+
+commit 0e17787c3547a0480a7ffb2069a4c62a72783cb9
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Wed Aug 26 19:58:35 2020 +0200
+
+    TEZ-4175: Consider removing YarnConfiguration where it's possible (László Bodor reviewed by Rajesh Balamohan, Mustafa Iman, Ashutosh Chauhan)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> not related
+
+commit 69e73517b4bbb6fea5d31892f020a1bb20a2adc3
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Tue Aug 25 18:56:59 2020 +0200
+
+    TEZ-4224: Add Laszlo Bodor's public key to KEYS (László Bodor reviewed by Jonathan Turner Eagles)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> no need
+
+commit 99895f9808170ce64fd1e7c6dfb2e932f4578489
+Author: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+Date:   Tue Aug 25 13:56:57 2020 +0200
+
+    TEZ-4213: Bound appContext executor capacity using a configurable property (Panagiotis Garefalakis reviewed by Ashutosh Chauhan, Mustafa Iman, Attila Magyar) - addendum checkstyle
+    --> no need
+
+commit 3986f5bc2c2e34ad160f77afd7478b26935fffa5
+Author: Rajesh Balamohan <rbalamohan@apache.org>
+Date:   Mon Aug 24 14:11:52 2020 -0700
+
+    TEZ-4216 : RLE check in MergeManager::finalMerge could be disabled (Rajesh Balamohan via Ashutosh Chauhan)
+    
+    Signed-off-by: Ashutosh Chauhan <hashutosh@apache.org>
+    --> okay
+
+commit ef1d69aaf48f068aaf7a2c6b4eb72d320d5c2d1a
+Author: Panagiotis Garefalakis <pangaref@gmail.com>
+Date:   Mon Aug 24 14:37:53 2020 +0200
+
+    TEZ-4213: Bound appContext executor capacity using a configurable property (Panagiotis Garefalakis reviewed by Ashutosh Chauhan, Mustafa Iman, Attila Magyar)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> no need
+
+commit 8f7209fcbb9f5a74dcea9e83cb53279a58e57aff
+Author: Rajesh Balamohan <rbalamohan@apache.org>
+Date:   Thu Aug 13 14:30:29 2020 +0530
+
+    TEZ-4207: Provide approximate number of input records to be processed in UnorderedKVInput (Rajesh Balamohan, reviewed by Ashutosh Chauhan)
+    --> left as TODO
+
+commit c047fde127a7ec2448c7851e89366cb3b0b03136
+Author: Harish JP <harishjp@apache.org>
+Date:   Thu Aug 13 11:59:40 2020 +0530
+
+    TEZ-4223 - Adding new jars or resources after the first DAG runs does not work.
+    
+    Signed-off-by: Rajesh Balamohan <rbalamohan@apache.org>
+    --> no need
+
+commit 59419dd3e3817d52f3a7ace34f122c92bea03d33
+Author: Harish JP <harishjp@apache.org>
+Date:   Thu Aug 13 11:59:03 2020 +0530
+
+    Revert "TEZ-4223 - Adding new jars or resources after the first DAG runs does not work."
+    
+    This reverts commit 6fc75ad6e9b1601b8b14dd85fa9b0aea53585fba.
+    --> no need
+
+commit 6fc75ad6e9b1601b8b14dd85fa9b0aea53585fba
+Author: Harish JP <harishjp@apache.org>
+Date:   Thu Aug 13 08:57:35 2020 +0530
+
+    TEZ-4223 - Adding new jars or resources after the first DAG runs does not work.
+    
+    Signed-off-by: Rajesh Balamohan <rbalamohan@apache.org>
+    --> no need (not related to MR3)
+
+commit 8364f17abd9a6adc95e100bb308b22754529f8f8
+Author: Eugene Chung <eugene.chung@navercorp.com>
+Date:   Fri Aug 7 16:27:22 2020 -0500
+
+    TEZ-4188. Link to NodeManager Logs of Home and DAG details doesn't consider yarnProtocol
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> no need
+
+commit 3ce961bc732322140db4d6120b309134958cac7b
+Author: Rajesh Balamohan <rbalamohan@apache.org>
+Date:   Wed Aug 5 16:52:46 2020 -0700
+
+    TEZ-4208 : Pipelinesorter uses single SortSpan after spill (Rajesh Balamohan via Ashutosh Chauhan)
+    
+    Signed-off-by: Ashutosh Chauhan <hashutosh@apache.org>
+    --> okay
+    --> test with query 67
+
+commit 5f3cac509df0acb733c9f3539a6a37dd0dda1297
+Author: Jonathan Eagles <jeagles@apache.org>
+Date:   Tue Aug 4 08:58:22 2020 -0500
+
+    TEZ-4212. Fix build checkstyle configuration and suppressions dtd URLs (Jonathan Eagles reviewed by László Bodor)
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> no need
+
+commit 3c405c96f4da9713968ff463af051d0ca8cd25ee
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Tue Aug 4 08:17:54 2020 +0200
+
+    TEZ-4172: Let tasks be killed after too many overall attempts (László Bodor reviewed by Jonathan Turner Eagles)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> no need
+
+commit 9d2b61b576a2421ec4fb813489d896d2b89fcce9
+Author: Mustafa Iman <mustafaiman@gmail.com>
+Date:   Thu Jul 30 12:19:36 2020 +0200
+
+    TEZ-4204: Data race in RootInputInitializerManager (Mustafa Iman via Ashutosh Chauhan)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> no need
+
+commit 134ecc3c73098a22d34417ab69d03b69068b1354
+Author: Mustafa Iman <mustafaiman@gmail.com>
+Date:   Thu Jul 30 12:08:18 2020 +0200
+
+    TEZ-4206: TestSpeculation.testBasicSpeculationPerVertexConf is flaky (Mustafa Iman via Ashutosh Chauhan)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> no need
+
+commit 2d7c60849adf3ed62f36f00e161c5d55962206f5
+Author: Jonathan Eagles <jeagles@apache.org>
+Date:   Tue Jul 21 15:45:22 2020 +0000
+
+    TEZ-4133. key class implements writableComparable and configurable use default configuration (wang qiang via jeagles)
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> okay
+
+commit 8acfb03335e10a983e51974107520a34581f1187
+Author: Mustafa Iman <mustafaiman@gmail.com>
+Date:   Fri Jul 17 11:34:46 2020 -0500
+
+    TEZ-4199. MergeManager::finalMerge should make use of compression
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> okay
+
+commit 5944982cd12804fde987d4d559d022571d9f9d72
+Author: Mustafa Iman <mustafaiman@gmail.com>
+Date:   Wed Jul 15 23:30:22 2020 -0500
+
+    TEZ-4201. findbugs-maven-plugin is not compatible with Maven 3.6.0+
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> no need
+
+commit 474bb22ba124800f4bc8a505c0895babcb65f0e6
+Author: Mustafa Iman <mustafaiman@gmail.com>
+Date:   Tue Jul 14 17:13:16 2020 -0500
+
+    TEZ-4200. Precommit docker image build fails
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> no need
+
+commit 21701261ebc02f4dea1752509b18144d70dc534f
+Author: Attila Magyar <amagyar@cloudera.com>
+Date:   Thu Jul 2 10:41:50 2020 -0700
+
+    TEZ-4170 : RootInputInitializerManager could make use of ThreadPool from appContext ( Attila Magyar via Rajesh Balamohan)
+    
+    Signed-off-by: Ashutosh Chauhan <hashutosh@apache.org>
+    --> no need
+
+commit 2c94033ea3222f78b6e2439b32d39da906127734
+Author: Attila Magyar <amagyar@cloudera.com>
+Date:   Thu Jun 4 18:15:53 2020 -0700
+
+    TEZ-4185 : Tez may skip file permission update on intermediate output (Attila Magyar via Ashutosh Chauhan)
+    
+    Signed-off-by: Ashutosh Chauhan <hashutosh@apache.org>
+    --> applied
+
+commit 6487834281f8ef5f8afd9f5ba9fba68736d5b44a
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Wed Jun 3 13:30:01 2020 +0200
+
+    TEZ-4105: Tez job-analyzer tool to support proto logging history (László Bodor reviewed by Jonathan Turner Eagles)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> no need
+
+commit b6c7fedfb74e8222f5b12bf2f53967a04f99860c
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Wed Jun 16 10:37:09 2021 +0200
+
+    TEZ-4295: Could not decompress data. Buffer length is too small. (#130) (Laszlo Bodor reviewed by Ashutosh Chauhan)
+    --> okay, but needs a change to MR3 runtime
+
+commit b934644871027722b40d83822bf6a0978141d6bf
+Author: jshmchenxi <jshmchenxi@gmail.com>
+Date:   Sat Apr 10 16:11:48 2021 +0800
+
+    TEZ-4302: NullPointerException in CodecUtils with GzipCodec (#117) (Xi Chen reviewed by Laszlo Bodor)
+    --> okay
+
+commit d0f498781e9675e88138db49fd8e9e140cc07f0c
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Tue Oct 6 08:56:57 2020 +0200
+
+    TEZ-4234: Compressor can cause IllegalArgumentException in Buffer.limit where limit exceeds capacity (László Bodor reviewed by Rajesh Balamohan, Jonathan Turner Eagles)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> okay
+
+commit 28cf7dcd3b5cd422755e61b21848c31397c157d7
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Thu May 28 17:16:40 2020 +0200
+
+    TEZ-4135: Improve memory allocation when executing in-memory reads (László Bodor reviewed by Ashutosh Chauhan)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> okay
+
+commit 0411a2e0244dc4e222e63b1e6f56ca8524e2d3aa
+Author: Mustafa Iman <mustafaiman@gmail.com>
+Date:   Tue May 26 22:39:21 2020 -0700
+
+    TEZ-4137 : Input/Output/Processor should merge payload to local conf (Mustafa Iman via Laszlo Bodor, Ashutosh Chauhan)
+    
+    Signed-off-by: Ashutosh Chauhan <hashutosh@apache.org>
+    --> do not apply
+
+commit 69a2bdeb19cbedb9f3d868f4e7231d3c92b98c75
+Author: Rajesh Balamohan <rbalamohan@apache.org>
+Date:   Fri Jul 31 15:12:06 2020 -0500
+
+    TEZ-4203. Findbugs: MergeThread.shuffleSchedulerThread; locked 80% of time
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> applied
+
+commit 7659726a1ed877d1f5303fc3673e4399bab33b65
+Author: Rajesh Balamohan <rbalamohan@apache.org>
+Date:   Tue May 26 17:13:00 2020 -0700
+
+    TEZ-4087 : Shuffle: Fix shuffle cleanup to prevent thread leaks (Rajesh Balamohan via Prasanth J, Ashutosh Chauhan)
+    
+    Signed-off-by: Ashutosh Chauhan <hashutosh@apache.org>
+    --> applied
+
+commit f047d4a712b7da6985561d2fa99de734002d71d9
+Author: Rajesh Balamohan <rbalamohan@apache.org>
+Date:   Fri May 22 11:30:05 2020 +0530
+
+    TEZ-4179: [Kubernetes] Extend NodeId in tez to support unique worker identity (Prasanth Jayachandran, Attila Magyar, reviewed by Rajesh Balamohan)
+    --> no need
+
+commit 07c807b2d474eada6afc55f623f2b8613bb891a0
+Author: Rajesh Balamohan <rbalamohaan@apache.org>
+Date:   Sat May 16 10:32:07 2020 -0500
+
+    TEZ-4171. DAGImp::getDAGStatus should try to report RUNNING state information correctly
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> no need
+
+commit cea0c797b2f08b1ad122f9293fc476f97d8e489b
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Fri May 15 09:14:38 2020 -0500
+
+    TEZ-4182. Expose build user and java version in version-info.properties
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> no need
+
+commit 354c2a4177fe8c3cf6b8a4c6009d4068a19d81f1
+Author: Rajesh Balamohan <rbalamohaan@apache.org>
+Date:   Thu May 14 03:53:07 2020 +0530
+
+    TEZ-4174: [Kubernetes] Fetcher should connection failure on SocketException (Prasanth Jayachandran reviewed by Rajesh Balamohan)
+    --> irrelevant for MR3 because:
+    // we send InputReadError regardless of connectFailed (Cf. gla2019.6.10.pptx, page 21)
+
+commit 4a97643cdc021b71e2a8bc60ac4fa0f7f9940d0f
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Tue May 12 10:36:38 2020 +0200
+
+    TEZ-2672: Allow specifying a new payload for plugins when a new DAG starts (László Bodor reviewed by Rajesh Balamohan)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> no need
+
+commit bc6a961229a9e9ab8c67bb978e5da745de32b1e1
+Author: Syed Shameerur Rahman <srahman@qubole.com>
+Date:   Tue May 12 10:30:18 2020 +0200
+
+    TEZ-4173: isSetParallelismCalled should be checked before skipping vertex reinit (Syed Shameerur Rahman via László Bodor)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> no need
+
+commit 4e4b8e5c9f373cff182272249b10a0d101254080
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Thu Apr 30 04:58:33 2020 -0500
+
+    TEZ-4165. Speed up TestShuffleScheduler#testNumParallelScheduledFetchers
+    
+    Signed-off-by: Jonathan Eagles <jeagles@apache.org>
+    --> no need
+
+commit 33980b80ddad271112de66482435b2f5d5097b6f
+Author: Jonathan Eagles <jeagles@apache.org>
+Date:   Thu Apr 30 04:55:17 2020 -0500
+
+    TEZ-4164. Speed up TestFetcher
+    --> no need
+
+commit 5373ca8ff06cc315c63ac66448daaa31c9b5882e
+Author: Jonathan Eagles <jeagles@apache.org>
+Date:   Thu Apr 30 04:52:36 2020 -0500
+
+    TEZ-4163. Speed up TestTaskReporter
+    --> no need
+
+commit 5dafc70530155453701fdfe5d8d8f65687accc62
+Author: Jonathan Eagles <jeagles@apache.org>
+Date:   Thu Apr 30 04:49:46 2020 -0500
+
+    TEZ-4162. Speed up TestInputReadyTracker
+    --> no need
+
+commit 41f6f3b587b00815c9abe016e617ef194326e58d
+Author: Jonathan Eagles <jeagles@apache.org>
+Date:   Thu Apr 30 04:44:23 2020 -0500
+
+    TEZ-4161. Speed up TestTezUtils
+    --> no need
+
+commit af3a9692ee4a4689464b82db3a78c70293631dce
+Author: Rajesh Balamohan <rbalamohan@apache.org>
+Date:   Wed Apr 29 03:43:49 2020 +0530
+
+    TEZ-4156: Fix Tez to reuse IPC connections (Rajesh Balamohan, reviewed by Siddharth Seth, László Bodor, Jonathan Turner Eagles)
+    --> no need
+
+commit 184c90c0bec9c8b788be717fe09952c9d574014e
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Tue Apr 28 17:39:49 2020 +0200
+
+    TEZ-4158: Change to a maintained bouncy castle version (László Bodor reviewed by Ashutosh Chauhan, Jonathan Turner Eagles)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> not related
+
+commit 9d6b11ca3ef2d51b0a5fd19d979a4a862f4aaa69
+Author: Gopal V <gopalv@apache.org>
+Date:   Thu May 21 14:29:42 2020 -0700
+
+    TEZ-4186: Limits: Fix init order regression from TEZ-4155 (Gopal V, reviewed by Rajesh Balamohan)
+    
+    Signed-off-by: Gopal V <gopalv@apache.org>
+    --> okay (applied to MR3)
+
+commit 117515c5c8e85455130d9ed803c3b8f56e57571f
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Tue Apr 28 17:32:04 2020 +0200
+
+    TEZ-4155: Remove sync bottleneck in counters (László Bodor reviewed by Rajesh Balamohan)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> okay (applied to MR3)
+
+commit 3f8e753778bddfcb78e57011342cfa4b79741019
+Author: László Bodor <bodorlaszlo0202@gmail.com>
+Date:   Wed Apr 22 09:27:06 2020 +0200
+
+    TEZ-4136: String representation for tez counters (László Bodor reviewed by Jonathan Turner Eagles)
+    
+    Signed-off-by: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+    --> unnecessary
+
+commit 24217e1432cafc9278863326f53901e982146227
+Author: Jonathan Eagles <jeagles@apache.org>
+Date:   Tue Apr 21 08:40:09 2020 -0500
+
+    TEZ-4151. Missing apache commons collections4 dependency on tez-mapreduce and tez-plugins/tez-history-parser (jeagles)
+    --> unnecessary
+
 commit e7c24f06e220cb707f114b4f5cc7210d27cce72d
 Author: Syed Shameerur Rahman <srahman@qubole.com>
 Date:   Sun Apr 19 10:12:09 2020 +0200
