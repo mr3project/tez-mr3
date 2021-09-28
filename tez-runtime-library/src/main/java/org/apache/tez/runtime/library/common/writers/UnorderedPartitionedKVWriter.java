@@ -906,6 +906,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     outputContext.notifyProgress();
     DataMovementEventPayloadProto.Builder payloadBuilder = DataMovementEventPayloadProto
         .newBuilder();
+    if (numPartitions == 1) {
+      payloadBuilder.setNumRecord((int) outputRecordsCounter.getValue());
+    }
 
     String host = getHost();
     if (emptyPartitions.cardinality() != 0) {
