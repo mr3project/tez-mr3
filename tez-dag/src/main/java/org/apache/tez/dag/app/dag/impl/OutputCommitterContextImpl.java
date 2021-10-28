@@ -94,4 +94,8 @@ public class OutputCommitterContextImpl implements OutputCommitterContext {
     return vertexIdx;
   }
 
+  @Override
+  public int getDAGIdentifier() {
+    return 0;
+  }
 }

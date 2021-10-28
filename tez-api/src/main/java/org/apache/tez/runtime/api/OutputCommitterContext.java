@@ -78,4 +78,9 @@ public interface OutputCommitterContext {
    */
   public int getVertexIndex();
 
+  /**
+   * Get the identifier of the DAG in Application
+   * @return the DAG identifier
+   */
+  public int getDAGIdentifier();
 }
