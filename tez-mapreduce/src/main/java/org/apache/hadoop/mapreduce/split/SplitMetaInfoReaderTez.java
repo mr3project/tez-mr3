@@ -48,14 +48,23 @@ public class SplitMetaInfoReaderTez {
   public static final int META_SPLIT_VERSION = JobSplit.META_SPLIT_VERSION;
   public static final byte[] META_SPLIT_FILE_HEADER = JobSplit.META_SPLIT_FILE_HEADER;
 
-  private static FSDataInputStream getFSDataIS(Configuration conf,
-      FileSystem fs) throws IOException {
+  private static String getMR3DagLocalResourceDir(Configuration conf, String dagUniqueIdentifier) {
+    String basePath = conf.get(MRFrameworkConfigs.TASK_LOCAL_RESOURCE_DIR, ".");
+    if (dagUniqueIdentifier == null || dagUniqueIdentifier.isEmpty()) {
+      return basePath;
+    }
+    Path dagLocalResourceDir = new Path(basePath, dagUniqueIdentifier + "_LR");
+    return dagLocalResourceDir.toString();
+  }
+
+  private static FSDataInputStream getFSDataIS(
+      Configuration conf, FileSystem fs, String dagUniqueIdentifier) throws IOException {
     long maxMetaInfoSize = conf.getLong(
         MRJobConfig.SPLIT_METAINFO_MAXSIZE,
         MRJobConfig.DEFAULT_SPLIT_METAINFO_MAXSIZE);
     FSDataInputStream in = null;
     // TODO NEWTEZ Figure out how this can be improved. i.e. access from context instead of setting in conf ?
-    String basePath = conf.get(MRFrameworkConfigs.TASK_LOCAL_RESOURCE_DIR, ".");
+    String basePath = getMR3DagLocalResourceDir(conf, dagUniqueIdentifier);
     LOG.info("Attempting to find splits in dir: " + basePath);
 
     Path metaSplitFile = new Path(
@@ -101,7 +110,7 @@ public class SplitMetaInfoReaderTez {
       FileSystem fs) throws IOException {
     FSDataInputStream in = null;
     try {
-      in = getFSDataIS(conf, fs);
+      in = getFSDataIS(conf, fs, "");
       final String jobSplitFile = MRJobConfig.JOB_SPLIT;
       final String basePath = conf.get(MRFrameworkConfigs.TASK_LOCAL_RESOURCE_DIR, ".");
       int numSplits = WritableUtils.readVInt(in); // TODO: check for insane values
@@ -133,14 +142,13 @@ public class SplitMetaInfoReaderTez {
    * @return split meta info object of the task.
    * @throws IOException
    */
-  public static TaskSplitMetaInfo getSplitMetaInfo(Configuration conf,
-      FileSystem fs, int index) throws IOException {
+  public static TaskSplitMetaInfo getSplitMetaInfo(
+      Configuration conf, FileSystem fs, int index, String dagUniqueIdentifier) throws IOException {
     FSDataInputStream in = null;
     try {
-      in = getFSDataIS(conf, fs);
+      in = getFSDataIS(conf, fs, dagUniqueIdentifier);
       final String jobSplitFile = MRJobConfig.JOB_SPLIT;
-      final String basePath =
-          conf.get(MRFrameworkConfigs.TASK_LOCAL_RESOURCE_DIR, ".");
+      final String basePath = getMR3DagLocalResourceDir(conf, dagUniqueIdentifier);
       final int numSplits = WritableUtils.readVInt(in); // TODO: check for insane values
       if (numSplits <= index) {
         throw new IOException("Index is larger than the number of splits");

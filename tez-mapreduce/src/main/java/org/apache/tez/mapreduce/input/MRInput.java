@@ -21,6 +21,7 @@ import javax.annotation.Nullable;
 
 import java.io.IOException;
 import java.net.URI;
+import java.text.NumberFormat;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.locks.Condition;
@@ -489,8 +490,18 @@ public class MRInput extends MRInputBase {
               getContext());
         }
       } else {
+        NumberFormat appIdFmt = NumberFormat.getInstance();
+        appIdFmt.setGroupingUsed(false);
+        appIdFmt.setMinimumIntegerDigits(4);
+
+        String mr3DagId =
+            "dag_" +
+            Long.toString(getContext().getApplicationId().getClusterTimestamp()) + "_" +
+            appIdFmt.format(getContext().getApplicationId().getId()) + "_" +
+            Integer.toString(getContext().getDagIdentifier());
+
         TaskSplitMetaInfo thisTaskMetaInfo = MRInputUtils.getSplits(jobConf,
-            getContext().getTaskIndex());
+            getContext().getTaskIndex(), mr3DagId);
         TaskSplitIndex splitMetaInfo = new TaskSplitIndex(thisTaskMetaInfo.getSplitLocation(),
             thisTaskMetaInfo.getStartOffset());
         long splitLength = -1;

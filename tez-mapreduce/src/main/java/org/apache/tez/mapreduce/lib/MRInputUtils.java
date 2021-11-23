@@ -47,9 +47,10 @@ public class MRInputUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(MRInputUtils.class);
 
-  public static TaskSplitMetaInfo getSplits(Configuration conf, int index) throws IOException {
+  public static TaskSplitMetaInfo getSplits(
+      Configuration conf, int index, String dagUniqueIdentifier) throws IOException {
     TaskSplitMetaInfo taskSplitMInfo = SplitMetaInfoReaderTez
-        .getSplitMetaInfo(conf, FileSystem.getLocal(conf), index);
+        .getSplitMetaInfo(conf, FileSystem.getLocal(conf), index, dagUniqueIdentifier);
     return taskSplitMInfo;
   }
 
