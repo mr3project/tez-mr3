@@ -21,6 +21,10 @@ package org.apache.tez.mapreduce.lib;
 import java.io.IOException;
 import java.util.Objects;
 
+import org.apache.hadoop.mapreduce.TaskAttemptID;
+import org.apache.hadoop.mapreduce.TaskID;
+import org.apache.hadoop.mapreduce.TaskType;
+import org.apache.tez.mapreduce.hadoop.MRConfig;
 import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
 import org.slf4j.Logger;
@@ -62,8 +66,16 @@ public class MRReaderMapReduce extends MRReader {
       int taskAttemptNumber, InputContext context) throws IOException {
     super(context);
     this.inputRecordCounter = inputRecordCounter;
-    this.taskAttemptContext = new TaskAttemptContextImpl(jobConf, tezCounters, clusterId,
-        vertexIndex, appId, taskIndex, taskAttemptNumber, true, null);
+    boolean isMap = jobConf.getBoolean(MRConfig.IS_MAP_PROCESSOR, false);
+    TaskAttemptID taskAttemptId = new TaskAttemptID(
+        new TaskID(
+            Long.toString(context.getApplicationId().getClusterTimestamp())
+                + Integer.toString((context.getDagIdentifier())),
+            context.getTaskVertexIndex(),
+            isMap ? TaskType.MAP : TaskType.REDUCE,
+            context.getTaskIndex()),
+        context.getTaskAttemptNumber());
+    this.taskAttemptContext = new TaskAttemptContextImpl(jobConf, taskAttemptId, tezCounters, isMap, null);
 
     Class<? extends org.apache.hadoop.mapreduce.InputFormat<?, ?>> inputFormatClazz;
 

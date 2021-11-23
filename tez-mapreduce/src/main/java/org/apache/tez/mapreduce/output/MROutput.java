@@ -44,9 +44,11 @@ import org.apache.hadoop.mapred.FileOutputFormat;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.JobContext;
 import org.apache.hadoop.mapred.TaskAttemptID;
+import org.apache.hadoop.mapred.TaskID;
 import org.apache.hadoop.mapreduce.OutputCommitter;
 import org.apache.hadoop.mapreduce.OutputFormat;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
+import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.tez.common.TezUtils;
@@ -69,7 +71,6 @@ import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.Output;
 import org.apache.tez.runtime.api.OutputContext;
 import org.apache.tez.runtime.library.api.KeyValueWriter;
-import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 
 /**
  * {@link MROutput} is an {@link Output} which allows key/values pairs
@@ -411,10 +412,14 @@ public class MROutput extends AbstractLogicalOutput {
     }
     jobConf.setInt(MRJobConfig.APPLICATION_ATTEMPT_ID,
         getContext().getDAGAttemptNumber());
-    TaskAttemptID taskAttemptId = org.apache.tez.mapreduce.hadoop.mapreduce.TaskAttemptContextImpl
-        .createMockTaskAttemptID(getContext().getApplicationId().getClusterTimestamp(),
-            getContext().getTaskVertexIndex(), getContext().getApplicationId().getId(),
-            getContext().getTaskIndex(), getContext().getTaskAttemptNumber(), isMapperOutput);
+    TaskAttemptID taskAttemptId = new TaskAttemptID(
+        new TaskID(
+            Long.toString(getContext().getApplicationId().getClusterTimestamp())
+                + Integer.toString(getContext().getDagIdentifier()),
+            getContext().getTaskVertexIndex(),
+            isMapperOutput ? TaskType.MAP : TaskType.REDUCE,
+            getContext().getTaskIndex()),
+        getContext().getTaskAttemptNumber());
     jobConf.set(JobContext.TASK_ATTEMPT_ID, taskAttemptId.toString());
     jobConf.set(JobContext.TASK_ID, taskAttemptId.getTaskID().toString());
     jobConf.setBoolean(JobContext.TASK_ISMAP, isMapperOutput);

@@ -34,6 +34,7 @@ import org.apache.tez.dag.records.TezDAGID;
 import org.apache.tez.dag.records.TezTaskAttemptID;
 import org.apache.tez.dag.records.TezTaskID;
 import org.apache.tez.dag.records.TezVertexID;
+import org.apache.tez.mapreduce.hadoop.MRConfig;
 import org.apache.tez.mapreduce.hadoop.MRInputHelpers;
 import org.apache.tez.mapreduce.hadoop.MRJobConfig;
 import org.apache.tez.mapreduce.input.MRInput;
@@ -90,10 +91,13 @@ public abstract class MRInputBase extends AbstractLogicalInput {
     // Add tokens to the jobConf - in case they are accessed within the RR / IF
     jobConf.getCredentials().mergeAll(UserGroupInformation.getCurrentUser().getCredentials());
 
+    boolean isMap = jobConf.getBoolean(MRConfig.IS_MAP_PROCESSOR, false);
     TaskAttemptID taskAttemptId = new TaskAttemptID(
         new TaskID(
-            Long.toString(getContext().getApplicationId().getClusterTimestamp()),
-            getContext().getApplicationId().getId(), TaskType.MAP,
+            Long.toString(getContext().getApplicationId().getClusterTimestamp())
+                + Integer.toString(getContext().getDagIdentifier()),
+            getContext().getTaskVertexIndex(),
+            isMap ? TaskType.MAP : TaskType.REDUCE,
             getContext().getTaskIndex()),
         getContext().getTaskAttemptNumber());
 

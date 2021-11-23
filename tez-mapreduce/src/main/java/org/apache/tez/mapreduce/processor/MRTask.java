@@ -36,7 +36,6 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.FileSystem.Statistics;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.DataInputBuffer;
@@ -69,13 +68,10 @@ import org.apache.tez.common.counters.TezCounters;
 import org.apache.tez.common.security.JobTokenIdentifier;
 import org.apache.tez.common.security.TokenCache;
 import org.apache.tez.dag.api.UserPayload;
-import org.apache.tez.dag.records.TezDAGID;
 import org.apache.tez.mapreduce.hadoop.DeprecatedKeys;
-import org.apache.tez.mapreduce.hadoop.IDConverter;
 import org.apache.tez.mapreduce.hadoop.MRConfig;
 import org.apache.tez.mapreduce.hadoop.MRJobConfig;
 import org.apache.tez.mapreduce.hadoop.mapred.TaskAttemptContextImpl;
-import org.apache.tez.mapreduce.hadoop.mapreduce.JobContextImpl;
 import org.apache.tez.mapreduce.output.MROutputLegacy;
 import org.apache.tez.runtime.api.AbstractLogicalIOProcessor;
 import org.apache.tez.runtime.api.LogicalInput;
@@ -90,7 +86,6 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
   static final Logger LOG = LoggerFactory.getLogger(MRTask.class);
 
   protected JobConf jobConf;
-  protected JobContext jobContext;
   protected TaskAttemptContext taskAttemptContext;
   protected OutputCommitter committer;
 
@@ -136,8 +131,9 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
     counters = processorContext.getCounters();
     this.taskAttemptId = new TaskAttemptID(
         new TaskID(
-            Long.toString(processorContext.getApplicationId().getClusterTimestamp()),
-            processorContext.getApplicationId().getId(),
+            Long.toString(processorContext.getApplicationId().getClusterTimestamp())
+                + Integer.toString(processorContext.getDagIdentifier()),
+            processorContext.getTaskVertexIndex(),
             (isMap ? TaskType.MAP : TaskType.REDUCE),
             processorContext.getTaskIndex()),
         processorContext.getTaskAttemptNumber());
@@ -321,12 +317,8 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
     }
     this.mrReporter = new MRTaskReporter(processorContext);
     this.useNewApi = jobConf.getUseNewMapper();
-    TezDAGID dagId = IDConverter.fromMRTaskAttemptId(taskAttemptId).getTaskID()
-        .getVertexID().getDAGId();
 
-    this.jobContext = new JobContextImpl(jobConf, dagId, mrReporter);
-    this.taskAttemptContext =
-        new TaskAttemptContextImpl(jobConf, taskAttemptId, mrReporter);
+    this.taskAttemptContext = new TaskAttemptContextImpl(jobConf, taskAttemptId, mrReporter);
 
     localizeConfiguration(jobConf);
   }
@@ -557,13 +549,4 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
   public org.apache.hadoop.mapreduce.TaskAttemptContext getTaskAttemptContext() {
     return taskAttemptContext;
   }
-
-  public JobContext getJobContext() {
-    return jobContext;
-  }
-
-  public TaskAttemptID getTaskAttemptId() {
-    return taskAttemptId;
-  }
-
 }

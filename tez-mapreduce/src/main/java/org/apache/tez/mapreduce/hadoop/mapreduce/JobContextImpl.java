@@ -41,10 +41,8 @@ import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.mapreduce.lib.partition.HashPartitioner;
 import org.apache.hadoop.security.Credentials;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Progressable;
-import org.apache.tez.dag.records.TezDAGID;
-import org.apache.tez.mapreduce.hadoop.IDConverter;
+import org.apache.tez.dag.records.TezVertexID;
 import org.apache.tez.mapreduce.hadoop.MRJobConfig;
 import org.apache.tez.mapreduce.processor.MRTaskReporter;
 
@@ -58,21 +56,21 @@ import org.apache.tez.mapreduce.processor.MRTaskReporter;
 public class JobContextImpl implements JobContext {
 
   protected final org.apache.hadoop.mapred.JobConf conf;
-  private TezDAGID dagId;
+  private TezVertexID vertexId;
   protected final Credentials credentials;
   private Progressable progress;
 
-  public JobContextImpl(Configuration conf, TezDAGID dagId) {
-    this(conf, dagId, MRTaskReporter.NULL);
+  public JobContextImpl(Configuration conf, TezVertexID vertexId) {
+    this(conf, vertexId, MRTaskReporter.NULL);
   }
   
-  public JobContextImpl(Configuration conf, TezDAGID dagId, Progressable progress) {
+  public JobContextImpl(Configuration conf, TezVertexID vertexId, Progressable progress) {
     if (conf instanceof JobConf) {
       this.conf = (JobConf)conf;
     } else {
       this.conf = new JobConf(conf);
     }
-    this.dagId = dagId;
+    this.vertexId = vertexId;
     this.credentials = this.conf.getCredentials();
     this.progress = progress;
   }
@@ -90,16 +88,12 @@ public class JobContextImpl implements JobContext {
    * @return the object with the job id
    */
   public JobID getJobID() {
-    return IDConverter.toMRJobId(dagId);
+    return new org.apache.hadoop.mapred.JobID(
+        Long.toString(vertexId.getDAGId().getApplicationId().getClusterTimestamp())
+        + Integer.toString(vertexId.getDAGId().getId()),
+        vertexId.getId());
   }
-  
-  /**
-   * Set the JobID.
-   */
-  public void setJobID(JobID jobId) {
-    this.dagId = IDConverter.fromMRJobId(jobId);
-  }
-  
+
   /**
    * Get configured the number of reduce tasks for this job. Defaults to 
    * <code>1</code>.

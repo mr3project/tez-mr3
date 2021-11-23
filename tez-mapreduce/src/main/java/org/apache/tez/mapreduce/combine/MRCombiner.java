@@ -102,14 +102,17 @@ public class MRCombiner implements Combiner {
 
     combineInputRecordsCounter = taskContext.getCounters().findCounter(TaskCounter.COMBINE_INPUT_RECORDS);
     combineOutputRecordsCounter = taskContext.getCounters().findCounter(TaskCounter.COMBINE_OUTPUT_RECORDS);
-    
+
     boolean isMap = conf.getBoolean(MRConfig.IS_MAP_PROCESSOR,false);
     this.mrTaskAttemptID = new TaskAttemptID(
-        new TaskID(String.valueOf(taskContext.getApplicationId()
-            .getClusterTimestamp()), taskContext.getApplicationId().getId(),
+        new TaskID(
+            String.valueOf(taskContext.getApplicationId().getClusterTimestamp())
+                + String.valueOf(taskContext.getDagIdentifier()),
+            taskContext.getTaskVertexIndex(),
             isMap ? TaskType.MAP : TaskType.REDUCE,
-            taskContext.getTaskIndex()), taskContext.getTaskAttemptNumber());
-    
+            taskContext.getTaskIndex()),
+        taskContext.getTaskAttemptNumber());
+
     LOG.info("Using combineKeyClass: " + keyClass + ", combineValueClass: " + valClass + ", combineComparator: " +comparator + ", useNewApi: " + useNewApi);
   }
 

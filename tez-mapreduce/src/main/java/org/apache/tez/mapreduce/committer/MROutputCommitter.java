@@ -29,6 +29,7 @@ import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.OutputFormat;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
+import org.apache.hadoop.mapreduce.TaskID;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.hadoop.mapreduce.TypeConverter;
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl;
@@ -123,11 +124,13 @@ public class MROutputCommitter extends OutputCommitter {
 
     if (newApiCommitter) {
       TaskAttemptID taskAttemptID = new TaskAttemptID(
-          Long.toString(context.getApplicationId().getClusterTimestamp()),
-          context.getApplicationId().getId(),
-          ((jobConf.getBoolean(MRConfig.IS_MAP_PROCESSOR, false) ?
-              TaskType.MAP : TaskType.REDUCE)),
-          0, context.getDAGAttemptNumber());
+          new TaskID(
+              Long.toString(context.getApplicationId().getClusterTimestamp())
+                  + Integer.toString(context.getDAGIdentifier()),
+              context.getVertexIndex(),
+              jobConf.getBoolean(MRConfig.IS_MAP_PROCESSOR, false) ? TaskType.MAP : TaskType.REDUCE,
+              0),
+          context.getDAGAttemptNumber());
 
       TaskAttemptContext taskContext = new TaskAttemptContextImpl(jobConf,
           taskAttemptID);
@@ -200,13 +203,15 @@ public class MROutputCommitter extends OutputCommitter {
     if (!initialized) {
       throw new RuntimeException("Committer not initialized");
     }
+    boolean isMap = jobConf.getBoolean(MRConfig.IS_MAP_PROCESSOR, false);
     TaskAttemptID taskAttemptID = new TaskAttemptID(
-        Long.toString(getContext().getApplicationId().getClusterTimestamp())
-        + String.valueOf(getContext().getVertexIndex()),
-        getContext().getApplicationId().getId(),
-        ((jobConf.getBoolean(MRConfig.IS_MAP_PROCESSOR, false) ?
-            TaskType.MAP : TaskType.REDUCE)),
-        taskIndex, attemptId);
+        new TaskID(
+            Long.toString(getContext().getApplicationId().getClusterTimestamp())
+                + Integer.toString(getContext().getDAGIdentifier()),
+            getContext().getVertexIndex(),
+            isMap ? TaskType.MAP : TaskType.REDUCE,
+            taskIndex),
+        attemptId);
     TaskAttemptContext taskContext = new TaskAttemptContextImpl(jobConf,
         taskAttemptID);
     committer.recoverTask(taskContext);
