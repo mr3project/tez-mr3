@@ -39,7 +39,7 @@
     <scala.version>2.11.12</scala.version>
     <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
     <clover.license>${user.home}/clover.license</clover.license>
-    <hadoop.version>3.1.2</hadoop.version>
+    <hadoop.version>3.1.4</hadoop.version>
     <jetty.version>9.3.27.v20190418</jetty.version>
     <pig.version>0.13.0</pig.version>
     <javac.version>1.8</javac.version>
