@@ -42,7 +42,7 @@ import org.apache.hadoop.classification.InterfaceStability;
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
-public class TezTaskAttemptID extends TezID {
+public class TezTaskAttemptID extends TezID implements TaskIDAware {
   public static final String ATTEMPT = "attempt";
   private TezTaskID taskId;
 
@@ -75,6 +75,7 @@ public class TezTaskAttemptID extends TezID {
   }
 
   /** Returns the {@link TezTaskID} object that this task attempt belongs to */
+  @Override
   public TezTaskID getTaskID() {
     return taskId;
   }
