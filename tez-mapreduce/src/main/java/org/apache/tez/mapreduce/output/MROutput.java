@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.tez.common.Preconditions;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.mapreduce.lib.output.LazyOutputFormat;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
 import org.slf4j.Logger;

@@ -180,9 +180,9 @@
         <version>2.6</version>
       </dependency>
       <dependency>
-        <groupId>commons-lang</groupId>
-        <artifactId>commons-lang</artifactId>
-        <version>2.6</version>
+       <groupId>org.apache.commons</groupId>
+       <artifactId>commons-lang3</artifactId>
+       <version>3.9</version>
       </dependency>
       <dependency>
         <groupId>javax.servlet</groupId>
@@ -211,11 +211,6 @@
           <exclusion>
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>httpclient</artifactId>
-          </exclusion>
-          <exclusion>
-            <!-- exclude because it is not needed for test-local MR3/master -->
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-lang3</artifactId>
           </exclusion>
           <exclusion>
             <groupId>commons-logging</groupId>
