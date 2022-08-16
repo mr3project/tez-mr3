@@ -83,10 +83,6 @@
       <groupId>org.apache.tez</groupId>
       <artifactId>tez-api</artifactId>
     </dependency>
-    <dependency>
-      <groupId>org.apache.tez</groupId>
-      <artifactId>hadoop-shim</artifactId>
-    </dependency>
   </dependencies>
 
   <build>

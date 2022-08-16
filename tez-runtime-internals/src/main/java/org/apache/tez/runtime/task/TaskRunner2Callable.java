@@ -65,7 +65,6 @@ public class TaskRunner2Callable implements Callable<TaskRunner2Callable.TaskRun
             return new TaskRunner2CallableResult(null);
           }
           LOG.info("Initializing task" + ", taskAttemptId={}", task.getTaskAttemptID());
-          TezUtilsInternal.setHadoopCallerContext(task.getHadoopShim(), task.getTaskAttemptID());
           task.initialize();
 
           if (!stopRequested.get() && !Thread.currentThread().isInterrupted()) {

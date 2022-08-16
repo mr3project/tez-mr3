@@ -37,7 +37,6 @@ import java.util.Set;
 import java.util.concurrent.*;
 
 import org.apache.commons.lang.exception.ExceptionUtils;
-import org.apache.tez.hadoop.shim.HadoopShim;
 import org.apache.tez.runtime.api.TaskFailureType;
 import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.api.impl.TezProcessorContextImpl;
@@ -144,7 +143,6 @@ public class LogicalIOProcessorRuntimeTask extends RuntimeTask {
   private volatile ObjectRegistry objectRegistry;
   private final ExecutionContext ExecutionContext;
   private final long memAvailable;
-  private final HadoopShim hadoopShim;
   private final int maxEventBacklog;
 
   private final boolean initializeProcessorFirst;
@@ -156,7 +154,7 @@ public class LogicalIOProcessorRuntimeTask extends RuntimeTask {
       Map<String, ByteBuffer> serviceConsumerMetadata, Map<String, String> envMap,
       Multimap<String, String> startedInputsMap, ObjectRegistry objectRegistry,
       String pid, ExecutionContext ExecutionContext, long memAvailable,
-      boolean updateSysCounters, HadoopShim hadoopShim,
+      boolean updateSysCounters,
       TezExecutors sharedExecutor) throws IOException {
     // Note: If adding any fields here, make sure they're cleaned up in the cleanupContext method.
     // TODO Remove jobToken from here post TEZ-421
@@ -207,7 +205,6 @@ public class LogicalIOProcessorRuntimeTask extends RuntimeTask {
     this.objectRegistry = objectRegistry;
     this.ExecutionContext = ExecutionContext;
     this.memAvailable = memAvailable;
-    this.hadoopShim = hadoopShim;
     this.maxEventBacklog = tezConf.getInt(TezConfiguration.TEZ_TASK_MAX_EVENT_BACKLOG,
         TezConfiguration.TEZ_TASK_MAX_EVENT_BACKLOG_DEFAULT);
     this.sharedExecutor = sharedExecutor;
@@ -1055,11 +1052,6 @@ public class LogicalIOProcessorRuntimeTask extends RuntimeTask {
   @VisibleForTesting
   public Map<String, LogicalOutput> getOutputs() {
     return this.outputsMap;
-  }
-
-  @Private
-  public HadoopShim getHadoopShim() {
-    return hadoopShim;
   }
 
   @Private

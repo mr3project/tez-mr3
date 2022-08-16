@@ -40,7 +40,6 @@
     <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
     <clover.license>${user.home}/clover.license</clover.license>
     <hadoop.version>3.1.2</hadoop.version>
-    <pig.version>0.13.0</pig.version>
     <javac.version>1.8</javac.version>
     <slf4j.version>1.7.30</slf4j.version>
     <enforced.java.version>[${javac.version},)</enforced.java.version>
@@ -110,11 +109,6 @@
       </dependency>
       <dependency>
         <groupId>org.apache.tez</groupId>
-        <artifactId>hadoop-shim</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.tez</groupId>
         <artifactId>tez-api</artifactId>
         <version>${project.version}</version>
       </dependency>
@@ -154,11 +148,6 @@
         <groupId>org.apache.tez</groupId>
         <artifactId>tez-dag</artifactId>
         <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pig</groupId>
-        <artifactId>pig</artifactId>
-        <version>${pig.version}</version>
       </dependency>
       <dependency>
         <groupId>io.dropwizard.metrics</groupId>
@@ -764,7 +753,6 @@
   </dependencyManagement>
 
   <modules>
-    <module>hadoop-shim</module>
     <module>tez-api</module>
     <module>tez-common</module>
     <module>tez-runtime-library</module>
@@ -773,7 +761,6 @@
     <module>tez-examples</module>
     <module>tez-tests</module>
     <module>tez-dag</module>
-    <module>hadoop-shim-impls</module>
     <module>tez-dist</module>
   </modules>
 

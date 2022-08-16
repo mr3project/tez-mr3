@@ -25,7 +25,6 @@
       <includes>
         <include>org.apache.tez:tez-api</include>
         <include>org.apache.tez:tez-common</include>
-        <include>org.apache.tez:hadoop-shim</include>
         <include>org.apache.tez:tez-runtime-internals</include>
         <include>org.apache.tez:tez-runtime-library</include>
         <include>org.apache.tez:tez-mapreduce</include>
