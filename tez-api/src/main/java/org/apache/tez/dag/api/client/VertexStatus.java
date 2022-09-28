@@ -58,6 +58,10 @@ public class VertexStatus {
     this.proxy = proxy;
   }
 
+  public String getId() {
+    throw new TezUncheckedException("VertexStatus not supported");
+  }
+
   public State getState() {
     return getState(proxy.getState());
   }
