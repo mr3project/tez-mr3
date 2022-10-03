@@ -1,3 +1,443 @@
+commit 55b6031fa2c38cd8af1d384414d29c4e19a875d7
+Author: zhengchenyu <zhengchenyu16@163.com>
+Date:   Mon Aug 29 19:52:29 2022 +0800
+
+    TEZ-4441: TezAppMaster may stuck because of reportError skip send error event (#236) (zhengchenyu reviewed by Laszlo Bodor)
+
+commit db915ebafb6ad9bb9de062ee9b17c67eab67c7ae
+Author: zhengchenyu <zhengchenyu16@163.com>
+Date:   Mon Aug 29 19:50:20 2022 +0800
+
+    TEZ-4440. When tez app run in yarn fed cluster, may throw NPE (#235) (zhengchenyu reviewed by Laszlo Bodor)
+
+commit 621a83152c305ccb654f69f57fe711bc52d271be
+Author: PJ Fanning <pjfanning@users.noreply.github.com>
+Date:   Tue Aug 2 09:20:14 2022 +0100
+
+    TEZ-4435: use jackson v2 - jackson v1 is EOL and full of security issues (#231) (PJ Fanning reviewed by Laszlo Bodor, Ayush Saxena)
+
+commit 5e31e4d970647aecba2b58e836ff65fedb144306
+Author: Aman Raj <104416558+amanraj2520@users.noreply.github.com>
+Date:   Tue Jul 26 12:04:04 2022 +0530
+
+    [TEZ-4439] Update the protobuf documentation in TEZ codebase (#233) (Aman Raj reviewed by Laszlo Bodor)
+
+commit c386865e74d54a3a1b87a3e57b4cd14ccd332167
+Author: Mark Bathori <57758037+mark-bathori@users.noreply.github.com>
+Date:   Fri Jul 22 10:25:23 2022 +0200
+
+    TEZ-4363: Bump protobuf dependency to 3.x (#192) (Mark Bathori reviewed by Laszlo Bodor, Aman Raj)
+
+commit a192ec4443032c33269f5326755a292c87a98292
+Author: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+Date:   Mon Jul 4 11:04:34 2022 +0200
+
+    Revert "TEZ-4397 Open Tez Input splits asynchronously"
+    
+    This reverts commit f724c546069885e29e6446813805bb63bf0d5d9d.
+    --> reverted
+
+----- TEZ 0.10.2
+
+commit 06fff5c9cec13bc656c9c2e1678ae8a8e2271208
+Author: Ganesha Shreedhara <ganeshashree2@gmail.com>
+Date:   Mon Jul 4 14:08:37 2022 +0530
+
+    TEZ-4430: Fix tez.task.launch.cmd-opts property not working (#228) (Ganesha Shreedhara reviewed by Laszlo Bodor)
+    --> not related
+
+commit be40104104796e265947b6c9666a5e1cd3ca848e
+Author: Aman Raj <104416558+amanraj2520@users.noreply.github.com>
+Date:   Thu Jun 30 15:47:03 2022 +0530
+
+    [TEZ-4427][CVE-2019-10744] Upgrade lodash.merge version to 4.6.2 to fix vulnerability (#229) (Aman Raj reviewed by Nikhil Gupta, Laszlo Bodor)
+    --> not applied (MR3-UI)
+
+commit adcc3138d3f79b056131bb2c7864a2b9a39848ea
+Author: Aman Raj <104416558+amanraj2520@users.noreply.github.com>
+Date:   Tue Jun 21 13:11:57 2022 +0530
+
+    TEZ-4426: [CVE-2018-1000620] Upgrade cryptiles from 2.0.5 to 4.1.2 (#227) (Aman Raj reviewed by Nikhil Gupta, Laszlo Bodor)
+    --> not applied (MR3-UI)
+
+commit f25831ee40904813f31b65f794228b58a4800b8e
+Author: Mark Bathori <57758037+mbathori-cloudera@users.noreply.github.com>
+Date:   Tue Jun 21 09:34:59 2022 +0200
+
+    TEZ-4428: Use protoc-jar-maven-plugin to generate protobuf classes (#218) (Mark Bathori reviewed by Martin Tzvetanov Grigorov, Sylwester Lachiewicz, Laszlo Bodor)
+    --> not applied
+
+commit 5f181ea32a630f583c2830101dd4969e6ab8d77d
+Author: Ayush Saxena <ayushsaxena@apache.org>
+Date:   Tue Jun 21 00:43:55 2022 +0530
+
+    TEZ-4429: Upgrade guava to 31.1 to fix CVE-2020-8908. (#223) (Ayush Saxena reviewed by Laszlo Bodor)
+    --> apply for Hive 4
+
+commit 1ab7fc97c91cd9db5c8150e46ee7f98375bcced9
+Author: Aman Raj <104416558+amanraj2520@users.noreply.github.com>
+Date:   Tue Jun 21 00:41:30 2022 +0530
+
+    [TEZ-4425][WS-2020-0345] Upgrade jsonpointer version from 4.0.1 to 4.1.0 (#226) (Aman Raj reviewed by Laszlo Bodor)
+    --> not applied (MR3-UI)
+
+commit 8ffa32df467c115ef6358ceef9c1703147d10a6a
+Author: Aman Raj <104416558+amanraj2520@users.noreply.github.com>
+Date:   Mon Jun 20 12:15:25 2022 +0530
+
+    [TEZ-4424][CVE-2021-3918] Upgrade json-schema from 0.2.3 to 0.4.0 to fix the vulnerability (#222) (Aman Raj reviewed by Laszlo Bodor)
+    --> not applied (MR3-UI)
+
+commit c6eb047aa2df2b60a673c2f852594295b5cb416a
+Author: Aman Raj <104416558+amanraj2520@users.noreply.github.com>
+Date:   Wed Jun 15 18:52:43 2022 +0530
+
+    [TEZ-4423][CVE-2021-44906] Upgrade minimist version from 0.0.8 to 1.2.6 to fix the vulnerability (#220)
+    --> not applied (MR3-UI)
+
+commit 3da8438e68263f71462e99eb0b728e121702f5bf
+Author: Aman Raj <104416558+amanraj2520@users.noreply.github.com>
+Date:   Wed Jun 15 14:55:38 2022 +0530
+
+    [TEZ-4422] [CVE-2021-43138] Upgrade async from 2.3.0 to 2.6.4 to fix the vulnerability. Also an upgrade of yarn version to 1.6.0 and frontend maven plugin to 1.8.0 was done. (#217) (Aman Raj reviewed by Laszlo Bodor)
+    --> not applied (MR3-UI)
+
+commit 86dc4fd83f64494f5584c154e6812a9cee3cf4fb
+Author: johnnyCake1 <92083002+johnnyCake1@users.noreply.github.com>
+Date:   Fri Jun 10 22:39:17 2022 +0200
+
+    TEZ-4038: Add a /prof profiler endpoint like HiveServer2 has (#212) (Zheenbek Akimzhanov reviewed by Laszlo Bodor)
+    --> unnecessary
+
+commit e5a5578025409cbc18f5e727ea35ec03ec4bcdac
+Author: László Attila Tóth <LA-Toth@users.noreply.github.com>
+Date:   Mon Jun 6 21:50:39 2022 +0200
+
+    TEZ-4383: upgrade to mockito 4.3.1 (#190) (Laszlo Attila Toth reviewed by Laszlo Bodor)
+    --> unnecessary
+
+commit cf9e3ff308402904cd0d4eb0ece313104270de8a
+Author: Mark Bathori <57758037+mbathori-cloudera@users.noreply.github.com>
+Date:   Wed Jun 1 19:54:15 2022 +0200
+
+    TEZ-4421: Missing sudo command in docker image (#214) (Mark Bathori reviewed by Laszlo Bodor)
+    --> unnecessary
+
+commit 24a77c93f2f3d7933fbd6a3fcbcb9cb5f9d58845
+Author: Murali Krishna <muralikrishna.dmmkr@gmail.com>
+Date:   Sun May 29 22:37:36 2022 +0530
+
+    TEZ-4409: Upgrade async-http-client to 2.12.3 to resolve CVE (#204) (D M Murali Krishna Reddy reviewed by Laszlo Bodor)
+    --> apply when necessary
+    --> apply for Hive 4
+
+commit ba851fa06e4f57584b938706276797db9807e1d8
+Author: Mark Bathori <57758037+mbathori-cloudera@users.noreply.github.com>
+Date:   Sun May 29 18:58:04 2022 +0200
+
+    TEZ-4417: Missing wget command in docker image (#210) (Mark Bathori reviewed by Laszlo Bodor)
+    --> unnecessary
+
+commit 98a81b1b66ee86273865ff4a77699d728ebb4786
+Author: skysiders <64545691+skysiders@users.noreply.github.com>
+Date:   Tue May 10 13:30:59 2022 +0800
+
+    TEZ-4412 ensure mkDirForAM create directory with special permissions (#209) (Zhang Dongsheng reviewed by Laszlo Bodor)
+    --> unnecessary (Cf. FSUtils.scala, createDirForAm())
+
+commit 798ddda06dbd4353f1088b7b4f2200831ff28910
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Wed May 4 06:44:54 2022 +0200
+
+    TEZ-4347: Add some diagnostic endpoints to TezAM's WebUIService (#160) (Laszlo Bodor reviewed by Rajesh Balamohan)
+    --> not applicable
+
+commit 75876fcc76cff736a6321c2e85ca1a3fdcc9dd42
+Author: Murali Krishna <muralikrishna.dmmkr@gmail.com>
+Date:   Mon May 2 12:09:54 2022 +0530
+
+    TEZ-4405: Replace log4j 1.x with reload4j (#200) (D M Murali Krishna Reddy reviewed by Laszlo Bodor)
+    --> applied
+
+commit 4d1a86070316a1b85196d06df94787268084a5da
+Author: Syed Shameerur Rahman <rhmanns@amazon.com>
+Date:   Sat Apr 30 13:37:04 2022 +0530
+
+    TEZ-4403: Upgrade SLF4J Version To 1.7.36 (#198) (Syed Shameerur Rahman reviewed by Laszlo Bodor)
+    --> applied
+
+commit 2a9495afe1ef9080941cb903fba0189abb7d3c8f
+Author: guptanikhil007 <gupta.nikhil0007@gmail.com>
+Date:   Fri Apr 29 12:26:19 2022 +0530
+
+    TEZ-4411: Update FileSaver dependency (#206) (Nikhil Gupta reviewed by Laszlo Bodor,  Deependra Patel)
+    --> unnecessary
+
+commit 9f8d6fbd34bc99756e9115373917a05fad2ab8fc
+Author: guptanikhil007 <gupta.nikhil0007@gmail.com>
+Date:   Tue Apr 26 04:29:03 2022 +0530
+
+    Create a FileSystem for given Path (#201)
+    
+    Co-authored-by: Nikhil Gupta <guptan@microsoft.com>
+    --> unnecessary
+
+commit 627f33077480afdcefc0611fbde87d6be0010176
+Author: csjuhasz-c <csjuhasz@cloudera.com>
+Date:   Thu Apr 14 11:33:56 2022 +0200
+
+    TEZ-4398: Gitignore pyc files (#199) (Csaba Juhasz reviewed by Laszlo Bodor)
+    --> unnecessary
+
+commit 3e452e9859c507f089c6d6c01cbfabe24fd7b1d9
+Author: Himanshu Mishra <himanshu.mishra.ce@gmail.com>
+Date:   Fri Apr 1 14:15:03 2022 +0530
+
+    TEZ-4399: ShuffleHandler fails with SSLHandshakeException not found when SSL is enabled (#196) (Himanshu Mishra reviewed by Laszlo Bodor)
+    --> not applicable
+
+commit f724c546069885e29e6446813805bb63bf0d5d9d
+Author: Ramesh Kumar <rameshkumar@cloudera.com>
+Date:   Wed Mar 23 21:34:47 2022 -0700
+
+    TEZ-4397 Open Tez Input splits asynchronously
+    
+    Contributed by Ramesh Kumar Thangarajan
+    --> apply for Hive 3 
+    --> perhaps not for Hive 4 because it is reverted
+
+commit 20873a3a1008d3572f0d0cfefe1c146f8f42449e
+Author: Syed Shameerur Rahman <rhmanns@amazon.com>
+Date:   Wed Mar 16 23:48:39 2022 +0530
+
+    TEZ-3363: Delete intermediate data at the vertex level for Shuffle Handler (#60) (Syed Shameerur Rahman reviewed by Laszlo Bodor)
+    --> unnecessary because MR3 deletes intermediate data
+
+commit 132ea4c1b3505a066d300173bd967d1bc04b142f
+Author: Mark Bathori <57758037+mbathori-cloudera@users.noreply.github.com>
+Date:   Thu Mar 10 20:54:24 2022 +0100
+
+    TEZ-4359: ShuffleHandler: Make sure of properly releasing netty reference counted objects (#194) (Mark Bathori reviewed by Laszlo Bodor)
+    --> specific to Netty 4
+
+commit fa74b95876e1074b5ba2eec6ddb0eea2699c9149
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Tue Feb 22 10:32:30 2022 +0100
+
+    TEZ-4388: Asynchttpclient can cause stuck TezChild processes (#189) (Laszlo Bodor reviewed by Rajesh Balamohan)
+    --> not applicable (TezChild)
+
+commit 5241f58a5945dfce87a5b4e7ec81caf0c6f021ac
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Fri Feb 18 20:12:32 2022 +0100
+
+    TEZ-4300: Download protoc automatically compile/development time (#115)
+    --> unnecessary (does not apply)
+
+commit a495fb69bb809007e5be507d321b9e5a876a952b
+Author: Mark Bathori <57758037+mbathori-cloudera@users.noreply.github.com>
+Date:   Fri Feb 18 09:25:36 2022 +0100
+
+    TEZ-4389: TestSecureShuffle fails if localhost name is different than "localhost" (#191) (Mark Bathori reviewed by Laszlo Bodor)
+    --> unnecessary
+
+commit f62bf12cea38c9db0e56bd527a2b2a294aa10f66
+Author: László Attila Tóth <LA-Toth@users.noreply.github.com>
+Date:   Tue Feb 15 10:42:03 2022 +0100
+
+    TEZ-4384: Remove unused EnvironmentUpdateUtils remaining from TEZ-1837 (#186) (Laszlo Attila Toth reviewed by Laszlo Bodor)
+    --> applied
+
+commit 9f4cb313980d91e0661fc3bdc568815f470b4bba
+Author: ghanko <54805928+ghanko@users.noreply.github.com>
+Date:   Mon Feb 14 10:23:54 2022 +0100
+
+    TEZ-4379 Tez Hive Queries query page rows does not go over (#183) (Csaba Juhasz, Gergely Hanko reviewed by Laszlo Bodor)
+    --> unnecessary (TEZ-UI)
+
+commit 7b66d3da714ee09b434b8d8d438ba30a0026af3c
+Author: ghanko <54805928+ghanko@users.noreply.github.com>
+Date:   Thu Feb 10 11:05:47 2022 +0100
+
+    TEZ-4227 Introduce convenient methods in TezID subclasses (#166) (Gergely Hanko reviewed by Laszlo Bodor)
+    --> unnecessary
+
+commit 6d7ef203c69f00c47831cd3cb9760a94242eee64
+Author: Mark Bathori <57758037+mbathori-cloudera@users.noreply.github.com>
+Date:   Sun Jan 30 11:48:56 2022 +0100
+
+    TEZ-4381: Speed up TestSecureShuffle (#180) (Mark Bathori reviewed by Laszlo Bodor)
+    --> unnecessary
+
+commit 4e3eb9574a9c59ea534a70021531337b2de13ed3
+Author: Syed Shameerur Rahman <syedthameem1@gmail.com>
+Date:   Thu Jan 27 19:47:53 2022 +0530
+
+    TEZ-4129: Delete intermediate attempt data for failed attempts for Shuffle Handler (#72) (Syed Shameerur Rahman reviewed by Laszlo Bodor)
+    --> unnecessary because MR3 deletes intermediate data
+
+commit 1176386c9519d90b69371e954f8b60b20dabc2f7
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Fri Jan 21 21:40:28 2022 +0100
+
+    TEZ-4350: Remove synchronized from DAGAppMaster.serviceInit (#162)
+    --> unnecessary
+
+commit 267ca11b497d080042feca5b98cf0fb7ca9b6e15
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Fri Jan 21 18:09:49 2022 +0100
+
+    TEZ-4366: Disk utilization limit fix should be applied to all tez mini clusters (#173)
+    
+    * TEZ-4366: Disk utilization limit fix should be applied to all tez mini clusters
+    --> unnecessary
+
+commit 02d574fd6a4681eca05cd1d6aba19304d6ada3d1
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Fri Jan 21 18:08:50 2022 +0100
+
+    TEZ-4369: Upgrade netty to 4.1.72 due to CVE-2021-37136, CVE-2021-37137 (#175)
+    --> currently async-http-client decides the netty version.
+    --> introduce netty.version and exclude dependency for async-http-client (Cf. mvn dependency:tree -Dincludes=io.netty)
+    --> apply for Hive 4
+
+commit 0210dab45042b20d40437aa416740df9d2482309
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Fri Jan 21 18:07:49 2022 +0100
+
+    TEZ-4310: Avoid duplicated precommit comments (#176)
+    --> not applicable
+
+commit cc8249e932c8c5b117c901188dbd92bf6f8d5391
+Author: csjuhasz-c <66361392+csjuhasz-c@users.noreply.github.com>
+Date:   Mon Jan 17 14:15:27 2022 +0100
+
+    TEZ-4340: Show convenient input -> output vertex names in input messages (#170) (Csaba Juhasz reviewed by Laszlo Bodor)
+    --> desirable, but not necessary
+
+commit 0b3f3b69f9eefc883b69439a37d93122904ee574
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Sun Jan 16 09:42:08 2022 +0100
+
+    TEZ-4376: Remove javax.security from the tez-auxservices shaded jar (#177) (Laszlo Bodor reviewed by Jonathan Eagles)
+    --> not applicable
+
+commit 41cbc17aab3a2cc5fb177fc6a15dec867e795b72
+Author: belugabehr <12578579+belugabehr@users.noreply.github.com>
+Date:   Wed Jan 12 08:11:58 2022 -0500
+
+    TEZ-4276: Clean Up Use of Preconditions (#96) (David Mollitor reviewed by Laszlo Bodor)
+    --> not strictly necessary and optional 
+
+commit a6a936dad34397226adcb672f25184169ecbcb71
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Thu Jan 6 21:30:58 2022 +0100
+
+    TEZ-4311: Bump hadoop dependency version to 3.3.x (#132) (Laszlo Bodor reviewed by Jonathan Eagles)
+    --> required for Hive 4
+
+commit 4953f2983b315bbb008de434017d6ff41121260d
+Author: jteagles <jeagles@gmail.com>
+Date:   Thu Jan 6 14:09:29 2022 -0600
+
+    TEZ-4167. Speed up TestPipelinedSorter (#174) (Jonathan Eagles reviewed by Laszlo Bodor)
+    --> unnecessary
+
+commit 227c75014165a30a8ec07f917fd47d838a09133d
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Wed Jan 5 21:40:06 2022 +0100
+
+    TEZ-4351: ShuffleHandler port should respect value in config (#163) (Laszlo Bodor reviewed by Jonathan Eagles)
+    --> not applicable
+
+commit 7e09dfa5081797b721f219472bd511b1633b55a7
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Mon Jan 3 10:57:11 2022 +0100
+
+    TEZ-4364: TestFaultTolerance timeout on master (#171) (Laszlo Bodor reviewed by Rajesh Balamohan)
+    --> unnecessary
+
+commit 56a7bf46cda95d9de2a3ef0c0e1ec73a68a7e95d
+Author: dmmkr <muralikrishna.dmmkr@gmail.com>
+Date:   Mon Jan 3 13:12:00 2022 +0530
+
+    TEZ-4354: Update netty to 4.1.61.Final (#164) (D M Murali Krishna Reddy reviewed by Laszlo Bodor)
+    --> for Hive 4
+
+commit a602a07dc2c18f2a59eddbcdade9d116d06174ec
+Author: Ahmed Hussein <50450311+amahussein@users.noreply.github.com>
+Date:   Mon Jan 3 01:39:40 2022 -0600
+
+    TEZ-4349. DAGClient gets stuck with invalid cached DAGStatus (#161) (Ahmed Hussein reviewed by Laszlo Bodor, Jonathan Eagles)
+    --> unnecessary
+
+commit c9b8e90db5af2b9648fccaa1501ad6dda82f31e0
+Author: belugabehr <12578579+belugabehr@users.noreply.github.com>
+Date:   Sun Dec 26 12:35:43 2021 -0500
+
+    TEZ-4270: HeartbeatHandlerBase Does Not Need Stop Condition (#93) (David Mollitor reviewed by Laszlo Bodor)
+    --> unnecessary
+
+commit 8f846dcfe131aca69f8d3cb5cc1b47c6413e3b01
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Sun Dec 26 18:10:36 2021 +0100
+
+    TEZ-4303: Exclude compile-time httpclient dependency from Tez (#119) (Laszlo Bodor reviewed by Jonathan Eagles)
+    --> partially applied
+
+commit bf616b22012b5e0f60242c80c697d58fc2eed005
+Author: jteagles <jeagles@gmail.com>
+Date:   Sat Dec 25 16:30:24 2021 -0600
+
+    TEZ-4294. Tez UI counters missing in settings view (#144) (Jonathan Eagles reviewed by Laszlo Bodor)
+    --> unnecessary
+
+commit 8a75317bb9f954108aac44fc8ca30bfde0c0e462
+Author: dmmkr <muralikrishna.dmmkr@gmail.com>
+Date:   Thu Nov 25 17:52:26 2021 +0530
+
+    TEZ-4353: Update commons-io to 2.8.0 (#165) (D M Murali Krishna Reddy reviewed by Laszlo Bodor)
+    --> required for Hive 4
+
+commit 211b59bf4a9692491de0c8306c94407d6a6536f4
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Fri Nov 19 11:09:47 2021 +0100
+
+    TEZ-4338: Tez should consider node information to realize OUTPUT_LOST as early as possible - upstream(mapper) problems (#152) (Laszlo Bodor reviewed by Rajesh Balamohan)
+    --> do not apply because MR3 uses its own logic for handling fetch failures
+
+commit f39a51e588fe7f731356cf3aa68755a5d98ff12a
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Tue Nov 2 18:32:45 2021 +0100
+
+    TEZ-4339: Expose real-time memory consumption of AM and task containers via DagClient (#157) (Laszlo Bodor reviewed by Rajesh Balamohan)
+    --> unnecessary for Hive 3 on MR3
+    --> required if Hive implements HIVE-25666
+
+commit 6863a2d9923ed1633d44c708631e454303503d46
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Tue Nov 2 18:26:47 2021 +0100
+
+    TEZ-4336: ShuffleScheduler should try to report the original exception (when shuffle becomes unhealthy) (#155) (Laszlo Bodor reviewed by Rajesh Balamohan)
+    --> does not apply (InputAttemptFetchFailure.java is not present)
+    --> desirable, but not necessary
+
+commit 3326978dfbe799f92f262d9a2b16c99a8ef61836
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Mon Oct 25 13:19:48 2021 +0200
+
+    TEZ-4342: TestSecureShuffle is broken - No subject alternative names present (#158) (Laszlo Bodor reviewed by Rajesh Balamohan)
+    --> unnecessary
+
+commit 58fca8bb77d63c1ca6e6eb400eb60588159d6ae0
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Thu Oct 14 16:12:57 2021 +0200
+
+    TEZ-4180: Show convenient input -> output vertex names in output/sort messages (#154)
+    --> desirable, but not necessary
+
+----- MR3 1.5
+
 commit c875b8216fa6c236230a04c8cdbdc25c38e7ef61
 Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
 Date:   Thu Aug 26 21:46:23 2021 +0200
