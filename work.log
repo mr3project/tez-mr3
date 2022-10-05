@@ -263,7 +263,8 @@ Author: ghanko <54805928+ghanko@users.noreply.github.com>
 Date:   Thu Feb 10 11:05:47 2022 +0100
 
     TEZ-4227 Introduce convenient methods in TezID subclasses (#166) (Gergely Hanko reviewed by Laszlo Bodor)
-    --> unnecessary
+    --> unnecessary for Hive 3
+    --> required for Hive 4
 
 commit 6d7ef203c69f00c47831cd3cb9760a94242eee64
 Author: Mark Bathori <57758037+mbathori-cloudera@users.noreply.github.com>
