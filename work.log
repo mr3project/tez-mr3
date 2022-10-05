@@ -15,18 +15,21 @@ Author: PJ Fanning <pjfanning@users.noreply.github.com>
 Date:   Tue Aug 2 09:20:14 2022 +0100
 
     TEZ-4435: use jackson v2 - jackson v1 is EOL and full of security issues (#231) (PJ Fanning reviewed by Laszlo Bodor, Ayush Saxena)
+    --> currently org.codehaus.jackson is imported by hadoop-common/jersey-json and not used by tez-mr3
 
 commit 5e31e4d970647aecba2b58e836ff65fedb144306
 Author: Aman Raj <104416558+amanraj2520@users.noreply.github.com>
 Date:   Tue Jul 26 12:04:04 2022 +0530
 
     [TEZ-4439] Update the protobuf documentation in TEZ codebase (#233) (Aman Raj reviewed by Laszlo Bodor)
+    --> unnecessary
 
 commit c386865e74d54a3a1b87a3e57b4cd14ccd332167
 Author: Mark Bathori <57758037+mark-bathori@users.noreply.github.com>
 Date:   Fri Jul 22 10:25:23 2022 +0200
 
     TEZ-4363: Bump protobuf dependency to 3.x (#192) (Mark Bathori reviewed by Laszlo Bodor, Aman Raj)
+    --> applied to master4 (no change to Java files necessary)
 
 commit a192ec4443032c33269f5326755a292c87a98292
 Author: Laszlo Bodor <bodorlaszlo0202@gmail.com>
@@ -1049,7 +1052,7 @@ Author: Rajesh Balamohan <rbalamohan@apache.org>
 Date:   Thu Aug 13 14:30:29 2020 +0530
 
     TEZ-4207: Provide approximate number of input records to be processed in UnorderedKVInput (Rajesh Balamohan, reviewed by Ashutosh Chauhan)
-    --> left as TODO
+    --> applied
 
 commit c047fde127a7ec2448c7851e89366cb3b0b03136
 Author: Harish JP <harishjp@apache.org>
