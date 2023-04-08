@@ -1747,6 +1747,7 @@ Date:   Mon Nov 18 13:24:32 2019 -0600
     
     Signed-off-by: Jonathan Eagles <jeagles@apache.org>
     --> do not apply yet, investigate when upgrading to Java 11
+    --> removed URLClassLoader from ReflectionUtils.java
 
 commit 9c66f974b2932a2d9551e6e7b6b1ed7e75c02f6d
 Author: László Bodor <bodorlaszlo0202@gmail.com>

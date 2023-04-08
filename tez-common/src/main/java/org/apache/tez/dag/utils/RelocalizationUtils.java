@@ -53,10 +53,6 @@ public class RelocalizationUtils {
     return urls;
   }
 
-  public static void addUrlsToClassPath(List<URL> urls) {
-    ReflectionUtils.addResourcesToSystemClassLoader(urls);
-  }
-
   private static Path downloadResource(String destName, URI uri, Configuration conf, String destDir)
       throws IOException {
     FileSystem fs = FileSystem.get(uri, conf);
