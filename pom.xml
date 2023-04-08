@@ -42,7 +42,6 @@
     <hadoop.version>3.1.2</hadoop.version>
     <javac.version>1.8</javac.version>
     <slf4j.version>1.7.30</slf4j.version>
-    <enforced.java.version>[${javac.version},)</enforced.java.version>
     <distMgmtSnapshotsId>apache.snapshots.https</distMgmtSnapshotsId>
     <distMgmtSnapshotsName>Apache Development Snapshot Repository</distMgmtSnapshotsName>
     <distMgmtSnapshotsUrl>https://repository.apache.org/content/repositories/snapshots</distMgmtSnapshotsUrl>
@@ -745,12 +744,6 @@
         <version>1.3.4</version>
       </dependency>
       <dependency>
-        <groupId>com.google.code.findbugs</groupId>
-        <artifactId>jsr305</artifactId>
-        <version>3.0.0</version>
-        <scope>provided</scope>
-      </dependency>
-      <dependency>
         <groupId>org.fusesource.leveldbjni</groupId>
         <artifactId>leveldbjni-all</artifactId>
         <version>1.8</version>
@@ -1016,30 +1009,6 @@
 
     <plugins>
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-enforcer-plugin</artifactId>
-        <version>1.4</version>
-        <inherited>false</inherited>
-        <executions>
-          <execution>
-            <id>clean</id>
-            <goals>
-              <goal>enforce</goal>
-            </goals>
-            <configuration>
-              <rules>
-                <requireMavenVersion>
-                  <version>[3.0.2,)</version>
-                </requireMavenVersion>
-                <requireJavaVersion>
-                  <version>${enforced.java.version}</version>
-                </requireJavaVersion>
-              </rules>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
         <groupId>org.apache.rat</groupId>
         <artifactId>apache-rat-plugin</artifactId>
       </plugin>
@@ -1196,8 +1165,6 @@
             <artifactId>maven-compiler-plugin</artifactId>
             <configuration>
               <fork>true</fork>
-              <source>${javac.version}</source>
-              <target>${javac.version}</target>
               <compilerArguments>
                 <Xlint/>
                 <Xmaxwarns>9999</Xmaxwarns>
