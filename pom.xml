@@ -38,7 +38,6 @@
     <mr3.version>1.0</mr3.version>
     <scala.version>2.11.12</scala.version>
     <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
-    <clover.license>${user.home}/clover.license</clover.license>
     <hadoop.version>3.1.2</hadoop.version>
     <javac.version>1.8</javac.version>
     <slf4j.version>1.7.30</slf4j.version>
@@ -55,7 +54,6 @@
     <scm.url>scm:git:https://git-wip-us.apache.org/repos/asf/tez.git</scm.url>
     <build.time>${maven.build.timestamp}</build.time>
     <frontend-maven-plugin.version>1.4</frontend-maven-plugin.version>
-    <javadoc-maven-plugin.version>2.10.4</javadoc-maven-plugin.version>
     <shade-maven-plugin.version>2.4.3</shade-maven-plugin.version>
   </properties>
   <scm>
@@ -822,14 +820,6 @@
           <version>2.2.1</version>
         </plugin>
         <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-javadoc-plugin</artifactId>
-          <version>${javadoc-maven-plugin.version}</version>
-          <configuration>
-            <additionalparam>-Xdoclint:none</additionalparam>
-          </configuration>
-        </plugin>
-        <plugin>
           <groupId>org.apache.hadoop</groupId>
           <artifactId>hadoop-maven-plugins</artifactId>
           <version>${hadoop.version}</version>
@@ -927,11 +917,6 @@
           <version>2.8.1</version>
         </plugin>
         <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-gpg-plugin</artifactId>
-          <version>1.4</version>
-        </plugin>
-        <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>build-helper-maven-plugin</artifactId>
           <version>1.8</version>
@@ -1017,10 +1002,6 @@
         <artifactId>maven-deploy-plugin</artifactId>
       </plugin>
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-gpg-plugin</artifactId>
-      </plugin>
-      <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>buildnumber-maven-plugin</artifactId>
       </plugin>
@@ -1036,123 +1017,6 @@
   </build>
 
   <profiles>
-    <profile>
-      <id>sign</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-gpg-plugin</artifactId>
-            <executions>
-              <execution>
-                <id>sign-artifacts</id>
-                <phase>verify</phase>
-                <goals>
-                  <goal>sign</goal>
-                </goals>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <profile>
-      <id>clover</id>
-      <activation>
-        <activeByDefault>false</activeByDefault>
-        <property>
-          <name>clover</name>
-        </property>
-      </activation>
-      <properties>
-        <maven.clover.licenseLocation>${clover.license}</maven.clover.licenseLocation>
-        <clover.version>3.1.11</clover.version>
-      </properties>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>com.atlassian.maven.plugins</groupId>
-            <artifactId>maven-clover2-plugin</artifactId>
-            <version>${clover.version}</version>
-            <configuration>
-              <includesAllSourceRoots>true</includesAllSourceRoots>
-              <includesTestSourceRoots>true</includesTestSourceRoots>
-              <targetPercentage>50%</targetPercentage>
-              <generateHtml>true</generateHtml>
-              <generateXml>true</generateXml>
-              <excludes>
-                <exclude>**/generated/**</exclude>
-              </excludes>
-            </configuration>
-            <executions>
-              <execution>
-                <id>clover-setup</id>
-                <phase>process-sources</phase>
-                <goals>
-                  <goal>setup</goal>
-                </goals>
-              </execution>
-              <execution>
-                <id>clover</id>
-                <phase>test</phase>
-                <goals>
-                  <goal>clover</goal>
-                </goals>
-              </execution>
-              <execution>
-                <id>site</id>
-                <phase>pre-site</phase>
-                <goals>
-                  <goal>aggregate</goal>
-                </goals>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <profile>
-      <id>sources</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-source-plugin</artifactId>
-            <executions>
-              <execution>
-                <id>attach-sources</id>
-                <goals>
-                  <goal>jar</goal>
-                </goals>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <profile>
-      <id>javadoc</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-javadoc-plugin</artifactId>
-            <version>${javadoc-maven-plugin.version}</version>
-            <configuration>
-              <docfilessubdirs>true</docfilessubdirs>
-            </configuration>
-            <executions>
-              <execution>
-                <id>attach-javadocs</id>
-                <goals>
-                  <goal>jar</goal>
-                </goals>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
     <profile>
       <id>test-patch</id>
       <activation>
@@ -1264,34 +1128,5 @@
       </dependencies>
     </profile>
   </profiles>
-
-  <reporting>
-    <plugins>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-javadoc-plugin</artifactId>
-        <version>${javadoc-maven-plugin.version}</version>
-        <reportSets>
-          <reportSet>
-            <id>aggregate</id>
-            <configuration>
-              <doclet>org.apache.hadoop.classification.tools.IncludePublicAnnotationsStandardDoclet</doclet>
-              <docletArtifacts>
-                <docletArtifact>
-                  <groupId>org.apache.hadoop</groupId>
-                  <artifactId>hadoop-annotations</artifactId>
-                  <version>${hadoop.version}</version>
-                </docletArtifact>
-              </docletArtifacts>
-              <useStandardDocletOptions>true</useStandardDocletOptions>
-            </configuration>
-            <reports>
-              <report>aggregate</report>
-            </reports>
-          </reportSet>
-        </reportSets>
-      </plugin>
-    </plugins>
-  </reporting>
 
 </project>
