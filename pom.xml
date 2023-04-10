@@ -39,7 +39,6 @@
     <scala.version>2.12.18</scala.version>
     <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
     <hadoop.version>3.3.1</hadoop.version>
-    <javac.version>1.8</javac.version>
     <slf4j.version>1.7.30</slf4j.version>
     <distMgmtSnapshotsId>apache.snapshots.https</distMgmtSnapshotsId>
     <distMgmtSnapshotsName>Apache Development Snapshot Repository</distMgmtSnapshotsName>
@@ -752,8 +751,7 @@
           <artifactId>maven-compiler-plugin</artifactId>
           <version>3.8.0</version>
           <configuration>
-            <source>${javac.version}</source>
-            <target>${javac.version}</target>
+            <release>11</release>
           </configuration>
         </plugin>
         <plugin>
