@@ -38,7 +38,7 @@
     <mr3.version>1.0</mr3.version>
     <scala.version>2.11.12</scala.version>
     <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
-    <hadoop.version>3.1.2</hadoop.version>
+    <hadoop.version>3.3.1</hadoop.version>
     <javac.version>1.8</javac.version>
     <slf4j.version>1.7.30</slf4j.version>
     <distMgmtSnapshotsId>apache.snapshots.https</distMgmtSnapshotsId>
