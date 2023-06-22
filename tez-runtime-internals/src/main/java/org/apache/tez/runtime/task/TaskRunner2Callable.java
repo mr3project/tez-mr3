@@ -14,17 +14,9 @@
 
 package org.apache.tez.runtime.task;
 
-import java.lang.reflect.UndeclaredThrowableException;
-import java.security.PrivilegedExceptionAction;
 import java.util.concurrent.Callable;
-import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.tez.common.TezUtilsInternal;
 import org.apache.tez.common.counters.TezCounters;
-import org.apache.tez.runtime.LogicalIOProcessorRuntimeTask;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * This class is responsible for running a {@link LogicalIOProcessorRuntimeTask}.
@@ -36,101 +28,18 @@ import org.slf4j.LoggerFactory;
  */
 public class TaskRunner2Callable implements Callable<TaskRunner2Callable.TaskRunner2CallableResult> {
 
-  private static final Logger LOG = LoggerFactory.getLogger(TaskRunner2Callable.class);
-
-  private final LogicalIOProcessorRuntimeTask task;
-  private final UserGroupInformation ugi;
-  private final AtomicBoolean stopRequested = new AtomicBoolean(false);
-  private final AtomicBoolean interruptAttempted = new AtomicBoolean(false);
-
-  private volatile Thread ownThread;
-
-  public TaskRunner2Callable(LogicalIOProcessorRuntimeTask task,
-                             UserGroupInformation ugi) {
-    this.task = task;
-    this.ugi = ugi;
+  public TaskRunner2Callable() {
   }
 
   @Override
   public TaskRunner2CallableResult call() throws Exception {
-    ownThread = Thread.currentThread();
-    if (stopRequested.get()) {
-      return new TaskRunner2CallableResult(null);
-    }
-    try {
-      return ugi.doAs(new PrivilegedExceptionAction<TaskRunner2CallableResult>() {
-        @Override
-        public TaskRunner2CallableResult run() throws Exception {
-          if (stopRequested.get() || Thread.currentThread().isInterrupted()) {
-            return new TaskRunner2CallableResult(null);
-          }
-          LOG.info("Initializing task" + ", taskAttemptId={}", task.getTaskAttemptID());
-          task.initialize();
-
-          if (!stopRequested.get() && !Thread.currentThread().isInterrupted()) {
-            LOG.info("Running task, taskAttemptId={}", task.getTaskAttemptID());
-            task.run();
-          } else {
-            LOG.info("Stopped before running the processor taskAttemptId={}",
-                task.getTaskAttemptID());
-            task.setFrameworkCounters();
-            return new TaskRunner2CallableResult(null);
-          }
-
-          if (!stopRequested.get() && !Thread.currentThread().isInterrupted()) {
-            LOG.info("Closing task, taskAttemptId={}", task.getTaskAttemptID());
-            task.close();
-            task.setFrameworkCounters();
-          } else {
-            LOG.info("Stopped before closing the processor, taskAttemptId={}", task.getTaskAttemptID());
-            task.setFrameworkCounters();
-            return new TaskRunner2CallableResult(null);
-          }
-          LOG.info("Task completed, taskAttemptId={}, askedToStop={}", task.getTaskAttemptID(), stopRequested.get());
-
-
-          return new TaskRunner2CallableResult(null);
-        }
-      });
-    } catch (Throwable t) {
-      if (t instanceof UndeclaredThrowableException) {
-        t = t.getCause();
-      }
-      task.setFrameworkCounters();
-      return new TaskRunner2CallableResult(t);
-    } finally {
-      // If a stop was requested. Make sure the interrupt status is set during the cleanup.
-
-      // One drawback of not communicating out from here is that task complete messages will only
-      // be sent out after cleanup is complete.
-      // For a successful task, however, this should be almost no delay since close has already happened.
-      maybeFixInterruptStatus();
-      LOG.info("Cleaning up task {}, stopRequested={}", task.getTaskAttemptID(), stopRequested.get());
-      task.cleanup();
-    }
+    return null;
   }
-
-  private void maybeFixInterruptStatus() {
-    if (stopRequested.get() && !Thread.currentThread().isInterrupted()) {
-      Thread.currentThread().interrupt();
-    }
-  }
-
 
   public void abortTask() {
-    if (!stopRequested.getAndSet(true)) {
-      task.abortTask();
-    }
   }
 
   public void interruptTask() {
-    if (!interruptAttempted.getAndSet(true)) {
-      LogicalIOProcessorRuntimeTask localTask = task;
-      // Send an interrupt only if the task is not done.
-      if (ownThread != null && (localTask != null && !localTask.isTaskDone())) {
-        ownThread.interrupt();
-      }
-    }
   }
 
   public static class TaskRunner2CallableResult {
@@ -142,6 +51,6 @@ public class TaskRunner2Callable implements Callable<TaskRunner2Callable.TaskRun
   }
 
   public TezCounters addAndGetTezCounter(final String name) {
-    return task.addAndGetTezCounter(name);
+    return null;
   }
 }

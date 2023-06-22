@@ -90,36 +90,4 @@ public class TezTaskRunner2 {
     return false;
   }
 
-  class UmbilicalAndErrorHandler implements TezUmbilical, ErrorReporter {
-
-    @Override
-    public void addEvents(Collection<TezEvent> events) {
-    }
-
-    @Override
-    public void signalFailure(TezTaskAttemptID taskAttemptID, TaskFailureType taskFailureType, Throwable t, String message,
-                              EventMetaData sourceInfo) {
-    }
-
-    @Override
-    public void signalKillSelf(TezTaskAttemptID taskAttemptID, Throwable t, String message,
-                               EventMetaData sourceInfo) {
-    }
-
-
-    @Override
-    public boolean canCommit(TezTaskAttemptID taskAttemptID) throws IOException {
-        return false;
-    }
-
-
-    @Override
-    public void reportError(Throwable t) {
-    }
-
-    @Override
-    public void shutdownRequested() {
-    }
-  }
-
 }
