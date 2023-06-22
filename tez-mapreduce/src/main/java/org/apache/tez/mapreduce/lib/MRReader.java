@@ -41,10 +41,8 @@ public abstract class MRReader extends KeyValueReader {
   }
   
   protected final void notifyProgress() {
-    context.notifyProgress();
   }
   
   protected final void notifyDone() {
-    context.notifyProgress();
   }
 }

@@ -336,7 +336,6 @@ public class ShuffleManager implements FetcherCallback {
           while (!isShutdown.get()
               && (runningFetchers.size() >= numFetchers || pendingHosts.isEmpty())
               && numCompletedInputs.get() < numInputs) {
-            inputContext.notifyProgress();
             boolean ret = wakeLoop.await(1000, TimeUnit.MILLISECONDS);
           }
         } finally {
@@ -713,7 +712,6 @@ public class ShuffleManager implements FetcherCallback {
     lock.lock();
     try {
       // lastProgressTime = System.currentTimeMillis();
-      inputContext.notifyProgress();
       if (!completedInputSet.get(inputIdentifier)) {
         fetchedInput.commit();
         fetchStatsLogger.logIndividualFetchComplete(copyDuration,
@@ -857,7 +855,6 @@ public class ShuffleManager implements FetcherCallback {
     LOG.info("{}: Fetch failed for src: InputIdentifier: {}, connectFailed: {}",
         srcNameTrimmed, srcAttemptIdentifier, connectFailed);
     failedShufflesCounter.increment(1);
-    inputContext.notifyProgress();
     if (srcAttemptIdentifier == null) {
       reportFatalError(null, "Received fetchFailure for an unknown src (null)");
     } 

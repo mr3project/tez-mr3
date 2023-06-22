@@ -357,7 +357,6 @@ public final class DefaultSorter extends ExternalSorter implements IndexedSortab
       int valend = bb.markRecord();
 
       mapOutputRecordCounter.increment(1);
-      outputContext.notifyProgress();
       mapOutputByteCounter.increment(
           distanceTo(keystart, valend, bufvoid));
 
@@ -673,7 +672,6 @@ public final class DefaultSorter extends ExternalSorter implements IndexedSortab
   @Override
   public void flush() throws IOException {
     LOG.info(outputContext.getDestinationVertexName() + ": " + "Starting flush of map output");
-    outputContext.notifyProgress();
     if (Thread.currentThread().isInterrupted()) {
       /**
        * Possible that the thread got interrupted when flush was happening or when the flush was
@@ -722,7 +720,6 @@ public final class DefaultSorter extends ExternalSorter implements IndexedSortab
           sameKeyCount = sameKey;
           totalKeysCount = totalKeys;
         }
-        outputContext.notifyProgress();
         sortAndSpill(sameKeyCount, totalKeysCount);
       }
     } catch (InterruptedException e) {
@@ -1328,7 +1325,6 @@ public final class DefaultSorter extends ExternalSorter implements IndexedSortab
         List<Segment> segmentList =
             new ArrayList<Segment>(numSpills);
         for (int i = 0; i < numSpills; i++) {
-          outputContext.notifyProgress();
           TezIndexRecord indexRecord = indexCacheList.get(i).getIndex(parts);
           if (indexRecord.hasData() || !sendEmptyPartitionDetails) {
             shouldWrite = true;

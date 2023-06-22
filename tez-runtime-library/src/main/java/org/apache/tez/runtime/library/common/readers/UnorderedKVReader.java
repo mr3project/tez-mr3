@@ -118,7 +118,6 @@ public class UnorderedKVReader<K, V> extends KeyValueReader {
   public boolean next() throws IOException {
     if (readNextFromCurrentReader()) {
       inputRecordCounter.increment(1);
-      context.notifyProgress();
       numRecordsRead++;
       return true;
     } else {
@@ -126,7 +125,6 @@ public class UnorderedKVReader<K, V> extends KeyValueReader {
       while (nextInputExists) {
         if(readNextFromCurrentReader()) {
           inputRecordCounter.increment(1);
-          context.notifyProgress();
           numRecordsRead++;
           return true;
         }

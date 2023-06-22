@@ -75,7 +75,6 @@ public abstract class ExternalSorter {
     spillFileIndexPaths.clear();
     spillFilePaths.clear();
     reportStatistics();
-    outputContext.notifyProgress();
     return Collections.emptyList();
   }
 
@@ -94,7 +93,6 @@ public abstract class ExternalSorter {
   protected final Progressable progressable = new Progressable() {
     @Override
     public void progress() {
-      outputContext.notifyProgress();
     }
   };
 
@@ -298,7 +296,6 @@ public abstract class ExternalSorter {
   protected void runCombineProcessor(TezRawKeyValueIterator kvIter,
       Writer writer) throws IOException {
     try {
-      outputContext.notifyProgress();
       combiner.combine(kvIter, writer);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();

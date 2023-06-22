@@ -90,7 +90,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   private final Progressable progressable = new Progressable() {
     @Override
     public void progress() {
-      inputContext.notifyProgress();
     }
   };
   private final Combiner combiner;  
@@ -743,9 +742,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         return;
       }
 
-      inputContext.notifyProgress();
-
-      InputAttemptIdentifier dummyMapId = inputs.get(0).getAttemptIdentifier(); 
+      InputAttemptIdentifier dummyMapId = inputs.get(0).getAttemptIdentifier();
       List<Segment> inMemorySegments = new ArrayList<Segment>();
 
       MapOutput mergedMapOutputs = null;
@@ -861,8 +858,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       }
 
       numMemToDiskMerges.increment(1);
-      inputContext.notifyProgress();
-      
+
       //name this output file same as the name of the first file that is 
       //there in the current list of inmem files (this is guaranteed to
       //be absent on the disk currently. So we don't overwrite a prev. 
@@ -979,7 +975,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         return;
       }
       numDiskToDiskMerges.increment(1);
-      inputContext.notifyProgress();
 
       long approxOutputSize = 0;
       int bytesPerSum = 
@@ -1158,8 +1153,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     logFinalMergeStart(inMemoryMapOutputs, onDiskMapOutputs);
     StringBuilder finalMergeLog = new StringBuilder();
     
-    inputContext.notifyProgress();
-
     // merge config params
     SerializationContext serContext = new SerializationContext(job);
     final Path tmpDir = new Path(inputContext.getUniqueIdentifier());

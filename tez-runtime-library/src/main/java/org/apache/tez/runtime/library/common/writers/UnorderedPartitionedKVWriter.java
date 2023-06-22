@@ -399,7 +399,6 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       // outputRecordsCounter and during its close method call,
       // it will update the outputRecordsCounter.
       writer.append(key, value);
-      outputContext.notifyProgress();
     } else {
       int partition = partitioner.getPartition(key, value, numPartitions);
       write(key, value, partition);
@@ -483,7 +482,6 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     outputRecordBytesCounter.increment(localOutputRecordBytesCounter);
     outputBytesWithOverheadCounter.increment(localOutputBytesWithOverheadCounter);
     outputRecordsCounter.increment(localOutputRecordsCounter);
-    outputContext.notifyProgress();
     localOutputRecordBytesCounter = 0;
     localOutputBytesWithOverheadCounter = 0;
     localOutputRecordsCounter = 0;
@@ -640,7 +638,6 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           long segmentStart = out.getPos();
           long numRecords = 0;
           for (WrappedBuffer buffer : filledBuffers) {
-            outputContext.notifyProgress();
             if (buffer.partitionPositions[i] == WrappedBuffer.PARTITION_ABSENT_POSITION) {
               // Skip empty partition.
               continue;
@@ -903,7 +900,6 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       boolean isLastSpill, String pathComponent, BitSet emptyPartitions)
       throws IOException {
 
-    outputContext.notifyProgress();
     DataMovementEventPayloadProto.Builder payloadBuilder = DataMovementEventPayloadProto
         .newBuilder();
     if (numPartitions == 1) {
@@ -1145,7 +1141,6 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
               writer.getCompressedLength());
           writer = null;
           finalSpillRecord.putIndex(indexRecord, i);
-          outputContext.notifyProgress();
         } finally {
           if (writer != null) {
             writer.close();

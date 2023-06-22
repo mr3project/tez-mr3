@@ -304,7 +304,6 @@ public class Shuffle implements ExceptionReporter {
 
       // Finish the on-going merges...
       TezRawKeyValueIterator kvIter = null;
-      inputContext.notifyProgress();
       try {
         kvIter = merger.close(true);
       } catch (Throwable e) {
@@ -314,7 +313,6 @@ public class Shuffle implements ExceptionReporter {
       }
       mergePhaseTime.setValue(System.currentTimeMillis() - startTime);
       
-      inputContext.notifyProgress();
       // Sanity check
       synchronized (Shuffle.this) {
         if (throwable.get() != null) {

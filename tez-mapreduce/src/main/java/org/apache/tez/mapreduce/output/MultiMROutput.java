@@ -124,7 +124,6 @@ public class MultiMROutput extends MROutput {
           getOldRecordWriter(basePath).write(key, value);
         }
         outputRecordCounter.increment(1);
-        getContext().notifyProgress();
       }
     };
   }

@@ -474,7 +474,6 @@ public class PipelinedSorter extends ExternalSorter {
     span.kvmeta.put(valstart);
     span.kvmeta.put(valend - valstart);
     mapOutputRecordCounter.increment(1);
-    outputContext.notifyProgress();
     mapOutputByteCounter.increment(valend - keystart);
   }
 
@@ -598,7 +597,6 @@ public class PipelinedSorter extends ExternalSorter {
         if (isThreadInterrupted()) {
           return false;
         }
-        outputContext.notifyProgress();
         TezRawKeyValueIterator kvIter = merger.filter(i);
         //write merged output to disk
         long segmentStart = out.getPos();
@@ -675,7 +673,6 @@ public class PipelinedSorter extends ExternalSorter {
   public void flush() throws IOException {
     final String uniqueIdentifier = outputContext.getUniqueIdentifier();
 
-    outputContext.notifyProgress();
     /**
      * Possible that the thread got interrupted when flush was happening or when the flush was
      * never invoked. As a part of cleanup activity in TezTaskRunner, it would invoke close()

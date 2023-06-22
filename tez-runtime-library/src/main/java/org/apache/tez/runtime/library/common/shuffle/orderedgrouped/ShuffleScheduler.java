@@ -573,7 +573,6 @@ class ShuffleScheduler {
                                          boolean isLocalFetch
                                          ) throws IOException {
 
-    inputContext.notifyProgress();
     if (!isInputFinished(srcAttemptIdentifier.getInputIdentifier())) {
       if (!isLocalFetch) {
         /**
@@ -754,7 +753,6 @@ class ShuffleScheduler {
                                       boolean connectError,
                                       boolean isLocalFetch) {
     failedShuffleCounter.increment(1);
-    inputContext.notifyProgress();
     int failures;
 
     synchronized (this) {
@@ -1469,7 +1467,6 @@ class ShuffleScheduler {
   }
 
   private synchronized void waitAndNotifyProgress() throws InterruptedException {
-      inputContext.notifyProgress();
       wait(1000);
   }
 

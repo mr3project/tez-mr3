@@ -93,7 +93,6 @@ public class TezProcessorContextImpl extends TezTaskContextImpl implements Proce
   public void setProgress(float progress) {
     if (Math.abs(progress - runtimeTask.getProgress()) >= 0.001f) {
       runtimeTask.setProgress(progress);
-      notifyProgress();
     }
   }
 

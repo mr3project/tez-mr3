@@ -530,7 +530,6 @@ public class MRInput extends MRInputBase {
       return new KeyValueReader() {
         @Override
         public boolean next() throws IOException {
-          getContext().notifyProgress();
           return false;
         }
 

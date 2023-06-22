@@ -237,7 +237,6 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput {
         return new KeyValuesReader() {
           @Override
           public boolean next() throws IOException {
-            getContext().notifyProgress();
             hasCompletedProcessing();
             completedProcessing = true;
             return false;
@@ -339,7 +338,6 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput {
 
     @Override
     public boolean next() throws IOException {
-      context.notifyProgress();
       return valuesIter.moveToNext();
     }
 
