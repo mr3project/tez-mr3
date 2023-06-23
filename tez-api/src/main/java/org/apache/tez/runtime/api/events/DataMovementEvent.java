@@ -56,6 +56,11 @@ public final class DataMovementEvent extends Event
     return new DataMovementEvent(newSrcOutputIndex, newDestInputIndex, version, userPayload);
   }
 
+  public CompositeRoutedDataMovementEvent createCompositeEvent(
+      int srcOutputIndex, int destInputIndex, int count) {
+    return CompositeRoutedDataMovementEvent.create(srcOutputIndex, destInputIndex, count, version, userPayload);
+  }
+
   @Private
   public static DataMovementEvent createRaw(int version,
                                             ByteBuffer userPayload) {

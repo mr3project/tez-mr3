@@ -19,6 +19,7 @@
 package org.apache.tez.runtime.api.events;
 
 import org.apache.hadoop.classification.InterfaceAudience.Private;
+import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.runtime.api.Event;
 
 /**
@@ -42,6 +43,11 @@ public class InputFailedEvent extends Event
   // should not be called concurrently
   public InputFailedEvent updateSrcOutputDestInputIndex(int newSrcOutputIndex, int newDestInputIndex) {
     return new InputFailedEvent(newDestInputIndex, this.version);
+  }
+
+  public com.datamonad.mr3.api.EventToLogicalInput createCompositeEvent(
+      int srcOutputIndex, int destInputIndex, int count) {
+    return null;
   }
 
   /**

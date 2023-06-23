@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
+import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.runtime.api.Event;
 
 /**
@@ -30,7 +31,21 @@ import org.apache.tez.runtime.api.Event;
  * for optimization purpose. It is not to be consumed by any user code.
  */
 @Public
-public final class CompositeRoutedDataMovementEvent extends Event {
+public final class CompositeRoutedDataMovementEvent extends Event
+  implements com.datamonad.mr3.api.EventToLogicalInput {
+
+  public int srcOutputIndex() {
+    return sourceIndex;
+  }
+
+  public CompositeRoutedDataMovementEvent updateSrcOutputDestInputIndex(int newSrcOutputIndex, int newDestInputIndex) {
+    throw new TezUncheckedException("CompositeRoutedDataMovementEvent not to be updated");
+  }
+
+  public com.datamonad.mr3.api.EventToLogicalInput createCompositeEvent(
+      int srcOutputIndex, int destInputIndex, int count) {
+    throw new TezUncheckedException("CompositeRoutedDataMovementEvent not to be updated");
+  }
 
   /**
    * Index(i) of the i-th (physical) Input or Output that generated an Event.
