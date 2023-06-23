@@ -26,12 +26,11 @@ message DataMovementEventPayloadProto {
   optional int32 num_ports = 3;
   repeated int32 ports = 4;
   optional string path_component = 5;
-  optional int32 run_duration = 6;
-  optional DataProto data = 7;
-  optional bool pipelined = 8;  // Related to pipelined shuffle
-  optional bool last_event = 9; // Related to pipelined shuffle
-  optional int32 spill_id = 10; //  Related to pipelined shuffle.
-  optional int32 num_record = 11;
+  optional DataProto data = 6;
+  optional bool pipelined = 7;  // Related to pipelined shuffle
+  optional bool last_event = 8; // Related to pipelined shuffle
+  optional int32 spill_id = 9; //  Related to pipelined shuffle.
+  optional int32 num_record = 10;
 } 
 
 message DataProto {

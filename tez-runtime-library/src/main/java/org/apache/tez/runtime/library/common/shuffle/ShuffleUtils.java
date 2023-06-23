@@ -280,7 +280,6 @@ public class ShuffleUtils {
       sb.append(dmProto.getPorts(i)).append(", ");
     }
     sb.append("pathComponent: " + dmProto.getPathComponent()).append(", ");
-    sb.append("runDuration: " + dmProto.getRunDuration()).append(", ");
     sb.append("hasDataInEvent: " + dmProto.hasData());
     sb.append("]");
     return sb.toString();
@@ -354,7 +353,6 @@ public class ShuffleUtils {
       payloadBuilder.setLastEvent(isLastEvent);
     }
 
-    payloadBuilder.setRunDuration(0); //TODO: who is dependent on this?
     DataMovementEventPayloadProto payloadProto = payloadBuilder.build();
     ByteBuffer payload = payloadProto.toByteString().asReadOnlyByteBuffer();
     return payload;
@@ -400,7 +398,6 @@ public class ShuffleUtils {
         TezCommonUtils.compressByteArrayToByteString(
             TezUtilsInternal.toByteArray(emptyPartitionDetails), deflater);
     payloadBuilder.setEmptyPartitions(emptyPartitionsBytesString);
-    payloadBuilder.setRunDuration(0);
     DataMovementEventPayloadProto payloadProto = payloadBuilder.build();
     ByteBuffer dmePayload = payloadProto.toByteString().asReadOnlyByteBuffer();
 
