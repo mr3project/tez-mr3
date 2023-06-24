@@ -167,7 +167,7 @@
       <dependency>
         <groupId>org.roaringbitmap</groupId>
         <artifactId>RoaringBitmap</artifactId>
-        <version>0.5.21</version>
+        <version>0.9.32</version>
       </dependency>
       <dependency>
         <groupId>org.slf4j</groupId>
