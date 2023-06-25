@@ -36,7 +36,7 @@
 
   <properties>
     <mr3.version>1.0</mr3.version>
-    <scala.version>2.11.12</scala.version>
+    <scala.version>2.12.15</scala.version>
     <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
     <hadoop.version>3.3.1</hadoop.version>
     <javac.version>1.8</javac.version>
