@@ -48,4 +48,5 @@ public interface OutputContext extends TaskContext, DecompressorPool {
    */
   public OutputStatisticsReporter getStatisticsReporter();
 
+  public int shuffleId();
 }

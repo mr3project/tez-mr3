@@ -53,4 +53,6 @@ public interface InputContext extends TaskContext, DecompressorPool {
    * @return {@link InputStatisticsReporter}
    */
   public InputStatisticsReporter getStatisticsReporter();
+
+  public int shuffleId();
 }
