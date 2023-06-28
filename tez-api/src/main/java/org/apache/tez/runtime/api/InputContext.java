@@ -55,4 +55,6 @@ public interface InputContext extends TaskContext, DecompressorPool {
   public InputStatisticsReporter getStatisticsReporter();
 
   public int shuffleId();
+
+  public boolean useRssShuffle();
 }
