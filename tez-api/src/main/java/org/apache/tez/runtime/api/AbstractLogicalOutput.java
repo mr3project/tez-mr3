@@ -20,6 +20,7 @@ package org.apache.tez.runtime.api;
 import java.util.List;
 
 import org.apache.hadoop.classification.InterfaceAudience.Public;
+import org.apache.celeborn.client.ShuffleClient;
 
 /**
  * An abstract class which should be the base class for all implementations of LogicalOutput.
@@ -35,6 +36,7 @@ public abstract class AbstractLogicalOutput implements LogicalOutput, LogicalOut
 
   private final int numPhysicalOutputs;
   private final OutputContext outputContext;
+  protected final ShuffleClient rssShuffleClient;
 
   /**
    * Constructor an instance of the LogicalOutput. Classes extending this one to create a
@@ -50,6 +52,9 @@ public abstract class AbstractLogicalOutput implements LogicalOutput, LogicalOut
   public AbstractLogicalOutput(OutputContext outputContext, int numPhysicalOutputs) {
     this.outputContext = outputContext;
     this.numPhysicalOutputs = numPhysicalOutputs;
+
+    Object sc = com.datamonad.mr3.MR3Runtime.env().getRssShuffleClient();
+    this.rssShuffleClient = outputContext.useRssShuffle() && sc != null ? (ShuffleClient)sc : null;
   }
 
   public abstract List<Event> initialize() throws Exception;

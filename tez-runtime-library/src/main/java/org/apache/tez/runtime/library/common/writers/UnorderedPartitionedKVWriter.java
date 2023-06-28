@@ -41,6 +41,7 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.zip.Deflater;
 
+import org.apache.celeborn.client.ShuffleClient;
 import com.google.common.collect.Lists;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
@@ -88,6 +89,8 @@ import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ByteString;
 
+import javax.annotation.Nullable;
+
 import static org.apache.tez.runtime.library.common.sort.impl.TezSpillRecord.ensureSpillFilePermissions;
 
 public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWriter {
@@ -116,7 +119,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   private final NonSyncDataOutputStream dos;
   @VisibleForTesting
   WrappedBuffer currentBuffer;
-  private final FileSystem rfs;
+  private final FileSystem rfs;   // null if using RSS ShuffleClient
 
   private final List<SpillInfo> spillInfoList = Collections
       .synchronizedList(new ArrayList<SpillInfo>());
@@ -204,22 +207,30 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
   private final boolean compositeFetch;
 
+  // use rssShuffleClient if and only if it is not null
+  private final ShuffleClient rssShuffleClient;
+
   public UnorderedPartitionedKVWriter(OutputContext outputContext, Configuration conf,
-      int numOutputs, long availableMemoryBytes) throws IOException {
-    super(outputContext, conf, numOutputs);
+      int numOutputs, long availableMemoryBytes, @Nullable ShuffleClient sc) throws IOException {
+    super(outputContext, conf, numOutputs, sc);
+    this.rssShuffleClient = sc;
 
     Preconditions.checkArgument(availableMemoryBytes >= 0, "availableMemory should be >= 0 bytes");
 
     this.destNameTrimmed = TezUtilsInternal.cleanVertexName(outputContext.getDestinationVertexName());
     //Not checking for TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT as it might not add much value in
     // this case.  Add it later if needed.
+
     boolean pipelinedShuffleConf = this.conf.getBoolean(TezRuntimeConfiguration
         .TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED, TezRuntimeConfiguration
         .TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT);
-    this.isFinalMergeEnabled = conf.getBoolean(
+    this.isFinalMergeEnabled = rssShuffleClient == null && conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT,
         TezRuntimeConfiguration.TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT_DEFAULT);
-    this.pipelinedShuffle = pipelinedShuffleConf && !isFinalMergeEnabled;
+    this.pipelinedShuffle = rssShuffleClient != null || (pipelinedShuffleConf && !isFinalMergeEnabled);
+    assert !(rssShuffleClient != null) || !this.isFinalMergeEnabled;
+    assert !(rssShuffleClient != null) || this.pipelinedShuffle;
+
     this.finalEvents = Lists.newLinkedList();
 
     this.dataViaEventsEnabled = conf.getBoolean(
@@ -271,7 +282,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     dos = new NonSyncDataOutputStream(baos);
     keySerializer.open(dos);
     valSerializer.open(dos);
-    rfs = ((LocalFileSystem) FileSystem.getLocal(this.conf)).getRaw();
+    rfs = rssShuffleClient == null ? null : ((LocalFileSystem) FileSystem.getLocal(this.conf)).getRaw();
 
     int maxThreads = Math.max(2, numBuffers/2);
     //TODO: Make use of TezSharedExecutor later
@@ -303,6 +314,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     indexFileSizeEstimate = numPartitions * Constants.MAP_OUTPUT_INDEX_RECORD_LENGTH;
 
     if (numPartitions == 1 && !pipelinedShuffle) {
+      assert rssShuffleClient == null && rfs != null;
       //special case, where in only one partition is available.
       skipBuffers = true;
       if (this.useCachedStream) {
@@ -319,8 +331,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       skipBuffers = false;
       writer = null;
     }
-    LOG.info("{}: numBuffers={}, sizePerBuffer={}, skipBuffers={}, numPartitions={}",
-        destNameTrimmed, numBuffers, sizePerBuffer, skipBuffers, numPartitions);
+    LOG.info("{}: numBuffers={}, sizePerBuffer={}, skipBuffers={}, numPartitions={}, rssShuffleClient={}",
+        destNameTrimmed, numBuffers, sizePerBuffer, skipBuffers, numPartitions, rssShuffleClient != null);
     if (LOG.isDebugEnabled()) {
       LOG.debug("availableMemory=" + availableMemory
           + ", maxSingleBufferSizeBytes=" + maxSingleBufferSizeBytes

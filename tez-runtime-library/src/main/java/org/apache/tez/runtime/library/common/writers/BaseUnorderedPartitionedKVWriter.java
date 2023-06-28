@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 
+import org.apache.celeborn.client.ShuffleClient;
 import org.apache.hadoop.io.serializer.Serialization;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,6 +44,8 @@ import org.apache.tez.runtime.library.common.TezRuntimeUtils;
 import org.apache.tez.runtime.library.common.task.local.output.TezTaskOutput;
 import org.apache.tez.runtime.library.utils.CodecUtils;
 
+import javax.annotation.Nullable;
+
 @SuppressWarnings("rawtypes")
 public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
 
@@ -60,8 +63,8 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
   protected final Serialization keySerialization;
   protected final Serialization valSerialization;
   protected final int numPartitions;
-  protected final CompressionCodec codec;
-  protected final TezTaskOutput outputFileHandler;
+  protected final CompressionCodec codec;           // null if using RSS ShuffleClient
+  protected final TezTaskOutput outputFileHandler;  // null if using RSS ShuffleClient
   
   protected final boolean ifileReadAhead;
   protected final int ifileReadAheadLength;
@@ -112,7 +115,8 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
   protected final TezCounter dataViaEventSize;
 
   @SuppressWarnings("unchecked")
-  public BaseUnorderedPartitionedKVWriter(OutputContext outputContext, Configuration conf, int numOutputs) {
+  public BaseUnorderedPartitionedKVWriter(OutputContext outputContext, Configuration conf, int numOutputs,
+                                          @Nullable ShuffleClient rssShuffleClient) {
     this.outputContext = outputContext;
     this.conf = conf;
     try {
@@ -143,7 +147,7 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
 
     // compression
     try {
-      this.codec = CodecUtils.getCodec(conf);
+      this.codec = rssShuffleClient != null ? null : CodecUtils.getCodec(conf);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
@@ -169,7 +173,7 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-    outputFileHandler = TezRuntimeUtils.instantiateTaskOutputManager(conf, outputContext);
+    outputFileHandler = rssShuffleClient != null ? null : TezRuntimeUtils.instantiateTaskOutputManager(conf, outputContext);
   }
 
   @Override

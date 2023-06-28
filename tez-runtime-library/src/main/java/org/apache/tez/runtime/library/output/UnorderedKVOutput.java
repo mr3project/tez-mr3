@@ -85,7 +85,7 @@ public class UnorderedKVOutput extends AbstractLogicalOutput {
 
     this.memoryUpdateCallbackHandler = new MemoryUpdateCallbackHandler();
 
-    boolean pipelinedShuffle = this.conf.getBoolean(TezRuntimeConfiguration
+    boolean pipelinedShuffle = this.rssShuffleClient != null || this.conf.getBoolean(TezRuntimeConfiguration
         .TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED, TezRuntimeConfiguration
         .TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT);
 
@@ -103,7 +103,7 @@ public class UnorderedKVOutput extends AbstractLogicalOutput {
       memoryUpdateCallbackHandler.validateUpdateReceived();
       //This would have just a single partition
       this.kvWriter = new UnorderedPartitionedKVWriter(getContext(), conf, 1,
-          memoryUpdateCallbackHandler.getMemoryAssigned());
+          memoryUpdateCallbackHandler.getMemoryAssigned(), rssShuffleClient);
       isStarted.set(true);
       LOG.info(getContext().getDestinationVertexName() + " started. MemoryAssigned="
           + memoryUpdateCallbackHandler.getMemoryAssigned());

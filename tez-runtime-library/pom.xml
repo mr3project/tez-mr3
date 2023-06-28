@@ -26,6 +26,10 @@
 
   <dependencies>
     <dependency>
+      <groupId>org.apache.celeborn</groupId>
+      <artifactId>celeborn-client-mr3-1.8-shaded_2.12</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.roaringbitmap</groupId>
       <artifactId>RoaringBitmap</artifactId>
     </dependency>
