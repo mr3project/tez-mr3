@@ -27,6 +27,7 @@ import java.util.zip.Inflater;
 
 import com.google.protobuf.ByteString;
 
+import org.apache.celeborn.client.ShuffleClient;
 import org.apache.tez.runtime.api.events.CompositeRoutedDataMovementEvent;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.slf4j.Logger;
@@ -76,10 +77,13 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
   private final AtomicInteger numObsoletionEvents = new AtomicInteger(0);
   private final AtomicInteger numDmeEventsNoData = new AtomicInteger(0);
 
+  private final ShuffleClient rssShuffleClient;
+
   public ShuffleInputEventHandlerImpl(InputContext inputContext,
                                       ShuffleManager shuffleManager,
                                       FetchedInputAllocator inputAllocator, CompressionCodec codec,
-                                      boolean ifileReadAhead, int ifileReadAheadLength, boolean compositeFetch) {
+                                      boolean ifileReadAhead, int ifileReadAheadLength, boolean compositeFetch,
+                                      ShuffleClient rssShuffleClient) {
     this.inputContext = inputContext;
     this.shuffleManager = shuffleManager;
     this.inputAllocator = inputAllocator;
@@ -91,6 +95,7 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
     this.useSharedInputs = (inputContext.getTaskAttemptNumber() == 0);
     this.compositeFetch = compositeFetch;
     this.inflater = TezCommonUtils.newInflater();
+    this.rssShuffleClient = rssShuffleClient;
   }
 
   @Override
@@ -172,7 +177,9 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
     LOG.info(s.toString());
   }
 
-  private void processDataMovementEvent(DataMovementEvent dme, DataMovementEventPayloadProto shufflePayload, BitSet emptyPartitionsBitSet) throws IOException {
+  private void processDataMovementEvent(
+      DataMovementEvent dme, DataMovementEventPayloadProto shufflePayload,
+      BitSet emptyPartitionsBitSet) throws IOException {
     int srcIndex = dme.getSourceIndex();
 
     if (LOG.isDebugEnabled()) {
@@ -185,13 +192,18 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
       if (emptyPartitionsBitSet.get(srcIndex)) {
         CompositeInputAttemptIdentifier srcAttemptIdentifier =
             constructInputAttemptIdentifier(dme.getTargetIndex(), 1, dme.getVersion(), shufflePayload, false);
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Source partition: " + srcIndex + " did not generate any data. SrcAttempt: ["
-              + srcAttemptIdentifier + "]. Not fetching.");
+        if (rssShuffleClient != null &&
+            srcAttemptIdentifier.getFetchTypeInfo() == InputAttemptIdentifier.SPILL_INFO.FINAL_UPDATE) {
+          LOG.info("Last spill is empty, but notify ShuffleManager later by calling addKnownInput(): {} {}", srcIndex, srcAttemptIdentifier);
+        } else {
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Source partition: " + srcIndex + " did not generate any data. SrcAttempt: ["
+                + srcAttemptIdentifier + "]. Not fetching.");
+          }
+          numDmeEventsNoData.getAndIncrement();
+          shuffleManager.addCompletedInputWithNoData(srcAttemptIdentifier.expand(0));
+          return;
         }
-        numDmeEventsNoData.getAndIncrement();
-        shuffleManager.addCompletedInputWithNoData(srcAttemptIdentifier.expand(0));
-        return;
       } else {
         shuffleManager.updateApproximateInputRecords(shufflePayload.getNumRecord());
       }
@@ -202,10 +214,12 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
     CompositeInputAttemptIdentifier srcAttemptIdentifier = constructInputAttemptIdentifier(dme.getTargetIndex(), 1, dme.getVersion(),
         shufflePayload, (useSharedInputs && srcIndex == 0));
 
-    int port = getShufflePort(shufflePayload);
+    int port = rssShuffleClient == null ? getShufflePort(shufflePayload) : 0;
     if (shufflePayload.hasData()) {
-      DataProto dataProto = shufflePayload.getData();
+      // if RSS is used, we do not use this optimization
+      assert rssShuffleClient == null;
 
+      DataProto dataProto = shufflePayload.getData();
       String hostIdentifier = shufflePayload.getHost() + ":" + port;
       FetchedInput fetchedInput =
           inputAllocator.allocate(dataProto.getRawLength(),
@@ -251,6 +265,8 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
       CompositeRoutedDataMovementEvent crdme,
       DataMovementEventPayloadProto shufflePayload,
       BitSet emptyPartitionsBitSet) throws IOException {
+    assert rssShuffleClient == null;
+
     int partitionId = crdme.getSourceIndex();
     if (LOG.isDebugEnabled()) {
       LOG.debug("DME srcIdx: " + partitionId + ", targetIndex: " + crdme.getTargetIndex() + ", count:" + crdme.getCount()
@@ -285,7 +301,7 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
     CompositeInputAttemptIdentifier srcAttemptIdentifier = constructInputAttemptIdentifier(crdme.getTargetIndex(), crdme.getCount(), crdme.getVersion(),
         shufflePayload, (useSharedInputs && partitionId == 0));
 
-    int port = getShufflePort(shufflePayload);
+    int port = getShufflePort(shufflePayload);  // because rssShuffleClient == null
     shuffleManager.addKnownInput(shufflePayload.getHost(), port, srcAttemptIdentifier, partitionId);
   }
 

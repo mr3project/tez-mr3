@@ -113,9 +113,10 @@ public class UnorderedKVInput extends AbstractLogicalInput {
     if (!isClosed && !isStarted.get()) {
       ////// Initial configuration
       memoryUpdateCallbackHandler.validateUpdateReceived();
-      CompressionCodec codec = CodecUtils.getCodec(conf);
+      CompressionCodec codec = rssShuffleClient != null ? null : CodecUtils.getCodec(conf);
 
-      boolean compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
+      // if rssShuffleClient != null, a Fetcher can fetch only a single partition
+      boolean compositeFetch = rssShuffleClient != null ? false : ShuffleUtils.isTezShuffleHandler(conf);
       boolean ifileReadAhead = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD,
           TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_DEFAULT);
       int ifileReadAheadLength = 0;
@@ -138,10 +139,10 @@ public class UnorderedKVInput extends AbstractLogicalInput {
           getContext().getTaskVertexIndex());
 
       this.shuffleManager = new ShuffleManager(getContext(), conf, getNumPhysicalInputs(), ifileBufferSize,
-          ifileReadAhead, ifileReadAheadLength, codec, inputManager);
+          ifileReadAhead, ifileReadAheadLength, codec, inputManager, rssShuffleClient);
 
       this.inputEventHandler = new ShuffleInputEventHandlerImpl(getContext(), shuffleManager,
-          inputManager, codec, ifileReadAhead, ifileReadAheadLength, compositeFetch);
+          inputManager, codec, ifileReadAhead, ifileReadAheadLength, compositeFetch, rssShuffleClient);
 
       ////// End of Initial configuration
 

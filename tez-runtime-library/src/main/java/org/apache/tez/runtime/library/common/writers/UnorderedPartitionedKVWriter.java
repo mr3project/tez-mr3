@@ -289,7 +289,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     dos = new NonSyncDataOutputStream(baos);
     keySerializer.open(dos);
     valSerializer.open(dos);
-    rfs = rssShuffleClient == null ? ((LocalFileSystem) FileSystem.getLocal(this.conf)).getRaw() : null;
+    rfs = rssShuffleClient != null ? null : ((LocalFileSystem) FileSystem.getLocal(this.conf)).getRaw();
 
     int maxThreads = Math.max(2, numBuffers/2);
     //TODO: Make use of TezSharedExecutor later
