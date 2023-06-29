@@ -1029,7 +1029,11 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
     if (emptyPartitions.cardinality() != numPartitions) {
       // Populate payload only if at least 1 partition has data
-      payloadBuilder.setHost(host);
+      if (rssShuffleClient == null) {
+        payloadBuilder.setHost(host);
+      } else {
+        payloadBuilder.setHost(String.valueOf(outputContext.getTaskIndex()));   // host = task index when using RSS
+      }
 
       // if useShuffleHandlerProcessOnK8s == true, the consumer can retrieve ports from InputContext
       if (!outputContext.useShuffleHandlerProcessOnK8s()) {
@@ -1040,7 +1044,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         }
       }
 
-      payloadBuilder.setPathComponent(ShuffleUtils.expandPathComponent(outputContext, compositeFetch, pathComponent));
+      if (rssShuffleClient == null) {
+        payloadBuilder.setPathComponent(ShuffleUtils.expandPathComponent(outputContext, compositeFetch, pathComponent));
+      }
     }
 
     if (addSpillDetails) {
