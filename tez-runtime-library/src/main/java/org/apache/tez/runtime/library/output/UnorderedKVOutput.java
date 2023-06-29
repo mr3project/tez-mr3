@@ -103,7 +103,7 @@ public class UnorderedKVOutput extends AbstractLogicalOutput {
       memoryUpdateCallbackHandler.validateUpdateReceived();
       //This would have just a single partition
       this.kvWriter = new UnorderedPartitionedKVWriter(getContext(), conf, 1,
-          memoryUpdateCallbackHandler.getMemoryAssigned(), rssShuffleClient);
+          memoryUpdateCallbackHandler.getMemoryAssigned(), rssShuffleClient, getNumPhysicalOutputs());
       isStarted.set(true);
       LOG.info(getContext().getDestinationVertexName() + " started. MemoryAssigned="
           + memoryUpdateCallbackHandler.getMemoryAssigned());

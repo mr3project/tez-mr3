@@ -314,6 +314,7 @@ public class IFile {
     // de-dup keys or not
     protected final boolean rle;
 
+    private final boolean useRSS;
 
     public Writer(Serialization keySerialization, Serialization valSerialization, FileSystem fs, Path file,
                   Class keyClass, Class valueClass,
@@ -329,6 +330,7 @@ public class IFile {
       writtenRecordsCounter = writesCounter;
       serializedUncompressedBytes = serializedBytesCounter;
       this.rle = rle;
+      this.useRSS = false;
     }
 
     public Writer(Serialization keySerialization, Serialization valSerialization, FSDataOutputStream outputStream,
@@ -336,6 +338,26 @@ public class IFile {
         TezCounter serializedBytesCounter) throws IOException {
       this(keySerialization, valSerialization, outputStream, keyClass, valueClass, codec, writesCounter,
           serializedBytesCounter, false);
+    }
+
+    public Writer(Serialization keySerialization, Serialization valSerialization,
+        DataOutputStream outputStream, Class keyClass, Class valueClass, TezCounter writesCounter,
+        TezCounter serializedBytesCounter, Boolean useRSS) throws IOException {
+      this.out = outputStream;
+      this.writtenRecordsCounter = writesCounter;
+      this.serializedUncompressedBytes = serializedBytesCounter;
+      this.useRSS = useRSS;
+      this.rle = false;
+
+      if (keyClass != null) {
+        this.closeSerializers = true;
+        this.keySerializer = keySerialization.getSerializer(keyClass);
+        this.keySerializer.open(buffer);
+        this.valueSerializer = valSerialization.getSerializer(valueClass);
+        this.valueSerializer.open(buffer);
+      } else {
+        this.closeSerializers = false;
+      }
     }
 
     public Writer(Serialization keySerialization, Serialization valSerialization, FSDataOutputStream outputStream,
@@ -347,6 +369,7 @@ public class IFile {
       this.serializedUncompressedBytes = serializedBytesCounter;
       this.start = this.rawOut.getPos();
       this.rle = rle;
+      this.useRSS = false;
 
       setupOutputStream(codec);
 
@@ -406,15 +429,17 @@ public class IFile {
         valueSerializer.close();
       }
 
-      // write V_END_MARKER as needed
-      writeValueMarker(out);
+      if (!useRSS) {
+        // write V_END_MARKER as needed
+        writeValueMarker(out);
 
-      // Write EOF_MARKER for key/value length
-      WritableUtils.writeVInt(out, EOF_MARKER);
-      WritableUtils.writeVInt(out, EOF_MARKER);
-      decompressedBytesWritten += 2 * WritableUtils.getVIntSize(EOF_MARKER);
-      //account for header bytes
-      decompressedBytesWritten += HEADER.length;
+        // Write EOF_MARKER for key/value length
+        WritableUtils.writeVInt(out, EOF_MARKER);
+        WritableUtils.writeVInt(out, EOF_MARKER);
+        decompressedBytesWritten += 2 * WritableUtils.getVIntSize(EOF_MARKER);
+        //account for header bytes
+        decompressedBytesWritten += HEADER.length;
+      }
 
       // Close the underlying stream iff we own it...
       if (ownOutputStream) {
@@ -425,16 +450,25 @@ public class IFile {
           compressedOut.finish();
           compressedOut.resetState();
         }
-        // Write the checksum and flush the buffer
-        checksumOut.finish();
-      }
-      //header bytes are already included in rawOut
-      compressedBytesWritten = rawOut.getPos() - start;
 
-      if (compressOutput) {
-        // Return back the compressor
-        CodecPool.returnCompressor(compressor);
-        compressor = null;
+        if (!useRSS) {
+          // Write the checksum and flush the buffer
+          checksumOut.finish();
+        }
+      }
+
+      if (useRSS) {
+        // We do not use Compressor with RSS.
+        compressedBytesWritten = decompressedBytesWritten;
+      } else {
+        //header bytes are already included in rawOut
+        compressedBytesWritten = rawOut.getPos() - start;
+
+        if (compressOutput) {
+          // Return back the compressor
+          CodecPool.returnCompressor(compressor);
+          compressor = null;
+        }
       }
 
       out = null;

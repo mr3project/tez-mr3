@@ -84,7 +84,7 @@ public class UnorderedPartitionedKVOutput extends AbstractLogicalOutput {
     if (!isStarted.get()) {
       memoryUpdateCallbackHandler.validateUpdateReceived();
       this.kvWriter = new UnorderedPartitionedKVWriter(getContext(), conf, getNumPhysicalOutputs(),
-          memoryUpdateCallbackHandler.getMemoryAssigned(), rssShuffleClient);
+          memoryUpdateCallbackHandler.getMemoryAssigned(), rssShuffleClient, getNumPhysicalOutputs());
       isStarted.set(true);
     }
   }
