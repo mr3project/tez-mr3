@@ -752,6 +752,8 @@ public class IFile {
     private CompressionCodec codec;
     private DecompressorPool inputOutputContext;
 
+    private final boolean useRSS;
+
     /**
      * Construct an IFile Reader.
      *
@@ -841,6 +843,7 @@ public class IFile {
       this.bytesReadCounter = bytesReadCounter;
       this.fileLength = length;
       this.bufferSize = Math.max(0, bufferSize);
+      this.useRSS = false;
     }
 
     /**

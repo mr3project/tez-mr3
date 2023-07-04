@@ -75,7 +75,7 @@ import org.apache.tez.common.Preconditions;
  * Responsible for fetching inputs served by the ShuffleHandler for a single
  * host. Construct using {@link FetcherBuilder}
  */
-public class Fetcher implements Callable<FetchResult> {
+public class Fetcher implements FetcherBase {
 
   public static class PathPartition {
 

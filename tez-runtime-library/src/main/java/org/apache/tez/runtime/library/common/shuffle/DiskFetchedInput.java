@@ -40,7 +40,7 @@ public class DiskFetchedInput extends FetchedInput {
   private final FileSystem localFS;
   private final Path tmpOutputPath;
   private final Path outputPath;
-  private final long size;
+  private long size;
 
   public DiskFetchedInput(long compressedSize,
       InputAttemptIdentifier inputAttemptIdentifier,
@@ -67,6 +67,11 @@ public class DiskFetchedInput extends FetchedInput {
   @Override
   public long getSize() {
     return size;
+  }
+
+  public void setSize(long size) {
+    assert this.size == -1;
+    this.size = size;
   }
 
   @Override
