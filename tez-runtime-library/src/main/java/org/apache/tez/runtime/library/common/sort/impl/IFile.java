@@ -965,11 +965,19 @@ public class IFile {
     }
 
     public long getLength() {
-      return fileLength - checksumIn.getSize();
+      if (useRSS) {
+        return fileLength;
+      } else {
+        return fileLength - checksumIn.getSize();
+      }
     }
 
     public long getPosition() throws IOException {
-      return checksumIn.getPosition();
+      if (useRSS) {
+        return bytesRead;
+      } else {
+        return checksumIn.getPosition();
+      }
     }
 
     /**

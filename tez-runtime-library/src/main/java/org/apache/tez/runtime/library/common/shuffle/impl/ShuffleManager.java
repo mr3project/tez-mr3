@@ -382,7 +382,7 @@ public class ShuffleManager implements FetcherCallback {
               }
               if (inputHost.getNumPendingPartitions() > 0 && !isShutdown.get()) {
                 FetcherBase fetcher;
-                if (rssShuffleClient != null) {
+                if (rssShuffleClient == null) {
                   fetcher = constructFetcherForHost(inputHost, conf);
                 } else {
                   fetcher = constructRssFetcher(inputHost);
