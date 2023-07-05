@@ -82,6 +82,9 @@ public class RssFetcher implements FetcherBase {
       int partition,
       InputAttemptIdentifier srcAttemptId,
       int dataLength) {
+    // dataLength should be either -1 or
+    //   the length of file content + (2 * WritableUtils.getVIntSize(IFile.EOF_MARKER)).
+
     this.fetcherCallback = fetcherCallback;
     this.inputAllocator = inputAllocator;
     this.shuffleClient = rssShuffleClient;

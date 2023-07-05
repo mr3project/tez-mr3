@@ -631,6 +631,7 @@ public class ShuffleManager implements FetcherCallback {
     if (!validateInputAttemptForPipelinedShuffle(srcAttemptIdentifier)) {
       return;
     }
+
     int inputIdentifier = srcAttemptIdentifier.getInputIdentifier();
     for (int i = 0; i < srcAttemptIdentifier.getInputIdentifierCount(); i++) {
       if (shuffleInfoEventsMap.get(inputIdentifier + i) == null) {

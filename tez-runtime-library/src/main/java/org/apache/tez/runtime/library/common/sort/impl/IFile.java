@@ -846,6 +846,18 @@ public class IFile {
       this.useRSS = false;
     }
 
+    public Reader(InputStream in, long length, TezCounter readsCounter, TezCounter bytesReadCounter) {
+      this.in = in;
+      this.fileLength = length;
+      this.readRecordsCounter = readsCounter;
+      this.bytesReadCounter = bytesReadCounter;
+
+      this.useRSS = true;
+
+      assert in != null;
+      this.dataIn = new DataInputStream(in);
+    }
+
     /**
      * Read entire ifile content to memory.
      *

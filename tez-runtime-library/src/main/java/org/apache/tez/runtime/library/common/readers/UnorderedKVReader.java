@@ -77,10 +77,11 @@ public class UnorderedKVReader<K, V> extends KeyValueReader {
   private final AtomicLong totalBytesRead = new AtomicLong(0);
   private final AtomicLong totalFileBytes = new AtomicLong(0);
 
+  private final boolean useRss;
 
   public UnorderedKVReader(ShuffleManager shuffleManager, Configuration conf,
       CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLength, int ifileBufferSize,
-      TezCounter inputRecordCounter, InputContext context)
+      TezCounter inputRecordCounter, InputContext context, boolean useRss)
       throws IOException {
     this.shuffleManager = shuffleManager;
     this.context = context;
@@ -102,6 +103,8 @@ public class UnorderedKVReader<K, V> extends KeyValueReader {
     this.keyDeserializer.open(keyIn);
     this.valDeserializer = serializationFactory.getDeserializer(valClass);
     this.valDeserializer.open(valIn);
+
+    this.useRss = useRss;
   }
 
   // TODO NEWTEZ Maybe add an interface to check whether next will block.
@@ -221,9 +224,13 @@ public class UnorderedKVReader<K, V> extends KeyValueReader {
       return new InMemoryReader(null, mfi.getInputAttemptIdentifier(),
           mfi.getBytes(), 0, (int) mfi.getSize());
     } else {
-      return new IFile.Reader(fetchedInput.getInputStream(),
-          fetchedInput.getSize(), codec, null, null, ifileReadAhead,
-          ifileReadAheadLength, ifileBufferSize, context);
+      if (useRss) {
+        return new IFile.Reader(fetchedInput.getInputStream(), fetchedInput.getSize(), null, null);
+      } else {
+        return new IFile.Reader(fetchedInput.getInputStream(),
+            fetchedInput.getSize(), codec, null, null, ifileReadAhead,
+            ifileReadAheadLength, ifileBufferSize, context);
+      }
     }
   }
 }

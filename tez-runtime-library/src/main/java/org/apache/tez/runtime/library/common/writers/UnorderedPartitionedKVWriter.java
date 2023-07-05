@@ -1115,10 +1115,16 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       updateGlobalStats(currentBuffer);
       filledBuffers.add(currentBuffer);
 
-      //setup output file and index file
-      SpillPathDetails spillPathDetails = getSpillPathDetails(true, -1);
-      SpillCallable spillCallable = new SpillCallable(filledBuffers,
-          codec, null, spillPathDetails);
+      SpillCallable spillCallable;
+      if (rssShuffleClient != null) {
+        int spillIndex = numSpills.getAndIncrement();
+        spillCallable = new SpillCallable(filledBuffers, null, null, spillIndex);
+      } else {
+        //setup output file and index file
+        SpillPathDetails spillPathDetails = getSpillPathDetails(true, -1);
+        spillCallable = new SpillCallable(filledBuffers, codec, null, spillPathDetails);
+      }
+
       try {
         SpillResult spillResult = spillCallable.call();
 

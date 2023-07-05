@@ -243,7 +243,7 @@ public class UnorderedKVInput extends AbstractLogicalInput {
       int ifileBufferSize, boolean ifileReadAheadEnabled, int ifileReadAheadLength)
       throws IOException {
     return new UnorderedKVReader(shuffleManager, conf, codec, ifileReadAheadEnabled,
-        ifileReadAheadLength, ifileBufferSize, inputRecordCounter, getContext());
+        ifileReadAheadLength, ifileBufferSize, inputRecordCounter, getContext(), rssShuffleClient != null);
   }
 
   private static final Set<String> confKeys = new HashSet<String>();
