@@ -1031,8 +1031,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       // Populate payload only if at least 1 partition has data
       if (rssShuffleClient == null) {
         payloadBuilder.setHost(host);
-      } else {
-        payloadBuilder.setHost(String.valueOf(outputContext.getTaskIndex()));   // host = task index when using RSS
+        payloadBuilder.setPathComponent(ShuffleUtils.expandPathComponent(outputContext, compositeFetch, pathComponent));
       }
 
       // if useShuffleHandlerProcessOnK8s == true, the consumer can retrieve ports from InputContext
@@ -1043,10 +1042,6 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           payloadBuilder.addPorts(shufflePorts[i]);
         }
       }
-
-      if (rssShuffleClient == null) {
-        payloadBuilder.setPathComponent(ShuffleUtils.expandPathComponent(outputContext, compositeFetch, pathComponent));
-      }
     }
 
     if (addSpillDetails) {
@@ -1054,9 +1049,11 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       payloadBuilder.setLastEvent(isLastSpill);
     }
 
-    if (rssShuffleClient != null && isLastSpill && !payloadBuilder.hasHost()) {
+    if (rssShuffleClient != null && isLastSpill) {
       // If RSS is enabled, reader fetches data when it gets a DME with isLastSpill == true.
-      // Therefore, the last event must contain mapper index.
+      // Therefore, the last event must contain mapId.
+
+      // host = task index when using RSS
       payloadBuilder.setHost(String.valueOf(outputContext.getTaskIndex()));
     }
 

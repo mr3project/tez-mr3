@@ -111,8 +111,8 @@ public class RssFetcher implements FetcherBase {
     int mapIndex = Integer.parseInt(host);
     synchronized (lock) {
       if (!isShutdown) {
-        rssShuffleInputStream = shuffleClient.readPartition(rssApplicationId, shuffleId,
-            srcAttemptId.getInputIdentifier(), srcAttemptId.getAttemptNumber(), mapIndex, mapIndex + 1);
+        rssShuffleInputStream = shuffleClient.readPartition(rssApplicationId, shuffleId, partition,
+            srcAttemptId.getAttemptNumber(), mapIndex, mapIndex + 1);
       } else {
         LOG.warn("RssFetcher.shutdown() is called before it connects to RSS. Stop running RssFetcher");
         throw new IllegalStateException("Detected shutdown");
