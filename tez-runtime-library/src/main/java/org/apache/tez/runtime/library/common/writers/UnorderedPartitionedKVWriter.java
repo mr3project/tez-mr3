@@ -1054,6 +1054,12 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       payloadBuilder.setLastEvent(isLastSpill);
     }
 
+    if (rssShuffleClient != null && isLastSpill && !payloadBuilder.hasHost()) {
+      // If RSS is enabled, reader fetches data when it gets a DME with isLastSpill == true.
+      // Therefore, the last event must contain mapper index.
+      payloadBuilder.setHost(String.valueOf(outputContext.getTaskIndex()));
+    }
+
     if (canSendDataOverDME()) {
       ShuffleUserPayloads.DataProto.Builder dataProtoBuilder = ShuffleUserPayloads.DataProto.newBuilder();
       dataProtoBuilder.setData(ByteString.copyFrom(readDataForDME()));
