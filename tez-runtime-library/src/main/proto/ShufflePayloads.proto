@@ -27,10 +27,11 @@ message DataMovementEventPayloadProto {
   repeated int32 ports = 4;
   optional string path_component = 5;
   optional DataProto data = 6;
-  optional bool pipelined = 7;  // Related to pipelined shuffle
-  optional bool last_event = 8; // Related to pipelined shuffle
-  optional int32 spill_id = 9; //  Related to pipelined shuffle.
-  optional int32 num_record = 10;
+  optional bool last_event = 7;   // Related to pipelined shuffle
+  optional int32 spill_id = 8;    // Related to pipelined shuffle
+  optional int32 num_record = 9;  // set if numPartitions == 1
+  repeated int32 partition_sizes = 10;        // for RSS (Celeborn)
+  repeated int64 partition_sizes_long = 11;   // for RSS (Celeborn)
 } 
 
 message DataProto {

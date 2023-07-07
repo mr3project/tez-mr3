@@ -312,7 +312,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     reportPartitionStats = ReportPartitionStats.fromString(
         conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_REPORT_PARTITION_STATS,
         TezRuntimeConfiguration.TEZ_RUNTIME_REPORT_PARTITION_STATS_DEFAULT));
-    sizePerPartition = (reportPartitionStats.isEnabled()) ?
+    // for reading sizePerPartition[], check reportPartitionStats.isEnabled()
+    sizePerPartition = (reportPartitionStats.isEnabled() || rssShuffleClient != null) ?
         new long[numPartitions] : null;
 
     outputLargeRecordsCounter = outputContext.getCounters().findCounter(
@@ -505,7 +506,6 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     currentBuffer.sizePerPartition[partition] +=
         currentBuffer.nextPosition - (metaStart + META_SIZE);
     currentBuffer.numRecords++;
-
   }
 
   private void updateTezCountersAndNotify() {
@@ -582,14 +582,18 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     return false;
   }
 
-  private boolean reportPartitionStats() {
+  private boolean updatePartitionStats() {
     return (sizePerPartition != null);
+  }
+
+  private long[] sizePerPartitionToReport() {
+    return reportPartitionStats.isEnabled() ? sizePerPartition : null;
   }
 
   private void updateGlobalStats(WrappedBuffer buffer) {
     for (int i = 0; i < numPartitions; i++) {
       numRecordsPerPartition[i] += buffer.recordsPerPartition[i];
-      if (reportPartitionStats()) {
+      if (updatePartitionStats()) {
         sizePerPartition[i] += buffer.sizePerPartition[i];
       }
     }
@@ -895,7 +899,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           if (outputRecordsCounter.getValue() == 0) {
             emptyPartitions.set(0);
           }
-          if (reportPartitionStats()) {
+          if (updatePartitionStats()) {
             if (outputRecordsCounter.getValue() > 0) {
               sizePerPartition[0] = rawLen;
             }
@@ -968,7 +972,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         // VertexManagerEvent is only sent at the end and thus sizePerPartition is used
         // for the sum of all spills.
         mayBeSendEventsForSpill(currentBuffer.recordsPerPartition,
-            sizePerPartition, numSpills.get() - 1, true);
+            sizePerPartitionToReport(), numSpills.get() - 1, true);
       }
 
       if (rssShuffleClient != null) {
@@ -999,7 +1003,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   }
 
   private Event generateVMEvent() throws IOException {
-    return ShuffleUtils.generateVMEvent(outputContext, this.sizePerPartition,
+    return ShuffleUtils.generateVMEvent(outputContext, sizePerPartitionToReport(),
         this.reportDetailedPartitionStats(), deflater.get());
   }
 
@@ -1049,12 +1053,29 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       payloadBuilder.setLastEvent(isLastSpill);
     }
 
-    if (rssShuffleClient != null && isLastSpill) {
+    if (rssShuffleClient != null && addSpillDetails && isLastSpill) {
+      assert pipelinedShuffle == true;
       // If RSS is enabled, reader fetches data when it gets a DME with isLastSpill == true.
       // Therefore, the last event must contain mapId.
 
       // host = task index when using RSS
       payloadBuilder.setHost(String.valueOf(outputContext.getTaskIndex()));
+
+      long maxPartitionSize = 0L;
+      for (int i = 0; i < numPhysicalOutputs; i++) {
+        if (maxPartitionSize < sizePerPartition[i]) {
+          maxPartitionSize = sizePerPartition[i];
+        }
+      }
+      if (maxPartitionSize < Integer.MAX_VALUE) {
+        for (int i = 0; i < numPhysicalOutputs; i++) {
+          payloadBuilder.addPartitionSizes((int)sizePerPartition[i]);
+        }
+      } else {
+        for (int i = 0; i < numPhysicalOutputs; i++) {
+          payloadBuilder.addPartitionSizesLong(sizePerPartition[i]);
+        }
+      }
     }
 
     if (canSendDataOverDME()) {
@@ -1098,7 +1119,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       if (pipelinedShuffle || !isFinalMergeEnabled) {
         List<Event> eventList = Lists.newLinkedList();
         eventList.add(ShuffleUtils.generateVMEvent(outputContext,
-            reportPartitionStats() ? new long[numPartitions] : null,
+            reportPartitionStats.isEnabled() ? new long[numPartitions] : null,
             reportDetailedPartitionStats(), deflater.get()));
         if (localOutputRecordsCounter == 0 && outputLargeRecordsCounter.getValue() == 0) {
           // Should send this event (all empty partitions) only when no records are written out.
@@ -1138,7 +1159,6 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         throw (ex instanceof IOException) ? (IOException)ex : new IOException(ex);
       }
     }
-
   }
 
   /**
@@ -1356,7 +1376,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
             writer.append(key, value);
             outputLargeRecordsCounter.increment(1);
             numRecordsPerPartition[i]++;
-            if (reportPartitionStats()) {
+            if (updatePartitionStats()) {
               sizePerPartition[i] += writer.getRawLength();
             }
             writer.close();
@@ -1381,7 +1401,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       }
       handleSpillIndex(spillPathDetails, spillRecord);
 
-      mayBeSendEventsForSpill(emptyPartitions, sizePerPartition,
+      mayBeSendEventsForSpill(emptyPartitions, sizePerPartitionToReport(),
           spillIndex, false);
 
       LOG.info("{}: Finished writing large record of size {} to spill file {}", destNameTrimmed, outSize, spillIndex);
@@ -1425,7 +1445,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
       outputLargeRecordsCounter.increment(1);
       numRecordsPerPartition[partition]++;
-      if (reportPartitionStats()) {
+      if (updatePartitionStats()) {
         sizePerPartition[partition] += writer.getRawLength();
       }
 
@@ -1463,7 +1483,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     emptyPartitions.set(0, numPartitions);
     emptyPartitions.clear(partition);
 
-    mayBeSendEventsForSpill(emptyPartitions, sizePerPartition, spillIndex, false);
+    mayBeSendEventsForSpill(emptyPartitions, sizePerPartitionToReport(), spillIndex, false);
 
     LOG.info("{}: Finished pushing large record of size {}. (Spill index: {})",
         destNameTrimmed, outSize, spillIndex);
