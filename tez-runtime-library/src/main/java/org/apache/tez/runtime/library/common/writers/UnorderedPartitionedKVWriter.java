@@ -593,7 +593,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   private void updateGlobalStats(WrappedBuffer buffer) {
     for (int i = 0; i < numPartitions; i++) {
       numRecordsPerPartition[i] += buffer.recordsPerPartition[i];
-      if (updatePartitionStats()) {
+      if (updatePartitionStats() && rssShuffleClient == null) {
         sizePerPartition[i] += buffer.sizePerPartition[i];
       }
     }
@@ -761,8 +761,11 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
               }
             }
             writer.close();
-            compressedLength += writer.getCompressedLength();
+            long curPartitionLength = writer.getCompressedLength();
             writer = null;
+
+            compressedLength += curPartitionLength;
+            sizePerPartition[i] += curPartitionLength;
 
             rssShuffleClient.pushData(outputContext.getRssApplicationId(), outputContext.shuffleId(),
                 outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber(), i,

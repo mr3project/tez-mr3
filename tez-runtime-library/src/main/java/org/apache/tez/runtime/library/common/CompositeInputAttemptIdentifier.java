@@ -26,6 +26,7 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 @Private
 public class CompositeInputAttemptIdentifier extends InputAttemptIdentifier {
   private final int inputIdentifierCount;
+  private final long[] partitionSizes;
 
   public CompositeInputAttemptIdentifier(int inputIdentifier, int attemptNumber, String pathComponent, int inputIdentifierCount) {
     this(inputIdentifier, attemptNumber, pathComponent, false, SPILL_INFO.FINAL_MERGE_ENABLED, -1, inputIdentifierCount);
@@ -37,23 +38,37 @@ public class CompositeInputAttemptIdentifier extends InputAttemptIdentifier {
 
   public CompositeInputAttemptIdentifier(int inputIdentifier, int attemptNumber, String pathComponent,
       boolean shared, SPILL_INFO fetchTypeInfo, int spillEventId, int inputIdentifierCount) {
-    super(inputIdentifier, attemptNumber, pathComponent, shared, fetchTypeInfo, spillEventId);
-    this.inputIdentifierCount = inputIdentifierCount;
+    this(inputIdentifier, attemptNumber, pathComponent, shared, fetchTypeInfo, spillEventId, inputIdentifierCount, null);
   }
 
-
+  public CompositeInputAttemptIdentifier(int inputIdentifier, int attemptNumber, String pathComponent,
+      boolean shared, SPILL_INFO fetchTypeInfo, int spillEventId, int inputIdentifierCount, long[] partitionSizes) {
+    super(inputIdentifier, attemptNumber, pathComponent, shared, fetchTypeInfo, spillEventId, -1L);
+    this.inputIdentifierCount = inputIdentifierCount;
+    this.partitionSizes = partitionSizes;
+  }
   public int getInputIdentifierCount() {
     return inputIdentifierCount;
   }
 
   public InputAttemptIdentifier expand(int inputIdentifierOffset) {
-    return new InputAttemptIdentifier(getInputIdentifier() + inputIdentifierOffset, getAttemptNumber(), getPathComponent(), isShared(), getFetchTypeInfo(), getSpillEventId());
+    return new InputAttemptIdentifier(getInputIdentifier() + inputIdentifierOffset, getAttemptNumber(),
+        getPathComponent(), isShared(), getFetchTypeInfo(), getSpillEventId(), -1L);
   }
 
   public boolean include(int thatInputIdentifier, int thatAttemptNumber) {
     return
         super.getInputIdentifier() <= thatInputIdentifier && thatInputIdentifier < (super.getInputIdentifier() + inputIdentifierCount) &&
         super.getAttemptNumber() == thatAttemptNumber;
+  }
+
+  @Override
+  public long getPartitionSize() {
+    throw new UnsupportedOperationException("CompositeInputAttemptIdentifier does not return partitionSize");
+  }
+
+  public long getPartitionSize(int partitionId) {
+    return partitionSizes == null ? -1L : partitionSizes[partitionId];
   }
 
   // PathComponent & shared does not need to be part of the hashCode and equals computation.

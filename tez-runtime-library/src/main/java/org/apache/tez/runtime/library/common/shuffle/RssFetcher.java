@@ -27,6 +27,7 @@ import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -49,7 +50,8 @@ public class RssFetcher implements FetcherBase {
 
   private static final Logger LOG = LoggerFactory.getLogger(RssFetcher.class);
 
-  private final int bufferSize = 64 * 1024;
+  private static final int BUFFER_SIZE = 64 * 1024;
+  private static final int EOF_MARKERS_SIZE = 2 * WritableUtils.getVIntSize(IFile.EOF_MARKER);
 
   private final Object lock = new Object();
 
@@ -66,24 +68,9 @@ public class RssFetcher implements FetcherBase {
       String host,
       int port,
       int partition,
-      InputAttemptIdentifier srcAttemptId) {
-    this(fetcherCallback, inputAllocator, rssShuffleClient, rssApplicationId, shuffleId, host, port,
-        partition, srcAttemptId, -1);
-  }
-
-  public RssFetcher(
-      FetcherCallback fetcherCallback,
-      FetchedInputAllocator inputAllocator,
-      ShuffleClient rssShuffleClient,
-      String rssApplicationId,
-      int shuffleId,
-      String host,
-      int port,
-      int partition,
       InputAttemptIdentifier srcAttemptId,
-      int dataLength) {
-    // dataLength should be either -1 or
-    //   the length of file content + (2 * WritableUtils.getVIntSize(IFile.EOF_MARKER)).
+      long dataLength) {
+    assert (dataLength == -1 || dataLength > 0);
 
     this.fetcherCallback = fetcherCallback;
     this.inputAllocator = inputAllocator;
@@ -105,7 +92,8 @@ public class RssFetcher implements FetcherBase {
       fetchedInput =
           inputAllocator.allocateType(FetchedInput.Type.DISK, dataLength, dataLength, srcAttemptId);
     } else {
-      fetchedInput = inputAllocator.allocate(dataLength, dataLength, srcAttemptId);
+      long actualSize = dataLength + EOF_MARKERS_SIZE;
+      fetchedInput = inputAllocator.allocate(actualSize, actualSize, srcAttemptId);
     }
 
     int mapIndex = Integer.parseInt(host);
@@ -126,42 +114,48 @@ public class RssFetcher implements FetcherBase {
         IOUtils.readFully(rssShuffleInputStream, buffer, 0, (int) dataLength);
       } catch (IOException e) {
         rssShuffleInputStream.close();
-        LOG.error("Fail to read shuffle data from rssShfufleInputStream", e);
+        LOG.error("Failed to read shuffle data from rssShuffleInputStream", e);
         throw e;
       }
+
+      ByteArrayOutputStream baos = new ByteArrayOutputStream();
+      DataOutputStream dos = new DataOutputStream(baos);
+      WritableUtils.writeVInt(dos, IFile.EOF_MARKER);
+      WritableUtils.writeVInt(dos, IFile.EOF_MARKER);
+      byte[] eofMarker = baos.toByteArray();
+
+      System.arraycopy(eofMarker, 0, buffer, (int) dataLength, EOF_MARKERS_SIZE);
     } else if (fetchedInput.getType() == FetchedInput.Type.DISK) {
       try (OutputStream diskOutputStream = fetchedInput.getOutputStream()) {
-        byte[] buffer = new byte[bufferSize];
+        byte[] buffer = new byte[BUFFER_SIZE];
         boolean reachEOF = false;
         int bytesWritten = 0;
         while (!reachEOF) {
-          int curBytesRead = rssShuffleInputStream.read(buffer, 0, bufferSize);
+          int curBytesRead = rssShuffleInputStream.read(buffer, 0, BUFFER_SIZE);
 
           if (curBytesRead <= 0) {
             reachEOF = true;
           } else {
-            reachEOF = curBytesRead < bufferSize;
+            reachEOF = curBytesRead < BUFFER_SIZE;
 
             diskOutputStream.write(buffer, 0, curBytesRead);
             bytesWritten += curBytesRead;
           }
         }
 
-        int eofFooterSize = 2 * WritableUtils.getVIntSize(IFile.EOF_MARKER);
-
-        assert (!(!dataLengthUnknown()) || bytesWritten + eofFooterSize == dataLength);
+        assert (!(!dataLengthUnknown()) || bytesWritten == dataLength);
 
         DataOutputStream dos = new DataOutputStream(diskOutputStream);
         WritableUtils.writeVInt(dos, IFile.EOF_MARKER);
         WritableUtils.writeVInt(dos, IFile.EOF_MARKER);
-        bytesWritten += eofFooterSize;
+        bytesWritten += EOF_MARKERS_SIZE;
 
         if (dataLengthUnknown()) {
           ((DiskFetchedInput) fetchedInput).setSize(bytesWritten);
         }
       }
     } else {
-      throw new TezUncheckedException("Bad fetchedInput type while fetching shuffle data " + fetchedInput);
+      throw new TezUncheckedException("Unknown FetchedInput.Type: " + fetchedInput);
     }
 
     long copyDuration  = System.currentTimeMillis() - startTime;
@@ -180,7 +174,7 @@ public class RssFetcher implements FetcherBase {
         }
       }
     } catch (IOException e) {
-      LOG.warn("Fail to close RSS InputStream while shutting down RssFetcher.", e);
+      LOG.warn("Fail to close rssShuffleInputStream while shutting down RssFetcher.", e);
     }
   }
 
@@ -188,4 +182,3 @@ public class RssFetcher implements FetcherBase {
     return dataLength == -1;
   }
 }
-

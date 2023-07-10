@@ -340,8 +340,23 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
       boolean lastEvent = shufflePayload.getLastEvent();
       InputAttemptIdentifier.SPILL_INFO spillInfo = (lastEvent) ? InputAttemptIdentifier.SPILL_INFO
           .FINAL_UPDATE : InputAttemptIdentifier.SPILL_INFO.INCREMENTAL_UPDATE;
+
+      long[] partitionSizes = null;
+      if (lastEvent) {
+        if (shufflePayload.getPartitionSizesLongCount() > 0) {
+          partitionSizes = shufflePayload.getPartitionSizesLongList().stream()
+              .mapToLong(Long::longValue)
+              .toArray();
+        } else if (shufflePayload.getPartitionSizesCount() > 0) {
+          partitionSizes = shufflePayload.getPartitionSizesList().stream()
+              .mapToLong(Integer::longValue)
+              .toArray();
+        }
+      }
+
       srcAttemptIdentifier =
-          new CompositeInputAttemptIdentifier(targetIndex, version, pathComponent, isShared, spillInfo, spillEventId, targetIndexCount);
+          new CompositeInputAttemptIdentifier(targetIndex, version, pathComponent, isShared, spillInfo,
+              spillEventId, targetIndexCount, partitionSizes);
     } else {
       srcAttemptIdentifier =
           new CompositeInputAttemptIdentifier(targetIndex, version, pathComponent, isShared, targetIndexCount);

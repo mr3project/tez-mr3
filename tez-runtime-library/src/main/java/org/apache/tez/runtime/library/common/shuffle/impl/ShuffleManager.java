@@ -600,9 +600,18 @@ public class ShuffleManager implements FetcherCallback {
           eventInfo.scheduledForDownload = true;
         }
 
+        long partitionSize;
+        if (selectedInputAttemptIdentifier instanceof CompositeInputAttemptIdentifier) {
+          CompositeInputAttemptIdentifier ciai =
+              (CompositeInputAttemptIdentifier) selectedInputAttemptIdentifier;
+          partitionSize = ciai.getPartitionSize(pendingInputs.getPartition());
+        } else {
+          partitionSize = selectedInputAttemptIdentifier.getPartitionSize();
+        }
+
         rssFetcher = new RssFetcher(this, inputManager, rssShuffleClient, inputContext.getRssApplicationId(),
             inputContext.shuffleId(), inputHost.getHost(), inputHost.getPort(),
-            pendingInputs.getPartition(), selectedInputAttemptIdentifier);
+            pendingInputs.getPartition(), selectedInputAttemptIdentifier, partitionSize);
       }
     }
 
