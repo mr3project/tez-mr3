@@ -28,7 +28,6 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.tez.common.counters.TezCounters;
 import org.apache.tez.dag.api.DAG;
-import org.apache.tez.dag.api.DagTypeConverters;
 import org.apache.tez.dag.api.records.DAGProtos.DAGStatusProtoOrBuilder;
 import org.apache.tez.dag.api.records.DAGProtos.StringProgressPairProto;
 import org.apache.tez.dag.api.TezUncheckedException;
@@ -141,14 +140,6 @@ public class DAGStatus {
   }
 
   public TezCounters getDAGCounters() {
-    if (countersInitialized.get()) {
-      return dagCounters;
-    }
-    if (proxy.hasDagCounters()) {
-      dagCounters = DagTypeConverters.convertTezCountersFromProto(
-        proxy.getDagCounters());
-    }
-    countersInitialized.set(true);
     return dagCounters;
   }
 

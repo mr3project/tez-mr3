@@ -25,7 +25,6 @@ import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.tez.common.counters.TezCounters;
-import org.apache.tez.dag.api.DagTypeConverters;
 import org.apache.tez.dag.api.Vertex;
 import org.apache.tez.dag.api.records.DAGProtos;
 import org.apache.tez.dag.api.records.DAGProtos.VertexStatusProtoOrBuilder;
@@ -104,14 +103,6 @@ public class VertexStatus {
   }
 
   public TezCounters getVertexCounters() {
-    if (countersInitialized.get()) {
-      return vertexCounters;
-    }
-    if (proxy.hasVertexCounters()) {
-      vertexCounters = DagTypeConverters.convertTezCountersFromProto(
-        proxy.getVertexCounters());
-    }
-    countersInitialized.set(true);
     return vertexCounters;
   }
   
