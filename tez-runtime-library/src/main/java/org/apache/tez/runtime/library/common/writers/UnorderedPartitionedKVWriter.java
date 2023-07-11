@@ -729,26 +729,32 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     private SpillResult pushToRSS() throws IOException, InterruptedException {
       LOG.info("Start pushing spill {} to RSS", spillNumber);
 
+      ByteArrayOutputStream rssBuffer = null;
       DataInputBuffer key = new DataInputBuffer();
       DataInputBuffer val = new DataInputBuffer();
-      long compressedLength = 0;
+      long totalPushedDataLength = 0;
       for (int i = 0; i < numPartitions; i++) {
         IFile.Writer writer = null;
-        ByteArrayOutputStream rssBuffer = null;
 
         try {
           long numRecords = 0;
-          for (WrappedBuffer buffer : filledBuffers) {
+          for (WrappedBuffer buffer: filledBuffers) {
             if (buffer.partitionPositions[i] == WrappedBuffer.PARTITION_ABSENT_POSITION) {
               // Skip empty partition.
               continue;
             }
-            if (writer == null) {
+
+            if (rssBuffer == null) {
               rssBuffer = rssBufferPool.take();
+            }
+
+            if (writer == null) {
+              rssBuffer.reset();
               DataOutputStream out = new DataOutputStream(rssBuffer);
               writer =
                   new Writer(keySerialization, valSerialization, out, keyClass, valClass, null, null, true);
             }
+
             numRecords += writePartition(buffer.partitionPositions[i], buffer, writer, key, val);
           }
 
@@ -760,28 +766,25 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
                 numRecordsCounter.increment(numRecords);
               }
             }
+
             writer.close();
             long curPartitionLength = writer.getCompressedLength();
             writer = null;
 
-            compressedLength += curPartitionLength;
+            totalPushedDataLength += curPartitionLength;
             sizePerPartition[i] += curPartitionLength;
 
             rssShuffleClient.pushData(outputContext.getRssApplicationId(), outputContext.shuffleId(),
                 outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber(), i,
                 rssBuffer.toByteArray(), 0, rssBuffer.size(), outputContext.getVertexParallelism(),
                 numPhysicalOutputs);
-
-            rssBuffer.reset();
-            rssBufferPool.offer(rssBuffer);
-            rssBuffer = null;
           }
         } finally {
           if (writer != null) {
             writer.close();
           }
+
           if (rssBuffer != null) {
-            rssBuffer.reset();
             rssBufferPool.offer(rssBuffer);
           }
         }
@@ -792,7 +795,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
       LOG.info("{}: Finished spill {}", destNameTrimmed, spillNumber);
 
-      return new SpillResult(compressedLength, this.filledBuffers);
+      return new SpillResult(totalPushedDataLength, this.filledBuffers);
     }
   }
 
