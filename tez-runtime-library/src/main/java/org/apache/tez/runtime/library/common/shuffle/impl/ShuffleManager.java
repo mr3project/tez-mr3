@@ -549,70 +549,37 @@ public class ShuffleManager implements FetcherCallback {
     RssFetcher rssFetcher = null;
 
     while (rssFetcher == null && inputHost.getNumPendingPartitions() > 0) {
-      InputAttemptIdentifier selectedInputAttemptIdentifier = null;
-
-      // Remove obsolete inputs from the list being given to the fetcher. Also remove from the obsolete list.
       PartitionToInputs pendingInputs = inputHost.clearAndGetOnePartitionRange();
-      for (Iterator<InputAttemptIdentifier> inputIter = pendingInputs.getInputs().iterator();
-           inputIter.hasNext();) {
-        InputAttemptIdentifier input = inputIter.next();
 
-        // Avoid adding attempts which have already completed.
-        boolean alreadyCompleted;
-        if (input instanceof CompositeInputAttemptIdentifier) {
-          CompositeInputAttemptIdentifier compositeInput = (CompositeInputAttemptIdentifier) input;
-          int nextClearBit = completedInputSet.nextClearBit(compositeInput.getInputIdentifier());
-          int maxClearBit = compositeInput.getInputIdentifier() + compositeInput.getInputIdentifierCount();
-          alreadyCompleted = nextClearBit > maxClearBit;
-        } else {
-          alreadyCompleted = completedInputSet.get(input.getInputIdentifier());
-        }
+      assert pendingInputs.getPartitionCount() == 1;
+      assert pendingInputs.getInputs().size() == 1;
+      assert pendingInputs.getInputs().get(0) instanceof CompositeInputAttemptIdentifier;
 
-        // Avoid adding attempts which have already completed
-        if (alreadyCompleted) {
-          inputIter.remove();
-          continue;
-        }
-        // Avoid adding attempts which have been marked as OBSOLETE
-        if (isObsoleteInputAttemptIdentifier(input)) {
-          LOG.info("Skipping obsolete input: " + input);
-          inputIter.remove();
-          continue;
-        }
+      CompositeInputAttemptIdentifier inputAttemptIdentifier =
+          (CompositeInputAttemptIdentifier) pendingInputs.getInputs().get(0);
 
-        if (selectedInputAttemptIdentifier == null) {
-          selectedInputAttemptIdentifier = input;
-        } else {
-          inputIter.remove();
-          inputHost.addKnownInput(pendingInputs.getPartition(), pendingInputs.getPartitionCount(), input);
-        }
-      }
+      boolean alreadyCompleted = completedInputSet.get(inputAttemptIdentifier.getInputIdentifier());
+      // We do not check obsoletedInput because we do not rerun SourceTask when RSS is enabled.
 
-      // If we have remaining InputAttemptIdentifiers, re-enqueue the inputHost.
-      if (inputHost.getNumPendingPartitions() > 0) {
-        pendingHosts.add(inputHost);
-      }
+      if (!alreadyCompleted) {
+        // Create an RssFetcher and stop iterating over the while loop
 
-      if (selectedInputAttemptIdentifier != null) {
-        ShuffleEventInfo eventInfo =
-            shuffleInfoEventsMap.get(selectedInputAttemptIdentifier.getInputIdentifier());
+        ShuffleEventInfo eventInfo = shuffleInfoEventsMap.get(inputAttemptIdentifier.getInputIdentifier());
         if (eventInfo != null) {
           eventInfo.scheduledForDownload = true;
         }
 
-        long partitionSize;
-        if (selectedInputAttemptIdentifier instanceof CompositeInputAttemptIdentifier) {
-          CompositeInputAttemptIdentifier ciai =
-              (CompositeInputAttemptIdentifier) selectedInputAttemptIdentifier;
-          partitionSize = ciai.getPartitionSize(pendingInputs.getPartition());
-        } else {
-          partitionSize = selectedInputAttemptIdentifier.getPartitionSize();
-        }
+        long partitionSize = inputAttemptIdentifier.getPartitionSize(pendingInputs.getPartition());
 
         rssFetcher = new RssFetcher(this, inputManager, rssShuffleClient, inputContext.getRssApplicationId(),
             inputContext.shuffleId(), inputHost.getHost(), inputHost.getPort(),
-            pendingInputs.getPartition(), selectedInputAttemptIdentifier, partitionSize);
+            pendingInputs.getPartition(), inputAttemptIdentifier, partitionSize);
       }
+    }
+
+    // If inputHost contains remaining InputAttemptIdentifiers, re-enqueue it.
+    if (inputHost.getNumPendingPartitions() > 0) {
+      pendingHosts.add(inputHost);
     }
 
     return rssFetcher;
