@@ -108,59 +108,16 @@ public class RssFetcher implements FetcherBase {
     }
 
     if (fetchedInput.getType() == FetchedInput.Type.MEMORY) {
-      byte[] buffer = ((MemoryFetchedInput) fetchedInput).getBytes();
-
-      try {
-        IOUtils.readFully(rssShuffleInputStream, buffer, 0, (int) dataLength);
-      } catch (IOException e) {
-        rssShuffleInputStream.close();
-        LOG.error("Failed to read shuffle data from rssShuffleInputStream", e);
-        throw e;
-      }
-
-      ByteArrayOutputStream baos = new ByteArrayOutputStream();
-      DataOutputStream dos = new DataOutputStream(baos);
-      WritableUtils.writeVInt(dos, IFile.EOF_MARKER);
-      WritableUtils.writeVInt(dos, IFile.EOF_MARKER);
-      byte[] eofMarker = baos.toByteArray();
-
-      System.arraycopy(eofMarker, 0, buffer, (int) dataLength, EOF_MARKERS_SIZE);
+      shuffleToMemory(rssShuffleInputStream, (MemoryFetchedInput) fetchedInput);
     } else if (fetchedInput.getType() == FetchedInput.Type.DISK) {
-      try (OutputStream diskOutputStream = fetchedInput.getOutputStream()) {
-        byte[] buffer = new byte[BUFFER_SIZE];
-        boolean reachEOF = false;
-        int bytesWritten = 0;
-        while (!reachEOF) {
-          int curBytesRead = rssShuffleInputStream.read(buffer, 0, BUFFER_SIZE);
-
-          if (curBytesRead <= 0) {
-            reachEOF = true;
-          } else {
-            reachEOF = curBytesRead < BUFFER_SIZE;
-
-            diskOutputStream.write(buffer, 0, curBytesRead);
-            bytesWritten += curBytesRead;
-          }
-        }
-
-        assert (!(!dataLengthUnknown()) || bytesWritten == dataLength);
-
-        DataOutputStream dos = new DataOutputStream(diskOutputStream);
-        WritableUtils.writeVInt(dos, IFile.EOF_MARKER);
-        WritableUtils.writeVInt(dos, IFile.EOF_MARKER);
-        bytesWritten += EOF_MARKERS_SIZE;
-
-        if (dataLengthUnknown()) {
-          ((DiskFetchedInput) fetchedInput).setSize(bytesWritten);
-        }
-      }
+      shuffleToDisk(rssShuffleInputStream, (DiskFetchedInput) fetchedInput);
     } else {
+      rssShuffleInputStream.close();
       throw new TezUncheckedException("Unknown FetchedInput.Type: " + fetchedInput);
     }
 
     long copyDuration  = System.currentTimeMillis() - startTime;
     fetcherCallback.fetchSucceeded(host, srcAttemptId, fetchedInput, dataLength, dataLength, copyDuration);
-    // TODO: fetchFailed()?
 
     return new FetchResult(host, port, partition, 1, new ArrayList<>());
   }
@@ -175,6 +132,60 @@ public class RssFetcher implements FetcherBase {
       }
     } catch (IOException e) {
       LOG.warn("Fail to close rssShuffleInputStream while shutting down RssFetcher.", e);
+    }
+  }
+
+  private void shuffleToMemory(InputStream inputStream, MemoryFetchedInput fetchedInput) throws IOException {
+    try {
+      byte[] buffer = fetchedInput.getBytes();
+      IOUtils.readFully(inputStream, buffer, 0, (int) dataLength);
+
+      ByteArrayOutputStream baos = new ByteArrayOutputStream();
+      DataOutputStream dos = new DataOutputStream(baos);
+      WritableUtils.writeVInt(dos, IFile.EOF_MARKER);
+      WritableUtils.writeVInt(dos, IFile.EOF_MARKER);
+      byte[] eofMarker = baos.toByteArray();
+
+      System.arraycopy(eofMarker, 0, buffer, (int) dataLength, EOF_MARKERS_SIZE);
+
+    } catch (IOException e) {
+      LOG.error("Failed to read shuffle data from rssShuffleInputStream", e);
+      throw e;
+    } finally {
+      inputStream.close();
+    }
+  }
+
+  private void shuffleToDisk(InputStream inputStream, DiskFetchedInput fetchedInput) throws IOException {
+    try (OutputStream diskOutputStream = fetchedInput.getOutputStream()) {
+      byte[] buffer = new byte[BUFFER_SIZE];
+      boolean reachEOF = false;
+      int bytesWritten = 0;
+      while (!reachEOF) {
+        int curBytesRead = inputStream.read(buffer, 0, BUFFER_SIZE);
+
+        if (curBytesRead <= 0) {
+          reachEOF = true;
+        } else {
+          reachEOF = curBytesRead < BUFFER_SIZE;
+
+          diskOutputStream.write(buffer, 0, curBytesRead);
+          bytesWritten += curBytesRead;
+        }
+      }
+
+      assert (!(!dataLengthUnknown()) || bytesWritten == dataLength);
+
+      DataOutputStream dos = new DataOutputStream(diskOutputStream);
+      WritableUtils.writeVInt(dos, IFile.EOF_MARKER);
+      WritableUtils.writeVInt(dos, IFile.EOF_MARKER);
+      bytesWritten += EOF_MARKERS_SIZE;
+
+      if (dataLengthUnknown()) {
+        fetchedInput.setSize(bytesWritten);
+      }
+    } finally {
+      inputStream.close();
     }
   }
 
