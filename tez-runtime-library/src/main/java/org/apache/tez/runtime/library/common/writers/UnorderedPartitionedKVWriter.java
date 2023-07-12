@@ -1127,8 +1127,11 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         eventList.add(ShuffleUtils.generateVMEvent(outputContext,
             reportPartitionStats.isEnabled() ? new long[numPartitions] : null,
             reportDetailedPartitionStats(), deflater.get()));
-        if (localOutputRecordsCounter == 0 && outputLargeRecordsCounter.getValue() == 0) {
+        if ((localOutputRecordsCounter == 0 && outputLargeRecordsCounter.getValue() == 0) ||
+            rssShuffleClient != null) {
           // Should send this event (all empty partitions) only when no records are written out.
+          // if rssShuffleClient is used, the last DME with isLastSpill == true should be sent
+          // so as to trigger fetching in the consumer tasks.
           BitSet emptyPartitions = new BitSet(numPartitions);
           emptyPartitions.flip(0, numPartitions);
           eventList.add(generateDMEvent(true, numSpills.get(), true,
