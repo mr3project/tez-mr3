@@ -1045,7 +1045,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       }
 
       // if useShuffleHandlerProcessOnK8s == true, the consumer can retrieve ports from InputContext
-      if (!outputContext.useShuffleHandlerProcessOnK8s()) {
+      if (rssShuffleClient == null && !outputContext.useShuffleHandlerProcessOnK8s()) {
         int[] shufflePorts = getShufflePort();
         payloadBuilder.setNumPorts(shufflePorts.length);
         for (int i = 0; i < shufflePorts.length; i++) {
