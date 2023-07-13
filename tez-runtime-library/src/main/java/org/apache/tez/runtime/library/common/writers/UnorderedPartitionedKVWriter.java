@@ -880,6 +880,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       LOG.error(destNameTrimmed + ": Error during spill, throwing");
       // Assuming close will be called on the same thread as the write
       cleanup();
+      cleanupRssShuffleClient();
       currentBuffer.cleanup();
       currentBuffer = null;
       if (spillException instanceof IOException) {
@@ -893,6 +894,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       }
       // Assuming close will be called on the same thread as the write
       cleanup();
+      cleanupRssShuffleClient();
 
       List<Event> events = Lists.newLinkedList();
       if (!pipelinedShuffle) {
@@ -1118,6 +1120,14 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       }
     }
     availableBuffers.clear();
+  }
+
+  private void cleanupRssShuffleClient() {
+    if (rssShuffleClient != null) {
+      rssShuffleClient.cleanup(
+         outputContext.getRssApplicationId(), outputContext.shuffleId(),
+         outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber());
+    }
   }
 
   private SpillResult finalSpill() throws IOException {

@@ -44,7 +44,7 @@ public abstract class AbstractLogicalInput implements LogicalInput, LogicalInput
 
   private final int numPhysicalInputs;
   private final InputContext inputContext;
-  protected final ShuffleClient rssShuffleClient;
+  protected final ShuffleClient rssShuffleClient;   // use RSS iff. rssShuffleClient != null
 
   /**
    * Constructor an instance of the LogicalInput. Classes extending this one to create a
@@ -59,9 +59,8 @@ public abstract class AbstractLogicalInput implements LogicalInput, LogicalInput
   public AbstractLogicalInput(InputContext inputContext, int numPhysicalInputs) {
     this.inputContext = inputContext;
     this.numPhysicalInputs = numPhysicalInputs;
-
-    Object sc = com.datamonad.mr3.MR3Runtime.env().getRssShuffleClient();
-    this.rssShuffleClient = inputContext.useRssShuffle() && sc != null ? (ShuffleClient)sc : null;
+    this.rssShuffleClient = inputContext.useRssShuffle() ?
+        (ShuffleClient)com.datamonad.mr3.MR3Runtime.env().getRssShuffleClient() : null;
   }
 
   @Override
