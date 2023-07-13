@@ -575,7 +575,8 @@ public class ShuffleManager implements FetcherCallback {
 
         long partitionSize = inputAttemptIdentifier.getPartitionSize(pendingInputs.getPartition());
 
-        rssFetcher = new RssFetcher(this, inputManager, rssShuffleClient, inputContext.getRssApplicationId(),
+        rssFetcher = new RssFetcher(this, inputManager, rssShuffleClient,
+            com.datamonad.mr3.MR3Runtime.env().rssApplicationId(),
             inputContext.shuffleId(), inputHost.getHost(), inputHost.getPort(),
             pendingInputs.getPartition(), inputAttemptIdentifier, partitionSize);
       }

@@ -285,6 +285,4 @@ public interface TaskContext {
   public String getJobUserName();
 
   public ExecutorServiceUserGroupInformation getExecutorServiceUgi();
-
-  public String getRssApplicationId();
 }

@@ -779,7 +779,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
             totalPushedDataLength += curPartitionLength;
             sizePerPartition[i] += curPartitionLength;
 
-            rssShuffleClient.pushData(outputContext.getRssApplicationId(), outputContext.shuffleId(),
+            rssShuffleClient.pushData(
+                com.datamonad.mr3.MR3Runtime.env().rssApplicationId(),
+                outputContext.shuffleId(),
                 outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber(), i,
                 rssBuffer.toByteArray(), 0, rssBuffer.size(), outputContext.getVertexParallelism(),
                 numPhysicalOutputs);
@@ -987,9 +989,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       }
 
       if (rssShuffleClient != null) {
-        rssShuffleClient.mapperEnd(outputContext.getRssApplicationId(), outputContext.shuffleId(),
-            outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber(),
-            outputContext.getVertexParallelism());
+        rssShuffleClient.mapperEnd(
+            com.datamonad.mr3.MR3Runtime.env().rssApplicationId(),
+            outputContext.shuffleId(),
+            outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber(), outputContext.getVertexParallelism());
       }
 
       updateTezCountersAndNotify();
@@ -1129,7 +1132,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   private void cleanupRssShuffleClient() {
     if (rssShuffleClient != null) {
       rssShuffleClient.cleanup(
-         outputContext.getRssApplicationId(), outputContext.shuffleId(),
+         com.datamonad.mr3.MR3Runtime.env().rssApplicationId(),
+         outputContext.shuffleId(),
          outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber());
     }
   }
@@ -1481,7 +1485,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
       writer = null;
 
-      rssShuffleClient.pushData(outputContext.getRssApplicationId(), outputContext.shuffleId(),
+      rssShuffleClient.pushData(
+          com.datamonad.mr3.MR3Runtime.env().rssApplicationId(),
+          outputContext.shuffleId(),
           outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber(), partition,
           rssBuffer.toByteArray(), 0, rssBuffer.size(), outputContext.getVertexParallelism(),
           numPhysicalOutputs);
