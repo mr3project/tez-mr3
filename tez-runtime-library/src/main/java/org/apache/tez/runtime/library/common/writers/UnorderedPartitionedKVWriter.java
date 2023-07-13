@@ -885,9 +885,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       LOG.error(destNameTrimmed + ": Error during spill, throwing");
       // Assuming close will be called on the same thread as the write
       cleanup();
+      cleanupCurrentBuffer();
       cleanupRssShuffleClient();
-      currentBuffer.cleanup();
-      currentBuffer = null;
       if (spillException instanceof IOException) {
         throw (IOException) spillException;
       } else {
@@ -899,7 +898,6 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       }
       // Assuming close will be called on the same thread as the write
       cleanup();
-      cleanupRssShuffleClient();
 
       List<Event> events = Lists.newLinkedList();
       if (!pipelinedShuffle) {
@@ -996,6 +994,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
       updateTezCountersAndNotify();
       cleanupCurrentBuffer();
+      cleanupRssShuffleClient();  // should be called after rssShuffleClient.mapperEnd()
       return events;
     }
   }
