@@ -295,6 +295,10 @@ public class ShuffleManager implements FetcherCallback {
     shuffleInfoEventsMap = new ConcurrentHashMap<Integer, ShuffleEventInfo>();
 
     this.rssShuffleClient = rssShuffleClient;
+    if (this.rssShuffleClient != null) {
+      LOG.info("Registering shuffleId = " + inputContext.shuffleId());
+      com.datamonad.mr3.MR3Runtime.env().registerShuffleId(inputContext.getDagId(), inputContext.shuffleId());
+    }
 
     LOG.info("{}: numInputs={}, numFetchers={}", srcNameTrimmed, numInputs, numFetchers);
     if (LOG.isDebugEnabled()) {

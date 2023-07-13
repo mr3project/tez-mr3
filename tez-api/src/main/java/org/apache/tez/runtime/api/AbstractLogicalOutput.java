@@ -38,6 +38,7 @@ public abstract class AbstractLogicalOutput implements LogicalOutput, LogicalOut
   private final OutputContext outputContext;
   protected final ShuffleClient rssShuffleClient;   // use RSS iff. rssShuffleClient != null
   // rssShuffleClient.cleanup() is called by its actual user (e.g., UnorderedPartitionedKVWriter)
+  // rssShuffleClient.registerShuffleId() is called by its actual user
 
   /**
    * Constructor an instance of the LogicalOutput. Classes extending this one to create a

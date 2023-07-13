@@ -39,7 +39,7 @@ public class RssFetcher implements FetcherBase {
   private final FetchedInputAllocator inputAllocator;
   private final long dataLength;
 
-  private final ShuffleClient shuffleClient;
+  private final ShuffleClient rssShuffleClient;
   private final String rssApplicationId;
   private final int shuffleId;
 
@@ -74,7 +74,7 @@ public class RssFetcher implements FetcherBase {
 
     this.fetcherCallback = fetcherCallback;
     this.inputAllocator = inputAllocator;
-    this.shuffleClient = rssShuffleClient;
+    this.rssShuffleClient = rssShuffleClient;
     this.rssApplicationId = rssApplicationId;
     this.shuffleId = shuffleId;
     this.host = host;
@@ -99,7 +99,7 @@ public class RssFetcher implements FetcherBase {
     int mapIndex = Integer.parseInt(host);
     synchronized (lock) {
       if (!isShutdown) {
-        rssShuffleInputStream = shuffleClient.readPartition(rssApplicationId, shuffleId, partition,
+        rssShuffleInputStream = rssShuffleClient.readPartition(rssApplicationId, shuffleId, partition,
             srcAttemptId.getAttemptNumber(), mapIndex, mapIndex + 1);
       } else {
         LOG.warn("RssFetcher.shutdown() is called before it connects to RSS. Stop running RssFetcher");
