@@ -57,4 +57,8 @@ public interface InputContext extends TaskContext, DecompressorPool {
   public int shuffleId();
 
   public boolean useRssShuffle();
+
+  public boolean readPartitionAllOnce();
+
+  public int getSourceVertexNumTasks();
 }
