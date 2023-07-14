@@ -550,36 +550,31 @@ public class ShuffleManager implements FetcherCallback {
   }
 
   public RssFetcher constructRssFetcher(InputHost inputHost) {
+    assert inputHost.getNumPendingPartitions() > 0;
     RssFetcher rssFetcher = null;
 
-    while (rssFetcher == null && inputHost.getNumPendingPartitions() > 0) {
-      PartitionToInputs pendingInputs = inputHost.clearAndGetOnePartitionRange();
+    PartitionToInputs pendingInputs = inputHost.clearAndGetOnePartitionRange();
+    assert pendingInputs.getPartitionCount() == 1;
+    assert pendingInputs.getInputs().size() == 1;
+    assert pendingInputs.getInputs().get(0) instanceof CompositeInputAttemptIdentifier;
+    // CompositeInputAttemptIdentifier.getPartitionSize(pendingInputs.getPartition()) to be called
 
-      assert pendingInputs.getPartitionCount() == 1;
-      assert pendingInputs.getInputs().size() == 1;
-      assert pendingInputs.getInputs().get(0) instanceof CompositeInputAttemptIdentifier;
+    CompositeInputAttemptIdentifier inputAttemptIdentifier =
+        (CompositeInputAttemptIdentifier) pendingInputs.getInputs().get(0);
 
-      CompositeInputAttemptIdentifier inputAttemptIdentifier =
-          (CompositeInputAttemptIdentifier) pendingInputs.getInputs().get(0);
-
-      boolean alreadyCompleted = completedInputSet.get(inputAttemptIdentifier.getInputIdentifier());
-      // We do not check obsoletedInput because we do not rerun SourceTask when RSS is enabled.
-
-      if (!alreadyCompleted) {
-        // Create an RssFetcher and stop iterating over the while loop
-
-        ShuffleEventInfo eventInfo = shuffleInfoEventsMap.get(inputAttemptIdentifier.getInputIdentifier());
-        if (eventInfo != null) {
-          eventInfo.scheduledForDownload = true;
-        }
-
-        long partitionSize = inputAttemptIdentifier.getPartitionSize(pendingInputs.getPartition());
-
-        rssFetcher = new RssFetcher(this, inputManager, rssShuffleClient,
-            com.datamonad.mr3.MR3Runtime.env().rssApplicationId(),
-            inputContext.shuffleId(), inputHost.getHost(), inputHost.getPort(),
-            pendingInputs.getPartition(), inputAttemptIdentifier, partitionSize);
+    boolean alreadyCompleted = completedInputSet.get(inputAttemptIdentifier.getInputIdentifier());
+    // We do not check obsoletedInput because we do not rerun SourceTask when RSS is enabled.
+    if (!alreadyCompleted) {
+      // Create an RssFetcher and stop iterating over the while loop
+      ShuffleEventInfo eventInfo = shuffleInfoEventsMap.get(inputAttemptIdentifier.getInputIdentifier());
+      if (eventInfo != null) {
+        eventInfo.scheduledForDownload = true;
       }
+      long partitionSize = inputAttemptIdentifier.getPartitionSize(pendingInputs.getPartition());
+      rssFetcher = new RssFetcher(this, inputManager, rssShuffleClient,
+          com.datamonad.mr3.MR3Runtime.env().rssApplicationId(),
+          inputContext.shuffleId(), inputHost.getHost(), inputHost.getPort(),
+          pendingInputs.getPartition(), inputAttemptIdentifier, partitionSize);
     }
 
     // If inputHost contains remaining InputAttemptIdentifiers, re-enqueue it.
@@ -598,7 +593,8 @@ public class ShuffleManager implements FetcherCallback {
     HostPort identifier = new HostPort(hostName, port);
     InputHost host = knownSrcHosts.get(identifier);
     if (host == null) {
-      host = new InputHost(identifier);
+      host = new InputHost(identifier,
+          inputContext.readPartitionAllOnce(), inputContext.getSourceVertexNumTasks());
       InputHost old = knownSrcHosts.putIfAbsent(identifier, host);
       if (old != null) {
         host = old;

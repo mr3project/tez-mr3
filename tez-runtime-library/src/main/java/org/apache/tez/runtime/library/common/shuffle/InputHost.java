@@ -19,13 +19,14 @@
 package org.apache.tez.runtime.library.common.shuffle;
 
 import java.util.ArrayList;
-import java.util.Iterator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 
 /**
@@ -78,8 +79,25 @@ public class InputHost extends HostPort {
   private final Map<PartitionRange, BlockingQueue<InputAttemptIdentifier>>
       partitionToInputs = new ConcurrentHashMap<>();
 
-  public InputHost(HostPort hostPort) {
+  // readPartitionAllOnce == true only if RSS is used
+  // no need to use ConcurrentHashMap[] for tempPartitionToInputs because:
+  //   1. it is used only when readPartitionAllOnce == true and thus RSS is used
+  //   2. when RSS is used, addKnownInput() is called only from ShuffleManager.addKnownInput(), thus
+  //      always from the same thread
+  //   3. addKnownInput() is guarded with synchronized
+  private final boolean readPartitionAllOnce;
+  private final int srcVertexNumTasks;
+  private final Map<PartitionRange, List<InputAttemptIdentifier>> tempPartitionToInputs;
+
+  public InputHost(HostPort hostPort, boolean readPartitionAllOnce, int srcVertexNumTasks) {
     super(hostPort.getHost(), hostPort.getPort());
+    this.readPartitionAllOnce = readPartitionAllOnce;
+    this.srcVertexNumTasks = srcVertexNumTasks;
+    if (readPartitionAllOnce) {
+      tempPartitionToInputs = new HashMap<PartitionRange, List<InputAttemptIdentifier>>();
+    } else {
+      tempPartitionToInputs = null;
+    }
   }
 
   public void setAdditionalInfo(String additionalInfo) {
@@ -96,14 +114,56 @@ public class InputHost extends HostPort {
 
   public synchronized void addKnownInput(int partition, int partitionCount,
       InputAttemptIdentifier srcAttempt) {
-    PartitionRange partitionRange = new PartitionRange(partition, partitionCount);
-    BlockingQueue<InputAttemptIdentifier> inputs =
-        partitionToInputs.get(partitionRange);
+    if (readPartitionAllOnce) {
+      assert partitionCount == 1;
+      addKnownInputForReadPartitionAllOnce(partition, srcAttempt);
+    } else {
+      PartitionRange partitionRange = new PartitionRange(partition, partitionCount);
+      addToPartitionToInputs(partitionRange, srcAttempt);
+    }
+  }
+
+  private void addToPartitionToInputs(
+      PartitionRange partitionRange, InputAttemptIdentifier srcAttempt) {
+    BlockingQueue<InputAttemptIdentifier> inputs = partitionToInputs.get(partitionRange);
     if (inputs == null) {
       inputs = new LinkedBlockingQueue<InputAttemptIdentifier>();
       partitionToInputs.put(partitionRange, inputs);
     }
     inputs.add(srcAttempt);
+  }
+
+  private void addKnownInputForReadPartitionAllOnce(int partitionId, InputAttemptIdentifier srcAttempt) {
+    PartitionRange partitionRange = new PartitionRange(partitionId, 1);
+    List<InputAttemptIdentifier> inputs = tempPartitionToInputs.get(partitionRange);
+    if (inputs == null) {
+      inputs = new ArrayList<InputAttemptIdentifier>();
+      tempPartitionToInputs.put(partitionRange, inputs);
+    }
+    inputs.add(srcAttempt);
+
+    if (inputs.size() == srcVertexNumTasks) {
+      long partitionTotalSize = 0L;
+      for (InputAttemptIdentifier identifier: inputs) {
+        CompositeInputAttemptIdentifier cid = (CompositeInputAttemptIdentifier)identifier;
+        partitionTotalSize += cid.getPartitionSize(partitionId);
+      }
+      long[] partitionSizes = new long[partitionId + 1];
+      partitionSizes[partitionId] = partitionTotalSize;
+
+      InputAttemptIdentifier firstId = inputs.get(0);
+      CompositeInputAttemptIdentifier mergedCid = new CompositeInputAttemptIdentifier(
+              firstId.getInputIdentifier(),
+              firstId.getAttemptNumber(),
+              firstId.getPathComponent(),
+              firstId.isShared(),
+              firstId.getFetchTypeInfo(),
+              firstId.getSpillEventId(),
+              1, partitionSizes);
+
+      addToPartitionToInputs(partitionRange, mergedCid);
+      tempPartitionToInputs.remove(partitionRange);
+    }
   }
 
   public synchronized PartitionToInputs clearAndGetOnePartitionRange() {

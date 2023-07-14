@@ -1073,8 +1073,13 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       // If RSS is enabled, reader fetches data when it gets a DME with isLastSpill == true.
       // Therefore, the last event must contain mapId.
 
-      // host = task index when using RSS
-      payloadBuilder.setHost(String.valueOf(outputContext.getTaskIndex()));
+      if (outputContext.readPartitionAllOnce()) {
+        // host = vertex name (so that all DMEs from mappers are sent to the same InputHost)
+        payloadBuilder.setHost(outputContext.getTaskVertexName());
+      } else {
+        // host = task index when using RSS
+        payloadBuilder.setHost(String.valueOf(outputContext.getTaskIndex()));
+      }
 
       long maxPartitionSize = 0L;
       for (int i = 0; i < numPhysicalOutputs; i++) {
