@@ -51,4 +51,6 @@ public interface OutputContext extends TaskContext, DecompressorPool {
   public int shuffleId();
 
   public boolean useRssShuffle();
+
+  public boolean readPartitionAllOnce();
 }
