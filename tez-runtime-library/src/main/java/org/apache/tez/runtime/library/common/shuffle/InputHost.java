@@ -28,12 +28,15 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Represents a Host with respect to the MapReduce ShuffleHandler.
  * 
  */
 public class InputHost extends HostPort {
+  private static final Logger LOG = LoggerFactory.getLogger(InputHost.class);
 
   private static class PartitionRange {
 
@@ -123,16 +126,6 @@ public class InputHost extends HostPort {
     }
   }
 
-  private void addToPartitionToInputs(
-      PartitionRange partitionRange, InputAttemptIdentifier srcAttempt) {
-    BlockingQueue<InputAttemptIdentifier> inputs = partitionToInputs.get(partitionRange);
-    if (inputs == null) {
-      inputs = new LinkedBlockingQueue<InputAttemptIdentifier>();
-      partitionToInputs.put(partitionRange, inputs);
-    }
-    inputs.add(srcAttempt);
-  }
-
   private void addKnownInputForReadPartitionAllOnce(int partitionId, InputAttemptIdentifier srcAttempt) {
     PartitionRange partitionRange = new PartitionRange(partitionId, 1);
     List<InputAttemptIdentifier> inputs = tempPartitionToInputs.get(partitionRange);
@@ -143,6 +136,7 @@ public class InputHost extends HostPort {
     inputs.add(srcAttempt);
 
     if (inputs.size() == srcVertexNumTasks) {
+      // TODO: sanity check
       long partitionTotalSize = 0L;
       for (InputAttemptIdentifier identifier: inputs) {
         CompositeInputAttemptIdentifier cid = (CompositeInputAttemptIdentifier)identifier;
@@ -151,6 +145,7 @@ public class InputHost extends HostPort {
       long[] partitionSizes = new long[partitionId + 1];
       partitionSizes[partitionId] = partitionTotalSize;
 
+      // mergedCid can be consumed by Fetcher
       InputAttemptIdentifier firstId = inputs.get(0);
       CompositeInputAttemptIdentifier mergedCid = new CompositeInputAttemptIdentifier(
               firstId.getInputIdentifier(),
@@ -160,17 +155,27 @@ public class InputHost extends HostPort {
               firstId.getFetchTypeInfo(),
               firstId.getSpillEventId(),
               1, partitionSizes);
+      LOG.info("Merging {} partition inputs with total size {}: {} ", srcVertexNumTasks, partitionTotalSize, mergedCid);
 
       addToPartitionToInputs(partitionRange, mergedCid);
       tempPartitionToInputs.remove(partitionRange);
     }
   }
 
+  private void addToPartitionToInputs(
+      PartitionRange partitionRange, InputAttemptIdentifier srcAttempt) {
+    BlockingQueue<InputAttemptIdentifier> inputs = partitionToInputs.get(partitionRange);
+    if (inputs == null) {
+      inputs = new LinkedBlockingQueue<InputAttemptIdentifier>();
+      partitionToInputs.put(partitionRange, inputs);
+    }
+    inputs.add(srcAttempt);
+  }
+
   public synchronized PartitionToInputs clearAndGetOnePartitionRange() {
     for (Map.Entry<PartitionRange, BlockingQueue<InputAttemptIdentifier>> entry :
         partitionToInputs.entrySet()) {
-      List<InputAttemptIdentifier> inputs =
-          new ArrayList<InputAttemptIdentifier>(entry.getValue().size());
+      List<InputAttemptIdentifier> inputs = new ArrayList<InputAttemptIdentifier>(entry.getValue().size());
       entry.getValue().drainTo(inputs);
       PartitionToInputs ret = new PartitionToInputs(entry.getKey().getPartition(), entry.getKey().getPartitionCount(), inputs);
       partitionToInputs.remove(entry.getKey());

@@ -59,6 +59,8 @@ public class RssFetcher implements FetcherBase {
   private InputStream rssShuffleInputStream = null;
   private boolean isShutdown = false;
 
+  private final int mapIndexStart, mapIndexEnd;
+
   public RssFetcher(
       FetcherCallback fetcherCallback,
       FetchedInputAllocator inputAllocator,
@@ -69,7 +71,7 @@ public class RssFetcher implements FetcherBase {
       int port,
       int partition,
       InputAttemptIdentifier srcAttemptId,
-      long dataLength) {
+      long dataLength, int mapIndexStart, int mapIndexEnd) {
     assert (dataLength == -1 || dataLength > 0);
 
     this.fetcherCallback = fetcherCallback;
@@ -82,6 +84,8 @@ public class RssFetcher implements FetcherBase {
     this.partition = partition;
     this.srcAttemptId = srcAttemptId;
     this.dataLength = dataLength;
+    this.mapIndexStart = mapIndexStart;
+    this.mapIndexEnd = mapIndexEnd;
   }
 
   public FetchResult call() throws Exception {
@@ -96,11 +100,10 @@ public class RssFetcher implements FetcherBase {
       fetchedInput = inputAllocator.allocate(actualSize, actualSize, srcAttemptId);
     }
 
-    int mapIndex = Integer.parseInt(host);
     synchronized (lock) {
       if (!isShutdown) {
         rssShuffleInputStream = rssShuffleClient.readPartition(rssApplicationId, shuffleId, partition,
-            srcAttemptId.getAttemptNumber(), mapIndex, mapIndex + 1);
+            srcAttemptId.getAttemptNumber(), mapIndexStart, mapIndexEnd);
       } else {
         LOG.warn("RssFetcher.shutdown() is called before it connects to RSS. Stop running RssFetcher");
         throw new IllegalStateException("Detected shutdown");
