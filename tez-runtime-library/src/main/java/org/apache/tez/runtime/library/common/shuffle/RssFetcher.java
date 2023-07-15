@@ -124,8 +124,8 @@ public class RssFetcher implements FetcherBase {
 
     long copyDuration = System.currentTimeMillis() - startTime;
     if (readPartitionAllOnce) {
-      LOG.info("RssFetcher finished with readPartitionAllOnce: {}, num={}",
-          srcAttemptId, srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().size());
+      LOG.info("RssFetcher finished with readPartitionAllOnce: {}, num={}, partitionId={}",
+          srcAttemptId, srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().size(), partitionId);
       // fetchSucceeded(srcAttemptId) must be called before the loop so as to mark completion correctly
       fetcherCallback.fetchSucceeded(host, srcAttemptId, fetchedInput, dataLength, dataLength, copyDuration);
       for (InputAttemptIdentifier inputIdentifier: srcAttemptId.getInputIdentifiersForReadPartitionAllOnce()) {

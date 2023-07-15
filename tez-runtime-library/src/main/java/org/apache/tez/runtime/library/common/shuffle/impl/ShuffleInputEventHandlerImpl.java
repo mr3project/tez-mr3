@@ -194,7 +194,9 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
             constructInputAttemptIdentifier(dme.getTargetIndex(), 1, dme.getVersion(), shufflePayload, false);
         if (rssShuffleClient != null &&
             srcAttemptIdentifier.getFetchTypeInfo() == InputAttemptIdentifier.SPILL_INFO.FINAL_UPDATE) {
-          LOG.info("Last spill is empty, but notify ShuffleManager later by calling addKnownInput(): {} {}", srcIndex, srcAttemptIdentifier);
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Last spill is empty, but notify ShuffleManager later by calling addKnownInput(): {} {}", srcIndex, srcAttemptIdentifier);
+          }
         } else {
           if (LOG.isDebugEnabled()) {
             LOG.debug("Source partition: " + srcIndex + " did not generate any data. SrcAttempt: ["
