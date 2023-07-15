@@ -897,6 +897,9 @@ public class ShuffleManager implements FetcherCallback {
       completedInputSet.set(fetchedInput.getInputAttemptIdentifier().getInputIdentifier());
 
       int numComplete = numCompletedInputs.incrementAndGet();
+      if (numComplete == 1 && inputContext.readPartitionAllOnce()) {
+        LOG.info("First partition input fetched: 1/{}, {}", numInputs, fetchedInput.getInputAttemptIdentifier());
+      }
       if (numComplete == numInputs) {
         // Poison pill End of Input message to awake blocking take call
         if (fetchedInput instanceof NullFetchedInput) {
@@ -986,7 +989,9 @@ public class ShuffleManager implements FetcherCallback {
       lock.unlock();
     }
     if (eventInfo.isDone()) {
-      LOG.info("Mark completion okay: {}/{}, {}", numCompletedInputs.get(), numInputs, srcAttemptIdentifier);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Mark completion okay: {}/{}, {}", numCompletedInputs.get(), numInputs, srcAttemptIdentifier);
+      }
     }
 
     if (LOG.isTraceEnabled()) {
