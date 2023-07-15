@@ -27,7 +27,8 @@ import org.apache.tez.dag.api.TezUncheckedException;
 @Private
 public class InputAttemptIdentifier {
 
-  private final int inputIdentifier;    // DataMovementEvent.targetIndex == destInputIndex
+  // inputIdentifier == DataMovementEvent.targetIndex == destInputIndex in [0, ..., numInputs - 1]
+  private final int inputIdentifier;
   private final int attemptNumber;
   private final String pathComponent;
   private final boolean shared;

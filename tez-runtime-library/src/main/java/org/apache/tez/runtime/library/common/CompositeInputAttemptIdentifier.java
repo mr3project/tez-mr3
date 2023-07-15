@@ -20,6 +20,8 @@ package org.apache.tez.runtime.library.common;
 
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 
+import java.util.List;
+
 /**
  * Container for a task number and an attempt number for the task.
  */
@@ -27,6 +29,10 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 public class CompositeInputAttemptIdentifier extends InputAttemptIdentifier {
   private final int inputIdentifierCount;
   private final long[] partitionSizes;
+
+  // only for readPartitionAllOnce, size == srcVertexNumTasks
+  // TODO: create a subclass of CompositeInputAttemptIdentifier
+  private List<InputAttemptIdentifier> inputIdentifiers;
 
   public CompositeInputAttemptIdentifier(int inputIdentifier, int attemptNumber, String pathComponent, int inputIdentifierCount) {
     this(inputIdentifier, attemptNumber, pathComponent, false, SPILL_INFO.FINAL_MERGE_ENABLED, -1, inputIdentifierCount);
@@ -46,6 +52,7 @@ public class CompositeInputAttemptIdentifier extends InputAttemptIdentifier {
     super(inputIdentifier, attemptNumber, pathComponent, shared, fetchTypeInfo, spillEventId, -1L);
     this.inputIdentifierCount = inputIdentifierCount;
     this.partitionSizes = partitionSizes;
+    this.inputIdentifiers = null;
   }
   public int getInputIdentifierCount() {
     return inputIdentifierCount;
@@ -69,6 +76,14 @@ public class CompositeInputAttemptIdentifier extends InputAttemptIdentifier {
 
   public long getPartitionSize(int partitionId) {
     return partitionSizes == null ? -1L : partitionSizes[partitionId];
+  }
+
+  public void setInputIdentifiersForReadPartitionAllOnce(List<InputAttemptIdentifier> inputIdentifiers) {
+    this.inputIdentifiers = inputIdentifiers;
+  }
+
+  public List<InputAttemptIdentifier> getInputIdentifiersForReadPartitionAllOnce() {
+    return inputIdentifiers;
   }
 
   // PathComponent & shared does not need to be part of the hashCode and equals computation.

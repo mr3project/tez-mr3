@@ -115,13 +115,13 @@ public class InputHost extends HostPort {
     return partitionToInputs.size();
   }
 
-  public synchronized void addKnownInput(int partition, int partitionCount,
+  public synchronized void addKnownInput(int partitionId, int partitionCount,
       InputAttemptIdentifier srcAttempt) {
     if (readPartitionAllOnce) {
       assert partitionCount == 1;
-      addKnownInputForReadPartitionAllOnce(partition, srcAttempt);
+      addKnownInputForReadPartitionAllOnce(partitionId, srcAttempt);
     } else {
-      PartitionRange partitionRange = new PartitionRange(partition, partitionCount);
+      PartitionRange partitionRange = new PartitionRange(partitionId, partitionCount);
       addToPartitionToInputs(partitionRange, srcAttempt);
     }
   }
@@ -136,26 +136,32 @@ public class InputHost extends HostPort {
     inputs.add(srcAttempt);
 
     if (inputs.size() == srcVertexNumTasks) {
-      // TODO: sanity check
+      // TODO: sanity check - all InputAttemptIdentifier's should have the same attemptNumber
       long partitionTotalSize = 0L;
-      for (InputAttemptIdentifier identifier: inputs) {
-        CompositeInputAttemptIdentifier cid = (CompositeInputAttemptIdentifier)identifier;
+      for (InputAttemptIdentifier input: inputs) {
+        CompositeInputAttemptIdentifier cid = (CompositeInputAttemptIdentifier)input;
         partitionTotalSize += cid.getPartitionSize(partitionId);
       }
       long[] partitionSizes = new long[partitionId + 1];
-      partitionSizes[partitionId] = partitionTotalSize;
+      partitionSizes[partitionId] = partitionTotalSize;   // other fields are never used
 
       // mergedCid can be consumed by Fetcher
       InputAttemptIdentifier firstId = inputs.get(0);
       CompositeInputAttemptIdentifier mergedCid = new CompositeInputAttemptIdentifier(
-              firstId.getInputIdentifier(),
-              firstId.getAttemptNumber(),
-              firstId.getPathComponent(),
-              firstId.isShared(),
-              firstId.getFetchTypeInfo(),
-              firstId.getSpillEventId(),
-              1, partitionSizes);
-      LOG.info("Merging {} partition inputs with total size {}: {} ", srcVertexNumTasks, partitionTotalSize, mergedCid);
+          // one representative InputAttemptIdentifier (i.e., destInputIndexes) for:
+          //   1. checking 'alreadyCompleted'  in ShuffleManager.constructRssFetcher()
+          //   2. for committing FetchedInput in RssFetcher
+          firstId.getInputIdentifier(),
+          firstId.getAttemptNumber(),
+          firstId.getPathComponent(),
+          firstId.isShared(),
+          firstId.getFetchTypeInfo(),
+          firstId.getSpillEventId(),
+          1, partitionSizes);
+      mergedCid.setInputIdentifiersForReadPartitionAllOnce(inputs);
+
+      LOG.info("Merging {} partition inputs for partitionId={} with total size {}: {} ",srcVertexNumTasks,
+          partitionId, partitionTotalSize, mergedCid);
 
       addToPartitionToInputs(partitionRange, mergedCid);
       tempPartitionToInputs.remove(partitionRange);

@@ -22,6 +22,7 @@ import org.apache.celeborn.client.ShuffleClient;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.tez.dag.api.TezUncheckedException;
+import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.slf4j.Logger;
@@ -45,8 +46,8 @@ public class RssFetcher implements FetcherBase {
 
   private final String host;
   private final int port;
-  private final int partition;
-  private final InputAttemptIdentifier srcAttemptId;
+  private final int partitionId;
+  private final CompositeInputAttemptIdentifier srcAttemptId;
 
   private static final Logger LOG = LoggerFactory.getLogger(RssFetcher.class);
 
@@ -60,6 +61,7 @@ public class RssFetcher implements FetcherBase {
   private boolean isShutdown = false;
 
   private final int mapIndexStart, mapIndexEnd;
+  private final boolean readPartitionAllOnce;
 
   public RssFetcher(
       FetcherCallback fetcherCallback,
@@ -69,9 +71,10 @@ public class RssFetcher implements FetcherBase {
       int shuffleId,
       String host,
       int port,
-      int partition,
-      InputAttemptIdentifier srcAttemptId,
-      long dataLength, int mapIndexStart, int mapIndexEnd) {
+      int partitionId,
+      CompositeInputAttemptIdentifier srcAttemptId,
+      long dataLength, int mapIndexStart, int mapIndexEnd,
+      boolean readPartitionAllOnce) {
     assert (dataLength == -1 || dataLength > 0);
 
     this.fetcherCallback = fetcherCallback;
@@ -81,11 +84,12 @@ public class RssFetcher implements FetcherBase {
     this.shuffleId = shuffleId;
     this.host = host;
     this.port = port;
-    this.partition = partition;
+    this.partitionId = partitionId;
     this.srcAttemptId = srcAttemptId;
     this.dataLength = dataLength;
     this.mapIndexStart = mapIndexStart;
     this.mapIndexEnd = mapIndexEnd;
+    this.readPartitionAllOnce = readPartitionAllOnce;
   }
 
   public FetchResult call() throws Exception {
@@ -93,8 +97,7 @@ public class RssFetcher implements FetcherBase {
 
     FetchedInput fetchedInput;
     if (dataLengthUnknown()) {
-      fetchedInput =
-          inputAllocator.allocateType(FetchedInput.Type.DISK, dataLength, dataLength, srcAttemptId);
+      fetchedInput = inputAllocator.allocateType(FetchedInput.Type.DISK, dataLength, dataLength, srcAttemptId);
     } else {
       long actualSize = dataLength + EOF_MARKERS_SIZE;
       fetchedInput = inputAllocator.allocate(actualSize, actualSize, srcAttemptId);
@@ -102,7 +105,7 @@ public class RssFetcher implements FetcherBase {
 
     synchronized (lock) {
       if (!isShutdown) {
-        rssShuffleInputStream = rssShuffleClient.readPartition(rssApplicationId, shuffleId, partition,
+        rssShuffleInputStream = rssShuffleClient.readPartition(rssApplicationId, shuffleId, partitionId,
             srcAttemptId.getAttemptNumber(), mapIndexStart, mapIndexEnd);
       } else {
         LOG.warn("RssFetcher.shutdown() is called before it connects to RSS. Stop running RssFetcher");
@@ -119,10 +122,21 @@ public class RssFetcher implements FetcherBase {
       throw new TezUncheckedException("Unknown FetchedInput.Type: " + fetchedInput);
     }
 
-    long copyDuration  = System.currentTimeMillis() - startTime;
-    fetcherCallback.fetchSucceeded(host, srcAttemptId, fetchedInput, dataLength, dataLength, copyDuration);
+    long copyDuration = System.currentTimeMillis() - startTime;
+    if (readPartitionAllOnce) {
+      LOG.info("RssFetcher finished with readPartitionAllOnce: {}, num={}",
+          srcAttemptId, srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().size());
+      // fetchSucceeded(srcAttemptId) must be called before the loop so as to mark completion correctly
+      fetcherCallback.fetchSucceeded(host, srcAttemptId, fetchedInput, dataLength, dataLength, copyDuration);
+      for (InputAttemptIdentifier inputIdentifier: srcAttemptId.getInputIdentifiersForReadPartitionAllOnce()) {
+        // fetchedInput == null, so mark completion
+        fetcherCallback.fetchSucceeded(host, inputIdentifier, null, 0L, 0L, 0L);
+      }
+    } else {
+      fetcherCallback.fetchSucceeded(host, srcAttemptId, fetchedInput, dataLength, dataLength, copyDuration);
+    }
 
-    return new FetchResult(host, port, partition, 1, new ArrayList<>());
+    return new FetchResult(host, port, partitionId, 1, new ArrayList<>());
   }
 
   public void shutdown() {

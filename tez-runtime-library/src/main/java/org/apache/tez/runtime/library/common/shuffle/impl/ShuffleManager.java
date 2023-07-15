@@ -100,7 +100,7 @@ public class ShuffleManager implements FetcherCallback {
   private static final FetchStatsLogger fetchStatsLogger = new FetchStatsLogger(LOG_FETCH, LOG);
 
   private final InputContext inputContext;
-  private final int numInputs;
+  private final int numInputs;  // AbstractLogicalInput.numPhysicalInputs
 
   private final DecimalFormat mbpsFormat = new DecimalFormat("0.00");
 
@@ -115,7 +115,7 @@ public class ShuffleManager implements FetcherCallback {
   private final BlockingQueue<FetchedInput> completedInputs;
   private final AtomicBoolean inputReadyNotificationSent = new AtomicBoolean(false);
   @VisibleForTesting
-  final BitSet completedInputSet;
+  final BitSet completedInputSet;   // [0, ..., numInputs - 1]
   private final ConcurrentMap<HostPort, InputHost> knownSrcHosts;
   private final BlockingQueue<InputHost> pendingHosts;
   private final Set<InputAttemptIdentifier> obsoletedInputs;
@@ -562,14 +562,25 @@ public class ShuffleManager implements FetcherCallback {
     CompositeInputAttemptIdentifier inputAttemptIdentifier =
         (CompositeInputAttemptIdentifier)pendingInputs.getInputs().get(0);
 
+    // if inputContext.readPartitionAllOnce() == true, we check just one inputIdentifier
     boolean alreadyCompleted = completedInputSet.get(inputAttemptIdentifier.getInputIdentifier());
     // We do not check obsoletedInput because we do not rerun SourceTask when RSS is enabled.
+
     if (!alreadyCompleted) {
-      // Create an RssFetcher and stop iterating over the while loop
-      ShuffleEventInfo eventInfo = shuffleInfoEventsMap.get(inputAttemptIdentifier.getInputIdentifier());
-      if (eventInfo != null) {
-        eventInfo.scheduledForDownload = true;
+      if (inputContext.readPartitionAllOnce()) {
+        for (InputAttemptIdentifier input: inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce()) {
+          ShuffleEventInfo eventInfo = shuffleInfoEventsMap.get(input.getInputIdentifier());
+          if (eventInfo != null) {
+            eventInfo.scheduledForDownload = true;
+          }
+        }
+      } else {
+        ShuffleEventInfo eventInfo = shuffleInfoEventsMap.get(inputAttemptIdentifier.getInputIdentifier());
+        if (eventInfo != null) {
+          eventInfo.scheduledForDownload = true;
+        }
       }
+
       long partitionSize = inputAttemptIdentifier.getPartitionSize(pendingInputs.getPartition());
 
       int mapIndexStart, mapIndexEnd;
@@ -585,7 +596,7 @@ public class ShuffleManager implements FetcherCallback {
           com.datamonad.mr3.MR3Runtime.env().rssApplicationId(),
           inputContext.shuffleId(), inputHost.getHost(), inputHost.getPort(),
           pendingInputs.getPartition(), inputAttemptIdentifier,
-          partitionSize, mapIndexStart, mapIndexEnd);
+          partitionSize, mapIndexStart, mapIndexEnd, inputContext.readPartitionAllOnce());
     }
 
     // If inputHost contains remaining InputAttemptIdentifiers, re-enqueue it.
@@ -599,7 +610,8 @@ public class ShuffleManager implements FetcherCallback {
   /////////////////// Methods for InputEventHandler
   
   public void addKnownInput(String hostName, int port,
-                            CompositeInputAttemptIdentifier srcAttemptIdentifier, int srcPhysicalIndex) {
+      CompositeInputAttemptIdentifier srcAttemptIdentifier, int srcPhysicalIndex) {
+    // srcPhysicalIndex == partitionId
     // if rssShuffleClient != null, hostName == source task index (encoded as a string) and port == 0
     HostPort identifier = new HostPort(hostName, port);
     InputHost host = knownSrcHosts.get(identifier);
@@ -804,35 +816,48 @@ public class ShuffleManager implements FetcherCallback {
     try {
       // lastProgressTime = System.currentTimeMillis();
       if (!completedInputSet.get(inputIdentifier)) {
-        fetchedInput.commit();
-        fetchStatsLogger.logIndividualFetchComplete(copyDuration,
-            fetchedBytes, decompressedLength, fetchedInput.getType().toString(), srcAttemptIdentifier);
+        if (fetchedInput != null) {
+          fetchedInput.commit();
+          fetchStatsLogger.logIndividualFetchComplete(copyDuration,
+              fetchedBytes, decompressedLength, fetchedInput.getType().toString(), srcAttemptIdentifier);
 
-        // Processing counters for completed and commit fetches only. Need
-        // additional counters for excessive fetches - which primarily comes
-        // in after speculation or retries.
-        shuffledInputsCounter.increment(1);
-        bytesShuffledCounter.increment(fetchedBytes);
-        if (fetchedInput.getType() == Type.MEMORY) {
-          bytesShuffledToMemCounter.increment(fetchedBytes);
-        } else if (fetchedInput.getType() == Type.DISK) {
-          bytesShuffledToDiskCounter.increment(fetchedBytes);
-        } else if (fetchedInput.getType() == Type.DISK_DIRECT) {
-          bytesShuffledDirectDiskCounter.increment(fetchedBytes);
-        }
-        decompressedDataSizeCounter.increment(decompressedLength);
+          // Processing counters for completed and commit fetches only. Need
+          // additional counters for excessive fetches - which primarily comes
+          // in after speculation or retries.
+          shuffledInputsCounter.increment(1);
+          bytesShuffledCounter.increment(fetchedBytes);
+          if (fetchedInput.getType() == Type.MEMORY) {
+            bytesShuffledToMemCounter.increment(fetchedBytes);
+          } else if (fetchedInput.getType() == Type.DISK) {
+            bytesShuffledToDiskCounter.increment(fetchedBytes);
+          } else if (fetchedInput.getType() == Type.DISK_DIRECT) {
+            bytesShuffledDirectDiskCounter.increment(fetchedBytes);
+          }
+          decompressedDataSizeCounter.increment(decompressedLength);
 
-        if (!srcAttemptIdentifier.canRetrieveInputInChunks()) {
-          registerCompletedInput(fetchedInput);
+          if (!srcAttemptIdentifier.canRetrieveInputInChunks()) {
+            registerCompletedInput(fetchedInput);
+          } else {
+            registerCompletedInputForPipelinedShuffle(srcAttemptIdentifier, fetchedInput);
+          }
+
+          totalBytesShuffledTillNow += fetchedBytes;
+          logProgress();
+          wakeLoop.signal();
         } else {
-          registerCompletedInputForPipelinedShuffle(srcAttemptIdentifier, fetchedInput);
+          // only mark completion
+          assert inputContext.readPartitionAllOnce();
+          shuffledInputsCounter.increment(1);
+          registerCompletedInputForPipelinedShuffleMarkOnly(srcAttemptIdentifier);
+          logProgress();
         }
-
-        totalBytesShuffledTillNow += fetchedBytes;
-        logProgress();
-        wakeLoop.signal();
       } else {
-        fetchedInput.abort(); // If this fails, the fetcher may attempt another abort.
+        if (fetchedInput != null) {
+          fetchedInput.abort(); // If this fails, the fetcher may attempt another abort.
+        } else {
+          // the representative InputAttemptIdentifier is processed twice when readPartitionAllOnce == true
+          assert inputContext.readPartitionAllOnce();
+        }
       }
     } finally {
       lock.unlock();
@@ -927,6 +952,41 @@ public class ShuffleManager implements FetcherCallback {
       }
     } finally {
       lock.unlock();
+    }
+
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("eventInfo " + eventInfo.toString());
+    }
+  }
+
+  private void registerCompletedInputForPipelinedShuffleMarkOnly(InputAttemptIdentifier srcAttemptIdentifier) {
+    int inputIdentifier = srcAttemptIdentifier.getInputIdentifier();
+    ShuffleEventInfo eventInfo = shuffleInfoEventsMap.get(inputIdentifier);
+
+    // TODO: assert eventInfo != null (???)
+    if (eventInfo == null) {
+      eventInfo = new ShuffleEventInfo(srcAttemptIdentifier);
+      shuffleInfoEventsMap.put(inputIdentifier, eventInfo);
+    }
+
+    eventInfo.spillProcessed(srcAttemptIdentifier.getSpillEventId());
+    numFetchedSpills.getAndIncrement();
+
+    assert srcAttemptIdentifier.getFetchTypeInfo() == InputAttemptIdentifier.SPILL_INFO.FINAL_UPDATE;
+    eventInfo.setFinalEventId(srcAttemptIdentifier.getSpillEventId());
+
+    lock.lock();
+    try {
+      if (eventInfo.isDone()) {
+        completedInputSet.set(srcAttemptIdentifier.getInputIdentifier());
+        numCompletedInputs.incrementAndGet();
+        shuffleInfoEventsMap.remove(srcAttemptIdentifier.getInputIdentifier());
+      }
+    } finally {
+      lock.unlock();
+    }
+    if (eventInfo.isDone()) {
+      LOG.info("Mark completion okay: {}/{}, {}", numCompletedInputs.get(), numInputs, srcAttemptIdentifier);
     }
 
     if (LOG.isTraceEnabled()) {
