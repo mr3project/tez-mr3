@@ -852,12 +852,7 @@ public class ShuffleManager implements FetcherCallback {
           logProgress();
         }
       } else {
-        if (fetchedInput != null) {
-          fetchedInput.abort(); // If this fails, the fetcher may attempt another abort.
-        } else {
-          // the representative InputAttemptIdentifier is processed twice when readPartitionAllOnce == true
-          assert inputContext.readPartitionAllOnce();
-        }
+        fetchedInput.abort();
       }
     } finally {
       lock.unlock();
@@ -897,9 +892,6 @@ public class ShuffleManager implements FetcherCallback {
       completedInputSet.set(fetchedInput.getInputAttemptIdentifier().getInputIdentifier());
 
       int numComplete = numCompletedInputs.incrementAndGet();
-      if (numComplete == 1 && inputContext.readPartitionAllOnce()) {
-        LOG.info("First partition input fetched: 1/{}, {}", numInputs, fetchedInput.getInputAttemptIdentifier());
-      }
       if (numComplete == numInputs) {
         // Poison pill End of Input message to awake blocking take call
         if (fetchedInput instanceof NullFetchedInput) {
