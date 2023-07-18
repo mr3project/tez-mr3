@@ -23,6 +23,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.text.DecimalFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collections;
@@ -366,6 +367,8 @@ public class ShuffleManager implements FetcherCallback {
         if (numCompletedInputs.get() < numInputs && !isShutdown.get()) {
           lock.lock();
           try {
+            // the while{} loop may create more than maxFetchersToRun Fetchers
+            // because constructRssFetcher() returns a list of RssFetchers
             int maxFetchersToRun = numFetchers - runningFetchers.size();
             int count = 0;
             while (pendingHosts.peek() != null && !isShutdown.get()) {
@@ -386,28 +389,39 @@ public class ShuffleManager implements FetcherCallback {
                     inputHost.toDetailedString());
               }
               if (inputHost.getNumPendingPartitions() > 0 && !isShutdown.get()) {
-                FetcherBase fetcher;
                 if (rssShuffleClient == null) {
-                  fetcher = constructFetcherForHost(inputHost, conf);
+                  FetcherBase fetcher = constructFetcherForHost(inputHost, conf);
+                  if (fetcher == null) {
+                    continue;
+                  }
+                  runningFetchers.add(fetcher);
+                  if (isShutdown.get()) {
+                    LOG.info(srcNameTrimmed + ": hasBeenShutdown, Breaking out of ShuffleScheduler Loop");
+                    break;
+                  }
+                  ListenableFuture<FetchResult> future = fetcherExecutor.submit(fetcher);
+                  Futures.addCallback(future, new FetchFutureCallback(fetcher));
+                  if (++count >= maxFetchersToRun) {
+                    break;
+                  }
                 } else {
-                  fetcher = constructRssFetcher(inputHost);
-                }
-
-                if (fetcher == null) {
-                  continue;
-                }
-
-                runningFetchers.add(fetcher);
-
-                if (isShutdown.get()) {
-                  LOG.info(srcNameTrimmed + ": hasBeenShutdown, Breaking out of ShuffleScheduler Loop");
-                  break;
-                }
-
-                ListenableFuture<FetchResult> future = fetcherExecutor.submit(fetcher);
-                Futures.addCallback(future, new FetchFutureCallback(fetcher));
-                if (++count >= maxFetchersToRun) {
-                  break;
+                  List<RssFetcher> fetchers = constructRssFetcher(inputHost);
+                  if (fetchers.isEmpty()) {
+                    continue;
+                  }
+                  runningFetchers.addAll(fetchers);
+                  if (isShutdown.get()) {
+                    LOG.info(srcNameTrimmed + ": hasBeenShutdown, Breaking out of ShuffleScheduler Loop");
+                    break;
+                  }
+                  for (RssFetcher fetcher: fetchers) {
+                    ListenableFuture<FetchResult> future = fetcherExecutor.submit(fetcher);
+                    Futures.addCallback(future, new FetchFutureCallback(fetcher));
+                  }
+                  count += fetchers.size();
+                  if (count >= maxFetchersToRun) {
+                    break;
+                  }
                 }
               } else {
                 if (LOG.isDebugEnabled()) {
@@ -550,9 +564,9 @@ public class ShuffleManager implements FetcherCallback {
     return fetcherBuilder.build();
   }
 
-  public RssFetcher constructRssFetcher(InputHost inputHost) {
+  public List<RssFetcher> constructRssFetcher(InputHost inputHost) {
     assert inputHost.getNumPendingPartitions() > 0;
-    RssFetcher rssFetcher = null;
+    List<RssFetcher> rssFetchers = new ArrayList<RssFetcher>();
 
     PartitionToInputs pendingInputs = inputHost.clearAndGetOnePartitionRange();
     assert pendingInputs.getPartitionCount() == 1;
@@ -582,22 +596,85 @@ public class ShuffleManager implements FetcherCallback {
         }
       }
 
-      long partitionSize = inputAttemptIdentifier.getPartitionSize(pendingInputs.getPartition());
+      long partitionTotalSize = inputAttemptIdentifier.getPartitionSize(pendingInputs.getPartition());
 
-      int mapIndexStart, mapIndexEnd;
       if (inputContext.readPartitionAllOnce()) {
-        mapIndexStart = 0;
-        mapIndexEnd = inputContext.getSourceVertexNumTasks();
-      } else {
-        mapIndexStart = Integer.parseInt(inputHost.getHost());
-        mapIndexEnd = mapIndexStart + 1;
-      }
+        List<InputAttemptIdentifier> inputAttemptIdentifiers =
+            inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce();
+        int numIdentifiers = inputAttemptIdentifiers.size();
+        assert numIdentifiers == inputContext.getSourceVertexNumTasks();
 
-      rssFetcher = new RssFetcher(this, inputManager, rssShuffleClient,
-          com.datamonad.mr3.MR3Runtime.env().rssApplicationId(),
-          inputContext.shuffleId(), inputHost.getHost(), inputHost.getPort(),
-          pendingInputs.getPartition(), inputAttemptIdentifier,
-          partitionSize, mapIndexStart, mapIndexEnd, inputContext.readPartitionAllOnce());
+        long thresholdSize = 512L * 1024 * 1024;    // 512MB
+        if (partitionTotalSize > thresholdSize) {
+          // a single call to RSS would create a file larger than thresholdSize
+          int numFetchers =
+              Math.min((int)((partitionTotalSize - 1L) / thresholdSize) + 1, numIdentifiers);
+          int numIndentifiersPerFetcher = numIdentifiers / numFetchers;
+          int numLargeFetchers = numIdentifiers - numIndentifiersPerFetcher * numFetchers;
+          assert numIdentifiers == numLargeFetchers * (numIndentifiersPerFetcher + 1) +
+              (numFetchers - numLargeFetchers) * numIndentifiersPerFetcher;
+
+          LOG.info("Splitting InputAttemptIdentifiers to {} RssFetchers: {} / {}",
+              numFetchers, partitionTotalSize, numIdentifiers);
+
+          int partitionId = pendingInputs.getPartition();
+          int mapIndexStart = 0;
+          int mapIndexEnd = numIdentifiers;
+          for (int i = 0; i < numFetchers; i++) {
+            int numExtra = i < numLargeFetchers ? 1 : 0;
+            int numIdentifiersToConsume = numIndentifiersPerFetcher + numExtra;
+            mapIndexEnd = mapIndexStart + numIdentifiersToConsume;
+
+            List<InputAttemptIdentifier> subList = inputAttemptIdentifiers.subList(mapIndexStart, mapIndexEnd);
+            long subTotalSize = 0L;
+            for (InputAttemptIdentifier input: subList) {
+              CompositeInputAttemptIdentifier cid = (CompositeInputAttemptIdentifier)input;
+              subTotalSize += cid.getPartitionSize(partitionId);
+            }
+
+            long[] partitionSizes = new long[partitionId + 1];
+            partitionSizes[partitionId] = subTotalSize;
+
+            InputAttemptIdentifier firstId = subList.get(0);
+            CompositeInputAttemptIdentifier mergedCid = new CompositeInputAttemptIdentifier(
+                firstId.getInputIdentifier(),
+                firstId.getAttemptNumber(),
+                firstId.getPathComponent(),
+                firstId.isShared(),
+                firstId.getFetchTypeInfo(),
+                firstId.getSpillEventId(),
+                1, partitionSizes);
+            mergedCid.setInputIdentifiersForReadPartitionAllOnce(subList);
+            RssFetcher rssFetcher = new RssFetcher(this, inputManager, rssShuffleClient,
+                com.datamonad.mr3.MR3Runtime.env().rssApplicationId(),
+                inputContext.shuffleId(), inputHost.getHost(), inputHost.getPort(),
+                partitionId, mergedCid,
+                subTotalSize, mapIndexStart, mapIndexEnd, true);
+            rssFetchers.add(rssFetcher);
+
+            mapIndexStart = mapIndexEnd;
+          }
+          assert mapIndexEnd == numIdentifiers;
+        } else {
+          int mapIndexStart = 0;
+          int mapIndexEnd = inputContext.getSourceVertexNumTasks();
+          RssFetcher rssFetcher = new RssFetcher(this, inputManager, rssShuffleClient,
+              com.datamonad.mr3.MR3Runtime.env().rssApplicationId(),
+              inputContext.shuffleId(), inputHost.getHost(), inputHost.getPort(),
+              pendingInputs.getPartition(), inputAttemptIdentifier,
+              partitionTotalSize, mapIndexStart, mapIndexEnd, true);
+          rssFetchers.add(rssFetcher);
+        }
+      } else {
+        int mapIndexStart = Integer.parseInt(inputHost.getHost());
+        int mapIndexEnd = mapIndexStart + 1;
+        RssFetcher rssFetcher = new RssFetcher(this, inputManager, rssShuffleClient,
+            com.datamonad.mr3.MR3Runtime.env().rssApplicationId(),
+            inputContext.shuffleId(), inputHost.getHost(), inputHost.getPort(),
+            pendingInputs.getPartition(), inputAttemptIdentifier,
+            partitionTotalSize, mapIndexStart, mapIndexEnd, false);
+        rssFetchers.add(rssFetcher);
+      }
     }
 
     // If inputHost contains remaining InputAttemptIdentifiers, re-enqueue it.
@@ -605,7 +682,7 @@ public class ShuffleManager implements FetcherCallback {
       pendingHosts.add(inputHost);
     }
 
-    return rssFetcher;
+    return rssFetchers;
   }
 
   /////////////////// Methods for InputEventHandler
