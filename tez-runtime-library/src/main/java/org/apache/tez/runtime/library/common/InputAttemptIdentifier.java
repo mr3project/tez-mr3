@@ -33,8 +33,6 @@ public class InputAttemptIdentifier {
   private final String pathComponent;
   private final boolean shared;
 
-  private final long partitionSize;  // for RSS (Celeborn)
-
   public static final String PATH_PREFIX = "attempt";
   public static final String PATH_PREFIX_MR3 = com.datamonad.mr3.container.ContainerID$.MODULE$.prefixInContainerWorkerEnv();
 
@@ -61,18 +59,17 @@ public class InputAttemptIdentifier {
   }
 
   public InputAttemptIdentifier(int inputIdentifier, int attemptNumber, String pathComponent, boolean shared) {
-    this(inputIdentifier, attemptNumber, pathComponent, shared, SPILL_INFO.FINAL_MERGE_ENABLED, -1, -1L);
+    this(inputIdentifier, attemptNumber, pathComponent, shared, SPILL_INFO.FINAL_MERGE_ENABLED, -1);
   }
 
   public InputAttemptIdentifier(int inputIdentifier, int attemptNumber, String pathComponent,
-      boolean shared, SPILL_INFO fetchTypeInfo, int spillEventId, long partitionSize) {
+      boolean shared, SPILL_INFO fetchTypeInfo, int spillEventId) {
     this.inputIdentifier = inputIdentifier;
     this.attemptNumber = attemptNumber;
     this.pathComponent = pathComponent;
     this.shared = shared;
     this.fetchTypeInfo = (byte)fetchTypeInfo.ordinal();
     this.spillEventId = spillEventId;
-    this.partitionSize = partitionSize;
     if (pathComponent != null && !pathComponent.startsWith(PATH_PREFIX_MR3) && !pathComponent.startsWith(PATH_PREFIX)) {
       throw new TezUncheckedException(
           "Path component must start with: " + PATH_PREFIX_MR3 + "/" + PATH_PREFIX + ", " + this);
@@ -106,10 +103,6 @@ public class InputAttemptIdentifier {
 
   public int getSpillEventId() {
     return spillEventId;
-  }
-
-  public long getPartitionSize() {
-    return partitionSize;
   }
 
   public boolean canRetrieveInputInChunks() {

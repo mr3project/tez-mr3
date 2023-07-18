@@ -49,7 +49,7 @@ public class CompositeInputAttemptIdentifier extends InputAttemptIdentifier {
 
   public CompositeInputAttemptIdentifier(int inputIdentifier, int attemptNumber, String pathComponent,
       boolean shared, SPILL_INFO fetchTypeInfo, int spillEventId, int inputIdentifierCount, long[] partitionSizes) {
-    super(inputIdentifier, attemptNumber, pathComponent, shared, fetchTypeInfo, spillEventId, -1L);
+    super(inputIdentifier, attemptNumber, pathComponent, shared, fetchTypeInfo, spillEventId);
     this.inputIdentifierCount = inputIdentifierCount;
     this.partitionSizes = partitionSizes;
     this.inputIdentifiers = null;
@@ -60,18 +60,13 @@ public class CompositeInputAttemptIdentifier extends InputAttemptIdentifier {
 
   public InputAttemptIdentifier expand(int inputIdentifierOffset) {
     return new InputAttemptIdentifier(getInputIdentifier() + inputIdentifierOffset, getAttemptNumber(),
-        getPathComponent(), isShared(), getFetchTypeInfo(), getSpillEventId(), -1L);
+        getPathComponent(), isShared(), getFetchTypeInfo(), getSpillEventId());
   }
 
   public boolean include(int thatInputIdentifier, int thatAttemptNumber) {
     return
         super.getInputIdentifier() <= thatInputIdentifier && thatInputIdentifier < (super.getInputIdentifier() + inputIdentifierCount) &&
         super.getAttemptNumber() == thatAttemptNumber;
-  }
-
-  @Override
-  public long getPartitionSize() {
-    throw new UnsupportedOperationException("CompositeInputAttemptIdentifier does not return partitionSize");
   }
 
   public long getPartitionSize(int partitionId) {
