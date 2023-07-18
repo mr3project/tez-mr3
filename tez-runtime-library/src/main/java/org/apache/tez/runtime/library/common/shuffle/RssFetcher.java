@@ -124,8 +124,8 @@ public class RssFetcher implements FetcherBase {
 
     long copyDuration = System.currentTimeMillis() - startTime;
     if (readPartitionAllOnce) {
-      LOG.info("RssFetcher finished with readPartitionAllOnce: {}, num={}, partitionId={}",
-          srcAttemptId, srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().size(), partitionId);
+      LOG.info("RssFetcher finished with readPartitionAllOnce: {}, num={}, partitionId={}, dataLength={}, copyDuration={}",
+          srcAttemptId, srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().size(), partitionId, dataLength, copyDuration);
       // ShuffleManager.getNextInput() should not get stuck in completedInputs.take():
       //   1. mark completion for every InputAttemptIdentifier except srcAttemptId
       //   2. call fetchSucceeded() on srcAttemptId and fetchedInput

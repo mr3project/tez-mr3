@@ -818,8 +818,10 @@ public class ShuffleManager implements FetcherCallback {
       if (!completedInputSet.get(inputIdentifier)) {
         if (fetchedInput != null) {
           fetchedInput.commit();
-          fetchStatsLogger.logIndividualFetchComplete(copyDuration,
-              fetchedBytes, decompressedLength, fetchedInput.getType().toString(), srcAttemptIdentifier);
+          if (!inputContext.readPartitionAllOnce()) {
+            fetchStatsLogger.logIndividualFetchComplete(copyDuration,
+                fetchedBytes, decompressedLength, fetchedInput.getType().toString(), srcAttemptIdentifier);
+          }
 
           // Processing counters for completed and commit fetches only. Need
           // additional counters for excessive fetches - which primarily comes
