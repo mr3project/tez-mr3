@@ -187,6 +187,8 @@ public class ShuffleManager implements FetcherCallback {
   // TODO More counters - FetchErrors, speed?
   private final ShuffleClient rssShuffleClient;
 
+  private long rssFetchSplitThresholdSize;
+
   public ShuffleManager(InputContext inputContext, Configuration conf, int numInputs,
       int bufferSize, boolean ifileReadAheadEnabled, int ifileReadAheadLength,
       CompressionCodec codec, FetchedInputAllocator inputAllocator,
@@ -297,8 +299,13 @@ public class ShuffleManager implements FetcherCallback {
 
     this.rssShuffleClient = rssShuffleClient;
     if (this.rssShuffleClient != null) {
-      LOG.info("Registering shuffleId = " + inputContext.shuffleId());
+      if (inputContext.readPartitionAllOnce()) {
+        rssFetchSplitThresholdSize = conf.getLong(
+            TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_FETCH_SPLIT_THRESHOLD,
+            TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_FETCH_SPLIT_THRESHOLD_DEFAULT);
+      }
       com.datamonad.mr3.MR3Runtime.env().registerShuffleId(inputContext.getDagId(), inputContext.shuffleId());
+      LOG.info("Registered shuffleId = " + inputContext.shuffleId());
     }
 
     LOG.info("{}: numInputs={}, numFetchers={}, rssShuffleClient={}",
@@ -604,11 +611,10 @@ public class ShuffleManager implements FetcherCallback {
         int numIdentifiers = inputAttemptIdentifiers.size();
         assert numIdentifiers == inputContext.getSourceVertexNumTasks();
 
-        long thresholdSize = 512L * 1024 * 1024;    // 512MB
-        if (partitionTotalSize > thresholdSize) {
+        if (partitionTotalSize > rssFetchSplitThresholdSize) {
           // a single call to RSS would create a file larger than thresholdSize
           int numFetchers =
-              Math.min((int)((partitionTotalSize - 1L) / thresholdSize) + 1, numIdentifiers);
+              Math.min((int)((partitionTotalSize - 1L) / rssFetchSplitThresholdSize) + 1, numIdentifiers);
           int numIndentifiersPerFetcher = numIdentifiers / numFetchers;
           int numLargeFetchers = numIdentifiers - numIndentifiersPerFetcher * numFetchers;
           assert numIdentifiers == numLargeFetchers * (numIndentifiersPerFetcher + 1) +
