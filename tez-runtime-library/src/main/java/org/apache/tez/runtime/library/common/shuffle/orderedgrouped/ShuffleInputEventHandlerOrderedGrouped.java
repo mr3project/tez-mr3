@@ -25,6 +25,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.Inflater;
 
 import com.google.protobuf.ByteString;
+import org.apache.celeborn.client.ShuffleClient;
 import org.apache.tez.runtime.api.events.CompositeRoutedDataMovementEvent;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleEventHandler;
@@ -61,13 +62,15 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
   private final AtomicInteger numObsoletionEvents = new AtomicInteger(0);
   private final AtomicInteger numDmeEventsNoData = new AtomicInteger(0);
 
-  public ShuffleInputEventHandlerOrderedGrouped(InputContext inputContext,
-                                                ShuffleScheduler scheduler,
-                                                boolean compositeFetch) {
+  private final ShuffleClient rssShuffleClient;
+
+  public ShuffleInputEventHandlerOrderedGrouped(InputContext inputContext, ShuffleScheduler scheduler,
+      boolean compositeFetch, ShuffleClient rssShuffleClient) {
     this.inputContext = inputContext;
     this.scheduler = scheduler;
     this.compositeFetch = compositeFetch;
     this.inflater = TezCommonUtils.newInflater();
+    this.rssShuffleClient = rssShuffleClient;
   }
 
   @Override
@@ -171,7 +174,8 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
         throw new TezUncheckedException("Unable to set the empty partition to succeeded", e);
       }
     }
-    int port = getShufflePort(shufflePayload);
+
+    int port = rssShuffleClient == null ? getShufflePort(shufflePayload) : 0;
     scheduler.addKnownMapOutput(StringInterner.intern(shufflePayload.getHost()), port,
         partitionId, srcAttemptIdentifier);
   }
@@ -180,6 +184,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
       CompositeRoutedDataMovementEvent crdmEvent,
       DataMovementEventPayloadProto shufflePayload,
       BitSet emptyPartitionsBitSet) throws IOException {
+    assert rssShuffleClient == null;
     int partitionId = crdmEvent.getSourceIndex();
     CompositeInputAttemptIdentifier compositeInputAttemptIdentifier =
         constructInputAttemptIdentifier(crdmEvent.getTargetIndex(), crdmEvent.getCount(), crdmEvent.getVersion(), shufflePayload);
@@ -245,6 +250,9 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
    */
   private CompositeInputAttemptIdentifier constructInputAttemptIdentifier(int targetIndex, int targetIndexCount, int version,
                                                                           DataMovementEventPayloadProto shufflePayload) {
+    assert !(rssShuffleClient != null) || shufflePayload.getSpillId() == 0;
+    assert !(rssShuffleClient != null) || shufflePayload.getLastEvent();
+
     String pathComponent = (shufflePayload.hasPathComponent()) ? StringInterner.intern(shufflePayload.getPathComponent()) : null;
     int spillEventId = shufflePayload.getSpillId();
     CompositeInputAttemptIdentifier srcAttemptIdentifier = null;
@@ -261,4 +269,3 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
     return srcAttemptIdentifier;
   }
 }
-

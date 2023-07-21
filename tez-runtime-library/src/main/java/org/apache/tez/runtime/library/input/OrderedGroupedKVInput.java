@@ -150,7 +150,8 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput {
 
   @VisibleForTesting
   Shuffle createShuffle() throws IOException {
-    return new Shuffle(getContext(), conf, getNumPhysicalInputs(), memoryUpdateCallbackHandler.getMemoryAssigned());
+    return new Shuffle(getContext(), conf, getNumPhysicalInputs(),
+        memoryUpdateCallbackHandler.getMemoryAssigned(), rssShuffleClient);
   }
 
   /**

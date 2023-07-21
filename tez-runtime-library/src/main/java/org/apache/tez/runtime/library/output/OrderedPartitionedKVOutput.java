@@ -18,7 +18,9 @@
 package org.apache.tez.runtime.library.output;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -30,7 +32,12 @@ import java.util.zip.Deflater;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 
+import com.google.protobuf.ByteString;
+import org.apache.tez.common.TezUtilsInternal;
+import org.apache.tez.runtime.api.events.CompositeDataMovementEvent;
+import org.apache.tez.runtime.api.events.VertexManagerEvent;
 import org.apache.tez.runtime.library.conf.OrderedPartitionedKVOutputConfig.SorterImpl;
+import org.apache.tez.runtime.library.shuffle.impl.ShuffleUserPayloads.DataMovementEventPayloadProto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -150,9 +157,13 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
               + "only works with PipelinedSorter.");
       }
 
+      assert !(rssShuffleClient != null) || !pipelinedShuffle;
+      assert !(rssShuffleClient != null) || finalMergeEnabled;
+      assert !(rssShuffleClient != null) || sorterImpl.equals(SorterImpl.PIPELINED);
+
       if (sorterImpl.equals(SorterImpl.PIPELINED)) {
         sorter = new PipelinedSorter(getContext(), conf, getNumPhysicalOutputs(),
-            memoryUpdateCallbackHandler.getMemoryAssigned());
+            memoryUpdateCallbackHandler.getMemoryAssigned(), rssShuffleClient);
       } else if (sorterImpl.equals(SorterImpl.LEGACY)) {
         sorter = new DefaultSorter(getContext(), conf, getNumPhysicalOutputs(),
             memoryUpdateCallbackHandler.getMemoryAssigned());
@@ -208,23 +219,28 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
   }
 
   private List<Event> generateEvents() throws IOException {
-    List<Event> eventList = Lists.newLinkedList();
-    if (finalMergeEnabled && !pipelinedShuffle) {
-      boolean isLastEvent = true;
-      String auxiliaryService = conf.get(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
-          TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT);
+    if (rssShuffleClient != null) {
+      return generateEventsForRSS(sorter.getPartitionStats(), sorter.reportDetailedPartitionStats());
+    } else if (finalMergeEnabled && !pipelinedShuffle) {
       if (sorter.getFinalIndexFile() == null) {
         // return an empty list because TezSpillRecord() throws NPE
         // this occurs when PipelinedSorter threads gets interrupted and LogicalOutput.close() is closed
+        return Lists.newLinkedList();
+      } else {
+        boolean isLastEvent = true;
+        String auxiliaryService = conf.get(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
+            TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT);
+        List<Event> eventList = Lists.newLinkedList();
+        ShuffleUtils.generateEventOnSpill(eventList, finalMergeEnabled, isLastEvent,
+            getContext(), 0, new TezSpillRecord(sorter.getFinalIndexFile(), localFs),
+            getNumPhysicalOutputs(), sendEmptyPartitionDetails, getContext().getUniqueIdentifier(),
+            sorter.getPartitionStats(), sorter.reportDetailedPartitionStats(), auxiliaryService, deflater,
+            compositeFetch);
         return eventList;
       }
-      ShuffleUtils.generateEventOnSpill(eventList, finalMergeEnabled, isLastEvent,
-          getContext(), 0, new TezSpillRecord(sorter.getFinalIndexFile(), localFs),
-          getNumPhysicalOutputs(), sendEmptyPartitionDetails, getContext().getUniqueIdentifier(),
-          sorter.getPartitionStats(), sorter.reportDetailedPartitionStats(), auxiliaryService, deflater,
-          compositeFetch);
+    } else {
+      return Lists.newLinkedList();
     }
-    return eventList;
   }
 
   private List<Event> generateEmptyEvents() throws IOException {
@@ -233,6 +249,58 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
     return eventList;
   }
 
+  private List<Event> generateEventsForRSS(long[] partitionStats, boolean reportDetailedPartitionStats)
+      throws IOException {
+    assert rssShuffleClient != null;
+    assert !pipelinedShuffle;
+    assert finalMergeEnabled;
+
+    List<Event> eventList = Lists.newLinkedList();
+
+    VertexManagerEvent vmEvent =
+        ShuffleUtils.generateVMEvent(getContext(), partitionStats, reportDetailedPartitionStats, deflater);
+    eventList.add(vmEvent);
+
+    DataMovementEventPayloadProto.Builder payloadBuilder = DataMovementEventPayloadProto.newBuilder();
+
+    payloadBuilder.setSpillId(0);
+    payloadBuilder.setLastEvent(true);
+    payloadBuilder.setHost(String.valueOf(getContext().getTaskIndex()));
+
+    int numPartitions = partitionStats.length;
+
+    BitSet emptyPartitions = new BitSet();
+    boolean exceedsIntegerRange = false;
+    for (int i = 0; i < numPartitions; i++) {
+      if (partitionStats[i] == 0) {
+        emptyPartitions.set(i);
+      } else if (partitionStats[i] > Integer.MAX_VALUE) {
+        exceedsIntegerRange = true;
+      }
+    }
+
+    if (emptyPartitions.cardinality() != 0) {
+      ByteString emptyPartitionByteString = TezCommonUtils.compressByteArrayToByteString(
+          TezUtilsInternal.toByteArray(emptyPartitions), deflater);
+      payloadBuilder.setEmptyPartitions(emptyPartitionByteString);
+    }
+
+    if (exceedsIntegerRange) {
+      for (int i = 0; i < numPartitions; i++) {
+        payloadBuilder.addPartitionSizesLong(partitionStats[i]);
+      }
+    } else {
+      for (int i = 0; i < numPartitions; i++) {
+        payloadBuilder.addPartitionSizes((int) partitionStats[i]);
+      }
+    }
+
+    ByteBuffer dmePayload = payloadBuilder.build().toByteString().asReadOnlyByteBuffer();
+    CompositeDataMovementEvent cdme = CompositeDataMovementEvent.create(0, partitionStats.length, dmePayload);
+    eventList.add(cdme);
+
+    return eventList;
+  }
 
   private static final Set<String> confKeys = new HashSet<String>();
 

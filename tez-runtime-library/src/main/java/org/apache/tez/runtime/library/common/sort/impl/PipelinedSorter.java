@@ -1,23 +1,24 @@
-  /**
-* Licensed to the Apache Software Foundation (ASF) under one
-* or more contributor license agreements.  See the NOTICE file
-* distributed with this work for additional information
-* regarding copyright ownership.  The ASF licenses this file
-* to you under the Apache License, Version 2.0 (the
-* "License"); you may not use this file except in compliance
-* with the License.  You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.tez.runtime.library.common.sort.impl;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
@@ -28,41 +29,40 @@ import java.util.List;
 import java.util.PriorityQueue;
 import java.util.concurrent.*;
 import java.util.zip.Deflater;
+import javax.annotation.Nullable;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.tez.common.Preconditions;
 import com.google.common.collect.Lists;
-
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.celeborn.client.ShuffleClient;
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.tez.dag.api.TezConfiguration;
-import org.apache.tez.runtime.library.api.IOInterruptedException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.DataInputBuffer;
-import org.apache.tez.common.TezUtilsInternal;
-import org.apache.tez.common.io.NonSyncDataOutputStream;
-import org.apache.tez.runtime.api.Event;
-import org.apache.tez.runtime.library.common.comparator.ProxyComparator;
 import org.apache.hadoop.io.RawComparator;
 import org.apache.hadoop.util.IndexedSortable;
 import org.apache.hadoop.util.IndexedSorter;
 import org.apache.hadoop.util.Progress;
+import org.apache.tez.common.Preconditions;
 import org.apache.tez.common.TezCommonUtils;
+import org.apache.tez.common.TezUtilsInternal;
+import org.apache.tez.common.io.NonSyncDataOutputStream;
+import org.apache.tez.dag.api.TezConfiguration;
+import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.OutputContext;
+import org.apache.tez.runtime.library.api.IOInterruptedException;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.ConfigUtils;
+import org.apache.tez.runtime.library.common.comparator.ProxyComparator;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Writer;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger.DiskSegment;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger.Segment;
 import org.apache.tez.runtime.library.utils.LocalProgress;
 import org.apache.tez.util.StopWatch;
-
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.tez.runtime.library.common.sort.impl.TezSpillRecord.ensureSpillFilePermissions;
 
@@ -128,9 +128,18 @@ public class PipelinedSorter extends ExternalSorter {
 
   // TODO Set additional countesr - total bytes written, spills etc.
 
-  public PipelinedSorter(OutputContext outputContext, Configuration conf, int numOutputs,
-      long initialMemoryAvailable) throws IOException {
-    super(outputContext, conf, numOutputs, initialMemoryAvailable);
+  private final ShuffleClient rssShuffleClient;
+  private static final int RSS_BUFFER_SIZE = 64 * 1024;
+
+  public PipelinedSorter(
+      OutputContext outputContext,
+      Configuration conf,
+      int numOutputs,
+      long initialMemoryAvailable,
+      @Nullable ShuffleClient shuffleClient) throws IOException {
+    super(outputContext, conf, numOutputs, initialMemoryAvailable, shuffleClient);
+
+    this.rssShuffleClient = shuffleClient;
 
     lazyAllocateMem = this.conf.getBoolean(TezRuntimeConfiguration
         .TEZ_RUNTIME_PIPELINED_SORTER_LAZY_ALLOCATE_MEMORY, TezRuntimeConfiguration
@@ -171,6 +180,10 @@ public class PipelinedSorter extends ExternalSorter {
     pipelinedShuffle = !isFinalMergeEnabled() && confPipelinedShuffle;
     auxiliaryService = conf.get(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
         TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT);
+
+    assert !(shuffleClient != null) || isFinalMergeEnabled();
+    assert !(shuffleClient != null) || !pipelinedShuffle;
+
     //sanity checks
     final long sortmb = this.availableMemoryMb;
 
@@ -671,8 +684,6 @@ public class PipelinedSorter extends ExternalSorter {
 
   @Override
   public void flush() throws IOException {
-    final String uniqueIdentifier = outputContext.getUniqueIdentifier();
-
     /**
      * Possible that the thread got interrupted when flush was happening or when the flush was
      * never invoked. As a part of cleanup activity in TezTaskRunner, it would invoke close()
@@ -742,7 +753,7 @@ public class PipelinedSorter extends ExternalSorter {
       numAdditionalSpills.increment(numSpills - 1);
 
       //In case final merge is required, the following code path is executed.
-      if (numSpills == 1) {
+      if (numSpills == 1 && rssShuffleClient == null) {
         // someday be able to pass this directly to shuffle
         // without writing to disk
         final Path filename = spillFilePaths.get(0);
@@ -770,107 +781,249 @@ public class PipelinedSorter extends ExternalSorter {
         return;
       }
 
-      finalOutputFile =
-          mapOutputFile.getOutputFileForWrite(0); //TODO
-      finalIndexFile =
-          mapOutputFile.getOutputIndexFileForWrite(0); //TODO
-
-      if (LOG.isDebugEnabled()) {
-        LOG.debug(outputContext.getDestinationVertexName() + ": " +
-            "numSpills: " + numSpills + ", finalOutputFile:" + finalOutputFile + ", finalIndexFile:"
-                + finalIndexFile);
+      if (rssShuffleClient == null) {
+        doFinalMergeAndSpill();
+      } else {
+        doFinalMergeAndPush();
+        rssShuffleClient.mapperEnd(
+            com.datamonad.mr3.MR3Runtime.env().rssApplicationId(),
+            outputContext.shuffleId(),
+            outputContext.getTaskIndex(),
+            outputContext.getTaskAttemptNumber(),
+            outputContext.getVertexParallelism());
       }
-      //The output stream for the final single output file
-      FSDataOutputStream finalOut = rfs.create(finalOutputFile, true, 4096);
-      ensureSpillFilePermissions(finalOutputFile, rfs);
-
-      final TezSpillRecord spillRec = new TezSpillRecord(partitions);
-
-      for (int parts = 0; parts < partitions; parts++) {
-        boolean shouldWrite = false;
-        //create the segments to be merged
-        List<Segment> segmentList =
-            new ArrayList<Segment>(numSpills);
-        for (int i = 0; i < numSpills; i++) {
-          Path spillFilename = spillFilePaths.get(i);
-          TezIndexRecord indexRecord = indexCacheList.get(i).getIndex(parts);
-          if (indexRecord.hasData() || !sendEmptyPartitionDetails) {
-            shouldWrite = true;
-            DiskSegment s =
-                new DiskSegment(rfs, spillFilename, indexRecord.getStartOffset(),
-                    indexRecord.getPartLength(), codec, ifileReadAhead,
-                    ifileReadAheadLength, ifileBufferSize, true);
-            segmentList.add(s);
-          }
-        }
-
-        int mergeFactor =
-            this.conf.getInt(TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_FACTOR,
-                TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_FACTOR_DEFAULT);
-        // sort the segments only if there are intermediate merges
-        boolean sortSegments = segmentList.size() > mergeFactor;
-        //merge
-        TezRawKeyValueIterator kvIter = TezMerger.merge(conf, rfs,
-            serializationContext, codec,
-            segmentList, mergeFactor,
-            new Path(uniqueIdentifier),
-            (RawComparator) ConfigUtils.getIntermediateOutputKeyComparator(conf),
-            progressable, sortSegments, true,
-            null, spilledRecordsCounter, additionalSpillBytesRead,
-            null, merger.needsRLE()); // Not using any Progress in TezMerger. Should just work.
-        //write merged output to disk
-        long segmentStart = finalOut.getPos();
-        long rawLength = 0;
-        long partLength = 0;
-        if (shouldWrite) {
-          Writer writer = new Writer(serializationContext.getKeySerialization(),
-              serializationContext.getValSerialization(), finalOut,
-              serializationContext.getKeyClass(), serializationContext.getValueClass(), codec,
-              spilledRecordsCounter, null, merger.needsRLE());
-          if (combiner == null || numSpills < minSpillsForCombine) {
-            TezMerger.writeFile(kvIter, writer, progressable,
-                TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
-          } else {
-            runCombineProcessor(kvIter, writer);
-          }
-
-          //close
-          writer.close();
-          rawLength = writer.getRawLength();
-          partLength = writer.getCompressedLength();
-        }
-        outputBytesWithOverheadCounter.increment(rawLength);
-
-        // record offsets
-        final TezIndexRecord rec =
-            new TezIndexRecord(segmentStart, rawLength, partLength);
-        spillRec.putIndex(rec, parts);
-        if (reportPartitionStats()) {
-          partitionStats[parts] += partLength;
-        }
-      }
-
-      numShuffleChunks.setValue(1); //final merge has happened.
-      fileOutputByteCounter.increment(rfs.getFileStatus(finalOutputFile).getLen());
-
-      spillRec.writeToFile(finalIndexFile, conf, localFs);
-      finalOut.close();
-      for (int i = 0; i < numSpills; i++) {
-        Path indexFilename = spillFileIndexPaths.get(i);
-        Path spillFilename = spillFilePaths.get(i);
-        rfs.delete(indexFilename, true);
-        rfs.delete(spillFilename, true);
-      }
-
-      spillFileIndexPaths.clear();
-      spillFilePaths.clear();
-    } catch(InterruptedException ie) {
+    } catch (InterruptedException ie) {
       if (cleanup) {
         cleanup();
       }
       Thread.currentThread().interrupt();
       throw new IOInterruptedException("Interrupted while closing Output", ie);
+    } finally {
+      cleanupRssShuffleClient();
     }
+  }
+
+  private void doFinalMergeAndSpill() throws IOException, InterruptedException {
+    final String uniqueIdentifier = outputContext.getUniqueIdentifier();
+
+    finalOutputFile =
+        mapOutputFile.getOutputFileForWrite(0); //TODO
+    finalIndexFile =
+        mapOutputFile.getOutputIndexFileForWrite(0); //TODO
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(outputContext.getDestinationVertexName() + ": " +
+          "numSpills: " + numSpills + ", finalOutputFile:" + finalOutputFile + ", finalIndexFile:"
+          + finalIndexFile);
+    }
+    //The output stream for the final single output file
+    FSDataOutputStream finalOut = rfs.create(finalOutputFile, true, 4096);
+    ensureSpillFilePermissions(finalOutputFile, rfs);
+
+    final TezSpillRecord spillRec = new TezSpillRecord(partitions);
+
+    for (int parts = 0; parts < partitions; parts++) {
+      boolean shouldWrite = false;
+      //create the segments to be merged
+      List<Segment> segmentList =
+          new ArrayList<Segment>(numSpills);
+      for (int i = 0; i < numSpills; i++) {
+        Path spillFilename = spillFilePaths.get(i);
+        TezIndexRecord indexRecord = indexCacheList.get(i).getIndex(parts);
+        if (indexRecord.hasData() || !sendEmptyPartitionDetails) {
+          shouldWrite = true;
+          DiskSegment s =
+              new DiskSegment(rfs, spillFilename, indexRecord.getStartOffset(),
+                  indexRecord.getPartLength(), codec, ifileReadAhead,
+                  ifileReadAheadLength, ifileBufferSize, true);
+          segmentList.add(s);
+        }
+      }
+
+      int mergeFactor =
+          this.conf.getInt(TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_FACTOR,
+              TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_FACTOR_DEFAULT);
+      // sort the segments only if there are intermediate merges
+      boolean sortSegments = segmentList.size() > mergeFactor;
+      //merge
+      TezRawKeyValueIterator kvIter = TezMerger.merge(conf, rfs,
+          serializationContext, codec,
+          segmentList, mergeFactor,
+          new Path(uniqueIdentifier),
+          (RawComparator) ConfigUtils.getIntermediateOutputKeyComparator(conf),
+          progressable, sortSegments, true,
+          null, spilledRecordsCounter, additionalSpillBytesRead,
+          null, merger.needsRLE()); // Not using any Progress in TezMerger. Should just work.
+      //write merged output to disk
+      long segmentStart = finalOut.getPos();
+      long rawLength = 0;
+      long partLength = 0;
+      if (shouldWrite) {
+        Writer writer = new Writer(serializationContext.getKeySerialization(),
+            serializationContext.getValSerialization(), finalOut,
+            serializationContext.getKeyClass(), serializationContext.getValueClass(), codec,
+            spilledRecordsCounter, null, merger.needsRLE());
+        if (combiner == null || numSpills < minSpillsForCombine) {
+          TezMerger.writeFile(kvIter, writer, progressable,
+              TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
+        } else {
+          runCombineProcessor(kvIter, writer);
+        }
+
+        //close
+        writer.close();
+        rawLength = writer.getRawLength();
+        partLength = writer.getCompressedLength();
+      }
+      outputBytesWithOverheadCounter.increment(rawLength);
+
+      // record offsets
+      final TezIndexRecord rec =
+          new TezIndexRecord(segmentStart, rawLength, partLength);
+      spillRec.putIndex(rec, parts);
+      if (reportPartitionStats()) {
+        partitionStats[parts] += partLength;
+      }
+    }
+
+    numShuffleChunks.setValue(1); //final merge has happened.
+    fileOutputByteCounter.increment(rfs.getFileStatus(finalOutputFile).getLen());
+
+    spillRec.writeToFile(finalIndexFile, conf, localFs);
+    finalOut.close();
+    for (int i = 0; i < numSpills; i++) {
+      Path indexFilename = spillFileIndexPaths.get(i);
+      Path spillFilename = spillFilePaths.get(i);
+      rfs.delete(indexFilename, true);
+      rfs.delete(spillFilename, true);
+    }
+
+    spillFileIndexPaths.clear();
+    spillFilePaths.clear();
+  }
+
+  private void doFinalMergeAndPush() throws IOException, InterruptedException {
+    assert rssShuffleClient != null;
+    assert partitionStats != null;
+
+    finalOutputFile = mapOutputFile.getOutputFileForWrite(0);
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Pushing data from " + outputContext.getDestinationVertexName() + ": " +
+          "numSpills: " + numSpills + ", tmpOutputFile:" + finalOutputFile);
+    }
+
+    //The output stream for the final single output file
+    FSDataOutputStream finalOut = rfs.create(finalOutputFile, true, 4096);
+    ensureSpillFilePermissions(finalOutputFile, rfs);
+
+    for (int parts = 0; parts < partitions; parts++) {
+      boolean shouldWrite = false;
+
+      List<Segment> segmentList = new ArrayList<Segment>(numSpills);
+      for (int i = 0; i < numSpills; i++) {
+        TezIndexRecord indexRecord = indexCacheList.get(i).getIndex(parts);
+        if (indexRecord.hasData() || !sendEmptyPartitionDetails) {
+          shouldWrite = true;
+          DiskSegment s =
+              new DiskSegment(rfs, spillFilePaths.get(i), indexRecord.getStartOffset(),
+                  indexRecord.getPartLength(), codec, ifileReadAhead,
+                  ifileReadAheadLength, ifileBufferSize, true);
+          segmentList.add(s);
+        }
+      }
+
+      final String uniqueIdentifier = outputContext.getUniqueIdentifier();
+      int mergeFactor =
+          this.conf.getInt(TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_FACTOR,
+              TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_FACTOR_DEFAULT);
+      // sort the segments only if there are intermediate merges
+      boolean sortSegments = segmentList.size() > mergeFactor;
+
+      //merge
+      TezRawKeyValueIterator kvIter = TezMerger.merge(conf, rfs,
+          serializationContext, codec,
+          segmentList, mergeFactor,
+          new Path(uniqueIdentifier),
+          (RawComparator) ConfigUtils.getIntermediateOutputKeyComparator(conf),
+          progressable, sortSegments, true,
+          null, spilledRecordsCounter, additionalSpillBytesRead,
+          null, merger.needsRLE()); // Not using any Progress in TezMerger. Should just work.
+
+      //write merged output to disk
+      long rawLength = 0;
+      long partLength = 0;
+      if (shouldWrite) {
+        // Use RSS-purpose writer in order to just copy and push byte[] from the final merged file.
+        Writer writer = new Writer(serializationContext.getKeySerialization(),
+            serializationContext.getValSerialization(), finalOut,
+            serializationContext.getKeyClass(), serializationContext.getValueClass(),
+            spilledRecordsCounter, null, merger.needsRLE(), true);
+        if (combiner == null || numSpills < minSpillsForCombine) {
+          TezMerger.writeFile(kvIter, writer, progressable,
+              TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
+        } else {
+          runCombineProcessor(kvIter, writer);
+        }
+
+        //close
+        writer.close();
+        rawLength = writer.getRawLength();
+        partLength = writer.getCompressedLength();
+      }
+      outputBytesWithOverheadCounter.increment(rawLength);
+
+      if (reportPartitionStats()) {
+        partitionStats[parts] += partLength;
+      }
+    }
+
+    numShuffleChunks.setValue(1); //final merge has happened.
+    fileOutputByteCounter.increment(rfs.getFileStatus(finalOutputFile).getLen());
+
+    finalOut.close();
+
+    String rssApplicationId = com.datamonad.mr3.MR3Runtime.env().rssApplicationId();
+    InputStream finalMergedInputStream = rfs.open(finalOutputFile);
+    byte[] buffer = new byte[RSS_BUFFER_SIZE];
+    for (int part = 0; part < partitions; part++) {
+      long remainingBytes = partitionStats[part];
+      while (remainingBytes > 0) {
+        int bufferLength = (int) Math.min(RSS_BUFFER_SIZE, remainingBytes);
+        int bytesRead = finalMergedInputStream.read(buffer, 0, bufferLength);
+
+        if (bytesRead < 0) {
+          finalMergedInputStream.close();
+          throw new IOException("Premature EOF from inputStream");
+        }
+
+        rssShuffleClient.pushData(
+            rssApplicationId,
+            outputContext.shuffleId(),
+            outputContext.getTaskIndex(),
+            outputContext.getTaskAttemptNumber(),
+            part,
+            buffer,
+            0,
+            bytesRead,
+            outputContext.getVertexParallelism(),
+            partitions);
+
+        remainingBytes -= bytesRead;
+      }
+    }
+
+    for (int i = 0; i < numSpills; i++) {
+      Path indexFilename = spillFileIndexPaths.get(i);
+      Path spillFilename = spillFilePaths.get(i);
+      rfs.delete(indexFilename, true);
+      rfs.delete(spillFilename, true);
+    }
+
+    spillFileIndexPaths.clear();
+    spillFilePaths.clear();
+
+    rfs.delete(finalOutputFile, true);
   }
 
   /**
@@ -883,6 +1036,14 @@ public class PipelinedSorter extends ExternalSorter {
     return finalEvents;
   }
 
+  private void cleanupRssShuffleClient() {
+    if (rssShuffleClient != null) {
+      rssShuffleClient.cleanup(
+          com.datamonad.mr3.MR3Runtime.env().rssApplicationId(),
+          outputContext.shuffleId(),
+          outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber());
+    }
+  }
 
   private interface PartitionedRawKeyValueIterator extends TezRawKeyValueIterator {
     int getPartition();

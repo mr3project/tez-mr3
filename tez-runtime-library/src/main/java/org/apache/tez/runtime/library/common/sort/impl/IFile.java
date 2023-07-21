@@ -342,12 +342,19 @@ public class IFile {
 
     public Writer(Serialization keySerialization, Serialization valSerialization,
         DataOutputStream outputStream, Class keyClass, Class valueClass, TezCounter writesCounter,
-        TezCounter serializedBytesCounter, Boolean useRSS) throws IOException {
+        TezCounter serializedBytesCounter, boolean useRSS) throws IOException {
+      this(keySerialization, valSerialization, outputStream, keyClass, valueClass, writesCounter,
+          serializedBytesCounter, false, useRSS);
+    }
+
+    public Writer(Serialization keySerialization, Serialization valSerialization,
+        DataOutputStream outputStream, Class keyClass, Class valueClass, TezCounter writesCounter,
+        TezCounter serializedBytesCounter, boolean rle, boolean useRSS) throws IOException {
       this.out = outputStream;
       this.writtenRecordsCounter = writesCounter;
       this.serializedUncompressedBytes = serializedBytesCounter;
+      this.rle = rle;
       this.useRSS = useRSS;
-      this.rle = false;
 
       if (keyClass != null) {
         this.closeSerializers = true;
@@ -429,10 +436,10 @@ public class IFile {
         valueSerializer.close();
       }
 
-      if (!useRSS) {
-        // write V_END_MARKER as needed
-        writeValueMarker(out);
+      // write V_END_MARKER as needed
+      writeValueMarker(out);
 
+      if (!useRSS) {
         // Write EOF_MARKER for key/value length
         WritableUtils.writeVInt(out, EOF_MARKER);
         WritableUtils.writeVInt(out, EOF_MARKER);

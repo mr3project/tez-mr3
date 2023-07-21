@@ -25,9 +25,11 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
+import org.apache.celeborn.client.ShuffleClient;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.OutputStatisticsReporter;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
@@ -43,7 +45,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.io.RawComparator;
 import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.hadoop.io.serializer.SerializationFactory;
 import org.apache.hadoop.io.serializer.Serializer;
 import org.apache.hadoop.util.IndexedSorter;
 import org.apache.hadoop.util.Progressable;
@@ -169,7 +170,7 @@ public abstract class ExternalSorter {
   protected final boolean compositeFetch;
 
   public ExternalSorter(OutputContext outputContext, Configuration conf, int numOutputs,
-      long initialMemoryAvailable) throws IOException {
+      long initialMemoryAvailable, @Nullable ShuffleClient shuffleClient) throws IOException {
     this.outputContext = outputContext;
     this.conf = conf;
     this.localFs = (RawLocalFileSystem) FileSystem.getLocal(conf).getRaw();
@@ -177,7 +178,7 @@ public abstract class ExternalSorter {
     reportPartitionStats = ReportPartitionStats.fromString(
         conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_REPORT_PARTITION_STATS,
         TezRuntimeConfiguration.TEZ_RUNTIME_REPORT_PARTITION_STATS_DEFAULT));
-    partitionStats = reportPartitionStats.isEnabled() ?
+    partitionStats = reportPartitionStats.isEnabled() || shuffleClient != null ?
         (new long[partitions]) : null;
 
     cleanup = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT,

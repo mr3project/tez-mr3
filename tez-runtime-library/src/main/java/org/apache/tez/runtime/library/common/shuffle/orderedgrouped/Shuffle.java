@@ -29,6 +29,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.celeborn.client.ShuffleClient;
 import org.apache.tez.runtime.api.TaskFailureType;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
@@ -106,7 +107,7 @@ public class Shuffle implements ExceptionReporter {
   private final TezCounter shufflePhaseTime;
 
   public Shuffle(InputContext inputContext, Configuration conf, int numInputs,
-      long initialMemoryAvailable) throws IOException {
+      long initialMemoryAvailable, ShuffleClient rssShuffleClient) throws IOException {
     this.inputContext = inputContext;
     this.conf = conf;
 
@@ -175,12 +176,10 @@ public class Shuffle implements ExceptionReporter {
     this.mergePhaseTime = inputContext.getCounters().findCounter(TaskCounter.MERGE_PHASE_TIME);
     this.shufflePhaseTime = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_PHASE_TIME);
 
+    boolean compositeFetch = rssShuffleClient != null ? false : ShuffleUtils.isTezShuffleHandler(conf);
 
-
-    eventHandler= new ShuffleInputEventHandlerOrderedGrouped(
-        inputContext,
-        scheduler,
-        ShuffleUtils.isTezShuffleHandler(conf));
+    eventHandler =
+        new ShuffleInputEventHandlerOrderedGrouped(inputContext, scheduler, compositeFetch, rssShuffleClient);
     
     ExecutorService rawExecutor = Executors.newFixedThreadPool(1, new ThreadFactoryBuilder()
         .setDaemon(true).setNameFormat("ShuffleAndMergeRunner {" + srcNameTrimmed + "}").build());
