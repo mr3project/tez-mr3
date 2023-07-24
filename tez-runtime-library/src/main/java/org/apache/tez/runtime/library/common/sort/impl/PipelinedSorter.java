@@ -224,6 +224,12 @@ public class PipelinedSorter extends ExternalSorter {
       while(allocateSpace() != null);
     }
 
+    if (this.rssShuffleClient != null) {
+      LOG.info("Registering shuffleId = " + outputContext.shuffleId());
+      com.datamonad.mr3.MR3Runtime.env()
+          .registerShuffleId(outputContext.getDagId(), outputContext.shuffleId());
+    }
+
     initialSetupLogLine.append("#blocks=").append(maxNumberOfBlocks);
     initialSetupLogLine.append(", maxMemUsage=").append(maxMemLimit);
     initialSetupLogLine.append(", lazyAllocateMem=").append(lazyAllocateMem);
@@ -234,6 +240,7 @@ public class PipelinedSorter extends ExternalSorter {
     initialSetupLogLine.append(", pipelinedShuffle=").append(pipelinedShuffle);
     initialSetupLogLine.append(", sendEmptyPartitions=").append(sendEmptyPartitionDetails);
     initialSetupLogLine.append(", ").append(TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB).append("=").append(sortmb);
+    initialSetupLogLine.append(", rssShuffleClient=").append(rssShuffleClient != null);
 
     Preconditions.checkState(buffers.size() > 0, "At least one buffer needs to be present");
     LOG.info(initialSetupLogLine.toString());

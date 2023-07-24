@@ -17,7 +17,6 @@
  */
 package org.apache.tez.runtime.library.common.shuffle.orderedgrouped;
 
-import javax.crypto.SecretKey;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.text.DecimalFormat;
@@ -35,11 +34,12 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import javax.crypto.SecretKey;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.tez.common.Preconditions;
 import com.google.common.collect.LinkedListMultimap;
 import com.google.common.collect.ListMultimap;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.FutureCallback;
@@ -48,34 +48,33 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-
-import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.tez.dag.api.TezConfiguration;
-import org.apache.tez.http.HttpConnectionParams;
-import org.apache.tez.common.security.JobTokenSecretManager;
-import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.celeborn.client.ShuffleClient;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.tez.common.Preconditions;
 import org.apache.tez.common.TezUtilsInternal;
 import org.apache.tez.common.counters.TaskCounter;
 import org.apache.tez.common.counters.TezCounter;
+import org.apache.tez.common.security.JobTokenSecretManager;
+import org.apache.tez.dag.api.TezConfiguration;
+import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.api.events.InputReadErrorEvent;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
+import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.TezRuntimeUtils;
-import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
-import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils.FetchStatsLogger;
 import org.apache.tez.runtime.library.common.shuffle.HostPort;
+import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils.FetchStatsLogger;
+import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.MapHost.HostPortPartition;
 import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.MapOutput.Type;
-
-import com.google.common.collect.Lists;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 class ShuffleScheduler {
 
@@ -194,8 +193,8 @@ class ShuffleScheduler {
   long failedShufflesSinceLastCompletion;
 
   private final int numFetchers;
-  private final Set<FetcherOrderedGrouped> runningFetchers =
-      Collections.newSetFromMap(new ConcurrentHashMap<FetcherOrderedGrouped, Boolean>());
+  private final Set<FetcherOrderedGroupedBase> runningFetchers =
+      Collections.newSetFromMap(new ConcurrentHashMap<FetcherOrderedGroupedBase, Boolean>());
 
   private final ListeningExecutorService fetcherExecutor;
 
@@ -248,17 +247,21 @@ class ShuffleScheduler {
   private final int MIN_FAILED_UNIQUE_FETCHES_SHUFFLE_UNHEALTHY = 10;
   private final int MAX_FAILED_UNIQUE_FETCHES_SHUFFLE_UNHEALTHY = 250;
 
-  public ShuffleScheduler(InputContext inputContext,
-                          Configuration conf,
-                          int numberOfInputs,
-                          ExceptionReporter exceptionReporter,
-                          MergeManager mergeManager,
-                          FetchedInputAllocatorOrderedGrouped allocator,
-                          long startTime,
-                          CompressionCodec codec,
-                          boolean ifileReadAhead,
-                          int ifileReadAheadLength,
-                          String srcNameTrimmed) throws IOException {
+  private final ShuffleClient rssShuffleClient;
+
+  public ShuffleScheduler(
+      InputContext inputContext,
+      Configuration conf,
+      int numberOfInputs,
+      ExceptionReporter exceptionReporter,
+      MergeManager mergeManager,
+      FetchedInputAllocatorOrderedGrouped allocator,
+      long startTime,
+      CompressionCodec codec,
+      boolean ifileReadAhead,
+      int ifileReadAheadLength,
+      String srcNameTrimmed,
+      ShuffleClient rssShuffleClient) throws IOException {
     this.inputContext = inputContext;
     this.conf = conf;
     this.localFs = (RawLocalFileSystem) FileSystem.getLocal(conf).getRaw();
@@ -417,9 +420,15 @@ class ShuffleScheduler {
     this.maxPenaltyTime = conf.getInt(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_HOST_PENALTY_TIME_LIMIT_MS,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_HOST_PENALTY_TIME_LIMIT_MS_DEFAULT);
 
+    this.rssShuffleClient = rssShuffleClient;
+    if (this.rssShuffleClient != null) {
+      LOG.info("Registering shuffleId = " + inputContext.shuffleId());
+      com.datamonad.mr3.MR3Runtime.env().registerShuffleId(inputContext.getDagId(), inputContext.shuffleId());
+    }
+
     pipelinedShuffleInfoEventsMap = Maps.newConcurrentMap();
-    LOG.info("ShuffleScheduler running for sourceVertex: {}, numFetchers={}",
-        inputContext.getSourceVertexName(), numFetchers);
+    LOG.info("ShuffleScheduler running for sourceVertex: {}, numFetchers={}, rssShuffleClient={}",
+        inputContext.getSourceVertexName(), numFetchers, rssShuffleClient != null);
     if (LOG.isDebugEnabled()) {
       LOG.debug("maxFailedUniqueFetches=" + maxFailedUniqueFetches
           + ", abortFailureLimit=" + abortFailureLimit
@@ -467,7 +476,7 @@ class ShuffleScheduler {
         }
 
         // Interrupt the fetchers.
-        for (FetcherOrderedGrouped fetcher : runningFetchers) {
+        for (FetcherOrderedGroupedBase fetcher : runningFetchers) {
           try {
             fetcher.shutDown();
           } catch (Exception e) {
@@ -1077,6 +1086,11 @@ class ShuffleScheduler {
       return;
     }
 
+    assert !(rssShuffleClient != null) || srcAttempt.getInputIdentifierCount() == 1;
+    assert !(rssShuffleClient != null) || srcAttempt.getSpillEventId() == 0;
+    assert !(rssShuffleClient != null) ||
+        srcAttempt.getFetchTypeInfo() == InputAttemptIdentifier.SPILL_INFO.FINAL_UPDATE;
+
     host.addKnownMap(srcAttempt);
     for (int i = 0; i < srcAttempt.getInputIdentifierCount(); i++) {
       PathPartition pathPartition = new PathPartition(srcAttempt.getPathComponent(), partitionId + i);
@@ -1449,10 +1463,15 @@ class ShuffleScheduler {
                   LOG.debug(srcNameTrimmed + ": " + "Scheduling fetch for inputHost: {}",
                       mapHost.getHostIdentifier() + ":" + mapHost.getPartitionId());
                 }
-                FetcherOrderedGrouped fetcherOrderedGrouped = constructFetcherForHost(mapHost);
-                runningFetchers.add(fetcherOrderedGrouped);
-                ListenableFuture<Void> future = fetcherExecutor.submit(fetcherOrderedGrouped);
-                Futures.addCallback(future, new FetchFutureCallback(fetcherOrderedGrouped));
+                FetcherOrderedGroupedBase fetcher;
+                if (rssShuffleClient == null) {
+                  fetcher = constructFetcherForHost(mapHost);
+                } else {
+                  fetcher = constructRssFetcherForHost(mapHost);
+                }
+                runningFetchers.add(fetcher);
+                ListenableFuture<Void> future = fetcherExecutor.submit(fetcher);
+                Futures.addCallback(future, new FetchFutureCallback(fetcher));
               }
             }
           }
@@ -1480,12 +1499,23 @@ class ShuffleScheduler {
         verifyDiskChecksum, compositeFetch, localFetchComparePort, inputContext);
   }
 
+  RssFetcherOrderedGrouped constructRssFetcherForHost(MapHost mapHost) {
+    return new RssFetcherOrderedGrouped(
+        allocator,
+        ShuffleScheduler.this,
+        exceptionReporter,
+        mapHost,
+        rssShuffleClient,
+        com.datamonad.mr3.MR3Runtime.env().rssApplicationId(),
+        inputContext.shuffleId());
+  }
+
   private class FetchFutureCallback implements FutureCallback<Void> {
 
-    private final FetcherOrderedGrouped fetcherOrderedGrouped;
+    private final FetcherOrderedGroupedBase fetcherOrderedGrouped;
 
     public FetchFutureCallback(
-        FetcherOrderedGrouped fetcherOrderedGrouped) {
+        FetcherOrderedGroupedBase fetcherOrderedGrouped) {
       this.fetcherOrderedGrouped = fetcherOrderedGrouped;
     }
 

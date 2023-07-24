@@ -56,7 +56,7 @@ import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 
 import com.google.common.annotations.VisibleForTesting;
 
-class FetcherOrderedGrouped implements Callable<Void> {
+class FetcherOrderedGrouped implements FetcherOrderedGroupedBase {
   
   private static final Logger LOG = LoggerFactory.getLogger(FetcherOrderedGrouped.class);
 

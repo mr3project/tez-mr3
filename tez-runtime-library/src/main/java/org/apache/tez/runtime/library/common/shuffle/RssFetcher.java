@@ -19,17 +19,12 @@
 package org.apache.tez.runtime.library.common.shuffle;
 
 import org.apache.celeborn.client.ShuffleClient;
-import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.io.WritableUtils;
 import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
-import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -50,9 +45,6 @@ public class RssFetcher implements FetcherBase {
   private final CompositeInputAttemptIdentifier srcAttemptId;
 
   private static final Logger LOG = LoggerFactory.getLogger(RssFetcher.class);
-
-  private static final int BUFFER_SIZE = 64 * 1024;
-  private static final int EOF_MARKERS_SIZE = 2 * WritableUtils.getVIntSize(IFile.EOF_MARKER);
 
   private final Object lock = new Object();
 
@@ -99,7 +91,7 @@ public class RssFetcher implements FetcherBase {
     if (dataLengthUnknown()) {
       fetchedInput = inputAllocator.allocateType(FetchedInput.Type.DISK, dataLength, dataLength, srcAttemptId);
     } else {
-      long actualSize = dataLength + EOF_MARKERS_SIZE;
+      long actualSize = dataLength + RssShuffleUtils.EOF_MARKERS_SIZE;
       fetchedInput = inputAllocator.allocate(actualSize, actualSize, srcAttemptId);
     }
 
@@ -152,23 +144,13 @@ public class RssFetcher implements FetcherBase {
         }
       }
     } catch (IOException e) {
-      LOG.warn("Fail to close rssShuffleInputStream while shutting down RssFetcher.", e);
+      LOG.warn("Failed to close rssShuffleInputStream while shutting down RssFetcher.", e);
     }
   }
 
   private void shuffleToMemory(InputStream inputStream, MemoryFetchedInput fetchedInput) throws IOException {
     try {
-      byte[] buffer = fetchedInput.getBytes();
-      IOUtils.readFully(inputStream, buffer, 0, (int) dataLength);
-
-      ByteArrayOutputStream baos = new ByteArrayOutputStream();
-      DataOutputStream dos = new DataOutputStream(baos);
-      WritableUtils.writeVInt(dos, IFile.EOF_MARKER);
-      WritableUtils.writeVInt(dos, IFile.EOF_MARKER);
-      byte[] eofMarker = baos.toByteArray();
-
-      System.arraycopy(eofMarker, 0, buffer, (int) dataLength, EOF_MARKERS_SIZE);
-
+      RssShuffleUtils.shuffleToMemory(inputStream, fetchedInput.getBytes(), dataLength);
     } catch (IOException e) {
       LOG.error("Failed to read shuffle data from rssShuffleInputStream", e);
       throw e;
@@ -179,28 +161,7 @@ public class RssFetcher implements FetcherBase {
 
   private void shuffleToDisk(InputStream inputStream, DiskFetchedInput fetchedInput) throws IOException {
     try (OutputStream diskOutputStream = fetchedInput.getOutputStream()) {
-      byte[] buffer = new byte[BUFFER_SIZE];
-      boolean reachEOF = false;
-      int bytesWritten = 0;
-      while (!reachEOF) {
-        int curBytesRead = inputStream.read(buffer, 0, BUFFER_SIZE);
-
-        if (curBytesRead <= 0) {
-          reachEOF = true;
-        } else {
-          reachEOF = curBytesRead < BUFFER_SIZE;
-
-          diskOutputStream.write(buffer, 0, curBytesRead);
-          bytesWritten += curBytesRead;
-        }
-      }
-
-      assert (!(!dataLengthUnknown()) || bytesWritten == dataLength);
-
-      DataOutputStream dos = new DataOutputStream(diskOutputStream);
-      WritableUtils.writeVInt(dos, IFile.EOF_MARKER);
-      WritableUtils.writeVInt(dos, IFile.EOF_MARKER);
-      bytesWritten += EOF_MARKERS_SIZE;
+      long bytesWritten = RssShuffleUtils.shuffleToDisk(inputStream, diskOutputStream, dataLength);
 
       if (dataLengthUnknown()) {
         fetchedInput.setSize(bytesWritten);

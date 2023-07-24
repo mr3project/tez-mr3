@@ -33,8 +33,10 @@ public class FileChunk implements Comparable<FileChunk> {
   private final Path path;
   private final InputAttemptIdentifier identifier;
 
+  private final boolean fromRss;
+
   public FileChunk(Path path, long offset, long length, boolean isLocalFile,
-                   InputAttemptIdentifier identifier) {
+      InputAttemptIdentifier identifier, boolean fromRss) {
     this.path = path;
     this.offset = offset;
     this.length = length;
@@ -43,10 +45,15 @@ public class FileChunk implements Comparable<FileChunk> {
     if (isLocalFile) {
       Objects.requireNonNull(identifier);
     }
+
+    this.fromRss = fromRss;
   }
 
+  /**
+   * For intermediate merged file.
+   */
   public FileChunk(Path path, long offset, long length) {
-    this(path, offset, length, false, null);
+    this(path, offset, length, false, null, false);
   }
 
   @Override
@@ -110,5 +117,9 @@ public class FileChunk implements Comparable<FileChunk> {
 
   public InputAttemptIdentifier getInputAttemptIdentifier() {
     return this.identifier;
+  }
+
+  public boolean isFromRss() {
+    return this.fromRss;
   }
 }

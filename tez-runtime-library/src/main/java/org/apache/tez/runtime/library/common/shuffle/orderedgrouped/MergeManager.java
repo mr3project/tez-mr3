@@ -159,22 +159,26 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
   private SerializationContext serializationContext;
 
+  private final boolean isRssEnabled;
+
   /**
    * Construct the MergeManager. Must call start before it becomes usable.
    */
-  public MergeManager(Configuration conf,
-                      FileSystem localFS,
-                      LocalDirAllocator localDirAllocator,  
-                      InputContext inputContext,
-                      Combiner combiner,
-                      TezCounter spilledRecordsCounter,
-                      TezCounter reduceCombineInputCounter,
-                      TezCounter mergedMapOutputsCounter,
-                      ExceptionReporter exceptionReporter,
-                      long initialMemoryAvailable,
-                      CompressionCodec codec,
-                      boolean ifileReadAheadEnabled,
-                      int ifileReadAheadLength) {
+  public MergeManager(
+      Configuration conf,
+      FileSystem localFS,
+      LocalDirAllocator localDirAllocator,
+      InputContext inputContext,
+      Combiner combiner,
+      TezCounter spilledRecordsCounter,
+      TezCounter reduceCombineInputCounter,
+      TezCounter mergedMapOutputsCounter,
+      ExceptionReporter exceptionReporter,
+      long initialMemoryAvailable,
+      CompressionCodec codec,
+      boolean ifileReadAheadEnabled,
+      int ifileReadAheadLength,
+      boolean isRssEnabled) {
     this.inputContext = inputContext;
     this.conf = conf;
     this.localDirAllocator = localDirAllocator;
@@ -212,7 +216,9 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     }
     this.ifileBufferSize = conf.getInt("io.file.buffer.size",
         TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_BUFFER_SIZE_DEFAULT);
-    
+
+    this.isRssEnabled = isRssEnabled;
+
     // Figure out initial memory req start
     final float maxInMemCopyUse =
       conf.getFloat(
@@ -429,7 +435,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
             maxSingleShuffleLimit + ")");
       }
       return MapOutput.createDiskMapOutput(srcAttemptIdentifier, this, compressedLength, conf,
-          fetcher, true, mapOutputFile);
+          fetcher, true, mapOutputFile, isRssEnabled);
     }
     
     // Stall shuffle if we are above the memory limit
@@ -996,8 +1002,15 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         }
         final Path file = fileChunk.getPath();
         approxOutputSize += size;
-        DiskSegment segment = new DiskSegment(rfs, file, offset, size, codec, ifileReadAhead,
-            ifileReadAheadLength, ifileBufferSize, preserve);
+        DiskSegment segment;
+        if (fileChunk.isFromRss()) {
+          assert offset == 0;
+          assert !preserve;
+          segment = new DiskSegment(rfs, file, size, null);
+        } else {
+          segment = new DiskSegment(rfs, file, offset, size, codec, ifileReadAhead,
+              ifileReadAheadLength, ifileBufferSize, preserve);
+        }
         inputSegments.add(segment);
       }
 
@@ -1255,8 +1268,16 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
       final long fileOffset = fileChunk.getOffset();
       final boolean preserve = fileChunk.isLocalFile();
-      diskSegments.add(new DiskSegment(fs, file, fileOffset, fileLength, codec, ifileReadAhead,
-                                   ifileReadAheadLength, ifileBufferSize, preserve, counter));
+      DiskSegment segment;
+      if (fileChunk.isFromRss()) {
+        assert fileOffset == 0;
+        assert !preserve;
+        segment = new DiskSegment(fs, file, fileLength, counter);
+      } else {
+        segment = new DiskSegment(fs, file, fileOffset, fileLength, codec, ifileReadAhead,
+            ifileReadAheadLength, ifileBufferSize, preserve, counter);
+      }
+      diskSegments.add(segment);
     }
     if (LOG.isInfoEnabled()) {
       finalMergeLog.append(". DiskSeg: " + onDisk.length + ", " + onDiskBytes);

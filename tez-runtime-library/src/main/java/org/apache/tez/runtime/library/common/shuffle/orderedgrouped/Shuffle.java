@@ -158,20 +158,22 @@ public class Shuffle implements ExceptionReporter {
         initialMemoryAvailable,
         codec,
         ifileReadAhead,
-        ifileReadAheadLength);
+        ifileReadAheadLength,
+        rssShuffleClient != null);
 
     scheduler = new ShuffleScheduler(
-          this.inputContext,
-          this.conf,
-          numInputs,
-          this,
-          merger,
-          merger,
-          startTime,
-          codec,
-          ifileReadAhead,
-          ifileReadAheadLength,
-          srcNameTrimmed);
+        this.inputContext,
+        this.conf,
+        numInputs,
+        this,
+        merger,
+        merger,
+        startTime,
+        codec,
+        ifileReadAhead,
+        ifileReadAheadLength,
+        srcNameTrimmed,
+        rssShuffleClient);
 
     this.mergePhaseTime = inputContext.getCounters().findCounter(TaskCounter.MERGE_PHASE_TIME);
     this.shufflePhaseTime = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_PHASE_TIME);

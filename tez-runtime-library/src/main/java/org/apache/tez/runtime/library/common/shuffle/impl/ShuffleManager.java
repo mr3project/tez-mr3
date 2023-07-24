@@ -300,7 +300,8 @@ public class ShuffleManager implements FetcherCallback {
       com.datamonad.mr3.MR3Runtime.env().registerShuffleId(inputContext.getDagId(), inputContext.shuffleId());
     }
 
-    LOG.info("{}: numInputs={}, numFetchers={}", srcNameTrimmed, numInputs, numFetchers);
+    LOG.info("{}: numInputs={}, numFetchers={}, rssShuffleClient={}",
+        srcNameTrimmed, numInputs, numFetchers, rssShuffleClient != null);
     if (LOG.isDebugEnabled()) {
       LOG.debug("compressionCodec="
           + (codec == null ? "NoCompressionCodec" : codec.getClass().getName())

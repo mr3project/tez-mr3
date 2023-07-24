@@ -59,10 +59,8 @@ abstract class MapOutput {
   }
 
   public static MapOutput createDiskMapOutput(InputAttemptIdentifier attemptIdentifier,
-                                              FetchedInputAllocatorOrderedGrouped callback, long size, Configuration conf,
-                                              int fetcher, boolean primaryMapOutput,
-                                              TezTaskOutputFiles mapOutputFile) throws
-      IOException {
+      FetchedInputAllocatorOrderedGrouped callback, long size, Configuration conf, int fetcher,
+      boolean primaryMapOutput, TezTaskOutputFiles mapOutputFile, boolean fromRss) throws IOException {
     FileSystem fs = FileSystem.getLocal(conf).getRaw();
     Path outputPath = mapOutputFile.getInputFileForWrite(
         attemptIdentifier.getInputIdentifier(), attemptIdentifier.getSpillEventId(), size);
@@ -72,7 +70,7 @@ abstract class MapOutput {
     long offset = 0;
 
     DiskMapOutput mapOutput = new DiskMapOutput(attemptIdentifier, callback, size, outputPath, offset,
-        primaryMapOutput, tmpOutputPath);
+        primaryMapOutput, tmpOutputPath, fromRss);
     mapOutput.disk = fs.create(tmpOutputPath);
 
     return mapOutput;
@@ -170,7 +168,7 @@ abstract class MapOutput {
     private DiskDirectMapOutput(InputAttemptIdentifier attemptIdentifier, FetchedInputAllocatorOrderedGrouped callback,
                       long size, Path outputPath, long offset, boolean primaryMapOutput) {
       super(attemptIdentifier, callback, primaryMapOutput);
-      this.outputPath = new FileChunk(outputPath, offset, size, true, attemptIdentifier);
+      this.outputPath = new FileChunk(outputPath, offset, size, true, attemptIdentifier, false);
     }
 
     @Override
@@ -203,13 +201,21 @@ abstract class MapOutput {
     private final Path tmpOutputPath;
     private final FileChunk outputPath;
     private OutputStream disk;
-    private DiskMapOutput(InputAttemptIdentifier attemptIdentifier, FetchedInputAllocatorOrderedGrouped callback,
-                                long size, Path outputPath, long offset, boolean primaryMapOutput, Path tmpOutputPath) {
+
+    private DiskMapOutput(
+        InputAttemptIdentifier attemptIdentifier,
+        FetchedInputAllocatorOrderedGrouped callback,
+        long size,
+        Path outputPath,
+        long offset,
+        boolean primaryMapOutput,
+        Path tmpOutputPath,
+        boolean fromRss) {
       super(attemptIdentifier, callback, primaryMapOutput);
 
       this.tmpOutputPath = tmpOutputPath;
       this.disk = null;
-      this.outputPath = new FileChunk(outputPath, offset, size, false, attemptIdentifier);
+      this.outputPath = new FileChunk(outputPath, offset, size, false, attemptIdentifier, fromRss);
     }
 
     @Override

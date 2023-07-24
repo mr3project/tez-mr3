@@ -161,6 +161,9 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
     if (shufflePayload.hasEmptyPartitions()) {
       try {
         if (emptyPartitionsBitSet.get(partitionId)) {
+          // When RSS is enabled, OrderedGrouped shuffle uses finalMerge and disables pipelined shuffle.
+          // So, unlike Unordered shuffle, there is no DME that waits for lastEvent == true.
+          // As consequence, it safe to call copySucceeded() even if RSS is enabled.
           if (LOG.isDebugEnabled()) {
             LOG.debug(
                 "Source partition: " + partitionId + " did not generate any data. SrcAttempt: ["
@@ -216,7 +219,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
       }
     }
 
-    int port = getShufflePort(shufflePayload);
+    int port = getShufflePort(shufflePayload);  // because rssShuffleClient == null
     scheduler.addKnownMapOutput(StringInterner.intern(shufflePayload.getHost()), port,
         partitionId, compositeInputAttemptIdentifier);
   }
@@ -260,8 +263,23 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
       boolean lastEvent = shufflePayload.getLastEvent();
       InputAttemptIdentifier.SPILL_INFO info = (lastEvent) ? InputAttemptIdentifier.SPILL_INFO
           .FINAL_UPDATE : InputAttemptIdentifier.SPILL_INFO.INCREMENTAL_UPDATE;
+
+      long[] partitionSizes = null;
+      if (lastEvent) {
+        if (shufflePayload.getPartitionSizesLongCount() > 0) {
+          partitionSizes = shufflePayload.getPartitionSizesLongList().stream()
+              .mapToLong(Long::longValue)
+              .toArray();
+        } else if (shufflePayload.getPartitionSizesCount() > 0) {
+          partitionSizes = shufflePayload.getPartitionSizesList().stream()
+              .mapToLong(Integer::longValue)
+              .toArray();
+        }
+      }
+
       srcAttemptIdentifier =
-          new CompositeInputAttemptIdentifier(targetIndex, version, pathComponent, false, info, spillEventId, targetIndexCount);
+          new CompositeInputAttemptIdentifier(targetIndex, version, pathComponent, false, info, spillEventId,
+              targetIndexCount, partitionSizes);
     } else {
       srcAttemptIdentifier =
           new CompositeInputAttemptIdentifier(targetIndex, version, pathComponent, targetIndexCount);
