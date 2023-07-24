@@ -132,7 +132,7 @@ public final class DefaultSorter extends ExternalSorter implements IndexedSortab
 
   public DefaultSorter(OutputContext outputContext, Configuration conf, int numOutputs,
       long initialMemoryAvailable) throws IOException {
-    super(outputContext, conf, numOutputs, initialMemoryAvailable);
+    super(outputContext, conf, numOutputs, initialMemoryAvailable, null);
     deflater = TezCommonUtils.newBestCompressionDeflater();
     // sanity checks
     final float spillper = this.conf.getFloat(
