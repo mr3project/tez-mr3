@@ -98,7 +98,7 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
         }
       }
     } catch (IOException e) {
-      LOG.warn("Failed to close rssShuffleInputStream while shutting down RssFecherOrderedGrouped.", e);
+      LOG.warn("Failed to close rssShuffleInputStream while shutting down RssFetcherOrderedGrouped.", e);
     }
   }
 
