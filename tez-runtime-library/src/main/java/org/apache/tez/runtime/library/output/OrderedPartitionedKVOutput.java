@@ -157,9 +157,14 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
               + "only works with PipelinedSorter.");
       }
 
-      assert !(rssShuffleClient != null) || !pipelinedShuffle;
-      assert !(rssShuffleClient != null) || finalMergeEnabled;
-      assert !(rssShuffleClient != null) || sorterImpl.equals(SorterImpl.PIPELINED);
+      if (rssShuffleClient != null) {
+        Preconditions.checkArgument(!pipelinedShuffle,
+            "OrderedGrouped shuffle does not support pipelined shuffle when RSS is enabled.");
+        Preconditions.checkArgument(finalMergeEnabled,
+            "OrderedGrouped shuffle should be used with final merge if RSS is enabled.");
+        Preconditions.checkArgument(sorterImpl.equals(SorterImpl.PIPELINED),
+            "OrderedGrouped shuffle only works with PipelinedSorter if RSS is enabled.");
+      }
 
       if (sorterImpl.equals(SorterImpl.PIPELINED)) {
         sorter = new PipelinedSorter(getContext(), conf, getNumPhysicalOutputs(),
