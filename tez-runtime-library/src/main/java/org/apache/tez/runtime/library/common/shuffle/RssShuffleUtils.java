@@ -32,8 +32,6 @@ public class RssShuffleUtils {
 
   public static final int EOF_MARKERS_SIZE = 2 * WritableUtils.getVIntSize(IFile.EOF_MARKER);
 
-  private static final int BUFFER_SIZE = 64 * 1024;
-
   public static void shuffleToMemory(InputStream inputStream, byte[] buffer, long dataLength)
       throws IOException {
     IOUtils.readFully(inputStream, buffer, 0, (int) dataLength);
@@ -49,16 +47,16 @@ public class RssShuffleUtils {
 
   public static long shuffleToDisk(InputStream inputStream, OutputStream outputStream,
       long dataLength) throws IOException {
-    byte[] buffer = new byte[BUFFER_SIZE];
+    byte[] buffer = new byte[ShuffleUtils.BUFFER_SIZE];
     boolean reachEOF = false;
     long bytesWritten = 0L;
     while (!reachEOF) {
-      int curBytesRead = inputStream.read(buffer, 0, BUFFER_SIZE);
+      int curBytesRead = inputStream.read(buffer, 0, ShuffleUtils.BUFFER_SIZE);
 
       if (curBytesRead <= 0) {
         reachEOF = true;
       } else {
-        reachEOF = curBytesRead < BUFFER_SIZE;
+        reachEOF = curBytesRead < ShuffleUtils.BUFFER_SIZE;
 
         outputStream.write(buffer, 0, curBytesRead);
         bytesWritten += curBytesRead;

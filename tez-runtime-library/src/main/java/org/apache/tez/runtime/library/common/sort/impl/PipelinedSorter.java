@@ -129,7 +129,6 @@ public class PipelinedSorter extends ExternalSorter {
   // TODO Set additional countesr - total bytes written, spills etc.
 
   private final ShuffleClient rssShuffleClient;
-  private static final int RSS_BUFFER_SIZE = 64 * 1024;
 
   public PipelinedSorter(
       OutputContext outputContext,
@@ -992,11 +991,11 @@ public class PipelinedSorter extends ExternalSorter {
 
     String rssApplicationId = com.datamonad.mr3.MR3Runtime.env().rssApplicationId();
     InputStream finalMergedInputStream = rfs.open(finalOutputFile);
-    byte[] buffer = new byte[RSS_BUFFER_SIZE];
+    byte[] buffer = new byte[ShuffleUtils.BUFFER_SIZE];
     for (int part = 0; part < partitions; part++) {
       long remainingBytes = partitionStats[part];
       while (remainingBytes > 0) {
-        int bufferLength = (int) Math.min(RSS_BUFFER_SIZE, remainingBytes);
+        int bufferLength = (int) Math.min(ShuffleUtils.BUFFER_SIZE, remainingBytes);
         int bytesRead = finalMergedInputStream.read(buffer, 0, bufferLength);
 
         if (bytesRead < 0) {

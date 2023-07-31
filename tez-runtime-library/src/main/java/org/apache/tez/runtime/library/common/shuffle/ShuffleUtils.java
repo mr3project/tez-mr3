@@ -80,6 +80,8 @@ public class ShuffleUtils {
   private static final Logger LOG = LoggerFactory.getLogger(ShuffleUtils.class);
   private static final long MB = 1024l * 1024l;
 
+  public static final int BUFFER_SIZE = 64 * 1024;
+
   static final ThreadLocal<DecimalFormat> MBPS_FORMAT =
       new ThreadLocal<DecimalFormat>() {
         @Override
@@ -167,10 +169,9 @@ public class ShuffleUtils {
         bytesLeft -= IFile.Reader.readToDisk(output, input, compressedLength,
             ifileReadAhead, ifileReadAheadLength);
       } else {
-        final int BYTES_TO_READ = 64 * 1024;
-        byte[] buf = new byte[BYTES_TO_READ];
+        byte[] buf = new byte[BUFFER_SIZE];
         while (bytesLeft > 0) {
-          int n = input.read(buf, 0, (int) Math.min(bytesLeft, BYTES_TO_READ));
+          int n = input.read(buf, 0, (int) Math.min(bytesLeft, BUFFER_SIZE));
           if (n < 0) {
             throw new IOException("read past end of stream reading "
                 + identifier);
