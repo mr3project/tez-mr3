@@ -652,7 +652,6 @@ public class ShuffleManager implements FetcherCallback {
                 1, partitionSizes);
             mergedCid.setInputIdentifiersForReadPartitionAllOnce(subList);
             RssFetcher rssFetcher = new RssFetcher(this, inputManager, rssShuffleClient,
-                com.datamonad.mr3.MR3Runtime.env().rssApplicationId(),
                 inputContext.shuffleId(), inputHost.getHost(), inputHost.getPort(),
                 partitionId, mergedCid,
                 subTotalSize, mapIndexStart, mapIndexEnd, true);
@@ -665,7 +664,6 @@ public class ShuffleManager implements FetcherCallback {
           int mapIndexStart = 0;
           int mapIndexEnd = inputContext.getSourceVertexNumTasks();
           RssFetcher rssFetcher = new RssFetcher(this, inputManager, rssShuffleClient,
-              com.datamonad.mr3.MR3Runtime.env().rssApplicationId(),
               inputContext.shuffleId(), inputHost.getHost(), inputHost.getPort(),
               pendingInputs.getPartition(), inputAttemptIdentifier,
               partitionTotalSize, mapIndexStart, mapIndexEnd, true);
@@ -675,7 +673,6 @@ public class ShuffleManager implements FetcherCallback {
         int mapIndexStart = Integer.parseInt(inputHost.getHost());
         int mapIndexEnd = mapIndexStart + 1;
         RssFetcher rssFetcher = new RssFetcher(this, inputManager, rssShuffleClient,
-            com.datamonad.mr3.MR3Runtime.env().rssApplicationId(),
             inputContext.shuffleId(), inputHost.getHost(), inputHost.getPort(),
             pendingInputs.getPartition(), inputAttemptIdentifier,
             partitionTotalSize, mapIndexStart, mapIndexEnd, false);

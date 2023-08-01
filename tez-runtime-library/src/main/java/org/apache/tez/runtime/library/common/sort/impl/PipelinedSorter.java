@@ -916,7 +916,6 @@ public class PipelinedSorter extends ExternalSorter {
       // In order to avoid reading final file immediately after writing it,
       // create a piped stream, pass OS to IFile.writer, and use IS instead of finalMergedInputStream here.
       InputStream finalMergedInputStream = rfs.open(finalOutputFile);
-      String rssApplicationId = com.datamonad.mr3.MR3Runtime.env().rssApplicationId();
       byte[] buffer = new byte[ShuffleUtils.BUFFER_SIZE];
       for (int part = 0; part < partitions; part++) {
         long remainingBytes = partitionStats[part];

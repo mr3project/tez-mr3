@@ -36,7 +36,6 @@ public class RssFetcher implements FetcherBase {
   private final long dataLength;
 
   private final ShuffleClient rssShuffleClient;
-  private final String rssApplicationId;
   private final int shuffleId;
 
   private final String host;
@@ -59,7 +58,6 @@ public class RssFetcher implements FetcherBase {
       FetcherCallback fetcherCallback,
       FetchedInputAllocator inputAllocator,
       ShuffleClient rssShuffleClient,
-      String rssApplicationId,
       int shuffleId,
       String host,
       int port,
@@ -72,7 +70,6 @@ public class RssFetcher implements FetcherBase {
     this.fetcherCallback = fetcherCallback;
     this.inputAllocator = inputAllocator;
     this.rssShuffleClient = rssShuffleClient;
-    this.rssApplicationId = rssApplicationId;
     this.shuffleId = shuffleId;
     this.host = host;
     this.port = port;

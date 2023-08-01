@@ -1506,7 +1506,6 @@ class ShuffleScheduler {
         exceptionReporter,
         mapHost,
         rssShuffleClient,
-        com.datamonad.mr3.MR3Runtime.env().rssApplicationId(),
         inputContext.shuffleId());
   }
 

@@ -40,7 +40,6 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
   private final ExceptionReporter exceptionReporter;
   private final MapHost mapHost;
   private final ShuffleClient rssShuffleClient;
-  private final String rssApplicationId;
   private final int shuffleId;
 
   private final int fetcherId;
@@ -57,14 +56,12 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
       ExceptionReporter exceptionReporter,
       MapHost mapHost,
       ShuffleClient rssShuffleClient,
-      String rssApplicationId,
       int shuffleId) {
     this.allocator = allocator;
     this.shuffleScheduler = shuffleScheduler;
     this.exceptionReporter = exceptionReporter;
     this.mapHost = mapHost;
     this.rssShuffleClient = rssShuffleClient;
-    this.rssApplicationId = rssApplicationId;
     this.shuffleId = shuffleId;
 
     this.fetcherId = nextId.getAndIncrement();
