@@ -47,8 +47,9 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
   private final Object lock = new Object();
 
   // guarded by lock
-  private InputStream rssShuffleInputStream = null;
   private boolean isShutdown = false;
+  private boolean rssShuffleInputStreamClosed = false;
+  private InputStream rssShuffleInputStream = null;
 
   public RssFetcherOrderedGrouped(
       FetchedInputAllocatorOrderedGrouped allocator,
@@ -90,7 +91,8 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
     try {
       synchronized (lock) {
         isShutdown = true;
-        if (rssShuffleInputStream != null) {
+        if (rssShuffleInputStream != null && !rssShuffleInputStreamClosed) {
+          rssShuffleInputStreamClosed = true;
           rssShuffleInputStream.close();
         }
       }
@@ -138,6 +140,7 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
       if (!isShutdown) {
         rssShuffleInputStream = rssShuffleClient.readPartition(shuffleId, partitionId,
             mapAttemptNumber, mapIndex, mapIndex + 1);
+        // now rssShuffleInputStream.close() should be called inside the current thread
       } else {
         LOG.warn("RssFetcherOrderedGrouped.shutdown() is called before it connects to RSS. " +
             "Stop running RssFetcherOrderedGrouped");
@@ -157,7 +160,12 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
       shuffleScheduler.copySucceeded(srcAttempt, mapHost, dataLength, dataLength, copyDuration, mapOutput,
           false);
     } finally {
-      rssShuffleInputStream.close();
+      synchronized (lock) {
+        if (!rssShuffleInputStreamClosed) {
+          rssShuffleInputStreamClosed = true;
+          rssShuffleInputStream.close();
+        }
+      }
     }
   }
 
@@ -172,7 +180,12 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
       shuffleScheduler.copySucceeded(srcAttempt, mapHost, dataLength, dataLength, copyDuration, mapOutput,
           false);
     } finally {
-      rssShuffleInputStream.close();
+      synchronized (lock) {
+        if (!rssShuffleInputStreamClosed) {
+          rssShuffleInputStreamClosed = true;
+          rssShuffleInputStream.close();
+        }
+      }
     }
   }
 }
