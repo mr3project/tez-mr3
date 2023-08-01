@@ -780,7 +780,6 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
             sizePerPartition[i] += curPartitionLength;
 
             rssShuffleClient.pushData(
-                com.datamonad.mr3.MR3Runtime.env().rssApplicationId(),
                 outputContext.shuffleId(),
                 outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber(), i,
                 rssBuffer.toByteArray(), 0, rssBuffer.size(), outputContext.getVertexParallelism(),
@@ -990,7 +989,6 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
       if (rssShuffleClient != null) {
         rssShuffleClient.mapperEnd(
-            com.datamonad.mr3.MR3Runtime.env().rssApplicationId(),
             outputContext.shuffleId(),
             outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber(), outputContext.getVertexParallelism());
       }
@@ -1137,7 +1135,6 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   private void cleanupRssShuffleClient() {
     if (rssShuffleClient != null) {
       rssShuffleClient.cleanup(
-         com.datamonad.mr3.MR3Runtime.env().rssApplicationId(),
          outputContext.shuffleId(),
          outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber());
     }
@@ -1491,7 +1488,6 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       writer = null;
 
       rssShuffleClient.pushData(
-          com.datamonad.mr3.MR3Runtime.env().rssApplicationId(),
           outputContext.shuffleId(),
           outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber(), partition,
           rssBuffer.toByteArray(), 0, rssBuffer.size(), outputContext.getVertexParallelism(),

@@ -934,7 +934,6 @@ public class PipelinedSorter extends ExternalSorter {
           }
 
           rssShuffleClient.pushData(
-              rssApplicationId,
               outputContext.shuffleId(),
               outputContext.getTaskIndex(),
               outputContext.getTaskAttemptNumber(),
@@ -954,7 +953,6 @@ public class PipelinedSorter extends ExternalSorter {
       assert finalIndexFile == null;
 
       rssShuffleClient.mapperEnd(
-          rssApplicationId,
           outputContext.shuffleId(),
           outputContext.getTaskIndex(),
           outputContext.getTaskAttemptNumber(),
@@ -975,7 +973,6 @@ public class PipelinedSorter extends ExternalSorter {
   private void cleanupRssShuffleClient() {
     if (rssShuffleClient != null) {
       rssShuffleClient.cleanup(
-          com.datamonad.mr3.MR3Runtime.env().rssApplicationId(),
           outputContext.shuffleId(),
           outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber());
     }

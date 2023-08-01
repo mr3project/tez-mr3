@@ -139,7 +139,7 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
       throws IOException {
     synchronized (lock) {
       if (!isShutdown) {
-        rssShuffleInputStream = rssShuffleClient.readPartition(rssApplicationId, shuffleId, partitionId,
+        rssShuffleInputStream = rssShuffleClient.readPartition(shuffleId, partitionId,
             mapAttemptNumber, mapIndex, mapIndex + 1);
       } else {
         LOG.warn("RssFetcherOrderedGrouped.shutdown() is called before it connects to RSS. " +
