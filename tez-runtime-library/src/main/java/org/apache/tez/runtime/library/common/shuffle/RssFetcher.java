@@ -48,8 +48,9 @@ public class RssFetcher implements FetcherBase {
   private final Object lock = new Object();
 
   // guarded by lock
-  private InputStream rssShuffleInputStream = null;
   private boolean isShutdown = false;
+  private boolean rssShuffleInputStreamClosed = false;
+  private InputStream rssShuffleInputStream = null;
 
   private final int mapIndexStart, mapIndexEnd;
   private final boolean readPartitionAllOnce;
@@ -92,22 +93,13 @@ public class RssFetcher implements FetcherBase {
       fetchedInput = inputAllocator.allocate(actualSize, actualSize, srcAttemptId);
     }
 
-    synchronized (lock) {
-      if (!isShutdown) {
-        rssShuffleInputStream = rssShuffleClient.readPartition(shuffleId, partitionId,
-            srcAttemptId.getAttemptNumber(), mapIndexStart, mapIndexEnd);
-      } else {
-        LOG.warn("RssFetcher.shutdown() is called before it connects to RSS. Stop running RssFetcher");
-        throw new IllegalStateException("Detected shutdown");
-      }
-    }
-
     if (fetchedInput.getType() == FetchedInput.Type.MEMORY) {
-      shuffleToMemory(rssShuffleInputStream, (MemoryFetchedInput) fetchedInput);
+      setupRssShuffleInputStream(mapIndexStart, mapIndexEnd, srcAttemptId.getAttemptNumber(), partitionId);
+      shuffleToMemory((MemoryFetchedInput) fetchedInput);
     } else if (fetchedInput.getType() == FetchedInput.Type.DISK) {
-      shuffleToDisk(rssShuffleInputStream, (DiskFetchedInput) fetchedInput);
+      setupRssShuffleInputStream(mapIndexStart, mapIndexEnd, srcAttemptId.getAttemptNumber(), partitionId);
+      shuffleToDisk((DiskFetchedInput) fetchedInput);
     } else {
-      rssShuffleInputStream.close();
       throw new TezUncheckedException("Unknown FetchedInput.Type: " + fetchedInput);
     }
 
@@ -136,7 +128,8 @@ public class RssFetcher implements FetcherBase {
     try {
       synchronized (lock) {
         isShutdown = true;
-        if (rssShuffleInputStream != null) {
+        if (rssShuffleInputStream != null && !rssShuffleInputStreamClosed) {
+          rssShuffleInputStreamClosed = true;
           rssShuffleInputStream.close();
         }
       }
@@ -145,26 +138,49 @@ public class RssFetcher implements FetcherBase {
     }
   }
 
-  private void shuffleToMemory(InputStream inputStream, MemoryFetchedInput fetchedInput) throws IOException {
+  private void setupRssShuffleInputStream(int mapIndexStart, int mapIndexEnd, int mapAttemptNumber,
+      int partitionId) throws IOException {
+    synchronized (lock) {
+      if (!isShutdown) {
+        rssShuffleInputStream = rssShuffleClient.readPartition(shuffleId, partitionId, mapAttemptNumber,
+            mapIndexStart, mapIndexEnd);
+      } else {
+        LOG.warn("RssFetcher.shutdown() is called before it connects to RSS. Stop running RssFetcher");
+        throw new IllegalStateException("Detected shutdown");
+      }
+    }
+  }
+
+  private void shuffleToMemory(MemoryFetchedInput fetchedInput) throws IOException {
     try {
-      RssShuffleUtils.shuffleToMemory(inputStream, fetchedInput.getBytes(), dataLength);
+      RssShuffleUtils.shuffleToMemory(rssShuffleInputStream, fetchedInput.getBytes(), dataLength);
     } catch (IOException e) {
       LOG.error("Failed to read shuffle data from rssShuffleInputStream", e);
       throw e;
     } finally {
-      inputStream.close();
+      synchronized (lock) {
+        if (!rssShuffleInputStreamClosed) {
+          rssShuffleInputStreamClosed = true;
+          rssShuffleInputStream.close();
+        }
+      }
     }
   }
 
-  private void shuffleToDisk(InputStream inputStream, DiskFetchedInput fetchedInput) throws IOException {
+  private void shuffleToDisk(DiskFetchedInput fetchedInput) throws IOException {
     try (OutputStream diskOutputStream = fetchedInput.getOutputStream()) {
-      long bytesWritten = RssShuffleUtils.shuffleToDisk(inputStream, diskOutputStream, dataLength);
+      long bytesWritten = RssShuffleUtils.shuffleToDisk(rssShuffleInputStream, diskOutputStream, dataLength);
 
       if (dataLengthUnknown()) {
         fetchedInput.setSize(bytesWritten);
       }
     } finally {
-      inputStream.close();
+      synchronized (lock) {
+        if (!rssShuffleInputStreamClosed) {
+          rssShuffleInputStreamClosed = true;
+          rssShuffleInputStream.close();
+        }
+      }
     }
   }
 
