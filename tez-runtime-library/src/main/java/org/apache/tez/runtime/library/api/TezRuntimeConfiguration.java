@@ -576,6 +576,11 @@ public class TezRuntimeConfiguration {
   public static final long TEZ_RUNTIME_CELEBORN_FETCH_SPLIT_THRESHOLD_DEFAULT =
       1024L * 1024L * 1024L;  // 1GB
 
+  @ConfigurationProperty(type = "integer")
+  public static final String TEZ_RUNTIME_CELEBORN_SHUFFLE_PARALLEL_COPIES = TEZ_RUNTIME_PREFIX +
+      "celeborn.shuffle.parallel.copies";
+  public static final int TEZ_RUNTIME_CELEBORN_SHUFFLE_PARALLEL_COPIES_DEFAULT = 4;
+
   static {
     tezRuntimeKeys.add(TEZ_RUNTIME_IFILE_READAHEAD);
     tezRuntimeKeys.add(TEZ_RUNTIME_IFILE_READAHEAD_BYTES);
@@ -643,6 +648,7 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_FETCHER_USE_SHARED_POOL);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_HOST_PENALTY_TIME_LIMIT_MS);
     tezRuntimeKeys.add(TEZ_RUNTIME_CELEBORN_FETCH_SPLIT_THRESHOLD);
+    tezRuntimeKeys.add(TEZ_RUNTIME_CELEBORN_SHUFFLE_PARALLEL_COPIES);
 
     // Do not keep defaultConf as a static member because it holds a reference to ClassLoader
     // of the Thread that is active at the time of loading this class. The active Thread usually

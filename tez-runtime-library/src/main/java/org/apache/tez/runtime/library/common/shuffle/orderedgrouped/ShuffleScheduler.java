@@ -284,7 +284,10 @@ class ShuffleScheduler {
     this.ifileReadAheadLength = ifileReadAheadLength;
     this.srcNameTrimmed = srcNameTrimmed;
     this.codec = codec;
-    int configuredNumFetchers =
+    int configuredNumFetchers = rssShuffleClient != null ?
+        conf.getInt(
+            TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_SHUFFLE_PARALLEL_COPIES,
+            TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_SHUFFLE_PARALLEL_COPIES_DEFAULT) :
         conf.getInt(
             TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_PARALLEL_COPIES,
             TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_PARALLEL_COPIES_DEFAULT);

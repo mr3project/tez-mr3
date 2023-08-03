@@ -238,7 +238,10 @@ public class ShuffleManager implements FetcherCallback {
     obsoletedInputs = Collections.newSetFromMap(new ConcurrentHashMap<InputAttemptIdentifier, Boolean>());
     runningFetchers = Collections.newSetFromMap(new ConcurrentHashMap<FetcherBase, Boolean>());
 
-    int maxConfiguredFetchers = 
+    int maxConfiguredFetchers = rssShuffleClient != null ?
+        conf.getInt(
+            TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_SHUFFLE_PARALLEL_COPIES,
+            TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_SHUFFLE_PARALLEL_COPIES_DEFAULT) :
         conf.getInt(
             TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_PARALLEL_COPIES,
             TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_PARALLEL_COPIES_DEFAULT);
