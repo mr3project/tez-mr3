@@ -90,8 +90,7 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
           + maxInMemCopyUse);
     }
     
-    long memReq = (long) (conf.getLong(Constants.TEZ_RUNTIME_TASK_MEMORY,
-        Math.min(maxAvailableTaskMemory, Integer.MAX_VALUE)) * maxInMemCopyUse);
+    long memReq = (long) (Math.min(maxAvailableTaskMemory, Integer.MAX_VALUE) * maxInMemCopyUse);
     
     if (memReq <= this.initialMemoryAvailable) {
       this.memoryLimit = memReq;
@@ -131,8 +130,7 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
           + TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT + ": "
           + maxInMemCopyUse);
     }
-    long memReq = (long) (conf.getLong(Constants.TEZ_RUNTIME_TASK_MEMORY,
-        Math.min(maxAvailableTaskMemory, Integer.MAX_VALUE)) * maxInMemCopyUse);
+    long memReq = (long) (Math.min(maxAvailableTaskMemory, Integer.MAX_VALUE) * maxInMemCopyUse);
     return memReq;
   }
 
