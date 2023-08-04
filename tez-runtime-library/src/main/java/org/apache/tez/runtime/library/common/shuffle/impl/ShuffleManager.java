@@ -584,8 +584,9 @@ public class ShuffleManager implements FetcherCallback {
     assert pendingInputs.getInputs().get(0) instanceof CompositeInputAttemptIdentifier;
     // CompositeInputAttemptIdentifier.getPartitionSize(pendingInputs.getPartition()) to be called
 
-    CompositeInputAttemptIdentifier inputAttemptIdentifier =
-        (CompositeInputAttemptIdentifier)pendingInputs.getInputs().get(0);
+    CompositeInputAttemptIdentifier inputAttemptIdentifier = (CompositeInputAttemptIdentifier)pendingInputs.getInputs().get(0);
+    assert !inputContext.readPartitionAllOnce() || (inputAttemptIdentifier.getTaskIndex() == -1);
+    assert !inputContext.readPartitionAllOnce() || (inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce() != null);
 
     // if inputContext.readPartitionAllOnce() == true, we check just one inputIdentifier
     boolean alreadyCompleted = completedInputSet.get(inputAttemptIdentifier.getInputIdentifier());
@@ -593,8 +594,6 @@ public class ShuffleManager implements FetcherCallback {
 
     if (!alreadyCompleted) {
       if (inputContext.readPartitionAllOnce()) {
-        // TODO: split by attemptNumber
-
         for (InputAttemptIdentifier input: inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce()) {
           ShuffleEventInfo eventInfo = shuffleInfoEventsMap.get(input.getInputIdentifier());
           if (eventInfo != null) {
@@ -608,80 +607,18 @@ public class ShuffleManager implements FetcherCallback {
         }
       }
 
-      long partitionTotalSize = inputAttemptIdentifier.getPartitionSize(pendingInputs.getPartition());
+      int partitionId = pendingInputs.getPartition();
 
       if (inputContext.readPartitionAllOnce()) {
-        List<InputAttemptIdentifier> inputAttemptIdentifiers =
-            inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce();
-        int numIdentifiers = inputAttemptIdentifiers.size();
-        assert numIdentifiers == inputContext.getSourceVertexNumTasks();
-
-        if (partitionTotalSize > rssFetchSplitThresholdSize) {
-          // a single call to RSS would create a file larger than thresholdSize
-          int numFetchers =
-              Math.min((int)((partitionTotalSize - 1L) / rssFetchSplitThresholdSize) + 1, numIdentifiers);
-          int numIndentifiersPerFetcher = numIdentifiers / numFetchers;
-          int numLargeFetchers = numIdentifiers - numIndentifiersPerFetcher * numFetchers;
-          assert numIdentifiers == numLargeFetchers * (numIndentifiersPerFetcher + 1) +
-              (numFetchers - numLargeFetchers) * numIndentifiersPerFetcher;
-
-          LOG.info("Splitting InputAttemptIdentifiers to {} RssFetchers: {} / {}",
-              numFetchers, partitionTotalSize, numIdentifiers);
-
-          int partitionId = pendingInputs.getPartition();
-          int mapIndexStart = 0;
-          int mapIndexEnd = numIdentifiers;
-          for (int i = 0; i < numFetchers; i++) {
-            int numExtra = i < numLargeFetchers ? 1 : 0;
-            int numIdentifiersToConsume = numIndentifiersPerFetcher + numExtra;
-            mapIndexEnd = mapIndexStart + numIdentifiersToConsume;
-
-            List<InputAttemptIdentifier> subList = inputAttemptIdentifiers.subList(mapIndexStart, mapIndexEnd);
-            long subTotalSize = 0L;
-            for (InputAttemptIdentifier input: subList) {
-              CompositeInputAttemptIdentifier cid = (CompositeInputAttemptIdentifier)input;
-              subTotalSize += cid.getPartitionSize(partitionId);
-            }
-
-            // optimize partitionSizes[] because only partitionId is used and other fields are never used
-            long[] partitionSizes = new long[1];
-            partitionSizes[0] = subTotalSize;
-
-            InputAttemptIdentifier firstId = subList.get(0);
-            CompositeInputAttemptIdentifier mergedCid = new CompositeInputAttemptIdentifier(
-                firstId.getInputIdentifier(),
-                firstId.getAttemptNumber(),
-                firstId.getPathComponent(),
-                firstId.isShared(),
-                firstId.getFetchTypeInfo(),
-                firstId.getSpillEventId(),
-                1, partitionSizes, mapIndexStart);
-            mergedCid.setInputIdentifiersForReadPartitionAllOnce(subList);
-            RssFetcher rssFetcher = new RssFetcher(this, inputManager, rssShuffleClient,
-                inputContext.shuffleId(), inputHost.getHost(), inputHost.getPort(),
-                partitionId, mergedCid,
-                subTotalSize, mapIndexStart, mapIndexEnd, true);
-            rssFetchers.add(rssFetcher);
-
-            mapIndexStart = mapIndexEnd;
-          }
-          assert mapIndexEnd == numIdentifiers;
-        } else {
-          int mapIndexStart = 0;
-          int mapIndexEnd = inputContext.getSourceVertexNumTasks();
-          RssFetcher rssFetcher = new RssFetcher(this, inputManager, rssShuffleClient,
-              inputContext.shuffleId(), inputHost.getHost(), inputHost.getPort(),
-              pendingInputs.getPartition(), inputAttemptIdentifier,
-              partitionTotalSize, mapIndexStart, mapIndexEnd, true);
-          rssFetchers.add(rssFetcher);
-        }
+        createRssFetchersForReadPartitionAllOnce(inputAttemptIdentifier, partitionId, inputHost, rssFetchers);
       } else {
         int mapIndexStart = Integer.parseInt(inputHost.getHost());
         assert mapIndexStart == inputAttemptIdentifier.getTaskIndex();
         int mapIndexEnd = mapIndexStart + 1;
+        long partitionTotalSize = inputAttemptIdentifier.getPartitionSize(partitionId);
         RssFetcher rssFetcher = new RssFetcher(this, inputManager, rssShuffleClient,
             inputContext.shuffleId(), inputHost.getHost(), inputHost.getPort(),
-            pendingInputs.getPartition(), inputAttemptIdentifier,
+            partitionId, inputAttemptIdentifier,
             partitionTotalSize, mapIndexStart, mapIndexEnd, false);
         rssFetchers.add(rssFetcher);
       }
@@ -693,6 +630,75 @@ public class ShuffleManager implements FetcherCallback {
     }
 
     return rssFetchers;
+  }
+
+  private void createRssFetchersForReadPartitionAllOnce(
+      CompositeInputAttemptIdentifier inputAttemptIdentifier,
+      int partitionId, InputHost inputHost, List<RssFetcher> rssFetchers) {
+    long partitionTotalSize = inputAttemptIdentifier.getPartitionSize(partitionId);
+    List<InputAttemptIdentifier> inputAttemptIdentifiers =
+        inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce();
+    int numIdentifiers = inputAttemptIdentifiers.size();
+    assert numIdentifiers == inputContext.getSourceVertexNumTasks();
+
+    if (partitionTotalSize > rssFetchSplitThresholdSize) {
+      // a single call to RSS would create a file larger than thresholdSize
+      int numFetchers =
+          Math.min((int)((partitionTotalSize - 1L) / rssFetchSplitThresholdSize) + 1, numIdentifiers);
+      int numIndentifiersPerFetcher = numIdentifiers / numFetchers;
+      int numLargeFetchers = numIdentifiers - numIndentifiersPerFetcher * numFetchers;
+      assert numIdentifiers == numLargeFetchers * (numIndentifiersPerFetcher + 1) +
+          (numFetchers - numLargeFetchers) * numIndentifiersPerFetcher;
+
+      LOG.info("Splitting InputAttemptIdentifiers to {} RssFetchers: {} / {}",
+          numFetchers, partitionTotalSize, numIdentifiers);
+
+      int mapIndexStart = 0;
+      int mapIndexEnd = numIdentifiers;
+      for (int i = 0; i < numFetchers; i++) {
+        int numExtra = i < numLargeFetchers ? 1 : 0;
+        int numIdentifiersToConsume = numIndentifiersPerFetcher + numExtra;
+        mapIndexEnd = mapIndexStart + numIdentifiersToConsume;
+
+        List<InputAttemptIdentifier> subList = inputAttemptIdentifiers.subList(mapIndexStart, mapIndexEnd);
+        long subTotalSize = 0L;
+        for (InputAttemptIdentifier input: subList) {
+          CompositeInputAttemptIdentifier cid = (CompositeInputAttemptIdentifier)input;
+          subTotalSize += cid.getPartitionSize(partitionId);
+        }
+
+        // optimize partitionSizes[] because only partitionId is used and other fields are never used
+        long[] partitionSizes = new long[1];
+        partitionSizes[0] = subTotalSize;
+
+        InputAttemptIdentifier firstId = subList.get(0);
+        CompositeInputAttemptIdentifier mergedCid = new CompositeInputAttemptIdentifier(
+            firstId.getInputIdentifier(),
+            firstId.getAttemptNumber(),
+            firstId.getPathComponent(),
+            firstId.isShared(),
+            firstId.getFetchTypeInfo(),
+            firstId.getSpillEventId(),
+            1, partitionSizes, -1);
+        mergedCid.setInputIdentifiersForReadPartitionAllOnce(subList);
+        RssFetcher rssFetcher = new RssFetcher(this, inputManager, rssShuffleClient,
+            inputContext.shuffleId(), inputHost.getHost(), inputHost.getPort(),
+            partitionId, mergedCid,
+            subTotalSize, mapIndexStart, mapIndexEnd, true);
+        rssFetchers.add(rssFetcher);
+
+        mapIndexStart = mapIndexEnd;
+      }
+      assert mapIndexEnd == numIdentifiers;
+    } else {
+      int mapIndexStart = 0;
+      int mapIndexEnd = inputContext.getSourceVertexNumTasks();
+      RssFetcher rssFetcher = new RssFetcher(this, inputManager, rssShuffleClient,
+          inputContext.shuffleId(), inputHost.getHost(), inputHost.getPort(),
+          partitionId, inputAttemptIdentifier,
+          partitionTotalSize, mapIndexStart, mapIndexEnd, true);
+      rssFetchers.add(rssFetcher);
+    }
   }
 
   /////////////////// Methods for InputEventHandler

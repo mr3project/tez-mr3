@@ -29,13 +29,29 @@ import java.util.List;
 public class CompositeInputAttemptIdentifier extends InputAttemptIdentifier {
   private final int inputIdentifierCount;
 
+  //
+  // fields for using RSS
+  //
+
   // both fields are set if shufflePayload.getLastEvent() == true
-  // partitionSizes.length == 1 if only a single entry is used
+  // optimization: partitionSizes.length == 1 if only a single entry is used
   private final long[] partitionSizes;
-  private final int taskIndex;  // -1 if not used
+  private final int taskIndex;
 
   // only for readPartitionAllOnce, size == srcVertexNumTasks
+  // InputAttemptIdentifiers in childInputIdentifiers[] are combined and replaced with
+  // this CompositeInputAttemptIdentifier.
   private List<InputAttemptIdentifier> childInputIdentifiers;
+
+  // Invariant for partitionSizes[], taskIndex, childInputIdentifiers[]
+  // 1. taskIndex >= 0:
+  //    this CompositeInputAttemptIdentifier originates from a mapper.
+  //    partitionSizes[] is fully loaded.
+  //    childInputIdentifiers == null
+  // 2. taskIndex == -1:
+  //    this CompositeInputAttemptIdentifier combines childInputIdentifiers[].
+  //    partitionSizes[] is compact.
+  //    childInputIdentifiers != null
 
   public CompositeInputAttemptIdentifier(int inputIdentifier, int attemptNumber, String pathComponent, int inputIdentifierCount) {
     this(inputIdentifier, attemptNumber, pathComponent, false, SPILL_INFO.FINAL_MERGE_ENABLED, -1, inputIdentifierCount);

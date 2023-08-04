@@ -133,11 +133,10 @@ public class InputHost extends HostPort {
       inputs = new ArrayList<InputAttemptIdentifier>();
       tempPartitionToInputs.put(partitionRange, inputs);
     }
+    // TODO: remove InputAttemptIdentifier with the same inputIdentifier and a different attemptNumber
     inputs.add(srcAttempt);
 
     if (inputs.size() == srcVertexNumTasks) {
-      // TODO: sanity check - each Task index should have exactly 1 InputAttemptIdentifier
-
       long partitionTotalSize = 0L;
       for (InputAttemptIdentifier input: inputs) {
         CompositeInputAttemptIdentifier cid = (CompositeInputAttemptIdentifier)input;
@@ -154,12 +153,12 @@ public class InputHost extends HostPort {
           //   1. checking 'alreadyCompleted' in ShuffleManager.constructRssFetcher()
           //   2. for committing FetchedInput in RssFetcher
           firstId.getInputIdentifier(),
-          0,
+          firstId.getAttemptNumber(),
           firstId.getPathComponent(),
           firstId.isShared(),
           firstId.getFetchTypeInfo(),
           firstId.getSpillEventId(),
-          1, partitionSizes, -1);  // taskIndex is not used
+          1, partitionSizes, -1);
       mergedCid.setInputIdentifiersForReadPartitionAllOnce(inputs);
 
       LOG.info("Merging {} partition inputs for partitionId={} with total size {}: {} ",srcVertexNumTasks,

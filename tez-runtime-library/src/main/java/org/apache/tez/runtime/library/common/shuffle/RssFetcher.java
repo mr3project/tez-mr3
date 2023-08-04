@@ -110,6 +110,7 @@ public class RssFetcher implements FetcherBase {
       // ShuffleManager.getNextInput() should not get stuck in completedInputs.take():
       //   1. mark completion for every InputAttemptIdentifier except srcAttemptId
       //   2. call fetchSucceeded() on srcAttemptId and fetchedInput
+      // Note that InputAttemptIdentifier's have the same partitionId, but different inputIdentifiers.
       for (InputAttemptIdentifier inputIdentifier: srcAttemptId.getInputIdentifiersForReadPartitionAllOnce()) {
         if (inputIdentifier.getInputIdentifier() != srcAttemptId.getInputIdentifier()) {
           // fetchedInput == null, so mark completion only
