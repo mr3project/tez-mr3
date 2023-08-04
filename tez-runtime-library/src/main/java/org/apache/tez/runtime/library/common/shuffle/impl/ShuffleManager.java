@@ -675,8 +675,8 @@ public class ShuffleManager implements FetcherCallback {
           rssFetchers.add(rssFetcher);
         }
       } else {
-        // TODO: use DataMovementEventPayloadProto.task_index
         int mapIndexStart = Integer.parseInt(inputHost.getHost());
+        assert mapIndexStart == inputAttemptIdentifier.getTaskIndex();
         int mapIndexEnd = mapIndexStart + 1;
         RssFetcher rssFetcher = new RssFetcher(this, inputManager, rssShuffleClient,
             inputContext.shuffleId(), inputHost.getHost(), inputHost.getPort(),
