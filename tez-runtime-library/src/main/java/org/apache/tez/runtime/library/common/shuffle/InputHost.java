@@ -133,7 +133,15 @@ public class InputHost extends HostPort {
       inputs = new ArrayList<InputAttemptIdentifier>();
       tempPartitionToInputs.put(partitionRange, inputs);
     }
-    // TODO: remove InputAttemptIdentifier with the same inputIdentifier and a different attemptNumber
+    inputs.removeIf(input -> {
+      if (input.getInputIdentifier() == srcAttempt.getInputIdentifier()) {
+        LOG.warn("Removing InputAttemptIdentifier with the same partitionId and a different attemptNumber: {}, {}, {} != {}",
+            partitionId, input.getInputIdentifier(), input.getAttemptNumber(), srcAttempt.getAttemptNumber());
+        return true;
+      } else {
+        return false;
+      }
+    });
     inputs.add(srcAttempt);
 
     if (inputs.size() == srcVertexNumTasks) {

@@ -485,7 +485,6 @@ public class ShuffleManager implements FetcherCallback {
 
   @VisibleForTesting
   Fetcher constructFetcherForHost(InputHost inputHost, Configuration conf) {
-
     Path lockDisk = null;
 
     if (sharedFetchEnabled) {
