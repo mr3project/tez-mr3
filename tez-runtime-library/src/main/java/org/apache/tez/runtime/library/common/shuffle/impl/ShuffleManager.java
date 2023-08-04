@@ -696,7 +696,9 @@ public class ShuffleManager implements FetcherCallback {
   public void addKnownInput(String hostName, int port,
       CompositeInputAttemptIdentifier srcAttemptIdentifier, int srcPhysicalIndex) {
     // srcPhysicalIndex == partitionId
-    // if rssShuffleClient != null, hostName == source task index (encoded as a string) and port == 0
+    // if rssShuffleClient != null,
+    //   readPartitionAllOnce == false: hostName == source task index (encoded as a string) and port == 0
+    //   readPartitionAllOnce == true: hostName == source Vertex Name and port == 0
     HostPort identifier = new HostPort(hostName, port);
     InputHost host = knownSrcHosts.get(identifier);
     if (host == null) {

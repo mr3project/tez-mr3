@@ -137,6 +137,7 @@ public class InputHost extends HostPort {
 
     if (inputs.size() == srcVertexNumTasks) {
       // TODO: sanity check - all InputAttemptIdentifier's should have the same attemptNumber
+
       long partitionTotalSize = 0L;
       for (InputAttemptIdentifier input: inputs) {
         CompositeInputAttemptIdentifier cid = (CompositeInputAttemptIdentifier)input;
@@ -149,7 +150,7 @@ public class InputHost extends HostPort {
       InputAttemptIdentifier firstId = inputs.get(0);
       CompositeInputAttemptIdentifier mergedCid = new CompositeInputAttemptIdentifier(
           // one representative InputAttemptIdentifier (i.e., destInputIndexes) for:
-          //   1. checking 'alreadyCompleted'  in ShuffleManager.constructRssFetcher()
+          //   1. checking 'alreadyCompleted' in ShuffleManager.constructRssFetcher()
           //   2. for committing FetchedInput in RssFetcher
           firstId.getInputIdentifier(),
           firstId.getAttemptNumber(),

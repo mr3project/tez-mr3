@@ -30,8 +30,9 @@ message DataMovementEventPayloadProto {
   optional bool last_event = 7;   // Related to pipelined shuffle
   optional int32 spill_id = 8;    // Related to pipelined shuffle
   optional int32 num_record = 9;  // set if numPartitions == 1
-  repeated int32 partition_sizes = 10;        // for RSS (Celeborn)
-  repeated int64 partition_sizes_long = 11;   // for RSS (Celeborn)
+  repeated int32 partition_sizes = 10;        // for RSS
+  repeated int64 partition_sizes_long = 11;   // for RSS
+  optional int32 task_index = 12;             // for RSS, readPartitionAllOnce()
 } 
 
 message DataProto {

@@ -180,26 +180,26 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
   private void processDataMovementEvent(
       DataMovementEvent dme, DataMovementEventPayloadProto shufflePayload,
       BitSet emptyPartitionsBitSet) throws IOException {
-    int srcIndex = dme.getSourceIndex();
+    int partitionId = dme.getSourceIndex();
 
     if (LOG.isDebugEnabled()) {
-      LOG.debug("DME srcIdx: " + srcIndex + ", targetIndex: " + dme.getTargetIndex()
+      LOG.debug("DME sourceIdx: " + partitionId + ", targetIndex: " + dme.getTargetIndex()
           + ", attemptNum: " + dme.getVersion() + ", payload: " + ShuffleUtils
           .stringify(shufflePayload));
     }
 
     if (shufflePayload.hasEmptyPartitions()) {
-      if (emptyPartitionsBitSet.get(srcIndex)) {
+      if (emptyPartitionsBitSet.get(partitionId)) {
         CompositeInputAttemptIdentifier srcAttemptIdentifier =
             constructInputAttemptIdentifier(dme.getTargetIndex(), 1, dme.getVersion(), shufflePayload, false);
         if (rssShuffleClient != null &&
             srcAttemptIdentifier.getFetchTypeInfo() == InputAttemptIdentifier.SPILL_INFO.FINAL_UPDATE) {
           if (LOG.isDebugEnabled()) {
-            LOG.debug("Last spill is empty, but notify ShuffleManager later by calling addKnownInput(): {} {}", srcIndex, srcAttemptIdentifier);
+            LOG.debug("Last spill is empty, but notify ShuffleManager later by calling addKnownInput(): {} {}", partitionId, srcAttemptIdentifier);
           }
         } else {
           if (LOG.isDebugEnabled()) {
-            LOG.debug("Source partition: " + srcIndex + " did not generate any data. SrcAttempt: ["
+            LOG.debug("Source partition: " + partitionId + " did not generate any data. SrcAttempt: ["
                 + srcAttemptIdentifier + "]. Not fetching.");
           }
           numDmeEventsNoData.getAndIncrement();
@@ -214,7 +214,7 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
     }
 
     CompositeInputAttemptIdentifier srcAttemptIdentifier = constructInputAttemptIdentifier(dme.getTargetIndex(), 1, dme.getVersion(),
-        shufflePayload, (useSharedInputs && srcIndex == 0));
+        shufflePayload, (useSharedInputs && partitionId == 0));
 
     int port = rssShuffleClient == null ? getShufflePort(shufflePayload) : 0;
     if (shufflePayload.hasData()) {
@@ -232,7 +232,7 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
       LOG.debug("Payload via DME : " + srcAttemptIdentifier);
     } else {
       shuffleManager.addKnownInput(shufflePayload.getHost(), port,
-              srcAttemptIdentifier, srcIndex);
+              srcAttemptIdentifier, partitionId);
     }
   }
 

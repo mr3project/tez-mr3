@@ -31,7 +31,6 @@ public class CompositeInputAttemptIdentifier extends InputAttemptIdentifier {
   private final long[] partitionSizes;
 
   // only for readPartitionAllOnce, size == srcVertexNumTasks
-  // TODO: create a subclass of CompositeInputAttemptIdentifier
   private List<InputAttemptIdentifier> inputIdentifiers;
 
   public CompositeInputAttemptIdentifier(int inputIdentifier, int attemptNumber, String pathComponent, int inputIdentifierCount) {

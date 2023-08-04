@@ -1074,8 +1074,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       if (outputContext.readPartitionAllOnce()) {
         // host = vertex name (so that all DMEs from mappers are sent to the same InputHost)
         payloadBuilder.setHost(outputContext.getTaskVertexName());
+        payloadBuilder.setTaskIndex(outputContext.getTaskIndex());
       } else {
         // host = task index when using RSS
+        // consumed in ShuffleManager.constructRssFetcher()
         payloadBuilder.setHost(String.valueOf(outputContext.getTaskIndex()));
       }
 

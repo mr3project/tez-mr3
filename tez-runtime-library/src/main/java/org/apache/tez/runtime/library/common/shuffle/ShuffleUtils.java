@@ -378,7 +378,6 @@ public class ShuffleUtils {
     DataMovementEventPayloadProto.Builder payloadBuilder = DataMovementEventPayloadProto
         .newBuilder();
 
-
     // Construct the VertexManager event if required.
     if (generateVmEvent) {
       ShuffleUserPayloads.VertexManagerEventPayloadProto.Builder vmBuilder =
@@ -401,7 +400,6 @@ public class ShuffleUtils {
     payloadBuilder.setEmptyPartitions(emptyPartitionsBytesString);
     DataMovementEventPayloadProto payloadProto = payloadBuilder.build();
     ByteBuffer dmePayload = payloadProto.toByteString().asReadOnlyByteBuffer();
-
 
     if (isCompositeEvent) {
       CompositeDataMovementEvent cdme =
