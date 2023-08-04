@@ -265,6 +265,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
           .FINAL_UPDATE : InputAttemptIdentifier.SPILL_INFO.INCREMENTAL_UPDATE;
 
       long[] partitionSizes = null;
+      int taskIndex = -1;
       if (lastEvent) {
         if (shufflePayload.getPartitionSizesLongCount() > 0) {
           partitionSizes = shufflePayload.getPartitionSizesLongList().stream()
@@ -275,11 +276,12 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
               .mapToLong(Integer::longValue)
               .toArray();
         }
+        taskIndex = shufflePayload.getTaskIndex();
       }
 
       srcAttemptIdentifier =
           new CompositeInputAttemptIdentifier(targetIndex, version, pathComponent, false, info, spillEventId,
-              targetIndexCount, partitionSizes);
+              targetIndexCount, partitionSizes, taskIndex);
     } else {
       srcAttemptIdentifier =
           new CompositeInputAttemptIdentifier(targetIndex, version, pathComponent, targetIndexCount);

@@ -28,10 +28,14 @@ import java.util.List;
 @Private
 public class CompositeInputAttemptIdentifier extends InputAttemptIdentifier {
   private final int inputIdentifierCount;
+
+  // both fields are set if shufflePayload.getLastEvent() == true
   private final long[] partitionSizes;
+  private final int taskIndex;  // -1 if not used
+  // TODO: partitionSizes[] can be replaced by 'partitionSize' only a single entry is used
 
   // only for readPartitionAllOnce, size == srcVertexNumTasks
-  private List<InputAttemptIdentifier> inputIdentifiers;
+  private List<InputAttemptIdentifier> childInputIdentifiers;
 
   public CompositeInputAttemptIdentifier(int inputIdentifier, int attemptNumber, String pathComponent, int inputIdentifierCount) {
     this(inputIdentifier, attemptNumber, pathComponent, false, SPILL_INFO.FINAL_MERGE_ENABLED, -1, inputIdentifierCount);
@@ -43,15 +47,17 @@ public class CompositeInputAttemptIdentifier extends InputAttemptIdentifier {
 
   public CompositeInputAttemptIdentifier(int inputIdentifier, int attemptNumber, String pathComponent,
       boolean shared, SPILL_INFO fetchTypeInfo, int spillEventId, int inputIdentifierCount) {
-    this(inputIdentifier, attemptNumber, pathComponent, shared, fetchTypeInfo, spillEventId, inputIdentifierCount, null);
+    this(inputIdentifier, attemptNumber, pathComponent, shared, fetchTypeInfo, spillEventId, inputIdentifierCount, null, -1);
   }
 
   public CompositeInputAttemptIdentifier(int inputIdentifier, int attemptNumber, String pathComponent,
-      boolean shared, SPILL_INFO fetchTypeInfo, int spillEventId, int inputIdentifierCount, long[] partitionSizes) {
+      boolean shared, SPILL_INFO fetchTypeInfo, int spillEventId,
+      int inputIdentifierCount, long[] partitionSizes, int taskIndex) {
     super(inputIdentifier, attemptNumber, pathComponent, shared, fetchTypeInfo, spillEventId);
     this.inputIdentifierCount = inputIdentifierCount;
     this.partitionSizes = partitionSizes;
-    this.inputIdentifiers = null;
+    this.taskIndex = taskIndex;
+    this.childInputIdentifiers = null;
   }
   public int getInputIdentifierCount() {
     return inputIdentifierCount;
@@ -72,12 +78,16 @@ public class CompositeInputAttemptIdentifier extends InputAttemptIdentifier {
     return partitionSizes == null ? -1L : partitionSizes[partitionId];
   }
 
+  public int getTaskIndex() {
+    return taskIndex;
+  }
+
   public void setInputIdentifiersForReadPartitionAllOnce(List<InputAttemptIdentifier> inputIdentifiers) {
-    this.inputIdentifiers = inputIdentifiers;
+    this.childInputIdentifiers = inputIdentifiers;
   }
 
   public List<InputAttemptIdentifier> getInputIdentifiersForReadPartitionAllOnce() {
-    return inputIdentifiers;
+    return childInputIdentifiers;
   }
 
   // PathComponent & shared does not need to be part of the hashCode and equals computation.

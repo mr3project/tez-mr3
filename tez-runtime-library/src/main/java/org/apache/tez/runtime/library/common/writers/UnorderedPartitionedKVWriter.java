@@ -1074,7 +1074,6 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       if (outputContext.readPartitionAllOnce()) {
         // host = vertex name (so that all DMEs from mappers are sent to the same InputHost)
         payloadBuilder.setHost(outputContext.getTaskVertexName());
-        payloadBuilder.setTaskIndex(outputContext.getTaskIndex());
       } else {
         // host = task index when using RSS
         // consumed in ShuffleManager.constructRssFetcher()
@@ -1096,6 +1095,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           payloadBuilder.addPartitionSizesLong(sizePerPartition[i]);
         }
       }
+      payloadBuilder.setTaskIndex(outputContext.getTaskIndex());
     }
 
     if (canSendDataOverDME()) {

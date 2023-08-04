@@ -299,6 +299,7 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
         payloadBuilder.addPartitionSizes((int) partitionStats[i]);
       }
     }
+    payloadBuilder.setTaskIndex(getContext().getTaskIndex());
 
     ByteBuffer dmePayload = payloadBuilder.build().toByteString().asReadOnlyByteBuffer();
     CompositeDataMovementEvent cdme = CompositeDataMovementEvent.create(0, partitionStats.length, dmePayload);

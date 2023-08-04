@@ -593,6 +593,8 @@ public class ShuffleManager implements FetcherCallback {
 
     if (!alreadyCompleted) {
       if (inputContext.readPartitionAllOnce()) {
+        // TODO: split by attemptNumber
+
         for (InputAttemptIdentifier input: inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce()) {
           ShuffleEventInfo eventInfo = shuffleInfoEventsMap.get(input.getInputIdentifier());
           if (eventInfo != null) {
@@ -652,7 +654,7 @@ public class ShuffleManager implements FetcherCallback {
                 firstId.isShared(),
                 firstId.getFetchTypeInfo(),
                 firstId.getSpillEventId(),
-                1, partitionSizes);
+                1, partitionSizes, mapIndexStart);
             mergedCid.setInputIdentifiersForReadPartitionAllOnce(subList);
             RssFetcher rssFetcher = new RssFetcher(this, inputManager, rssShuffleClient,
                 inputContext.shuffleId(), inputHost.getHost(), inputHost.getPort(),
@@ -673,6 +675,7 @@ public class ShuffleManager implements FetcherCallback {
           rssFetchers.add(rssFetcher);
         }
       } else {
+        // TODO: use DataMovementEventPayloadProto.task_index
         int mapIndexStart = Integer.parseInt(inputHost.getHost());
         int mapIndexEnd = mapIndexStart + 1;
         RssFetcher rssFetcher = new RssFetcher(this, inputManager, rssShuffleClient,

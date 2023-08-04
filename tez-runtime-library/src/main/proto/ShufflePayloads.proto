@@ -32,7 +32,7 @@ message DataMovementEventPayloadProto {
   optional int32 num_record = 9;  // set if numPartitions == 1
   repeated int32 partition_sizes = 10;        // for RSS
   repeated int64 partition_sizes_long = 11;   // for RSS
-  optional int32 task_index = 12;             // for RSS, readPartitionAllOnce()
+  optional int32 task_index = 12;             // for RSS
 } 
 
 message DataProto {
