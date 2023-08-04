@@ -143,8 +143,9 @@ public class InputHost extends HostPort {
         CompositeInputAttemptIdentifier cid = (CompositeInputAttemptIdentifier)input;
         partitionTotalSize += cid.getPartitionSize(partitionId);
       }
-      long[] partitionSizes = new long[partitionId + 1];
-      partitionSizes[partitionId] = partitionTotalSize;   // other fields are never used
+      // optimize partitionSizes[] because only partitionId is used and other fields are never used
+      long[] partitionSizes = new long[1];
+      partitionSizes[0] = partitionTotalSize;
 
       // mergedCid is consumed by Fetcher
       InputAttemptIdentifier firstId = inputs.get(0);

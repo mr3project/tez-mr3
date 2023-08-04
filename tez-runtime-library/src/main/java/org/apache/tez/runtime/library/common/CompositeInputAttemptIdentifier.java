@@ -30,9 +30,9 @@ public class CompositeInputAttemptIdentifier extends InputAttemptIdentifier {
   private final int inputIdentifierCount;
 
   // both fields are set if shufflePayload.getLastEvent() == true
+  // partitionSizes.length == 1 if only a single entry is used
   private final long[] partitionSizes;
   private final int taskIndex;  // -1 if not used
-  // TODO: partitionSizes[] can be replaced by 'partitionSize' only a single entry is used
 
   // only for readPartitionAllOnce, size == srcVertexNumTasks
   private List<InputAttemptIdentifier> childInputIdentifiers;
@@ -75,7 +75,8 @@ public class CompositeInputAttemptIdentifier extends InputAttemptIdentifier {
   }
 
   public long getPartitionSize(int partitionId) {
-    return partitionSizes == null ? -1L : partitionSizes[partitionId];
+    return partitionSizes == null ? -1L :
+        (partitionSizes.length == 1 ? partitionSizes[0] : partitionSizes[partitionId]);
   }
 
   public int getTaskIndex() {

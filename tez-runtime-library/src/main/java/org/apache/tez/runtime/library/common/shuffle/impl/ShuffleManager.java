@@ -643,8 +643,9 @@ public class ShuffleManager implements FetcherCallback {
               subTotalSize += cid.getPartitionSize(partitionId);
             }
 
-            long[] partitionSizes = new long[partitionId + 1];
-            partitionSizes[partitionId] = subTotalSize;
+            // optimize partitionSizes[] because only partitionId is used and other fields are never used
+            long[] partitionSizes = new long[1];
+            partitionSizes[0] = subTotalSize;
 
             InputAttemptIdentifier firstId = subList.get(0);
             CompositeInputAttemptIdentifier mergedCid = new CompositeInputAttemptIdentifier(
