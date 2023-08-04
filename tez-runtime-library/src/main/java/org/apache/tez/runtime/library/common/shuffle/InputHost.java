@@ -133,15 +133,21 @@ public class InputHost extends HostPort {
       inputs = new ArrayList<InputAttemptIdentifier>();
       tempPartitionToInputs.put(partitionRange, inputs);
     }
-    inputs.removeIf(input -> {
-      if (input.getInputIdentifier() == srcAttempt.getInputIdentifier()) {
-        LOG.warn("Removing InputAttemptIdentifier with the same partitionId and a different attemptNumber: {}, {}, {} != {}",
-            partitionId, input.getInputIdentifier(), input.getAttemptNumber(), srcAttempt.getAttemptNumber());
-        return true;
-      } else {
-        return false;
-      }
-    });
+    // The following code checks for duplicate InputAttemptIdentifier's with different attemptNumbers.
+    // For now, this is unnecessary because we do not use VertexRerun for RSS.
+    // TODO: set to true when using VertexRerun
+    boolean checkForDuplicateWithDifferentAttemptNumbers = false;
+    if (checkForDuplicateWithDifferentAttemptNumbers) {
+      inputs.removeIf(input -> {
+        if (input.getInputIdentifier() == srcAttempt.getInputIdentifier()) {
+          LOG.warn("Removing InputAttemptIdentifier with the same partitionId and a different attemptNumber: {}, {}, {} != {}",
+              partitionId, input.getInputIdentifier(), input.getAttemptNumber(), srcAttempt.getAttemptNumber());
+          return true;
+        } else {
+          return false;
+        }
+      });
+    }
     inputs.add(srcAttempt);
 
     if (inputs.size() == srcVertexNumTasks) {
@@ -169,8 +175,8 @@ public class InputHost extends HostPort {
           1, partitionSizes, -1);
       mergedCid.setInputIdentifiersForReadPartitionAllOnce(inputs);
 
-      LOG.info("Merging {} partition inputs for partitionId={} with total size {}: {} ",srcVertexNumTasks,
-          partitionId, partitionTotalSize, mergedCid);
+      LOG.info("Merging {} partition inputs for partitionId={} with total size {}: {} ",
+          srcVertexNumTasks, partitionId, partitionTotalSize, mergedCid);
 
       addToPartitionToInputs(partitionRange, mergedCid);
       tempPartitionToInputs.remove(partitionRange);
