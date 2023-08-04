@@ -610,16 +610,34 @@ public class ShuffleManager implements FetcherCallback {
       int partitionId = pendingInputs.getPartition();
 
       if (inputContext.readPartitionAllOnce()) {
-        createRssFetchersForReadPartitionAllOnce(inputAttemptIdentifier, partitionId, inputHost, rssFetchers);
+        List<InputAttemptIdentifier> childInputAttemptIdentifiers = inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce();
+        int attemptNumber = childInputAttemptIdentifiers.get(0).getAttemptNumber();
+        boolean useSameAttemptNumber = true;
+        for (InputAttemptIdentifier input: childInputAttemptIdentifiers) {
+          if (input.getAttemptNumber() != attemptNumber) {
+            LOG.warn("Reverting to {} individual RssFetchers because different attemptNumber: , {} != {}",
+                childInputAttemptIdentifiers.size(), attemptNumber, input.getAttemptNumber());
+            useSameAttemptNumber = false;
+            break;
+          }
+        }
+
+        if (useSameAttemptNumber) {
+          createRssFetchersForReadPartitionAllOnce(inputAttemptIdentifier, partitionId, inputHost, rssFetchers);
+        } else {
+          // TODO: optimize by combining consecutive fetches with a single RssFetcher
+          for (InputAttemptIdentifier input: childInputAttemptIdentifiers) {
+            CompositeInputAttemptIdentifier cinput = (CompositeInputAttemptIdentifier)input;
+            assert cinput.getTaskIndex() != -1;
+            RssFetcher rssFetcher = createRssFetcherForIndividualInput(cinput, partitionId, inputHost, cinput.getTaskIndex());
+            rssFetchers.add(rssFetcher);
+          }
+        }
       } else {
         int mapIndexStart = Integer.parseInt(inputHost.getHost());
         assert mapIndexStart == inputAttemptIdentifier.getTaskIndex();
-        int mapIndexEnd = mapIndexStart + 1;
-        long partitionTotalSize = inputAttemptIdentifier.getPartitionSize(partitionId);
-        RssFetcher rssFetcher = new RssFetcher(this, inputManager, rssShuffleClient,
-            inputContext.shuffleId(), inputHost.getHost(), inputHost.getPort(),
-            partitionId, inputAttemptIdentifier,
-            partitionTotalSize, mapIndexStart, mapIndexEnd, false);
+        RssFetcher rssFetcher = createRssFetcherForIndividualInput(
+            inputAttemptIdentifier, partitionId, inputHost, mapIndexStart);
         rssFetchers.add(rssFetcher);
       }
     }
@@ -699,6 +717,17 @@ public class ShuffleManager implements FetcherCallback {
           partitionTotalSize, mapIndexStart, mapIndexEnd, true);
       rssFetchers.add(rssFetcher);
     }
+  }
+
+  private RssFetcher createRssFetcherForIndividualInput(
+      CompositeInputAttemptIdentifier inputAttemptIdentifier,
+      int partitionId, InputHost inputHost, int mapIndexStart) {
+    int mapIndexEnd = mapIndexStart + 1;
+    long partitionTotalSize = inputAttemptIdentifier.getPartitionSize(partitionId);
+    return new RssFetcher(this, inputManager, rssShuffleClient,
+        inputContext.shuffleId(), inputHost.getHost(), inputHost.getPort(),
+        partitionId, inputAttemptIdentifier,
+        partitionTotalSize, mapIndexStart, mapIndexEnd, false);
   }
 
   /////////////////// Methods for InputEventHandler
