@@ -73,8 +73,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 public class Shuffle implements ExceptionReporter {
   
   private static final Logger LOG = LoggerFactory.getLogger(Shuffle.class);
-  private static final int PROGRESS_FREQUENCY = 2000;
-  
+
   private final Configuration conf;
   private final InputContext inputContext;
   
@@ -98,7 +97,6 @@ public class Shuffle implements ExceptionReporter {
   private final String srcNameTrimmed;
   
   private AtomicBoolean isShutDown = new AtomicBoolean(false);
-  private AtomicBoolean fetchersClosed = new AtomicBoolean(false);
   private AtomicBoolean schedulerClosed = new AtomicBoolean(false);
   private AtomicBoolean mergerClosed = new AtomicBoolean(false);
 
@@ -197,7 +195,6 @@ public class Shuffle implements ExceptionReporter {
     } else {
       LOG.info(srcNameTrimmed + ": " + "Ignoring events since already shutdown. EventCount: " + events.size());
     }
-
   }
   
   /**

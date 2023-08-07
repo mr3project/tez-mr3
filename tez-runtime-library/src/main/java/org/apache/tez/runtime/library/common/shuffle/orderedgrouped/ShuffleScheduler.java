@@ -69,6 +69,8 @@ import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.TezRuntimeUtils;
 import org.apache.tez.runtime.library.common.shuffle.HostPort;
+import org.apache.tez.runtime.library.common.shuffle.RssFetcher;
+import org.apache.tez.runtime.library.common.shuffle.RssShuffleUtils;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils.FetchStatsLogger;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.MapHost.HostPortPartition;
@@ -764,6 +766,9 @@ class ShuffleScheduler {
                                       boolean readError,
                                       boolean connectError,
                                       boolean isLocalFetch) {
+    assert rssShuffleClient == null;
+    // if rssShuffleClient != null, pathToIdentifierMap[] should be maintained
+
     failedShuffleCounter.increment(1);
     int failures;
 
@@ -931,8 +936,7 @@ class ShuffleScheduler {
       return (pipelinedShuffleInfoEventsMap.size() == numInputs);
     } else {
       //no pipelining
-      return ((pathToIdentifierMap.size() + skippedInputCounter.getValue())
-          == numInputs);
+      return ((pathToIdentifierMap.size() + skippedInputCounter.getValue()) == numInputs);
     }
   }
 
@@ -945,7 +949,6 @@ class ShuffleScheduler {
    * @return true to indicate fetchers are healthy
    */
   private boolean isFetcherHealthy(String logContext) {
-
     long totalFailures = failedShuffleCounter.getValue();
     int doneMaps = numInputs - remainingMaps.get();
 
@@ -1080,7 +1083,8 @@ class ShuffleScheduler {
 
     MapHost host = mapLocations.get(identifier);
     if (host == null) {
-      host = new MapHost(inputHostName, port, partitionId, srcAttempt.getInputIdentifierCount());
+      host = new MapHost(inputHostName, port, partitionId, srcAttempt.getInputIdentifierCount(),
+          inputContext.readPartitionAllOnce(), inputContext.getSourceVertexNumTasks());
       mapLocations.put(identifier, host);
     }
 
@@ -1089,15 +1093,19 @@ class ShuffleScheduler {
       return;
     }
 
-    assert !(rssShuffleClient != null) || srcAttempt.getInputIdentifierCount() == 1;
-    assert !(rssShuffleClient != null) || srcAttempt.getSpillEventId() == 0;
-    assert !(rssShuffleClient != null) ||
-        srcAttempt.getFetchTypeInfo() == InputAttemptIdentifier.SPILL_INFO.FINAL_UPDATE;
+    assert !(rssShuffleClient != null) || (
+        srcAttempt.getInputIdentifierCount() == 1 &&
+        srcAttempt.getSpillEventId() == 0 &&
+        srcAttempt.getFetchTypeInfo() == InputAttemptIdentifier.SPILL_INFO.FINAL_UPDATE &&
+        srcAttempt.getPathComponent() == null);
 
     host.addKnownMap(srcAttempt);
-    for (int i = 0; i < srcAttempt.getInputIdentifierCount(); i++) {
-      PathPartition pathPartition = new PathPartition(srcAttempt.getPathComponent(), partitionId + i);
-      pathToIdentifierMap.put(pathPartition, srcAttempt.expand(i));
+
+    if (rssShuffleClient == null) {
+      for (int i = 0; i < srcAttempt.getInputIdentifierCount(); i++) {
+        PathPartition pathPartition = new PathPartition(srcAttempt.getPathComponent(), partitionId + i);
+        pathToIdentifierMap.put(pathPartition, srcAttempt.expand(i));
+      }
     }
 
     // Mark the host as pending
@@ -1150,7 +1158,6 @@ class ShuffleScheduler {
     }
 
     if (!pendingHosts.isEmpty()) {
-
       MapHost host = null;
       Iterator<MapHost> iter = pendingHosts.iterator();
       int numToPick = random.nextInt(pendingHosts.size());
@@ -1396,7 +1403,6 @@ class ShuffleScheduler {
 
   private class ShuffleSchedulerCallable implements Callable<Void> {
 
-
     @Override
     public Void call() throws InterruptedException {
       while (!isShutdown.get() && remainingMaps.get() > 0) {
@@ -1445,6 +1451,7 @@ class ShuffleScheduler {
               MapHost mapHost;
               try {
                 mapHost = getHost();  // Leads to a wait.
+                // mapHost is in State.BUSY
               } catch (InterruptedException e) {
                 if (isShutdown.get()) {
                   LOG.info(srcNameTrimmed + ": Interrupted while waiting for host and hasBeenShutdown. Breaking out of ShuffleSchedulerCallable loop");
@@ -1466,15 +1473,19 @@ class ShuffleScheduler {
                   LOG.debug(srcNameTrimmed + ": " + "Scheduling fetch for inputHost: {}",
                       mapHost.getHostIdentifier() + ":" + mapHost.getPartitionId());
                 }
-                FetcherOrderedGroupedBase fetcher;
                 if (rssShuffleClient == null) {
-                  fetcher = constructFetcherForHost(mapHost);
+                  FetcherOrderedGroupedBase fetcher = constructFetcherForHost(mapHost);
+                  runningFetchers.add(fetcher);
+                  ListenableFuture<Void> future = fetcherExecutor.submit(fetcher);
+                  Futures.addCallback(future, new FetchFutureCallback(fetcher));
                 } else {
-                  fetcher = constructRssFetcherForHost(mapHost);
+                  List<RssFetcherOrderedGrouped> fetchers = constructRssFetcherForHost(mapHost);
+                  runningFetchers.addAll(fetchers);
+                  for (RssFetcherOrderedGrouped fetcher: fetchers) {
+                    ListenableFuture<Void> future = fetcherExecutor.submit(fetcher);
+                    Futures.addCallback(future, new FetchFutureCallback(fetcher));
+                  }
                 }
-                runningFetchers.add(fetcher);
-                ListenableFuture<Void> future = fetcherExecutor.submit(fetcher);
-                Futures.addCallback(future, new FetchFutureCallback(fetcher));
               }
             }
           }
@@ -1502,14 +1513,51 @@ class ShuffleScheduler {
         verifyDiskChecksum, compositeFetch, localFetchComparePort, inputContext);
   }
 
-  RssFetcherOrderedGrouped constructRssFetcherForHost(MapHost mapHost) {
-    return new RssFetcherOrderedGrouped(
-        allocator,
-        ShuffleScheduler.this,
-        exceptionReporter,
-        mapHost,
-        rssShuffleClient,
-        inputContext.shuffleId());
+  List<RssFetcherOrderedGrouped> constructRssFetcherForHost(MapHost mapHost) {
+    assert mapHost.getPort() == 0;
+    assert mapHost.getPartitionCount() == 1;
+    assert mapHost.getNumKnownMapOutputs() == 1;
+    List<RssFetcherOrderedGrouped> rssFetchers = new ArrayList<RssFetcherOrderedGrouped>();
+
+    // skip calling shuffleScheduler.getMapsForHost(mapHost)
+    // as there is only 1 IAI in each MapHost when RSS is enabled.
+    CompositeInputAttemptIdentifier inputAttemptIdentifier =
+        (CompositeInputAttemptIdentifier) mapHost.getAndClearKnownMaps().get(0);
+    assert !inputContext.readPartitionAllOnce() || (inputAttemptIdentifier.getTaskIndex() == -1);
+    assert !inputContext.readPartitionAllOnce() || (inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce() != null);
+
+    int partitionId = mapHost.getPartitionId();
+
+    if (inputContext.readPartitionAllOnce()) {
+      List<InputAttemptIdentifier> childInputAttemptIdentifiers = inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce();
+      int attemptNumber = childInputAttemptIdentifiers.get(0).getAttemptNumber();
+      boolean useSameAttemptNumber = true;
+      for (InputAttemptIdentifier input: childInputAttemptIdentifiers) {
+        if (input.getAttemptNumber() != attemptNumber) {
+          LOG.warn("Ordered - Reverting to {} individual RssFetchers because different attemptNumber: , {} != {}",
+              childInputAttemptIdentifiers.size(), attemptNumber, input.getAttemptNumber());
+          useSameAttemptNumber = false;
+          break;
+        }
+      }
+      // TODO: ???
+    } else {
+      int mapIndexStart = Integer.parseInt(mapHost.getHost());
+      assert mapIndexStart == inputAttemptIdentifier.getTaskIndex();
+      int mapIndexEnd = mapIndexStart + 1;
+      long partitionTotalSize = inputAttemptIdentifier.getPartitionSize(partitionId);
+      // TODO: ???
+      RssFetcherOrderedGrouped rssFetcher = new RssFetcherOrderedGrouped(
+          allocator,
+          ShuffleScheduler.this,
+          exceptionReporter,
+          mapHost,
+          rssShuffleClient,
+          inputContext.shuffleId());
+      rssFetchers.add(rssFetcher);
+    }
+
+    return rssFetchers;
   }
 
   private class FetchFutureCallback implements FutureCallback<Void> {

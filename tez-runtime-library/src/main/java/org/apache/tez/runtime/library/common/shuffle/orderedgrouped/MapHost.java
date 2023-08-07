@@ -21,10 +21,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hadoop.classification.InterfaceAudience.Private;
+import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
+import org.apache.tez.runtime.library.common.shuffle.InputHost;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Private
 class MapHost {
+  private static final Logger LOG = LoggerFactory.getLogger(InputHost.class);
 
   public static enum State {
     IDLE,               // No map outputs available
@@ -85,20 +90,34 @@ class MapHost {
   private State state = State.IDLE;
   private final String host;
   private final int port;
-  private final int partition;
+  private final int partitionId;
   private final int partitionCount;
   // Tracks attempt IDs
   private List<InputAttemptIdentifier> maps = new ArrayList<InputAttemptIdentifier>();
-  
-  public MapHost(String host, int port, int partition, int partitionCount) {
+
+  private final boolean readPartitionAllOnce;
+  private final int srcVertexNumTasks;
+  private final List<InputAttemptIdentifier> tempMaps;
+
+  public MapHost(String host, int port, int partitionId, int partitionCount,
+      boolean readPartitionAllOnce, int srcVertexNumTasks) {
     this.host = host;
     this.port = port;
-    this.partition = partition;
+    this.partitionId = partitionId;
     this.partitionCount = partitionCount;
+
+    this.readPartitionAllOnce = readPartitionAllOnce;
+    this.srcVertexNumTasks = srcVertexNumTasks;
+    if (readPartitionAllOnce) {
+      assert partitionCount == 1;
+      tempMaps = new ArrayList<InputAttemptIdentifier>();
+    } else {
+      tempMaps = null;
+    }
   }
 
   public int getPartitionId() {
-    return partition;
+    return partitionId;
   }
 
   public int getPartitionCount() {
@@ -121,8 +140,45 @@ class MapHost {
     return host + ":" + port;
   }
 
+  // TODO: add combinedForRssReadPartitionAllOnce
   public synchronized void addKnownMap(InputAttemptIdentifier srcAttempt) {
-    maps.add(srcAttempt);
+    if (readPartitionAllOnce) {
+      tempMaps.add(srcAttempt);
+    } else {
+      maps.add(srcAttempt);
+    }
+
+    if (readPartitionAllOnce) {
+      // TODO: use checkForDuplicateWithDifferentAttemptNumbers when using VertexRerun
+
+      if (tempMaps.size() == srcVertexNumTasks) {
+        long partitionTotalSize = 0L;
+        for (InputAttemptIdentifier input: tempMaps) {
+          CompositeInputAttemptIdentifier cid = (CompositeInputAttemptIdentifier)input;
+          partitionTotalSize += cid.getPartitionSize(partitionId);
+        }
+        // optimize partitionSizes[] because only partitionId is used and other fields are never used
+        long[] partitionSizes = new long[1];
+        partitionSizes[0] = partitionTotalSize;
+
+        InputAttemptIdentifier firstId = tempMaps.get(0);
+        CompositeInputAttemptIdentifier mergedCid = new CompositeInputAttemptIdentifier(
+            firstId.getInputIdentifier(),
+            firstId.getAttemptNumber(),
+            firstId.getPathComponent(),
+            firstId.isShared(),
+            firstId.getFetchTypeInfo(),
+            firstId.getSpillEventId(),
+            1, partitionSizes, -1);
+        mergedCid.setInputIdentifiersForReadPartitionAllOnce(tempMaps);
+
+        LOG.info("Ordered - Merging {} partition inputs for partitionId={} with total size {}: {} ",
+            srcVertexNumTasks, partitionId, partitionTotalSize, mergedCid);
+
+        maps.add(mergedCid);
+      }
+    }
+
     if (state == State.IDLE) {
       state = State.PENDING;
     }

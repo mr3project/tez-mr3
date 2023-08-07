@@ -82,11 +82,9 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
 
   @Override
   public void logProgress(boolean updateOnClose) {
-    LOG.info(inputContext.getSourceVertexName() + ": "
-        + "numDmeEventsSeen=" + numDmeEvents.get()
-        + ", numDmeEventsSeenWithNoData=" + numDmeEventsNoData.get()
-        + ", numObsoletionEventsSeen=" + numObsoletionEvents.get()
-        + (updateOnClose == true ? ", updateOnClose" : ""));
+    LOG.info("{}: numDmeEventsSeen={}, numDmeEventsSeenWithNoData={}, numObsoletionEventsSeen={}, {}",
+        inputContext.getSourceVertexName(), numDmeEvents.get(), numDmeEventsNoData.get(),
+        numObsoletionEvents.get(), (updateOnClose == true ? ", updateOnClose" : ""));
   }
 
   private void handleEvent(Event event) throws IOException {
