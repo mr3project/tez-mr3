@@ -422,7 +422,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   public synchronized MapOutput reserve(InputAttemptIdentifier srcAttemptIdentifier, 
                                         long requestedSize,
                                         long compressedLength,
-                                        int fetcher) throws IOException {
+                                        int fetcher, boolean useRssFetcher) throws IOException {
     if (!canShuffleToMemory(requestedSize)) {
       if (LOG.isDebugEnabled()) {
         LOG.debug(srcAttemptIdentifier + ": Shuffling to disk since " + requestedSize +
@@ -454,7 +454,12 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
             + ") is greater than memoryLimit (" + memoryLimit + ")." +
             " CommitMemory is (" + commitMemory + ")");
       }
-      return stallShuffle;
+      if (useRssFetcher) {
+        return MapOutput.createDiskMapOutput(srcAttemptIdentifier, this, compressedLength, conf,
+            fetcher, true, mapOutputFile, isRssEnabled);
+      } else {
+        return stallShuffle;
+      }
     }
     
     // Allow the in-memory shuffle to progress

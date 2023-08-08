@@ -140,11 +140,10 @@ class MapHost {
     return host + ":" + port;
   }
 
-  // TODO: add combinedForRssReadPartitionAllOnce
   public synchronized void addKnownMap(InputAttemptIdentifier srcAttempt) {
-    if (readPartitionAllOnce) {
+    if (readPartitionAllOnce) {   // for InputSpec, readPartitionAllOnce == true implies useRssShuffle == true
       tempMaps.add(srcAttempt);
-    } else {
+    } else {  // either we do not use RSS or we have readPartitionAllOnce == false
       maps.add(srcAttempt);
     }
 

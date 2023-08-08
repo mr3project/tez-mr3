@@ -541,7 +541,7 @@ class FetcherOrderedGrouped implements FetcherOrderedGroupedBase {
         decompressedLength = mapOutputStat.decompressedLength;
         compressedLength = mapOutputStat.compressedLength;
         try {
-          mapOutput = allocator.reserve(srcAttemptId, decompressedLength, compressedLength, id);
+          mapOutput = allocator.reserve(srcAttemptId, decompressedLength, compressedLength, id, false);
         } catch (IOException e) {
           if (!stopped) {
             // Kill the reduce attempt

@@ -126,7 +126,8 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
   private void doFetch() throws IOException {
     // TODO: Read first 8 bytes and then allocate MapOutput. Repeat this until we reach EOF.
     long actualSize = blockLength + RssShuffleUtils.EOF_MARKERS_SIZE - Long.BYTES;
-    MapOutput mapOutput = allocator.reserve(srcAttemptId, actualSize, actualSize, fetcherId);
+    MapOutput mapOutput = allocator.reserve(srcAttemptId, actualSize, actualSize, fetcherId, true);
+    assert mapOutput.getType() != MapOutput.Type.WAIT;
 
     if (mapOutput.getType() == MapOutput.Type.MEMORY) {
       setupRssShuffleInputStream(mapIndexStart, mapIndexEnd, srcAttemptId.getAttemptNumber(), partitionId);
@@ -144,9 +145,6 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
 
       long copyDuration = System.currentTimeMillis() - startTime;
       reportCopySucceeded(copyDuration, mapOutput);
-    } else if (mapOutput.getType() == MapOutput.Type.WAIT) {
-      // TODO: bug-fix - mapHost should not be put back because it can generate multiple fetchers
-      shuffleScheduler.putBackKnownMapOutput(mapHost, srcAttemptId);
     } else {
       throw new TezUncheckedException("Unknown MapOutput.Type: " + mapOutput);
     }
