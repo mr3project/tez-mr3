@@ -20,15 +20,22 @@ package org.apache.tez.runtime.library.common.shuffle;
 
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.WritableUtils;
+import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
+import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.List;
 
 public class RssShuffleUtils {
+
+  private static final Logger LOG = LoggerFactory.getLogger(RssShuffleUtils.class);
 
   public static final int EOF_MARKERS_SIZE = 2 * WritableUtils.getVIntSize(IFile.EOF_MARKER);
 
@@ -71,5 +78,87 @@ public class RssShuffleUtils {
     bytesWritten += EOF_MARKERS_SIZE;
 
     return bytesWritten;
+  }
+
+  public static boolean checkUseSameAttemptNumber(CompositeInputAttemptIdentifier inputAttemptIdentifier) {
+    List<InputAttemptIdentifier> childInputAttemptIdentifiers = inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce();
+    int attemptNumber = childInputAttemptIdentifiers.get(0).getAttemptNumber();
+    boolean useSameAttemptNumber = true;
+    for (InputAttemptIdentifier input: childInputAttemptIdentifiers) {
+      if (input.getAttemptNumber() != attemptNumber) {
+        useSameAttemptNumber = false;
+        break;
+      }
+    }
+    return useSameAttemptNumber;
+  }
+
+  public interface FetcherCreate {
+    void operate(
+        CompositeInputAttemptIdentifier mergedCid,
+        long subTotalSize, int mapIndexStart, int mapIndexEnd);
+  }
+
+  public static void createRssFetchersForReadPartitionAllOnce(
+      CompositeInputAttemptIdentifier inputAttemptIdentifier,
+      int partitionId,
+      int sourceVertexNumTasks, long rssFetchSplitThresholdSize,
+      FetcherCreate createFn, boolean ordered) {
+    long partitionTotalSize = inputAttemptIdentifier.getPartitionSize(partitionId);
+    List<InputAttemptIdentifier> inputAttemptIdentifiers =
+        inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce();
+    int numIdentifiers = inputAttemptIdentifiers.size();
+    assert numIdentifiers == sourceVertexNumTasks;
+
+    if (partitionTotalSize > rssFetchSplitThresholdSize) {
+      // a single call to RSS would create a file larger than thresholdSize
+      int numFetchers =
+          Math.min((int)((partitionTotalSize - 1L) / rssFetchSplitThresholdSize) + 1, numIdentifiers);
+      int numIdentifiersPerFetcher = numIdentifiers / numFetchers;
+      int numLargeFetchers = numIdentifiers - numIdentifiersPerFetcher * numFetchers;
+      assert numIdentifiers == numLargeFetchers * (numIdentifiersPerFetcher + 1) +
+          (numFetchers - numLargeFetchers) * numIdentifiersPerFetcher;
+
+      LOG.info("{} - Splitting InputAttemptIdentifiers to {} RssFetchers: {} / {}",
+          ordered ? "Ordered" : "Unordered",
+          numFetchers, partitionTotalSize, numIdentifiers);
+
+      int mapIndexStart = 0;
+      int mapIndexEnd = -1;
+      for (int i = 0; i < numFetchers; i++) {
+        int numExtra = i < numLargeFetchers ? 1 : 0;
+        int numIdentifiersToConsume = numIdentifiersPerFetcher + numExtra;
+        mapIndexEnd = mapIndexStart + numIdentifiersToConsume;
+
+        List<InputAttemptIdentifier> subList = inputAttemptIdentifiers.subList(mapIndexStart, mapIndexEnd);
+        long subTotalSize = 0L;
+        for (InputAttemptIdentifier input: subList) {
+          CompositeInputAttemptIdentifier cid = (CompositeInputAttemptIdentifier)input;
+          subTotalSize += cid.getPartitionSize(partitionId);
+        }
+
+        // optimize partitionSizes[] because only partitionId is used and other fields are never used
+        long[] partitionSizes = new long[1];
+        partitionSizes[0] = subTotalSize;
+
+        InputAttemptIdentifier firstId = subList.get(0);
+        CompositeInputAttemptIdentifier mergedCid = new CompositeInputAttemptIdentifier(
+            firstId.getInputIdentifier(),
+            firstId.getAttemptNumber(),
+            firstId.getPathComponent(),
+            firstId.isShared(),
+            firstId.getFetchTypeInfo(),
+            firstId.getSpillEventId(),
+            1, partitionSizes, -1);
+        mergedCid.setInputIdentifiersForReadPartitionAllOnce(subList);
+        createFn.operate(mergedCid, subTotalSize, mapIndexStart, mapIndexEnd);
+        mapIndexStart = mapIndexEnd;
+      }
+      assert mapIndexEnd == numIdentifiers;
+    } else {
+      int mapIndexStart = 0;
+      int mapIndexEnd = sourceVertexNumTasks;
+      createFn.operate(inputAttemptIdentifier, partitionTotalSize, mapIndexStart, mapIndexEnd);
+    }
   }
 }
