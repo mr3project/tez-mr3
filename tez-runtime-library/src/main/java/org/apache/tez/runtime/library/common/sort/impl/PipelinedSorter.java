@@ -918,32 +918,52 @@ public class PipelinedSorter extends ExternalSorter {
       InputStream finalMergedInputStream = rfs.open(finalOutputFile);
       byte[] buffer = new byte[ShuffleUtils.BUFFER_SIZE];
       for (int part = 0; part < partitions; part++) {
-        long remainingBytes = partitionStats[part];
-        while (remainingBytes > 0) {
-          int bufferLength = (int) Math.min(ShuffleUtils.BUFFER_SIZE, remainingBytes);
-          int bytesRead = finalMergedInputStream.read(buffer, 0, bufferLength);
+        long partitionSize = partitionStats[part];
+        if (partitionSize != 0L) {
+          // We assume that the number of bytes read by DataInputStream.readLong() is equal to Long.BYTES.
 
-          if (bytesRead < 0) {
-            finalMergedInputStream.close();
-
-            long expected = partitionStats[part];
-            long actual = expected - remainingBytes;
-            throw new IOException("Premature EOF from inputStream. " +
-                "Expect " + expected + " bytes, but received " + actual + " bytes.");
-          }
-
+          ByteBuffer lengthBuffer = ByteBuffer.allocate(Long.BYTES);
+          lengthBuffer.putLong(partitionSize);
           rssShuffleClient.pushData(
               outputContext.shuffleId(),
               outputContext.getTaskIndex(),
               outputContext.getTaskAttemptNumber(),
               part,
-              buffer,
+              lengthBuffer.array(),
               0,
-              bytesRead,
+              Long.BYTES,
               outputContext.getVertexParallelism(),
               partitions);
 
-          remainingBytes -= bytesRead;
+          long remainingBytes = partitionStats[part];
+          while (remainingBytes > 0) {
+            int bufferLength = (int) Math.min(ShuffleUtils.BUFFER_SIZE, remainingBytes);
+            int bytesRead = finalMergedInputStream.read(buffer, 0, bufferLength);
+
+            if (bytesRead < 0) {
+              finalMergedInputStream.close();
+
+              long expected = partitionStats[part];
+              long actual = expected - remainingBytes;
+              throw new IOException("Premature EOF from inputStream. " +
+                  "Expect " + expected + " bytes, but received " + actual + " bytes.");
+            }
+
+            rssShuffleClient.pushData(
+                outputContext.shuffleId(),
+                outputContext.getTaskIndex(),
+                outputContext.getTaskAttemptNumber(),
+                part,
+                buffer,
+                0,
+                bytesRead,
+                outputContext.getVertexParallelism(),
+                partitions);
+
+            remainingBytes -= bytesRead;
+          }
+
+          partitionStats[part] += Long.BYTES;
         }
       }
 

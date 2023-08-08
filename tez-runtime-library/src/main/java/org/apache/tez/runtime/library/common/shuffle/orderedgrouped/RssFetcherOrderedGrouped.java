@@ -25,6 +25,7 @@ import org.apache.tez.runtime.library.common.shuffle.RssShuffleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -53,7 +54,7 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
 
   private final int partitionId;
   private final CompositeInputAttemptIdentifier srcAttemptId;
-  private final long dataLength;
+  private final long blockLength;
   private final int mapIndexStart, mapIndexEnd;
   private final boolean readPartitionAllOnce;
 
@@ -66,7 +67,7 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
       int shuffleId,
       int partitionId,
       CompositeInputAttemptIdentifier srcAttemptId,
-      long dataLength, int mapIndexStart, int mapIndexEnd,
+      long blockLength, int mapIndexStart, int mapIndexEnd,
       boolean readPartitionAllOnce) {
     this.allocator = allocator;
     this.shuffleScheduler = shuffleScheduler;
@@ -77,11 +78,11 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
 
     this.partitionId = partitionId;
     this.srcAttemptId = srcAttemptId;
-    this.dataLength = dataLength;
+    this.blockLength = blockLength;
     this.mapIndexStart = mapIndexStart;
     this.mapIndexEnd = mapIndexEnd;
     this.readPartitionAllOnce = readPartitionAllOnce;
-    assert dataLength > 0;  // TODO: support DME with partitionSizes == null.
+    assert blockLength > 0;  // TODO: support DME with partitionSizes == null.
 
     this.fetcherId = nextId.getAndIncrement();
   }
@@ -123,14 +124,15 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
   }
 
   private void doFetch() throws IOException {
-    long actualSize = dataLength + RssShuffleUtils.EOF_MARKERS_SIZE;
+    // TODO: Read first 8 bytes and then allocate MapOutput. Repeat this until we reach EOF.
+    long actualSize = blockLength + RssShuffleUtils.EOF_MARKERS_SIZE - Long.BYTES;
     MapOutput mapOutput = allocator.reserve(srcAttemptId, actualSize, actualSize, fetcherId);
 
     if (mapOutput.getType() == MapOutput.Type.MEMORY) {
       setupRssShuffleInputStream(mapIndexStart, mapIndexEnd, srcAttemptId.getAttemptNumber(), partitionId);
 
       long startTime = System.currentTimeMillis();
-      shuffleToMemory(srcAttemptId, mapOutput, dataLength);
+      shuffleToMemory(srcAttemptId, mapOutput, blockLength);
 
       long copyDuration = System.currentTimeMillis() - startTime;
       reportCopySucceeded(copyDuration, mapOutput);
@@ -138,7 +140,7 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
       setupRssShuffleInputStream(mapIndexStart, mapIndexEnd, srcAttemptId.getAttemptNumber(), partitionId);
 
       long startTime = System.currentTimeMillis();
-      shuffleToDisk(srcAttemptId, mapOutput, dataLength);
+      shuffleToDisk(srcAttemptId, mapOutput, blockLength);
 
       long copyDuration = System.currentTimeMillis() - startTime;
       reportCopySucceeded(copyDuration, mapOutput);
@@ -153,15 +155,15 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
   private void reportCopySucceeded(long copyDuration, MapOutput mapOutput) throws IOException {
     if (readPartitionAllOnce) {
       LOG.info("Ordered - RssFetcher finished with readPartitionAllOnce: {}, num={}, partitionId={}, dataLength={}, copyDuration={}",
-          srcAttemptId, srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().size(), partitionId, dataLength, copyDuration);
+          srcAttemptId, srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().size(), partitionId, blockLength, copyDuration);
       for (InputAttemptIdentifier inputIdentifier: srcAttemptId.getInputIdentifiersForReadPartitionAllOnce()) {
         if (inputIdentifier.getInputIdentifier() != srcAttemptId.getInputIdentifier()) {
           shuffleScheduler.copySucceeded(inputIdentifier, mapHost, 0L, 0L, copyDuration, mapOutput, false);
         }
       }
-      shuffleScheduler.copySucceeded(srcAttemptId, mapHost, dataLength, dataLength, copyDuration, mapOutput, false);
+      shuffleScheduler.copySucceeded(srcAttemptId, mapHost, blockLength, blockLength, copyDuration, mapOutput, false);
     } else {
-      shuffleScheduler.copySucceeded(srcAttemptId, mapHost, dataLength, dataLength, copyDuration, mapOutput, false);
+      shuffleScheduler.copySucceeded(srcAttemptId, mapHost, blockLength, blockLength, copyDuration, mapOutput, false);
     }
   }
 
@@ -180,9 +182,11 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
     }
   }
 
-  private void shuffleToMemory(InputAttemptIdentifier srcAttempt, MapOutput mapOutput, long dataLength)
+  private void shuffleToMemory(InputAttemptIdentifier srcAttempt, MapOutput mapOutput, long blockLength)
       throws IOException {
     try {
+      long dataLength = getLengthFromHeader(rssShuffleInputStream);
+      assert dataLength + Long.BYTES == blockLength;
       RssShuffleUtils.shuffleToMemory(rssShuffleInputStream, mapOutput.getMemory(), dataLength);
     } finally {
       synchronized (lock) {
@@ -194,9 +198,11 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
     }
   }
 
-  private void shuffleToDisk(InputAttemptIdentifier srcAttempt, MapOutput mapOutput, long dataLength)
+  private void shuffleToDisk(InputAttemptIdentifier srcAttempt, MapOutput mapOutput, long blockLength)
       throws IOException{
     try (OutputStream outputStream = mapOutput.getDisk()) {
+      long dataLength = getLengthFromHeader(rssShuffleInputStream);
+      assert dataLength + Long.BYTES == blockLength;
       RssShuffleUtils.shuffleToDisk(rssShuffleInputStream, outputStream, dataLength);
     } finally {
       synchronized (lock) {
@@ -206,5 +212,10 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
         }
       }
     }
+  }
+
+  private long getLengthFromHeader(InputStream inputStream) throws IOException {
+    DataInputStream dis = new DataInputStream(inputStream);
+    return dis.readLong();
   }
 }
