@@ -1553,6 +1553,11 @@ class ShuffleScheduler {
           rssFetchers.add(rssFetcher);
         }
       }
+
+      // Since multiple fetchers can be created from inputAttemptIdentifier, we cannot call freeHost()
+      // in RssFetcherOrderedGrouped.call(). Thus we pretend that fetching has been finished.
+      freeHost(mapHost);
+      assert mapHost.getState() == MapHost.State.IDLE;
     } else {
       int mapIndexStart = Integer.parseInt(mapHost.getHost());
       assert mapIndexStart == inputAttemptIdentifier.getTaskIndex();
