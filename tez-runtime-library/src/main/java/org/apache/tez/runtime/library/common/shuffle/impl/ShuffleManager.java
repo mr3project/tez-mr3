@@ -662,10 +662,10 @@ public class ShuffleManager implements FetcherCallback {
       // a single call to RSS would create a file larger than thresholdSize
       int numFetchers =
           Math.min((int)((partitionTotalSize - 1L) / rssFetchSplitThresholdSize) + 1, numIdentifiers);
-      int numIndentifiersPerFetcher = numIdentifiers / numFetchers;
-      int numLargeFetchers = numIdentifiers - numIndentifiersPerFetcher * numFetchers;
-      assert numIdentifiers == numLargeFetchers * (numIndentifiersPerFetcher + 1) +
-          (numFetchers - numLargeFetchers) * numIndentifiersPerFetcher;
+      int numIdentifiersPerFetcher = numIdentifiers / numFetchers;
+      int numLargeFetchers = numIdentifiers - numIdentifiersPerFetcher * numFetchers;
+      assert numIdentifiers == numLargeFetchers * (numIdentifiersPerFetcher + 1) +
+          (numFetchers - numLargeFetchers) * numIdentifiersPerFetcher;
 
       LOG.info("Splitting InputAttemptIdentifiers to {} RssFetchers: {} / {}",
           numFetchers, partitionTotalSize, numIdentifiers);
@@ -674,7 +674,7 @@ public class ShuffleManager implements FetcherCallback {
       int mapIndexEnd = numIdentifiers;
       for (int i = 0; i < numFetchers; i++) {
         int numExtra = i < numLargeFetchers ? 1 : 0;
-        int numIdentifiersToConsume = numIndentifiersPerFetcher + numExtra;
+        int numIdentifiersToConsume = numIdentifiersPerFetcher + numExtra;
         mapIndexEnd = mapIndexStart + numIdentifiersToConsume;
 
         List<InputAttemptIdentifier> subList = inputAttemptIdentifiers.subList(mapIndexStart, mapIndexEnd);

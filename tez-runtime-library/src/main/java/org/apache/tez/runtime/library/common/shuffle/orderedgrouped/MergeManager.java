@@ -420,10 +420,9 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
   @Override
   public synchronized MapOutput reserve(InputAttemptIdentifier srcAttemptIdentifier, 
-                                             long requestedSize,
-                                             long compressedLength,
-                                             int fetcher
-                                             ) throws IOException {
+                                        long requestedSize,
+                                        long compressedLength,
+                                        int fetcher) throws IOException {
     if (!canShuffleToMemory(requestedSize)) {
       if (LOG.isDebugEnabled()) {
         LOG.debug(srcAttemptIdentifier + ": Shuffling to disk since " + requestedSize +
