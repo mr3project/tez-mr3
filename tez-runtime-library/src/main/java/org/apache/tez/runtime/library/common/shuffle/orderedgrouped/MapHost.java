@@ -178,7 +178,7 @@ class MapHost {
       }
     }
 
-    if (state == State.IDLE) {
+    if (state == State.IDLE && maps.size() > 0) {
       state = State.PENDING;
     }
   }
