@@ -48,7 +48,7 @@ public class TezTaskOutputFiles extends TezTaskOutput {
                             String containerId, int vertexId) {
     super(conf, uniqueId, dagID, containerId);
     this.outputDir =
-      ShuffleUtils.isTezShuffleHandler(conf) ? Constants.VERTEX_PREFIX + vertexId : Constants.TEZ_RUNTIME_TASK_OUTPUT_DIR;
+      useExtendedPath ? Constants.VERTEX_PREFIX + vertexId : Constants.TEZ_RUNTIME_TASK_OUTPUT_DIR;
   }
 
   private static final Logger LOG = LoggerFactory.getLogger(TezTaskOutputFiles.class);
@@ -280,6 +280,6 @@ public class TezTaskOutputFiles extends TezTaskOutput {
   }
 
   public String getDagOutputDir(String child) {
-    return ShuffleUtils.isTezShuffleHandler(conf) ? dagId.concat(child) : child;
+    return useExtendedPath ? dagId.concat(child) : child;
   }
 }

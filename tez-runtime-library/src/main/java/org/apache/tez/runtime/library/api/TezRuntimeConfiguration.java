@@ -570,6 +570,11 @@ public class TezRuntimeConfiguration {
       "merge.progress.records";
   public static final long TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT = 10000;
 
+  @ConfigurationProperty(type = "boolean")
+  public static final String TEZ_RUNTIME_CELEBORN_ENABLED = TEZ_RUNTIME_PREFIX +
+      "celeborn.enabled";
+  public static final boolean TEZ_RUNTIME_CELEBORN_ENABLED_DEFAULT = true;
+
   @ConfigurationProperty(type = "long")
   public static final String TEZ_RUNTIME_CELEBORN_FETCH_SPLIT_THRESHOLD = TEZ_RUNTIME_PREFIX +
       "celeborn.fetch.split.threshold";
@@ -647,6 +652,7 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_UNORDERED_PARTITIONED_KVWRITER_BUFFER_MERGE_PERCENT);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_FETCHER_USE_SHARED_POOL);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_HOST_PENALTY_TIME_LIMIT_MS);
+    tezRuntimeKeys.add(TEZ_RUNTIME_CELEBORN_ENABLED);
     tezRuntimeKeys.add(TEZ_RUNTIME_CELEBORN_FETCH_SPLIT_THRESHOLD);
     tezRuntimeKeys.add(TEZ_RUNTIME_CELEBORN_SHUFFLE_PARALLEL_COPIES);
 

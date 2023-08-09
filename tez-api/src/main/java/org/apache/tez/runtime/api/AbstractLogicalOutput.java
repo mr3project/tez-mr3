@@ -36,9 +36,6 @@ public abstract class AbstractLogicalOutput implements LogicalOutput, LogicalOut
 
   private final int numPhysicalOutputs;
   private final OutputContext outputContext;
-  protected final ShuffleClient rssShuffleClient;   // use RSS iff. rssShuffleClient != null
-  // rssShuffleClient.cleanup() is called by its actual user (e.g., UnorderedPartitionedKVWriter)
-  // rssShuffleClient.registerShuffleId() is called by its actual user
 
   /**
    * Constructor an instance of the LogicalOutput. Classes extending this one to create a
@@ -54,8 +51,6 @@ public abstract class AbstractLogicalOutput implements LogicalOutput, LogicalOut
   public AbstractLogicalOutput(OutputContext outputContext, int numPhysicalOutputs) {
     this.outputContext = outputContext;
     this.numPhysicalOutputs = numPhysicalOutputs;
-    this.rssShuffleClient = outputContext.useRssShuffle() ?
-        (ShuffleClient)com.datamonad.mr3.MR3Runtime.env().getRssShuffleClient() : null;
   }
 
   public abstract List<Event> initialize() throws Exception;
