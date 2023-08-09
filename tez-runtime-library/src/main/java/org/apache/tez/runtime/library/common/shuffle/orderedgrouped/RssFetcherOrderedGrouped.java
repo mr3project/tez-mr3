@@ -166,18 +166,21 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
     int numBlocks = mapIndexEnd - mapIndexStart;
     LOG.info("Ordered - RssFetcher starts fetching {} concatenated blocks from RSS.", numBlocks);
 
-    long totalReceivedBytes = 0L;
     setupRssShuffleInputStream(mapIndexStart, mapIndexEnd, srcAttemptId.getAttemptNumber(), partitionId);
 
+    long totalReceivedBytes = 0L;
+    int numFetchedBlocks = 0;
     try {
-      for (int i = 0; i < numBlocks; i++) {
+      while (numFetchedBlocks < numBlocks && totalReceivedBytes < blockLength) {
+        int index = numFetchedBlocks;
+        numFetchedBlocks++;
+
         long startTime = System.currentTimeMillis();
         InputAttemptIdentifier inputAttemptId =
-            srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().get(i);
+            srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().get(index);
 
         long dataLength = getLengthFromHeader(rssShuffleInputStream);
-        totalReceivedBytes += dataLength;
-        assert totalReceivedBytes < blockLength;
+        totalReceivedBytes += Long.BYTES;
 
         long actualSize = dataLength + RssShuffleUtils.EOF_MARKERS_SIZE;
         MapOutput mapOutput = allocator.reserve(inputAttemptId, actualSize, actualSize, fetcherId, true);
@@ -191,6 +194,7 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
         } else {
           throw new TezUncheckedException("Unexpected MapOutput.Type: " + mapOutput);
         }
+        totalReceivedBytes += dataLength;
 
         long copyDuration = System.currentTimeMillis() - startTime;
         shuffleScheduler.copySucceeded(inputAttemptId, mapHost, dataLength, dataLength, copyDuration,
@@ -198,10 +202,19 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
       }
     } finally {
       closeRssShuffleInputStream();
-
     }
 
-    assert totalReceivedBytes == blockLength + (long) numBlocks * Long.BYTES;
+    LOG.info("Ordered - RssFetcher finished fetching {} concatenated blocks from RSS. {} blocks are empty.",
+        numFetchedBlocks, numBlocks - numFetchedBlocks);
+
+    assert totalReceivedBytes == blockLength;
+    if (numFetchedBlocks < numBlocks) {
+      for (int i = numFetchedBlocks; i < numBlocks; i++) {
+        InputAttemptIdentifier inputAttemptId =
+            srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().get(i);
+        shuffleScheduler.copySucceeded(inputAttemptId, mapHost, 0L, 0L, 0, null, false);
+      }
+    }
   }
 
   private void setupRssShuffleInputStream(int mapIndexStart, int mapIndexEnd, int mapAttemptNumber, int partitionId)

@@ -168,8 +168,12 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
                     + srcAttemptIdentifier + "]. Not fetching.");
           }
           numDmeEventsNoData.getAndIncrement();
-          scheduler.copySucceeded(srcAttemptIdentifier.expand(0), null, 0, 0, 0, null, true);
-          return;
+
+          // We have to call addKnownMapOutput() if readPartitionAllOnce is enabled.
+          if (!inputContext.readPartitionAllOnce()) {
+            scheduler.copySucceeded(srcAttemptIdentifier.expand(0), null, 0, 0, 0, null, true);
+            return;
+          }
         }
       } catch (IOException e) {
         throw new TezUncheckedException("Unable to set the empty partition to succeeded", e);
