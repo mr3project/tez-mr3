@@ -97,9 +97,7 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
   @Override
   public synchronized List<Event> initialize() throws IOException {
     this.conf = TezUtils.createConfFromUserPayload(getContext().getUserPayload());
-    if (rssShuffleClient != null) {
-      this.conf.setBoolean(ShuffleUtils.TEZ_CELEBORN_ENABLED, true);
-    }
+    this.conf.setBoolean(ShuffleUtils.TEZ_CELEBORN_ENABLED_INTERNAL, rssShuffleClient != null);
     this.localFs = (RawLocalFileSystem) FileSystem.getLocal(conf).getRaw();
 
     // Initializing this parametr in this conf since it is used in multiple

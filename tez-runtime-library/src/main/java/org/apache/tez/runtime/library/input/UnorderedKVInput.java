@@ -26,7 +26,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.tez.common.TezUtilsInternal;
 import org.apache.tez.runtime.api.ProgressFailedException;
-import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -88,9 +87,7 @@ public class UnorderedKVInput extends AbstractLogicalInput {
   public synchronized List<Event> initialize() throws Exception {
     Preconditions.checkArgument(getNumPhysicalInputs() != -1, "Number of Inputs has not been set");
     this.conf = TezUtils.createConfFromUserPayload(getContext().getUserPayload());
-    if (rssShuffleClient != null) {
-      this.conf.setBoolean(ShuffleUtils.TEZ_CELEBORN_ENABLED, true);
-    }
+    this.conf.setBoolean(ShuffleUtils.TEZ_CELEBORN_ENABLED_INTERNAL, rssShuffleClient != null);
 
     if (getNumPhysicalInputs() == 0) {
       getContext().requestInitialMemory(0l, null);

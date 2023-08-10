@@ -24,7 +24,6 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 
@@ -56,7 +55,7 @@ public abstract class TezTaskOutput {
     this.conf = conf;
     this.uniqueId = uniqueId;
     this.useExtendedPath =
-      conf.getBoolean(ShuffleUtils.TEZ_CELEBORN_ENABLED, false) || ShuffleUtils.isTezShuffleHandler(conf);
+      conf.getBoolean(ShuffleUtils.TEZ_CELEBORN_ENABLED_INTERNAL, false) || ShuffleUtils.isTezShuffleHandler(conf);
     this.dagId = useExtendedPath ?
       Constants.DAG_PREFIX + dagID + Path.SEPARATOR + containerId + Path.SEPARATOR :
       Constants.DAG_PREFIX + dagID + Path.SEPARATOR;

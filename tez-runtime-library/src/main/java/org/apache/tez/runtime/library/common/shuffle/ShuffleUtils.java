@@ -29,7 +29,6 @@ import java.text.DecimalFormat;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.Deflater;
 
@@ -83,7 +82,7 @@ public class ShuffleUtils {
   public static final int BUFFER_SIZE = 64 * 1024;
 
   // internal to Tez-MR3 to use in TezTaskOutput
-  public static String TEZ_CELEBORN_ENABLED = "tez.celeborn.enabled";
+  public static String TEZ_CELEBORN_ENABLED_INTERNAL = "tez.celeborn.enabled.internal";
 
   static final ThreadLocal<DecimalFormat> MBPS_FORMAT =
       new ThreadLocal<DecimalFormat>() {
