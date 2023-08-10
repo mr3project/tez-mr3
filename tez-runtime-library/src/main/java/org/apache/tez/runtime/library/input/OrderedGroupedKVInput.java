@@ -28,7 +28,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.celeborn.client.ShuffleClient;
 import org.apache.tez.runtime.api.ProgressFailedException;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
 import org.apache.tez.runtime.library.common.Constants;
@@ -94,8 +93,6 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput {
 
   private boolean isClosed = false;
 
-  private ShuffleClient rssShuffleClient;   // use RSS iff. rssShuffleClient != null
-
   public OrderedGroupedKVInput(InputContext inputContext, int numPhysicalInputs) {
     super(inputContext, numPhysicalInputs);
   }
@@ -103,10 +100,6 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput {
   @Override
   public synchronized List<Event> initialize() throws IOException {
     this.conf = TezUtils.createConfFromUserPayload(getContext().getUserPayload());
-    this.rssShuffleClient = getContext().useRssShuffle() && conf.getBoolean(
-        TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_ENABLED,
-        TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_ENABLED_DEFAULT) ?
-        (ShuffleClient)com.datamonad.mr3.MR3Runtime.env().getRssShuffleClient() : null;
 
     if (this.getNumPhysicalInputs() == 0) {
       getContext().requestInitialMemory(0l, null);

@@ -33,7 +33,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 
 import com.google.protobuf.ByteString;
-import org.apache.celeborn.client.ShuffleClient;
 import org.apache.tez.common.TezUtilsInternal;
 import org.apache.tez.runtime.api.events.CompositeDataMovementEvent;
 import org.apache.tez.runtime.api.events.VertexManagerEvent;
@@ -90,8 +89,6 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
 
   private boolean compositeFetch;
 
-  private ShuffleClient rssShuffleClient;   // use RSS iff. rssShuffleClient != null
-
   public OrderedPartitionedKVOutput(OutputContext outputContext, int numPhysicalOutputs) {
     super(outputContext, numPhysicalOutputs);
     deflater = TezCommonUtils.newBestCompressionDeflater();
@@ -100,10 +97,6 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
   @Override
   public synchronized List<Event> initialize() throws IOException {
     this.conf = TezUtils.createConfFromUserPayload(getContext().getUserPayload());
-    this.rssShuffleClient = getContext().useRssShuffle() && conf.getBoolean(
-        TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_ENABLED,
-        TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_ENABLED_DEFAULT) ?
-        (ShuffleClient)com.datamonad.mr3.MR3Runtime.env().getRssShuffleClient() : null;
     this.localFs = (RawLocalFileSystem) FileSystem.getLocal(conf).getRaw();
 
     // Initializing this parametr in this conf since it is used in multiple

@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.celeborn.client.ShuffleClient;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,21 +68,15 @@ public class UnorderedKVOutput extends AbstractLogicalOutput {
   private MemoryUpdateCallbackHandler memoryUpdateCallbackHandler;
   private final AtomicBoolean isStarted = new AtomicBoolean(false);
 
-  private ShuffleClient rssShuffleClient;   // use RSS iff. rssShuffleClient != null
-
   public UnorderedKVOutput(OutputContext outputContext, int numPhysicalOutputs) {
     super(outputContext, numPhysicalOutputs);
   }
+
 
   @Override
   public synchronized List<Event> initialize()
       throws Exception {
     this.conf = TezUtils.createConfFromUserPayload(getContext().getUserPayload());
-    this.rssShuffleClient = getContext().useRssShuffle() && conf.getBoolean(
-        TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_ENABLED,
-        TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_ENABLED_DEFAULT) ?
-        (ShuffleClient)com.datamonad.mr3.MR3Runtime.env().getRssShuffleClient() : null;
-
     this.conf.setStrings(TezRuntimeFrameworkConfigs.LOCAL_DIRS,
         getContext().getWorkDirs());
 
