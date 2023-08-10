@@ -143,7 +143,7 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
           throw new TezUncheckedException("Unable to set the empty partition to succeeded", e);
         }
       }
-      if (compositeFetch) {
+      if (rssShuffleClient == null && compositeFetch) {
         numDmeEvents.addAndGet(crdme.getCount());
         processCompositeRoutedDataMovementEvent(crdme, shufflePayload, emptyPartitionsBitSet);
       } else {

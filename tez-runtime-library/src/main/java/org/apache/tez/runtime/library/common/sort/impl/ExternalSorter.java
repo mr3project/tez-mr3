@@ -170,7 +170,7 @@ public abstract class ExternalSorter {
   protected final boolean compositeFetch;
 
   public ExternalSorter(OutputContext outputContext, Configuration conf, int numOutputs,
-      long initialMemoryAvailable, @Nullable ShuffleClient shuffleClient) throws IOException {
+      long initialMemoryAvailable, @Nullable ShuffleClient rssShuffleClient) throws IOException {
     this.outputContext = outputContext;
     this.conf = conf;
     this.localFs = (RawLocalFileSystem) FileSystem.getLocal(conf).getRaw();
@@ -178,7 +178,7 @@ public abstract class ExternalSorter {
     reportPartitionStats = ReportPartitionStats.fromString(
         conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_REPORT_PARTITION_STATS,
         TezRuntimeConfiguration.TEZ_RUNTIME_REPORT_PARTITION_STATS_DEFAULT));
-    partitionStats = reportPartitionStats.isEnabled() || shuffleClient != null ?
+    partitionStats = reportPartitionStats.isEnabled() || rssShuffleClient != null ?
         (new long[partitions]) : null;
 
     cleanup = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT,
@@ -261,7 +261,7 @@ public abstract class ExternalSorter {
     // this.physicalHostFetch = conf.getBoolean(
     //     TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH,
     //     TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_DEFAULT);
-    this.compositeFetch = ShuffleUtils.isTezShuffleHandler(this.conf);
+    this.compositeFetch = rssShuffleClient != null || ShuffleUtils.isTezShuffleHandler(this.conf);
   }
 
   @VisibleForTesting

@@ -31,6 +31,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.tez.runtime.api.ProgressFailedException;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
 import org.apache.tez.runtime.library.common.Constants;
+import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -100,6 +101,9 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput {
   @Override
   public synchronized List<Event> initialize() throws IOException {
     this.conf = TezUtils.createConfFromUserPayload(getContext().getUserPayload());
+    if (rssShuffleClient != null) {
+      this.conf.setBoolean(ShuffleUtils.TEZ_CELEBORN_ENABLED, true);
+    }
 
     if (this.getNumPhysicalInputs() == 0) {
       getContext().requestInitialMemory(0l, null);

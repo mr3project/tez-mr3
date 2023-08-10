@@ -82,6 +82,9 @@ public class ShuffleUtils {
 
   public static final int BUFFER_SIZE = 64 * 1024;
 
+  // internal to Tez-MR3 to use in TezTaskOutput
+  public static String TEZ_CELEBORN_ENABLED = "tez.celeborn.enabled";
+
   static final ThreadLocal<DecimalFormat> MBPS_FORMAT =
       new ThreadLocal<DecimalFormat>() {
         @Override
@@ -661,7 +664,7 @@ public class ShuffleUtils {
   }
 
   public static String adjustPathComponent(boolean compositeFetch, int dagIdentifier, String pathComponent) {
-    if(compositeFetch) {  // == isTezShuffleHandler
+    if (compositeFetch) {
       // pathComponent includes ${containerId}/${vertexId}/ in its prefix
       return Constants.DAG_PREFIX + dagIdentifier + Path.SEPARATOR + pathComponent;
     } else {

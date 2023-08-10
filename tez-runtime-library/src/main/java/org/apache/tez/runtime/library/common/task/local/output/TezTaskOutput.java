@@ -56,7 +56,7 @@ public abstract class TezTaskOutput {
     this.conf = conf;
     this.uniqueId = uniqueId;
     this.useExtendedPath =
-      conf.getBoolean("tez.celeborn.enabled", true) || ShuffleUtils.isTezShuffleHandler(conf);
+      conf.getBoolean(ShuffleUtils.TEZ_CELEBORN_ENABLED, false) || ShuffleUtils.isTezShuffleHandler(conf);
     this.dagId = useExtendedPath ?
       Constants.DAG_PREFIX + dagID + Path.SEPARATOR + containerId + Path.SEPARATOR :
       Constants.DAG_PREFIX + dagID + Path.SEPARATOR;

@@ -214,7 +214,7 @@ public class ShuffleManager implements FetcherCallback {
     this.shufflePhaseTime = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_PHASE_TIME);
     this.firstEventReceived = inputContext.getCounters().findCounter(TaskCounter.FIRST_EVENT_RECEIVED);
     this.lastEventReceived = inputContext.getCounters().findCounter(TaskCounter.LAST_EVENT_RECEIVED);
-    this.compositeFetch = rssShuffleClient != null ? false : ShuffleUtils.isTezShuffleHandler(conf);
+    this.compositeFetch = rssShuffleClient != null || ShuffleUtils.isTezShuffleHandler(conf);
 
     this.srcNameTrimmed = TezUtilsInternal.cleanVertexName(inputContext.getSourceVertexName());
   

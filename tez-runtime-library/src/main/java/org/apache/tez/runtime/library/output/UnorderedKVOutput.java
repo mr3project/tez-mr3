@@ -77,6 +77,9 @@ public class UnorderedKVOutput extends AbstractLogicalOutput {
   public synchronized List<Event> initialize()
       throws Exception {
     this.conf = TezUtils.createConfFromUserPayload(getContext().getUserPayload());
+    if (rssShuffleClient != null) {
+      this.conf.setBoolean(ShuffleUtils.TEZ_CELEBORN_ENABLED, true);
+    }
     this.conf.setStrings(TezRuntimeFrameworkConfigs.LOCAL_DIRS,
         getContext().getWorkDirs());
 

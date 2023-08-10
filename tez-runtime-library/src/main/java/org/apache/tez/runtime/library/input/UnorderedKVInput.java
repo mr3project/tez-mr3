@@ -88,6 +88,9 @@ public class UnorderedKVInput extends AbstractLogicalInput {
   public synchronized List<Event> initialize() throws Exception {
     Preconditions.checkArgument(getNumPhysicalInputs() != -1, "Number of Inputs has not been set");
     this.conf = TezUtils.createConfFromUserPayload(getContext().getUserPayload());
+    if (rssShuffleClient != null) {
+      this.conf.setBoolean(ShuffleUtils.TEZ_CELEBORN_ENABLED, true);
+    }
 
     if (getNumPhysicalInputs() == 0) {
       getContext().requestInitialMemory(0l, null);
@@ -115,8 +118,7 @@ public class UnorderedKVInput extends AbstractLogicalInput {
       memoryUpdateCallbackHandler.validateUpdateReceived();
       CompressionCodec codec = rssShuffleClient != null ? null : CodecUtils.getCodec(conf);
 
-      // if rssShuffleClient != null, a Fetcher can fetch only a single partition
-      boolean compositeFetch = rssShuffleClient != null ? false : ShuffleUtils.isTezShuffleHandler(conf);
+      boolean compositeFetch = rssShuffleClient != null || ShuffleUtils.isTezShuffleHandler(conf);
       boolean ifileReadAhead = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD,
           TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_DEFAULT);
       int ifileReadAheadLength = 0;

@@ -256,7 +256,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     this.useCachedStream = useCachedStreamConfig && (this.dataViaEventsEnabled && (numPartitions == 1)
         && !pipelinedShuffle);
 
-    this.compositeFetch = ShuffleUtils.isTezShuffleHandler(this.conf);
+    this.compositeFetch = rssShuffleClient != null || ShuffleUtils.isTezShuffleHandler(conf);
 
     if (availableMemoryBytes == 0) {
       Preconditions.checkArgument(((numPartitions == 1) && !pipelinedShuffle), "availableMemory "

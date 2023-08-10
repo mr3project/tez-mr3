@@ -1169,8 +1169,8 @@ public final class DefaultSorter extends ExternalSorter implements IndexedSortab
         partitionStats, reportDetailedPartitionStats(), auxiliaryService, deflater,
         compositeFetch);
 
-    LOG.info(outputContext.getDestinationVertexName() + ": " +
-        "Adding spill event for spill (final update=" + isLastEvent + "), spillId=" + index);
+    LOG.info("{}: Adding spill event for spill (final update={}, spillId={}",
+        outputContext.getDestinationVertexName(), isLastEvent, index);
 
     if (sendEvent) {
       outputContext.sendEvents(events);

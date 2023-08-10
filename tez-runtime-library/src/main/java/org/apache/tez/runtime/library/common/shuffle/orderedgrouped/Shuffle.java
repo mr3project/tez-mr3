@@ -176,8 +176,7 @@ public class Shuffle implements ExceptionReporter {
     this.mergePhaseTime = inputContext.getCounters().findCounter(TaskCounter.MERGE_PHASE_TIME);
     this.shufflePhaseTime = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_PHASE_TIME);
 
-    boolean compositeFetch = rssShuffleClient != null ? false : ShuffleUtils.isTezShuffleHandler(conf);
-
+    boolean compositeFetch = rssShuffleClient != null || ShuffleUtils.isTezShuffleHandler(conf);
     eventHandler =
         new ShuffleInputEventHandlerOrderedGrouped(inputContext, scheduler, compositeFetch, rssShuffleClient);
     
