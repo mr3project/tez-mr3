@@ -142,7 +142,13 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
 
     try {
       long dataLength = getLengthFromHeader(rssShuffleInputStream);
-      assert dataLength + Long.BYTES == blockLength;
+      if (dataLength + Long.BYTES != blockLength) {
+        String message =
+            "The length of block come from DME and InputStream do not match. " +
+            String.format("DME: %d, InputStream: %d", blockLength, dataLength + Long.BYTES);
+        LOG.error(message);
+        throw new IOException(message);
+      }
 
       if (mapOutput.getType() == MapOutput.Type.MEMORY) {
         RssShuffleUtils.shuffleToMemory(rssShuffleInputStream, mapOutput.getMemory(), dataLength);
@@ -207,7 +213,13 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
     LOG.info("Ordered - RssFetcher finished fetching {} concatenated blocks from RSS. {} blocks are empty.",
         numFetchedBlocks, numBlocks - numFetchedBlocks);
 
-    assert totalReceivedBytes == blockLength;
+    if (totalReceivedBytes != blockLength) {
+      String message = String.format("Ordered - RssFetcher received only %d bytes. Expected size: %d",
+          totalReceivedBytes, blockLength);
+      LOG.error(message);
+      throw new IOException(message);
+    }
+
     if (numFetchedBlocks < numBlocks) {
       for (int i = numFetchedBlocks; i < numBlocks; i++) {
         InputAttemptIdentifier inputAttemptId =
