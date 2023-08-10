@@ -24,6 +24,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 
@@ -40,6 +41,7 @@ public abstract class TezTaskOutput {
   protected final Configuration conf;
   protected final String uniqueId;
   protected final String dagId;   // = dag_${dagId}/${containerId}/
+  protected final boolean useExtendedPath;
 
   /**
    * @param conf     the configuration from which local-dirs will be picked up
@@ -53,7 +55,9 @@ public abstract class TezTaskOutput {
   public TezTaskOutput(Configuration conf, String uniqueId, int dagID, String containerId) {
     this.conf = conf;
     this.uniqueId = uniqueId;
-    this.dagId = ShuffleUtils.isTezShuffleHandler(conf) ?
+    this.useExtendedPath =
+      conf.getBoolean("tez.celeborn.enabled", true) || ShuffleUtils.isTezShuffleHandler(conf);
+    this.dagId = useExtendedPath ?
       Constants.DAG_PREFIX + dagID + Path.SEPARATOR + containerId + Path.SEPARATOR :
       Constants.DAG_PREFIX + dagID + Path.SEPARATOR;
   }
