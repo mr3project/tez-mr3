@@ -81,7 +81,7 @@ public class RssShuffleUtils {
   }
 
   public static boolean checkUseSameAttemptNumber(CompositeInputAttemptIdentifier inputAttemptIdentifier) {
-    List<InputAttemptIdentifier> childInputAttemptIdentifiers = inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce();
+    List<CompositeInputAttemptIdentifier> childInputAttemptIdentifiers = inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce();
     int attemptNumber = childInputAttemptIdentifiers.get(0).getAttemptNumber();
     boolean useSameAttemptNumber = true;
     for (InputAttemptIdentifier input: childInputAttemptIdentifiers) {
@@ -105,7 +105,7 @@ public class RssShuffleUtils {
       int sourceVertexNumTasks, long rssFetchSplitThresholdSize,
       FetcherCreate createFn, boolean ordered) {
     long partitionTotalSize = inputAttemptIdentifier.getPartitionSize(partitionId);
-    List<InputAttemptIdentifier> inputAttemptIdentifiers =
+    List<CompositeInputAttemptIdentifier> inputAttemptIdentifiers =
         inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce();
     int numIdentifiers = inputAttemptIdentifiers.size();
     assert numIdentifiers == sourceVertexNumTasks;
@@ -130,10 +130,9 @@ public class RssShuffleUtils {
         int numIdentifiersToConsume = numIdentifiersPerFetcher + numExtra;
         mapIndexEnd = mapIndexStart + numIdentifiersToConsume;
 
-        List<InputAttemptIdentifier> subList = inputAttemptIdentifiers.subList(mapIndexStart, mapIndexEnd);
+        List<CompositeInputAttemptIdentifier> subList = inputAttemptIdentifiers.subList(mapIndexStart, mapIndexEnd);
         long subTotalSize = 0L;
-        for (InputAttemptIdentifier input: subList) {
-          CompositeInputAttemptIdentifier cid = (CompositeInputAttemptIdentifier)input;
+        for (CompositeInputAttemptIdentifier cid: subList) {
           subTotalSize += cid.getPartitionSize(partitionId);
         }
 

@@ -90,14 +90,14 @@ public class InputHost extends HostPort {
   //   3. addKnownInput() is guarded with synchronized
   private final boolean readPartitionAllOnce;
   private final int srcVertexNumTasks;
-  private final Map<PartitionRange, List<InputAttemptIdentifier>> tempPartitionToInputs;
+  private final Map<PartitionRange, List<CompositeInputAttemptIdentifier>> tempPartitionToInputs;
 
   public InputHost(HostPort hostPort, boolean readPartitionAllOnce, int srcVertexNumTasks) {
     super(hostPort.getHost(), hostPort.getPort());
     this.readPartitionAllOnce = readPartitionAllOnce;
     this.srcVertexNumTasks = srcVertexNumTasks;
     if (readPartitionAllOnce) {
-      tempPartitionToInputs = new HashMap<PartitionRange, List<InputAttemptIdentifier>>();
+      tempPartitionToInputs = new HashMap<PartitionRange, List<CompositeInputAttemptIdentifier>>();
     } else {
       tempPartitionToInputs = null;
     }
@@ -119,23 +119,22 @@ public class InputHost extends HostPort {
       InputAttemptIdentifier srcAttempt) {
     if (readPartitionAllOnce) {
       assert partitionCount == 1;
-      addKnownInputForReadPartitionAllOnce(partitionId, srcAttempt);
+      addKnownInputForReadPartitionAllOnce(partitionId, (CompositeInputAttemptIdentifier) srcAttempt);
     } else {
       PartitionRange partitionRange = new PartitionRange(partitionId, partitionCount);
       addToPartitionToInputs(partitionRange, srcAttempt);
     }
   }
 
-  private void addKnownInputForReadPartitionAllOnce(int partitionId, InputAttemptIdentifier srcAttempt) {
+  private void addKnownInputForReadPartitionAllOnce(int partitionId, CompositeInputAttemptIdentifier srcAttempt) {
     PartitionRange partitionRange = new PartitionRange(partitionId, 1);
-    List<InputAttemptIdentifier> inputs = tempPartitionToInputs.get(partitionRange);
+    List<CompositeInputAttemptIdentifier> inputs = tempPartitionToInputs.get(partitionRange);
     if (inputs == null) {
-      inputs = new ArrayList<InputAttemptIdentifier>();
+      inputs = new ArrayList<CompositeInputAttemptIdentifier>();
       tempPartitionToInputs.put(partitionRange, inputs);
     }
     // The following code checks for duplicate InputAttemptIdentifier's with different attemptNumbers.
     // For now, this is unnecessary because we do not use VertexRerun for RSS.
-    // TODO: set to true when using VertexRerun
     boolean checkForDuplicateWithDifferentAttemptNumbers = false;
     if (checkForDuplicateWithDifferentAttemptNumbers) {
       inputs.removeIf(input -> {
@@ -152,8 +151,7 @@ public class InputHost extends HostPort {
 
     if (inputs.size() == srcVertexNumTasks) {
       long partitionTotalSize = 0L;
-      for (InputAttemptIdentifier input: inputs) {
-        CompositeInputAttemptIdentifier cid = (CompositeInputAttemptIdentifier)input;
+      for (CompositeInputAttemptIdentifier cid: inputs) {
         partitionTotalSize += cid.getPartitionSize(partitionId);
       }
       // optimize partitionSizes[] because only partitionId is used and other fields are never used

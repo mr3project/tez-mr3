@@ -36,6 +36,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 
 import javax.crypto.SecretKey;
 
@@ -584,7 +585,7 @@ public class ShuffleManager implements FetcherCallback {
 
     if (!alreadyCompleted) {
       if (inputContext.readPartitionAllOnce()) {
-        for (InputAttemptIdentifier input: inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce()) {
+        for (CompositeInputAttemptIdentifier input: inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce()) {
           ShuffleEventInfo eventInfo = shuffleInfoEventsMap.get(input.getInputIdentifier());
           if (eventInfo != null) {
             eventInfo.scheduledForDownload = true;
@@ -610,15 +611,7 @@ public class ShuffleManager implements FetcherCallback {
         if (useSameAttemptNumber) {
           createRssFetchersForReadPartitionAllOnce(inputAttemptIdentifier, partitionId, inputHost, rssFetchers);
         } else {
-          // TODO: optimize by combining consecutive fetches with a single RssFetcher
-          List<InputAttemptIdentifier> childInputAttemptIdentifiers = inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce();
-          for (InputAttemptIdentifier input: childInputAttemptIdentifiers) {
-            CompositeInputAttemptIdentifier cinput = (CompositeInputAttemptIdentifier)input;
-            assert cinput.getTaskIndex() != -1;
-            RssFetcher rssFetcher = createRssFetcherForIndividualInput(
-                cinput, partitionId, inputHost, cinput.getTaskIndex());
-            rssFetchers.add(rssFetcher);
-          }
+          createRssFetchersForMultipleAttemptNumbers(inputAttemptIdentifier, partitionId, inputHost, rssFetchers);
         }
       } else {
         int mapIndexStart = Integer.parseInt(inputHost.getHost());
@@ -640,7 +633,6 @@ public class ShuffleManager implements FetcherCallback {
   private void createRssFetchersForReadPartitionAllOnce(
       CompositeInputAttemptIdentifier inputAttemptIdentifier,
       final int partitionId, final InputHost inputHost, List<RssFetcher> rssFetchers) {
-
     RssShuffleUtils.FetcherCreate createFn = (mergedCid, subTotalSize, mapIndexStart, mapIndexEnd) -> {
       RssFetcher rssFetcher = new RssFetcher(this, inputManager, rssShuffleClient,
           inputContext.shuffleId(), inputHost.getHost(), inputHost.getPort(),
@@ -651,6 +643,18 @@ public class ShuffleManager implements FetcherCallback {
     RssShuffleUtils.createRssFetchersForReadPartitionAllOnce(
         inputAttemptIdentifier, partitionId, inputContext.getSourceVertexNumTasks(), rssFetchSplitThresholdSize,
         createFn, false);
+  }
+
+  private void createRssFetchersForMultipleAttemptNumbers(
+      CompositeInputAttemptIdentifier inputAttemptIdentifier,
+      final int partitionId, final InputHost inputHost, List<RssFetcher> rssFetchers) {
+    List<CompositeInputAttemptIdentifier> childInputAttemptIdentifiers = inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce();
+    for (CompositeInputAttemptIdentifier cinput: childInputAttemptIdentifiers) {
+      assert cinput.getTaskIndex() != -1;
+      RssFetcher rssFetcher = createRssFetcherForIndividualInput(
+          cinput, partitionId, inputHost, cinput.getTaskIndex());
+      rssFetchers.add(rssFetcher);
+    }
   }
 
   private RssFetcher createRssFetcherForIndividualInput(
