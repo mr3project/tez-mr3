@@ -164,7 +164,7 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
     }
 
     long copyDuration = System.currentTimeMillis() - startTime;
-    shuffleScheduler.copySucceeded(srcAttemptId, mapHost, blockLength, blockLength, copyDuration, mapOutput,
+    shuffleScheduler.copySucceeded(srcAttemptId, null, blockLength, blockLength, copyDuration, mapOutput,
         false);
   }
 
@@ -207,7 +207,7 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
         totalReceivedBytes += dataLength;
 
         long copyDuration = System.currentTimeMillis() - startTime;
-        shuffleScheduler.copySucceeded(inputAttemptId, mapHost, dataLength, dataLength, copyDuration,
+        shuffleScheduler.copySucceeded(inputAttemptId, null, dataLength, dataLength, copyDuration,
             mapOutput, false);
       }
     } finally {
@@ -228,7 +228,7 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
       for (int i = numFetchedBlocks; i < numBlocks; i++) {
         InputAttemptIdentifier inputAttemptId =
             srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().get(i);
-        shuffleScheduler.copySucceeded(inputAttemptId, mapHost, 0L, 0L, 0, null, false);
+        shuffleScheduler.copySucceeded(inputAttemptId, null, 0L, 0L, 0, null, false);
       }
     }
   }

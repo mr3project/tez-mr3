@@ -582,6 +582,7 @@ class ShuffleScheduler {
     }
   }
 
+  // host can be null when using RSS
   public synchronized void copySucceeded(InputAttemptIdentifier srcAttemptIdentifier,
                                          MapHost host,
                                          long bytesCompressed,
