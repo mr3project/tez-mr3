@@ -1535,15 +1535,14 @@ class ShuffleScheduler {
 
     if (inputContext.readPartitionAllOnce()) {
       boolean useSameAttemptNumber = RssShuffleUtils.checkUseSameAttemptNumber(inputAttemptIdentifier);
-      if (!useSameAttemptNumber) {
-        LOG.warn("Ordered - Reverting to {} individual RssFetchers because different attemptNumber: {}",
+      if (useSameAttemptNumber) {
+        LOG.info("Ordered - Merging {} RssFetchers to a single RssFetcher: {}",
             inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce().size(),
             inputAttemptIdentifier.getAttemptNumber());
-      }
-
-      if (useSameAttemptNumber) {
         createRssFetchersForReadPartitionAllOnce(inputAttemptIdentifier, partitionId, mapHost, rssFetchers);
       } else {
+        LOG.info("Ordered - Reverting to {} individual RssFetchers because of different attemptNumbers",
+            inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce().size());
         List<CompositeInputAttemptIdentifier> childInputAttemptIdentifiers = inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce();
         for (CompositeInputAttemptIdentifier cinput: childInputAttemptIdentifiers) {
           assert cinput.getTaskIndex() != -1;
@@ -1560,6 +1559,7 @@ class ShuffleScheduler {
     } else {
       int mapIndexStart = Integer.parseInt(mapHost.getHost());
       assert mapIndexStart == inputAttemptIdentifier.getTaskIndex();
+      LOG.info("Ordered - Creating a single RssFetcher: {}", mapIndexStart);
       RssFetcherOrderedGrouped rssFetcher = createRssFetcherForIndividualInput(
           inputAttemptIdentifier, partitionId, mapHost, mapIndexStart);
       rssFetchers.add(rssFetcher);
