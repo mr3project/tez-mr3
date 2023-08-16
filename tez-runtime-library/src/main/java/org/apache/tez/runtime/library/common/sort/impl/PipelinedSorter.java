@@ -40,6 +40,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.DataInputBuffer;
+import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.RawComparator;
 import org.apache.hadoop.util.IndexedSortable;
 import org.apache.hadoop.util.IndexedSorter;
@@ -916,52 +917,44 @@ public class PipelinedSorter extends ExternalSorter {
       // In order to avoid reading final file immediately after writing it,
       // create a piped stream, pass OS to IFile.writer, and use IS instead of finalMergedInputStream here.
       InputStream finalMergedInputStream = rfs.open(finalOutputFile);
-      byte[] buffer = new byte[ShuffleUtils.BUFFER_SIZE];
+
+      long bufferSize = 0L;
+      for (long size: partitionStats) {
+        if (size > bufferSize) {
+          bufferSize = size;
+        }
+      }
+      bufferSize += Long.BYTES;
+
+      if (bufferSize > Integer.MAX_VALUE) {
+        throw new IOException("Failed to push a partition to RSS. Partition size: " + bufferSize);
+      }
+
+      byte[] buffer = new byte[(int) bufferSize];
+      ByteBuffer lengthBuffer = ByteBuffer.allocate(Long.BYTES);
+
       for (int part = 0; part < partitions; part++) {
-        long partitionSize = partitionStats[part];
-        if (partitionSize != 0L) {
+        int partitionSize = (int) partitionStats[part];
+        if (partitionSize != 0) {
           // We assume that the number of bytes read by DataInputStream.readLong() is equal to Long.BYTES.
 
-          ByteBuffer lengthBuffer = ByteBuffer.allocate(Long.BYTES);
+          // TODO: Use 4 bytes instead of 8 bytes
           lengthBuffer.putLong(partitionSize);
+          System.arraycopy(lengthBuffer.array(), 0, buffer, 0, Long.BYTES);
+          lengthBuffer.clear();
+
+          IOUtils.readFully(finalMergedInputStream, buffer, Long.BYTES, partitionSize);
+
           rssShuffleClient.pushData(
               outputContext.shuffleId(),
               outputContext.getTaskIndex(),
               outputContext.getTaskAttemptNumber(),
               part,
-              lengthBuffer.array(),
+              buffer,
               0,
-              Long.BYTES,
+              Long.BYTES + partitionSize,
               outputContext.getVertexParallelism(),
               partitions);
-
-          long remainingBytes = partitionStats[part];
-          while (remainingBytes > 0) {
-            int bufferLength = (int) Math.min(ShuffleUtils.BUFFER_SIZE, remainingBytes);
-            int bytesRead = finalMergedInputStream.read(buffer, 0, bufferLength);
-
-            if (bytesRead < 0) {
-              finalMergedInputStream.close();
-
-              long expected = partitionStats[part];
-              long actual = expected - remainingBytes;
-              throw new IOException("Premature EOF from inputStream. " +
-                  "Expect " + expected + " bytes, but received " + actual + " bytes.");
-            }
-
-            rssShuffleClient.pushData(
-                outputContext.shuffleId(),
-                outputContext.getTaskIndex(),
-                outputContext.getTaskAttemptNumber(),
-                part,
-                buffer,
-                0,
-                bytesRead,
-                outputContext.getVertexParallelism(),
-                partitions);
-
-            remainingBytes -= bytesRead;
-          }
 
           partitionStats[part] += Long.BYTES;
         }
