@@ -581,6 +581,11 @@ public class TezRuntimeConfiguration {
       "celeborn.shuffle.parallel.copies";
   public static final int TEZ_RUNTIME_CELEBORN_SHUFFLE_PARALLEL_COPIES_DEFAULT = 4;
 
+  @ConfigurationProperty(type = "boolean")
+  public static final String TEZ_RUNTIME_CELEBORN_ORDERED_EDGE_ENABLED = TEZ_RUNTIME_PREFIX +
+      "celeborn.ordered.edge.enabled";
+  public static final boolean TEZ_RUNTIME_CELEBORN_ORDERED_EDGE_ENABLED_DEFAULT = true;
+
   static {
     tezRuntimeKeys.add(TEZ_RUNTIME_IFILE_READAHEAD);
     tezRuntimeKeys.add(TEZ_RUNTIME_IFILE_READAHEAD_BYTES);
@@ -649,6 +654,7 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_HOST_PENALTY_TIME_LIMIT_MS);
     tezRuntimeKeys.add(TEZ_RUNTIME_CELEBORN_FETCH_SPLIT_THRESHOLD);
     tezRuntimeKeys.add(TEZ_RUNTIME_CELEBORN_SHUFFLE_PARALLEL_COPIES);
+    tezRuntimeKeys.add(TEZ_RUNTIME_CELEBORN_ORDERED_EDGE_ENABLED);
 
     // Do not keep defaultConf as a static member because it holds a reference to ClassLoader
     // of the Thread that is active at the time of loading this class. The active Thread usually

@@ -44,7 +44,7 @@ public abstract class AbstractLogicalInput implements LogicalInput, LogicalInput
 
   private final int numPhysicalInputs;
   private final InputContext inputContext;
-  protected final ShuffleClient rssShuffleClient;   // use RSS iff. rssShuffleClient != null
+  protected ShuffleClient rssShuffleClient;   // use RSS iff. rssShuffleClient != null
   // rssShuffleClient.registerShuffleId() is called by its actual user
 
   /**

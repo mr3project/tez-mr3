@@ -36,7 +36,7 @@ public abstract class AbstractLogicalOutput implements LogicalOutput, LogicalOut
 
   private final int numPhysicalOutputs;
   private final OutputContext outputContext;
-  protected final ShuffleClient rssShuffleClient;   // use RSS iff. rssShuffleClient != null
+  protected ShuffleClient rssShuffleClient;   // use RSS iff. rssShuffleClient != null
   // rssShuffleClient.cleanup() is called by its actual user (e.g., UnorderedPartitionedKVWriter)
   // rssShuffleClient.registerShuffleId() is called by its actual user
 
