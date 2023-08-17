@@ -72,7 +72,9 @@ public class RssShuffleUtils {
       }
     }
 
-    assert !(dataLength != -1L) || dataLength == bytesWritten;
+    if (dataLength != -1L && dataLength != bytesWritten) {
+      throw new IOException("shuffleToDisk() mismatch: " + dataLength + " != " + bytesWritten);
+    }
 
     DataOutputStream dos = new DataOutputStream(outputStream);
     WritableUtils.writeVInt(dos, IFile.EOF_MARKER);
@@ -128,10 +130,10 @@ public class RssShuffleUtils {
           ordered ? "Ordered" : "Unordered",
           numFetchers, partitionTotalSize, numIdentifiers);
 
-      if (ordered) {
+      // if (ordered) {
         Collections.sort(inputAttemptIdentifiers,
           Comparator.comparingInt(CompositeInputAttemptIdentifier::getTaskIndex));
-      }
+      // }
 
       int mapIndexStart = 0;
       int mapIndexEnd = -1;
@@ -143,10 +145,11 @@ public class RssShuffleUtils {
         List<CompositeInputAttemptIdentifier> subList = inputAttemptIdentifiers.subList(mapIndexStart, mapIndexEnd);
         long subTotalSize = 0L;
         for (CompositeInputAttemptIdentifier cid: subList) {
-          assert !ordered || (mapIndexStart <= cid.getTaskIndex() && cid.getTaskIndex() < mapIndexEnd);
+          assert (mapIndexStart <= cid.getTaskIndex() && cid.getTaskIndex() < mapIndexEnd);
+          // assert !ordered || (mapIndexStart <= cid.getTaskIndex() && cid.getTaskIndex() < mapIndexEnd);
           subTotalSize += cid.getPartitionSize(partitionId);
           LOG.info("Fetcher batch #{} - taskIndex = {}, size = {}",
-              cid.getTaskIndex(), cid.getPartitionSize(partitionId));
+              i, cid.getTaskIndex(), cid.getPartitionSize(partitionId));
         }
         LOG.info("Fetcher batch #{} --- total partition size = {}", i, subTotalSize);
 
@@ -168,6 +171,10 @@ public class RssShuffleUtils {
         mapIndexStart = mapIndexEnd;
       }
       assert mapIndexEnd == numIdentifiers;
+
+      LOG.info("{} - Finished - Splitting InputAttemptIdentifiers to {} RssFetchers: {} / {}",
+          ordered ? "Ordered" : "Unordered",
+          numFetchers, partitionTotalSize, numIdentifiers);
     } else {
       int mapIndexStart = 0;
       int mapIndexEnd = sourceVertexNumTasks;

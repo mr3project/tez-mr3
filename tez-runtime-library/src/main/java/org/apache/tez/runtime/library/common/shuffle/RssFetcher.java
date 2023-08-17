@@ -93,6 +93,11 @@ public class RssFetcher implements FetcherBase {
       fetchedInput = inputAllocator.allocate(actualSize, actualSize, srcAttemptId);
     }
 
+    if (readPartitionAllOnce) {
+      LOG.info("RssFetcher beginning with readPartitionAllOnce: {}, num={}, partitionId={}, dataLength={}",
+          srcAttemptId, srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().size(), partitionId, dataLength);
+    }
+
     if (fetchedInput.getType() == FetchedInput.Type.MEMORY) {
       setupRssShuffleInputStream(mapIndexStart, mapIndexEnd, srcAttemptId.getAttemptNumber(), partitionId);
       shuffleToMemory((MemoryFetchedInput) fetchedInput);

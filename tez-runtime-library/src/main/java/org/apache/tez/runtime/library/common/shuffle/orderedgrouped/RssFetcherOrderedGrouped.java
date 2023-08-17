@@ -225,6 +225,13 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
         }
         totalReceivedBytes += dataLength;
 
+        if (currentPartitionSize != Long.BYTES + dataLength) {
+          String message = String.format("Ordered - RssFetcher for %d received only %d bytes. Expected size: %d",
+             currentMapIndex, Long.BYTES + dataLength, currentPartitionSize);
+          LOG.error(message);
+          throw new IOException(message);
+        }
+
         long copyDuration = System.currentTimeMillis() - startTime;
         shuffleScheduler.copySucceeded(inputAttemptId, null, dataLength, dataLength, copyDuration,
             mapOutput, false);
