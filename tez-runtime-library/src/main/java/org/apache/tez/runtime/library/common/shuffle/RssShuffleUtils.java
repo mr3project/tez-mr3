@@ -112,6 +112,9 @@ public class RssShuffleUtils {
     int numIdentifiers = inputAttemptIdentifiers.size();
     assert numIdentifiers == sourceVertexNumTasks;
 
+    assert partitionTotalSize == inputAttemptIdentifiers.stream()
+        .map(x -> x.getPartitionSize(partitionId)).mapToLong(Long::longValue).sum();
+
     if (partitionTotalSize > rssFetchSplitThresholdSize) {
       // a single call to RSS would create a file larger than thresholdSize
       int numFetchers =
@@ -142,7 +145,10 @@ public class RssShuffleUtils {
         for (CompositeInputAttemptIdentifier cid: subList) {
           assert !ordered || (mapIndexStart <= cid.getTaskIndex() && cid.getTaskIndex() < mapIndexEnd);
           subTotalSize += cid.getPartitionSize(partitionId);
+          LOG.info("Fetcher batch #{} - taskIndex = {}, size = {}",
+              cid.getTaskIndex(), cid.getPartitionSize(partitionId));
         }
+        LOG.info("Fetcher batch #{} --- total partition size = {}", i, subTotalSize);
 
         // optimize partitionSizes[] because only partitionId is used and other fields are never used
         long[] partitionSizes = new long[1];
