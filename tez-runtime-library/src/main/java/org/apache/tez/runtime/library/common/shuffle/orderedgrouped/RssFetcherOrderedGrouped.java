@@ -170,7 +170,8 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
 
   private void fetchMultipleBlocks() throws IOException {
     int numBlocks = mapIndexEnd - mapIndexStart;
-    LOG.info("Ordered - RssFetcher starts fetching {} concatenated blocks from RSS.", numBlocks);
+    LOG.info("Ordered - RssFetcher starts fetching {} concatenated blocks from RSS: {} to {}, total block length={}",
+        numBlocks, mapIndexStart, mapIndexEnd, blockLength);
 
     setupRssShuffleInputStream(mapIndexStart, mapIndexEnd, srcAttemptId.getAttemptNumber(), partitionId);
 
@@ -186,8 +187,13 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
         numFetchedBlocks++;
 
         long startTime = System.currentTimeMillis();
-        InputAttemptIdentifier inputAttemptId =
+        CompositeInputAttemptIdentifier inputAttemptId =
             srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().get(index);
+        int currentMapIndex = inputAttemptId.getTaskIndex();
+        long currentPartitionSize = inputAttemptId.getPartitionSize(partitionId);
+        assert mapIndexStart <= currentMapIndex && currentMapIndex < mapIndexEnd;
+        LOG.info("Ordered - RssFetcher is reading (total={}): index={}, mapIndex={}, {}, partitionSize={}",
+            totalReceivedBytes, index, currentMapIndex, currentPartitionSize);
 
         long dataLength = getLengthFromHeader(rssShuffleInputStream);
         totalReceivedBytes += Long.BYTES;

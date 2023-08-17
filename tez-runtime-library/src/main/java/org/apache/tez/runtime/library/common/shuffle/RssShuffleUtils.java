@@ -140,6 +140,7 @@ public class RssShuffleUtils {
         List<CompositeInputAttemptIdentifier> subList = inputAttemptIdentifiers.subList(mapIndexStart, mapIndexEnd);
         long subTotalSize = 0L;
         for (CompositeInputAttemptIdentifier cid: subList) {
+          assert mapIndexStart <= cid.getTaskIndex() && cid.getTaskIndex() < mapIndexEnd;
           subTotalSize += cid.getPartitionSize(partitionId);
         }
 
