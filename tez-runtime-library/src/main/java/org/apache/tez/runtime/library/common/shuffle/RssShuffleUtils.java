@@ -31,6 +31,8 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 public class RssShuffleUtils {
@@ -122,6 +124,11 @@ public class RssShuffleUtils {
       LOG.info("{} - Splitting InputAttemptIdentifiers to {} RssFetchers: {} / {}",
           ordered ? "Ordered" : "Unordered",
           numFetchers, partitionTotalSize, numIdentifiers);
+
+      if (ordered) {
+        Collections.sort(inputAttemptIdentifiers,
+          Comparator.comparingInt(CompositeInputAttemptIdentifier::getTaskIndex));
+      }
 
       int mapIndexStart = 0;
       int mapIndexEnd = -1;
