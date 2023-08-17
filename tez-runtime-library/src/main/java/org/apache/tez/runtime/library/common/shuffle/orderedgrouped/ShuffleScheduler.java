@@ -600,7 +600,6 @@ class ShuffleScheduler {
         failedShufflesSinceLastCompletion = 0;
       }
       if (output != null) {
-
         failureCounts.remove(srcAttemptIdentifier);
         if (host != null) {
           hostFailures.remove(new HostPort(host.getHost(), host.getPort()));
