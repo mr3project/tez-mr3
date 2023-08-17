@@ -28,6 +28,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -57,19 +58,18 @@ public class RssShuffleUtils {
   public static long shuffleToDisk(InputStream inputStream, OutputStream outputStream,
       long dataLength) throws IOException {
     byte[] buffer = new byte[ShuffleUtils.BUFFER_SIZE];
-    boolean reachEOF = false;
+    long remaining = dataLength;
     long bytesWritten = 0L;
-    while (!reachEOF) {
-      int curBytesRead = inputStream.read(buffer, 0, ShuffleUtils.BUFFER_SIZE);
+    while (remaining > 0) {
+      int curBytesRead = inputStream.read(buffer, 0, (int) Math.min(remaining, ShuffleUtils.BUFFER_SIZE));
 
-      if (curBytesRead <= 0) {
-        reachEOF = true;
-      } else {
-        reachEOF = curBytesRead < ShuffleUtils.BUFFER_SIZE;
-
-        outputStream.write(buffer, 0, curBytesRead);
-        bytesWritten += curBytesRead;
+      if (curBytesRead < 0) {
+        throw new EOFException("Expected size: " + dataLength + ", Received size: " + bytesWritten);
       }
+
+      outputStream.write(buffer, 0, curBytesRead);
+      bytesWritten += curBytesRead;
+      remaining -= curBytesRead;
     }
 
     assert !(dataLength != -1L) || dataLength == bytesWritten;
