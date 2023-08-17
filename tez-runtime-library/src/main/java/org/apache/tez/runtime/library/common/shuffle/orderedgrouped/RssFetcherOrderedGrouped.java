@@ -144,7 +144,7 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
       long dataLength = getLengthFromHeader(rssShuffleInputStream);
       if (dataLength + Long.BYTES != blockLength) {
         String message =
-            "The length of block come from DME and InputStream do not match. " +
+            "The length of blocks coming from DME and InputStream does not match. " +
             String.format("DME: %d, InputStream: %d", blockLength, dataLength + Long.BYTES);
         LOG.error(message);
         throw new IOException(message);

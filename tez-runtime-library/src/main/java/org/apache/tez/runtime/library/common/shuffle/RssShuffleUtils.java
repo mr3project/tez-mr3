@@ -31,6 +31,8 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 public class RssShuffleUtils {
@@ -81,7 +83,7 @@ public class RssShuffleUtils {
   }
 
   public static boolean checkUseSameAttemptNumber(CompositeInputAttemptIdentifier inputAttemptIdentifier) {
-    List<InputAttemptIdentifier> childInputAttemptIdentifiers = inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce();
+    List<CompositeInputAttemptIdentifier> childInputAttemptIdentifiers = inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce();
     int attemptNumber = childInputAttemptIdentifiers.get(0).getAttemptNumber();
     boolean useSameAttemptNumber = true;
     for (InputAttemptIdentifier input: childInputAttemptIdentifiers) {
@@ -105,7 +107,7 @@ public class RssShuffleUtils {
       int sourceVertexNumTasks, long rssFetchSplitThresholdSize,
       FetcherCreate createFn, boolean ordered) {
     long partitionTotalSize = inputAttemptIdentifier.getPartitionSize(partitionId);
-    List<InputAttemptIdentifier> inputAttemptIdentifiers =
+    List<CompositeInputAttemptIdentifier> inputAttemptIdentifiers =
         inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce();
     int numIdentifiers = inputAttemptIdentifiers.size();
     assert numIdentifiers == sourceVertexNumTasks;
@@ -123,6 +125,11 @@ public class RssShuffleUtils {
           ordered ? "Ordered" : "Unordered",
           numFetchers, partitionTotalSize, numIdentifiers);
 
+      if (ordered) {
+        Collections.sort(inputAttemptIdentifiers,
+          Comparator.comparingInt(CompositeInputAttemptIdentifier::getTaskIndex));
+      }
+
       int mapIndexStart = 0;
       int mapIndexEnd = -1;
       for (int i = 0; i < numFetchers; i++) {
@@ -130,10 +137,9 @@ public class RssShuffleUtils {
         int numIdentifiersToConsume = numIdentifiersPerFetcher + numExtra;
         mapIndexEnd = mapIndexStart + numIdentifiersToConsume;
 
-        List<InputAttemptIdentifier> subList = inputAttemptIdentifiers.subList(mapIndexStart, mapIndexEnd);
+        List<CompositeInputAttemptIdentifier> subList = inputAttemptIdentifiers.subList(mapIndexStart, mapIndexEnd);
         long subTotalSize = 0L;
-        for (InputAttemptIdentifier input: subList) {
-          CompositeInputAttemptIdentifier cid = (CompositeInputAttemptIdentifier)input;
+        for (CompositeInputAttemptIdentifier cid: subList) {
           subTotalSize += cid.getPartitionSize(partitionId);
         }
 

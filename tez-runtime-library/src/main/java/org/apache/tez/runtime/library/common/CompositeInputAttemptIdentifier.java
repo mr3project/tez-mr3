@@ -38,10 +38,10 @@ public class CompositeInputAttemptIdentifier extends InputAttemptIdentifier {
   private final long[] partitionSizes;
   private final int taskIndex;
 
-  // only for readPartitionAllOnce, size == srcVertexNumTasks
+  // only for readPartitionAllOnce
   // InputAttemptIdentifiers in childInputIdentifiers[] are combined and replaced with
   // this CompositeInputAttemptIdentifier.
-  private List<InputAttemptIdentifier> childInputIdentifiers;
+  private List<CompositeInputAttemptIdentifier> childInputIdentifiers;
 
   // Invariant for partitionSizes[], taskIndex, childInputIdentifiers[]
   // 1. taskIndex >= 0:
@@ -99,11 +99,11 @@ public class CompositeInputAttemptIdentifier extends InputAttemptIdentifier {
     return taskIndex;
   }
 
-  public void setInputIdentifiersForReadPartitionAllOnce(List<InputAttemptIdentifier> inputIdentifiers) {
+  public void setInputIdentifiersForReadPartitionAllOnce(List<CompositeInputAttemptIdentifier> inputIdentifiers) {
     this.childInputIdentifiers = inputIdentifiers;
   }
 
-  public List<InputAttemptIdentifier> getInputIdentifiersForReadPartitionAllOnce() {
+  public List<CompositeInputAttemptIdentifier> getInputIdentifiersForReadPartitionAllOnce() {
     return childInputIdentifiers;
   }
 

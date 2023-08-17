@@ -97,7 +97,7 @@ class MapHost {
 
   private final boolean readPartitionAllOnce;
   private final int srcVertexNumTasks;
-  private final List<InputAttemptIdentifier> tempMaps;
+  private final List<CompositeInputAttemptIdentifier> tempMaps;
 
   public MapHost(String host, int port, int partitionId, int partitionCount,
       boolean readPartitionAllOnce, int srcVertexNumTasks) {
@@ -110,7 +110,7 @@ class MapHost {
     this.srcVertexNumTasks = srcVertexNumTasks;
     if (readPartitionAllOnce) {
       assert partitionCount == 1;
-      tempMaps = new ArrayList<InputAttemptIdentifier>();
+      tempMaps = new ArrayList<CompositeInputAttemptIdentifier>();
     } else {
       tempMaps = null;
     }
@@ -142,7 +142,7 @@ class MapHost {
 
   public synchronized void addKnownMap(InputAttemptIdentifier srcAttempt) {
     if (readPartitionAllOnce) {   // for InputSpec, readPartitionAllOnce == true implies useRssShuffle == true
-      tempMaps.add(srcAttempt);
+      tempMaps.add((CompositeInputAttemptIdentifier) srcAttempt);
     } else {  // either we do not use RSS or we have readPartitionAllOnce == false
       maps.add(srcAttempt);
     }
