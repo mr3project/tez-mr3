@@ -83,7 +83,7 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
     this.mapIndexEnd = mapIndexEnd;
     this.readPartitionAllOnce = readPartitionAllOnce;
 
-    assert blockLength > 0;  // TODO: support DME with partitionSizes == null.
+    assert blockLength >= 0;
     assert !readPartitionAllOnce || srcAttemptId.getInputIdentifiersForReadPartitionAllOnce() != null;
     assert !readPartitionAllOnce ||
         srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().size() == mapIndexEnd - mapIndexStart;
@@ -132,6 +132,11 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
   }
 
   private void fetchSingleBlock() throws IOException {
+    if (blockLength == 0) {
+      shuffleScheduler.copySucceeded(srcAttemptId, null, blockLength, blockLength, 0L, null,
+          false);
+      return;
+    }
     long actualSize = blockLength + RssShuffleUtils.EOF_MARKERS_SIZE - Long.BYTES;
     MapOutput mapOutput = allocator.reserve(srcAttemptId, actualSize, actualSize, fetcherId, true);
     assert mapOutput.getType() != MapOutput.Type.WAIT;
@@ -173,6 +178,13 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
     LOG.info("Ordered - RssFetcher starts fetching {} concatenated blocks from RSS: {} to {}, total block length={}",
         numBlocks, mapIndexStart, mapIndexEnd, blockLength);
 
+    if (blockLength == 0) {
+      for (InputAttemptIdentifier inputAttemptId : srcAttemptId.getInputIdentifiersForReadPartitionAllOnce()) {
+          shuffleScheduler.copySucceeded(inputAttemptId, null, 0L, 0L, 0, null, false);
+      }
+      return;
+    }
+
     setupRssShuffleInputStream(mapIndexStart, mapIndexEnd, srcAttemptId.getAttemptNumber(), partitionId);
 
     long totalReceivedBytes = 0L;
@@ -187,12 +199,13 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
         numFetchedBlocks++;
 
         long startTime = System.currentTimeMillis();
+
         CompositeInputAttemptIdentifier inputAttemptId =
             srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().get(index);
         int currentMapIndex = inputAttemptId.getTaskIndex();
         long currentPartitionSize = inputAttemptId.getPartitionSize(partitionId);
         assert mapIndexStart <= currentMapIndex && currentMapIndex < mapIndexEnd;
-        LOG.info("Ordered - RssFetcher is reading (total={}): index={}, mapIndex={}, {}, partitionSize={}",
+        LOG.info("Ordered - RssFetcher is reading (totalReceivedBytes={}): index={}, mapIndex={}, partitionSize={}",
             totalReceivedBytes, index, currentMapIndex, currentPartitionSize);
 
         long dataLength = getLengthFromHeader(rssShuffleInputStream);
