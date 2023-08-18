@@ -152,9 +152,11 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
         dmEvent.getTargetIndex(), 1, dmEvent.getVersion(), shufflePayload);
 
     if (rssShuffleClient != null && dmEvent.getVersion() != 0) {
-      LOG.info("Ordered - processDataMovementEvent with non-zero attemptNumber: taskIndex_attemptNumber={}_{}, dataLength={}",
+      LOG.info("Ordered - processDataMovementEvent with non-zero attemptNumber: taskIndex_attemptNumber={}_{}_{}, dataLength={}",
           srcAttemptIdentifier.getTaskIndex(),
-          srcAttemptIdentifier.getAttemptNumber(), srcAttemptIdentifier.getPartitionSize(partitionId));
+          srcAttemptIdentifier.getAttemptNumber(),
+          partitionId,
+          srcAttemptIdentifier.getPartitionSize(partitionId));
     }
 
     if (LOG.isDebugEnabled()) {

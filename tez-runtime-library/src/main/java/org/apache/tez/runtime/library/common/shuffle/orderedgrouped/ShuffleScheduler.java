@@ -1546,8 +1546,9 @@ class ShuffleScheduler {
         for (CompositeInputAttemptIdentifier cinput: childInputAttemptIdentifiers) {
           assert cinput.getTaskIndex() != -1;
           if (cinput.getAttemptNumber() != 0) {
-             LOG.info("Ordered - revert with non-zero attemptNumber: taskIndex_attemptNumber={}_{}, dataLength={}",
-                cinput.getTaskIndex(), cinput.getAttemptNumber(), cinput.getPartitionSize(partitionId));
+             LOG.info("Ordered - revert with non-zero attemptNumber: taskIndex_attemptNumber={}_{}_{}, dataLength={}",
+                cinput.getTaskIndex(), cinput.getAttemptNumber(), partitionId,
+                cinput.getPartitionSize(partitionId));
           }
           RssFetcherOrderedGrouped rssFetcher = createRssFetcherForIndividualInput(
               cinput, partitionId, mapHost, cinput.getTaskIndex());
