@@ -303,6 +303,14 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
       payloadBuilder.setEmptyPartitions(emptyPartitionByteString);
     }
 
+    if (getContext().getTaskAttemptNumber() > 0) {
+      for (int i = 0; i < numPartitions; i++) {
+        LOG.info("Ordered output partitionSizes[] - taskIndex_attemptNumber={}_{} = {}",
+            getContext().getTaskIndex(),
+            getContext().getTaskAttemptNumber(), partitionStats[i]);
+      }
+    }
+
     if (exceedsIntegerRange) {
       for (int i = 0; i < numPartitions; i++) {
         payloadBuilder.addPartitionSizesLong(partitionStats[i]);

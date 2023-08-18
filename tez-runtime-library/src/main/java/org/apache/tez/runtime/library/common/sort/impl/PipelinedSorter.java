@@ -912,7 +912,11 @@ public class PipelinedSorter extends ExternalSorter {
       LOG.debug("Write an index file for merged shuffle data");
       spillRec.writeToFile(finalIndexFile, conf, localFs);
     } else {
-      LOG.debug("Start pushing data to Shuffle Server");
+      LOG.info("Start pushing data to Shuffle Server: from {} to {}, taskIndex_attemptNumber={}_{}",
+          outputContext.getTaskVertexName(),
+          outputContext.getDestinationVertexName(),
+          outputContext.getTaskIndex(),
+          outputContext.getTaskAttemptNumber());
 
       // In order to avoid reading final file immediately after writing it,
       // create a piped stream, pass OS to IFile.writer, and use IS instead of finalMergedInputStream here.
@@ -944,6 +948,12 @@ public class PipelinedSorter extends ExternalSorter {
           lengthBuffer.clear();
 
           IOUtils.readFully(finalMergedInputStream, buffer, Long.BYTES, partitionSize);
+
+          if (outputContext.getTaskAttemptNumber() > 0) {
+          LOG.info("Ordered output pushData() - taskIndex_attemptNumber={}_{} = {} or {}",
+              outputContext.getTaskIndex(),
+              outputContext.getTaskAttemptNumber(), partitionSize, partitionSize + Long.BYTES);
+          }
 
           rssShuffleClient.pushData(
               outputContext.shuffleId(),
