@@ -66,8 +66,6 @@ public class RssFetcher implements FetcherBase {
       CompositeInputAttemptIdentifier srcAttemptId,
       long dataLength, int mapIndexStart, int mapIndexEnd,
       boolean readPartitionAllOnce) {
-    assert (dataLength == -1 || dataLength > 0);
-
     this.fetcherCallback = fetcherCallback;
     this.inputAllocator = inputAllocator;
     this.rssShuffleClient = rssShuffleClient;
@@ -80,12 +78,15 @@ public class RssFetcher implements FetcherBase {
     this.mapIndexStart = mapIndexStart;
     this.mapIndexEnd = mapIndexEnd;
     this.readPartitionAllOnce = readPartitionAllOnce;
+
+    assert dataLength >= 0;
   }
 
   public FetchResult call() throws Exception {
     long startTime = System.currentTimeMillis();
 
     FetchedInput fetchedInput;
+    // TODO: remove dataLengthUnknown()
     if (dataLengthUnknown()) {
       LOG.warn("RssFetcher dataLength unknown: {}, {}, {}", mapIndexStart, mapIndexEnd,  readPartitionAllOnce);
       fetchedInput = inputAllocator.allocateType(FetchedInput.Type.DISK, dataLength, dataLength, srcAttemptId);
@@ -179,6 +180,7 @@ public class RssFetcher implements FetcherBase {
     try (OutputStream diskOutputStream = fetchedInput.getOutputStream()) {
       long bytesWritten = RssShuffleUtils.shuffleToDisk(rssShuffleInputStream, diskOutputStream, dataLength);
 
+      // TODO: remove dataLengthUnknown()
       if (dataLengthUnknown()) {
         fetchedInput.setSize(bytesWritten);
       }
@@ -193,6 +195,7 @@ public class RssFetcher implements FetcherBase {
   }
 
   private boolean dataLengthUnknown() {
+    assert false;
     return dataLength == -1;
   }
 }

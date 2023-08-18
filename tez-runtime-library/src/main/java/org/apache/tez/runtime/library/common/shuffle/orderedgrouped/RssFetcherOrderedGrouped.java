@@ -132,11 +132,17 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
   }
 
   private void fetchSingleBlock() throws IOException {
+    if (srcAttemptId.getAttemptNumber() != 0) {
+      LOG.info("Ordered - fetchSingleBlock with non-zero attemptNumber: taskIndex_attemptNumber={}_{}, dataLength={}",
+          srcAttemptId.getTaskIndex(), srcAttemptId.getAttemptNumber(), srcAttemptId.getPartitionSize(partitionId));
+    }
+
     if (blockLength == 0) {
       shuffleScheduler.copySucceeded(srcAttemptId, null, blockLength, blockLength, 0L, null,
           false);
       return;
     }
+
     long actualSize = blockLength + RssShuffleUtils.EOF_MARKERS_SIZE - Long.BYTES;
     MapOutput mapOutput = allocator.reserve(srcAttemptId, actualSize, actualSize, fetcherId, true);
     assert mapOutput.getType() != MapOutput.Type.WAIT;

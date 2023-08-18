@@ -148,7 +148,14 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
 
   private void processDataMovementEvent(DataMovementEvent dmEvent, DataMovementEventPayloadProto shufflePayload, BitSet emptyPartitionsBitSet) throws IOException {
     int partitionId = dmEvent.getSourceIndex();
-    CompositeInputAttemptIdentifier srcAttemptIdentifier = constructInputAttemptIdentifier(dmEvent.getTargetIndex(), 1, dmEvent.getVersion(), shufflePayload);
+    CompositeInputAttemptIdentifier srcAttemptIdentifier = constructInputAttemptIdentifier(
+        dmEvent.getTargetIndex(), 1, dmEvent.getVersion(), shufflePayload);
+
+    if (rssShuffleClient != null && dmEvent.getVersion() != 0) {
+      LOG.info("Ordered - processDataMovementEvent with non-zero attemptNumber: taskIndex_attemptNumber={}_{}, dataLength={}",
+          srcAttemptIdentifier.getTaskIndex(),
+          srcAttemptIdentifier.getAttemptNumber(), srcAttemptIdentifier.getPartitionSize(partitionId));
+    }
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("DME srcIdx: " + partitionId + ", targetIdx: " + dmEvent.getTargetIndex()
