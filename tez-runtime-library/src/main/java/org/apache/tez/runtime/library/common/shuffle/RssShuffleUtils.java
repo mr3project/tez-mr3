@@ -137,6 +137,7 @@ public class RssShuffleUtils {
           ordered ? "Ordered" : "Unordered",
           numFetchers, partitionTotalSize, numIdentifiers,
           mapIndexStart, inputAttemptIdentifiers.get(numIdentifiers - 1).getTaskIndex());
+      assert mapIndexStart + numIdentifiers - 1 == inputAttemptIdentifiers.get(numIdentifiers - 1).getTaskIndex();
 
       for (int i = 0; i < numFetchers; i++) {
         int numExtra = i < numLargeFetchers ? 1 : 0;
@@ -171,7 +172,7 @@ public class RssShuffleUtils {
         createFn.operate(mergedCid, subTotalSize, mapIndexStart, mapIndexEnd);
         mapIndexStart = mapIndexEnd;
       }
-      assert mapIndexEnd == mapIndexStart + numIdentifiers;
+      assert mapIndexEnd == inputAttemptIdentifiers.get(0).getTaskIndex() + numIdentifiers;
 
       LOG.info("{} - Finished - Splitting InputAttemptIdentifiers to {} RssFetchers: {} / {}",
           ordered ? "Ordered" : "Unordered",
