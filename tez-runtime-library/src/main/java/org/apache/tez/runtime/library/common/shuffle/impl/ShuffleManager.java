@@ -646,6 +646,7 @@ public class ShuffleManager implements FetcherCallback {
     for (Map.Entry<Integer, List<CompositeInputAttemptIdentifier>> entry : groupedByAttemptNumber.entrySet()) {
       int attemptNumber = entry.getKey();
       List<CompositeInputAttemptIdentifier> inputAttemptIdentifiers = entry.getValue();
+      LOG.info("Processing attemptNumber={}, size={}", attemptNumber, inputAttemptIdentifiers.size());
 
       Collections.sort(inputAttemptIdentifiers,
           Comparator.comparingInt(CompositeInputAttemptIdentifier::getTaskIndex));
@@ -673,8 +674,8 @@ public class ShuffleManager implements FetcherCallback {
         // consume the pair of (inputs[], attemptNumber)
         int mapIndexStart = inputs.get(0).getTaskIndex();
         int mapIndexEnd = inputs.get(inputs.size() - 1).getTaskIndex() + 1;
+        LOG.info("Create RssFetcher for attemptNumber={}: from {} to {}", attemptNumber, mapIndexStart, mapIndexEnd);
         assert mapIndexStart < mapIndexEnd;
-        LOG.info("Create RssFetcher for attemptNumber{}: from {} to {}", attemptNumber, mapIndexStart, mapIndexEnd);
 
         if (mapIndexStart + 1 == mapIndexEnd) {
           RssFetcher rssFetcher = createRssFetcherForIndividualInput(

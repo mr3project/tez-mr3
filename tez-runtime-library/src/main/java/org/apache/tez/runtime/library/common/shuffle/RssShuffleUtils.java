@@ -88,8 +88,10 @@ public class RssShuffleUtils {
     List<CompositeInputAttemptIdentifier> childInputAttemptIdentifiers = inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce();
     int attemptNumber = childInputAttemptIdentifiers.get(0).getAttemptNumber();
     boolean useSameAttemptNumber = true;
-    for (InputAttemptIdentifier input: childInputAttemptIdentifiers) {
+    for (CompositeInputAttemptIdentifier input: childInputAttemptIdentifiers) {
       if (input.getAttemptNumber() != attemptNumber) {
+        LOG.error("Different attemptNumber found: {}, {}, {}",
+            input.getAttemptNumber(), attemptNumber, input.getTaskIndex());
         useSameAttemptNumber = false;
         break;
       }
@@ -113,7 +115,6 @@ public class RssShuffleUtils {
         inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce();
     int numIdentifiers = inputAttemptIdentifiers.size();
     assert numIdentifiers == sourceVertexNumTasks;
-
     assert partitionTotalSize == inputAttemptIdentifiers.stream()
         .map(x -> x.getPartitionSize(partitionId)).mapToLong(Long::longValue).sum();
 
@@ -126,17 +127,17 @@ public class RssShuffleUtils {
       assert numIdentifiers == numLargeFetchers * (numIdentifiersPerFetcher + 1) +
           (numFetchers - numLargeFetchers) * numIdentifiersPerFetcher;
 
-      LOG.info("{} - Splitting InputAttemptIdentifiers to {} RssFetchers: {} / {}",
-          ordered ? "Ordered" : "Unordered",
-          numFetchers, partitionTotalSize, numIdentifiers);
-
-      // if (ordered) {
-        Collections.sort(inputAttemptIdentifiers,
+      Collections.sort(inputAttemptIdentifiers,
           Comparator.comparingInt(CompositeInputAttemptIdentifier::getTaskIndex));
-      // }
 
-      int mapIndexStart = 0;
+      int mapIndexStart = inputAttemptIdentifiers.get(0).getTaskIndex();
       int mapIndexEnd = -1;
+
+      LOG.info("{} - Splitting InputAttemptIdentifiers to {} RssFetchers: {} / {}, from {} to {}",
+          ordered ? "Ordered" : "Unordered",
+          numFetchers, partitionTotalSize, numIdentifiers,
+          mapIndexStart, inputAttemptIdentifiers.get(numIdentifiers - 1).getTaskIndex());
+
       for (int i = 0; i < numFetchers; i++) {
         int numExtra = i < numLargeFetchers ? 1 : 0;
         int numIdentifiersToConsume = numIdentifiersPerFetcher + numExtra;
@@ -145,10 +146,10 @@ public class RssShuffleUtils {
         List<CompositeInputAttemptIdentifier> subList = inputAttemptIdentifiers.subList(mapIndexStart, mapIndexEnd);
         long subTotalSize = 0L;
         for (CompositeInputAttemptIdentifier cid: subList) {
-          assert (mapIndexStart <= cid.getTaskIndex() && cid.getTaskIndex() < mapIndexEnd);
-          // assert !ordered || (mapIndexStart <= cid.getTaskIndex() && cid.getTaskIndex() < mapIndexEnd);
+          assert (mapIndexStart <= cid.getTaskIndex() && cid.getTaskIndex() < mapIndexEnd) :
+              "mapIndexStart=" + mapIndexStart + ", taskIndex=" + cid.getTaskIndex() + ", mapIndexEnd=" + mapIndexEnd;
           subTotalSize += cid.getPartitionSize(partitionId);
-          LOG.info("Fetcher batch #{} - taskIndex = {}, size = {}",
+          LOG.info("Fetcher batch #{} - taskIndex = {}, size = {}",   // TODO: remove
               i, cid.getTaskIndex(), cid.getPartitionSize(partitionId));
         }
         LOG.info("Fetcher batch #{} --- total partition size = {}", i, subTotalSize);
@@ -170,7 +171,7 @@ public class RssShuffleUtils {
         createFn.operate(mergedCid, subTotalSize, mapIndexStart, mapIndexEnd);
         mapIndexStart = mapIndexEnd;
       }
-      assert mapIndexEnd == numIdentifiers;
+      assert mapIndexEnd == mapIndexStart + numIdentifiers;
 
       LOG.info("{} - Finished - Splitting InputAttemptIdentifiers to {} RssFetchers: {} / {}",
           ordered ? "Ordered" : "Unordered",
@@ -179,6 +180,9 @@ public class RssShuffleUtils {
       int mapIndexStart = 0;
       int mapIndexEnd = sourceVertexNumTasks;
       createFn.operate(inputAttemptIdentifier, partitionTotalSize, mapIndexStart, mapIndexEnd);
+      LOG.info("{} - Finished - Creating a single RssFetcher: {} / {}",
+          ordered ? "Ordered" : "Unordered",
+          partitionTotalSize, numIdentifiers);
     }
   }
 }
