@@ -85,6 +85,8 @@ public class RssFetcher implements FetcherBase {
   public FetchResult call() throws Exception {
     long startTime = System.currentTimeMillis();
 
+    // do not optimize for dataLength==0 because we have to use fetchedInput when calling fetchSucceeded()
+
     FetchedInput fetchedInput;
     // TODO: remove dataLengthUnknown()
     if (dataLengthUnknown()) {
