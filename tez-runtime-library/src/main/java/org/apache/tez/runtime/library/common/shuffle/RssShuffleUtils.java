@@ -55,6 +55,9 @@ public class RssShuffleUtils {
     System.arraycopy(eofMarker, 0, buffer, (int) dataLength, EOF_MARKERS_SIZE);
   }
 
+  // shuffleToDisk() reads precisely dataLength bytes from inputStream and does not inspect the remaining data.
+  // inputStream may have more than dataLength bytes because in the case of ordered edges,
+  // we may have subsequent calls to shuffleToDisk() from RssFetcherOrderedGrouped.fetchMultipleBlocks().
   public static long shuffleToDisk(InputStream inputStream, OutputStream outputStream,
       long dataLength) throws IOException {
     byte[] buffer = new byte[ShuffleUtils.BUFFER_SIZE];
