@@ -305,9 +305,9 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
 
     if (getContext().getTaskAttemptNumber() > 0) {
       for (int i = 0; i < numPartitions; i++) {
-        LOG.info("Ordered output partitionSizes[] - taskIndex_attemptNumber={}_{} = {}",
+        LOG.info("Ordered output partitionSizes[] - taskIndex_attemptNumber={}_{}_{} = {}",
             getContext().getTaskIndex(),
-            getContext().getTaskAttemptNumber(), partitionStats[i]);
+            getContext().getTaskAttemptNumber(), i, partitionStats[i]);
       }
     }
 
