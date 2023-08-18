@@ -87,6 +87,7 @@ public class RssFetcher implements FetcherBase {
 
     FetchedInput fetchedInput;
     if (dataLengthUnknown()) {
+      LOG.warn("RssFetcher dataLength unknown: {}, {}, {}", mapIndexStart, mapIndexEnd,  readPartitionAllOnce);
       fetchedInput = inputAllocator.allocateType(FetchedInput.Type.DISK, dataLength, dataLength, srcAttemptId);
     } else {
       long actualSize = dataLength + RssShuffleUtils.EOF_MARKERS_SIZE;
@@ -94,8 +95,9 @@ public class RssFetcher implements FetcherBase {
     }
 
     if (readPartitionAllOnce) {
-      LOG.info("RssFetcher beginning with readPartitionAllOnce: {}, num={}, partitionId={}, dataLength={}",
-          srcAttemptId, srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().size(), partitionId, dataLength);
+      LOG.info("RssFetcher beginning with readPartitionAllOnce: {}, num={}, partitionId={}, dataLength={}, from={}, to={}",
+          srcAttemptId, srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().size(), partitionId, dataLength,
+          mapIndexStart, mapIndexEnd);
     }
 
     if (fetchedInput.getType() == FetchedInput.Type.MEMORY) {

@@ -118,6 +118,12 @@ public class RssShuffleUtils {
     assert partitionTotalSize == inputAttemptIdentifiers.stream()
         .map(x -> x.getPartitionSize(partitionId)).mapToLong(Long::longValue).sum();
 
+    Collections.sort(inputAttemptIdentifiers,
+        Comparator.comparingInt(CompositeInputAttemptIdentifier::getTaskIndex));
+    int mapIndexOrigin = inputAttemptIdentifiers.get(0).getTaskIndex();
+    int mapIndexLast = mapIndexOrigin + numIdentifiers;
+    assert mapIndexLast == inputAttemptIdentifiers.get(numIdentifiers - 1).getTaskIndex() + 1;
+
     if (partitionTotalSize > rssFetchSplitThresholdSize) {
       // a single call to RSS would create a file larger than thresholdSize
       int numFetchers =
@@ -127,10 +133,6 @@ public class RssShuffleUtils {
       assert numIdentifiers == numLargeFetchers * (numIdentifiersPerFetcher + 1) +
           (numFetchers - numLargeFetchers) * numIdentifiersPerFetcher;
 
-      Collections.sort(inputAttemptIdentifiers,
-          Comparator.comparingInt(CompositeInputAttemptIdentifier::getTaskIndex));
-
-      int mapIndexOrigin = inputAttemptIdentifiers.get(0).getTaskIndex();
       int mapIndexStart = mapIndexOrigin;
       int mapIndexEnd = -1;
 
@@ -174,18 +176,16 @@ public class RssShuffleUtils {
         createFn.operate(mergedCid, subTotalSize, mapIndexStart, mapIndexEnd);
         mapIndexStart = mapIndexEnd;
       }
-      assert mapIndexEnd == inputAttemptIdentifiers.get(0).getTaskIndex() + numIdentifiers;
+      assert mapIndexEnd == mapIndexLast;
 
       LOG.info("{} - Finished - Splitting InputAttemptIdentifiers to {} RssFetchers: {} / {}",
           ordered ? "Ordered" : "Unordered",
           numFetchers, partitionTotalSize, numIdentifiers);
     } else {
-      int mapIndexStart = 0;
-      int mapIndexEnd = sourceVertexNumTasks;
-      createFn.operate(inputAttemptIdentifier, partitionTotalSize, mapIndexStart, mapIndexEnd);
-      LOG.info("{} - Finished - Creating a single RssFetcher: {} / {}",
+      createFn.operate(inputAttemptIdentifier, partitionTotalSize, mapIndexOrigin, mapIndexLast);
+      LOG.info("{} - Finished - Creating a single RssFetcher: {} / {}, from {} to {}",
           ordered ? "Ordered" : "Unordered",
-          partitionTotalSize, numIdentifiers);
+          partitionTotalSize, numIdentifiers, mapIndexOrigin, mapIndexLast);
     }
   }
 }
