@@ -88,14 +88,8 @@ public class RssFetcher implements FetcherBase {
     // do not optimize for dataLength==0 because we have to use fetchedInput when calling fetchSucceeded()
 
     FetchedInput fetchedInput;
-    // TODO: remove dataLengthUnknown()
-    if (dataLengthUnknown()) {
-      LOG.warn("RssFetcher dataLength unknown: {}, {}, {}", mapIndexStart, mapIndexEnd,  readPartitionAllOnce);
-      fetchedInput = inputAllocator.allocateType(FetchedInput.Type.DISK, dataLength, dataLength, srcAttemptId);
-    } else {
-      long actualSize = dataLength + RssShuffleUtils.EOF_MARKERS_SIZE;
-      fetchedInput = inputAllocator.allocate(actualSize, actualSize, srcAttemptId);
-    }
+    long actualSize = dataLength + RssShuffleUtils.EOF_MARKERS_SIZE;
+    fetchedInput = inputAllocator.allocate(actualSize, actualSize, srcAttemptId);
 
     if (readPartitionAllOnce) {
       LOG.info("RssFetcher beginning with readPartitionAllOnce: {}, num={}, partitionId={}, dataLength={}, from={}, to={}",
@@ -180,12 +174,7 @@ public class RssFetcher implements FetcherBase {
 
   private void shuffleToDisk(DiskFetchedInput fetchedInput) throws IOException {
     try (OutputStream diskOutputStream = fetchedInput.getOutputStream()) {
-      long bytesWritten = RssShuffleUtils.shuffleToDisk(rssShuffleInputStream, diskOutputStream, dataLength);
-
-      // TODO: remove dataLengthUnknown()
-      if (dataLengthUnknown()) {
-        fetchedInput.setSize(bytesWritten);
-      }
+      RssShuffleUtils.shuffleToDisk(rssShuffleInputStream, diskOutputStream, dataLength);
     } finally {
       synchronized (lock) {
         if (!rssShuffleInputStreamClosed) {
@@ -194,10 +183,5 @@ public class RssFetcher implements FetcherBase {
         }
       }
     }
-  }
-
-  private boolean dataLengthUnknown() {
-    assert false;
-    return dataLength == -1;
   }
 }
