@@ -130,10 +130,11 @@ public class RssShuffleUtils {
       Collections.sort(inputAttemptIdentifiers,
           Comparator.comparingInt(CompositeInputAttemptIdentifier::getTaskIndex));
 
-      int mapIndexStart = inputAttemptIdentifiers.get(0).getTaskIndex();
+      int mapIndexOrigin = inputAttemptIdentifiers.get(0).getTaskIndex();
+      int mapIndexStart = mapIndexOrigin;
       int mapIndexEnd = -1;
 
-      LOG.info("{} - Splitting InputAttemptIdentifiers to {} RssFetchers: {} / {}, from {} to {}",
+      LOG.info("{} - Splitting InputAttemptIdentifiers to {} RssFetchers: {} / {}, task index from {} to {}",
           ordered ? "Ordered" : "Unordered",
           numFetchers, partitionTotalSize, numIdentifiers,
           mapIndexStart, inputAttemptIdentifiers.get(numIdentifiers - 1).getTaskIndex());
@@ -144,7 +145,8 @@ public class RssShuffleUtils {
         int numIdentifiersToConsume = numIdentifiersPerFetcher + numExtra;
         mapIndexEnd = mapIndexStart + numIdentifiersToConsume;
 
-        List<CompositeInputAttemptIdentifier> subList = inputAttemptIdentifiers.subList(mapIndexStart, mapIndexEnd);
+        List<CompositeInputAttemptIdentifier> subList =
+            inputAttemptIdentifiers.subList(mapIndexStart - mapIndexOrigin, mapIndexEnd - mapIndexOrigin);
         long subTotalSize = 0L;
         for (CompositeInputAttemptIdentifier cid: subList) {
           assert (mapIndexStart <= cid.getTaskIndex() && cid.getTaskIndex() < mapIndexEnd) :
