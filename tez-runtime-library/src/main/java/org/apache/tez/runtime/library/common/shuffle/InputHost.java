@@ -91,11 +91,14 @@ public class InputHost extends HostPort {
   private final boolean readPartitionAllOnce;
   private final int srcVertexNumTasks;
   private final Map<PartitionRange, List<CompositeInputAttemptIdentifier>> tempPartitionToInputs;
+  private final int shuffleId;    // TODO: remove
 
-  public InputHost(HostPort hostPort, boolean readPartitionAllOnce, int srcVertexNumTasks) {
+  public InputHost(HostPort hostPort, boolean readPartitionAllOnce,
+                   int srcVertexNumTasks, int shuffleId) {
     super(hostPort.getHost(), hostPort.getPort());
     this.readPartitionAllOnce = readPartitionAllOnce;
     this.srcVertexNumTasks = srcVertexNumTasks;
+    this.shuffleId = shuffleId;
     if (readPartitionAllOnce) {
       tempPartitionToInputs = new HashMap<PartitionRange, List<CompositeInputAttemptIdentifier>>();
     } else {
@@ -184,7 +187,8 @@ public class InputHost extends HostPort {
           1, partitionSizes, -1);
       mergedCid.setInputIdentifiersForReadPartitionAllOnce(inputs);
 
-      LOG.info("Unordered output pushData() - merged unordered_taskIndex_attemptNumber={}_{}_{} = {}",
+      LOG.info("Unordered InputHost - merged unordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{} = {}",
+          shuffleId,
           firstId.getTaskIndex(),
           firstId.getAttemptNumber(), partitionId, partitionTotalSize);
 

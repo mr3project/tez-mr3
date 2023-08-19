@@ -99,8 +99,10 @@ class MapHost {
   private final int srcVertexNumTasks;
   private final List<CompositeInputAttemptIdentifier> tempMaps;
 
+  private final int shuffleId;    // TODO: remove
+
   public MapHost(String host, int port, int partitionId, int partitionCount,
-      boolean readPartitionAllOnce, int srcVertexNumTasks) {
+      boolean readPartitionAllOnce, int srcVertexNumTasks, int shuffleId) {
     this.host = host;
     this.port = port;
     this.partitionId = partitionId;
@@ -108,6 +110,7 @@ class MapHost {
 
     this.readPartitionAllOnce = readPartitionAllOnce;
     this.srcVertexNumTasks = srcVertexNumTasks;
+    this.shuffleId = shuffleId;
     if (readPartitionAllOnce) {
       assert partitionCount == 1;
       tempMaps = new ArrayList<CompositeInputAttemptIdentifier>();
@@ -169,7 +172,7 @@ class MapHost {
         long[] partitionSizes = new long[1];
         partitionSizes[0] = partitionTotalSize;
 
-        InputAttemptIdentifier firstId = tempMaps.get(0);
+        CompositeInputAttemptIdentifier firstId = tempMaps.get(0);
         CompositeInputAttemptIdentifier mergedCid = new CompositeInputAttemptIdentifier(
             firstId.getInputIdentifier(),
             firstId.getAttemptNumber(),
@@ -179,6 +182,11 @@ class MapHost {
             firstId.getSpillEventId(),
             1, partitionSizes, -1);
         mergedCid.setInputIdentifiersForReadPartitionAllOnce(tempMaps);
+
+        LOG.info("Ordered MapHost - merged Ordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{} = {}",
+            shuffleId,
+            firstId.getTaskIndex(),
+            firstId.getAttemptNumber(), partitionId, partitionTotalSize);
 
         LOG.info("Ordered - Merging {} partition inputs for partitionId={} with total size {}: {} ",
             srcVertexNumTasks, partitionId, partitionTotalSize, mergedCid);

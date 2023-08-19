@@ -132,7 +132,8 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
   }
 
   private void fetchSingleBlock() throws IOException {
-      LOG.info("Ordered - fetchSingleBlock : Ordered_taskIndex_attemptNumber={}_{}_{}, dataLength={}",
+      LOG.info("Ordered - fetchSingleBlock : Ordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{}, dataLength={}",
+          shuffleId,
           srcAttemptId.getTaskIndex(), srcAttemptId.getAttemptNumber(), partitionId,
           srcAttemptId.getPartitionSize(partitionId));
 

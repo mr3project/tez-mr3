@@ -178,8 +178,8 @@ public class Shuffle implements ExceptionReporter {
 
     boolean compositeFetch = rssShuffleClient != null || ShuffleUtils.isTezShuffleHandler(conf);
     eventHandler =
-        new ShuffleInputEventHandlerOrderedGrouped(inputContext, scheduler, compositeFetch, rssShuffleClient);
-    
+        new ShuffleInputEventHandlerOrderedGrouped(inputContext, scheduler, compositeFetch, rssShuffleClient,
+            inputContext.shuffleId());
     ExecutorService rawExecutor = Executors.newFixedThreadPool(1, new ThreadFactoryBuilder()
         .setDaemon(true).setNameFormat("ShuffleAndMergeRunner {" + srcNameTrimmed + "}").build());
 

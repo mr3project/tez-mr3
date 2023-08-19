@@ -64,13 +64,16 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
 
   private final ShuffleClient rssShuffleClient;
 
+  private final int shuffleId;
+
   public ShuffleInputEventHandlerOrderedGrouped(InputContext inputContext, ShuffleScheduler scheduler,
-      boolean compositeFetch, ShuffleClient rssShuffleClient) {
+      boolean compositeFetch, ShuffleClient rssShuffleClient, int shuffleId) {
     this.inputContext = inputContext;
     this.scheduler = scheduler;
     this.compositeFetch = compositeFetch;
     this.inflater = TezCommonUtils.newInflater();
     this.rssShuffleClient = rssShuffleClient;
+    this.shuffleId = shuffleId;
   }
 
   @Override
@@ -152,7 +155,8 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
         dmEvent.getTargetIndex(), 1, dmEvent.getVersion(), shufflePayload);
 
     if (rssShuffleClient != null) {
-      LOG.info("Ordered - processDataMovementEvent: Ordered_taskIndex_attemptNumber={}_{}_{}, dataLength={}",
+      LOG.info("Ordered - processDataMovementEvent: Ordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{}, dataLength={}",
+          shuffleId,
           srcAttemptIdentifier.getTaskIndex(),
           srcAttemptIdentifier.getAttemptNumber(),
           partitionId,

@@ -779,7 +779,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
             totalPushedDataLength += curPartitionLength;
             sizePerPartition[i] += curPartitionLength;
 
-            LOG.info("Unordered output pushData() - unordered_taskIndex_attemptNumber={}_{}_{} = {}",
+            LOG.info("Unordered output pushData() - unordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{} = {}",
+              outputContext.shuffleId(),
               outputContext.getTaskIndex(),
               outputContext.getTaskAttemptNumber(), i, rssBuffer.size());
 
@@ -1493,7 +1494,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
       writer = null;
 
-      LOG.info("Unordered output pushData() - large unordered_taskIndex_attemptNumber={}_{}_{} = {}",
+      LOG.info("Unordered output pushData() - large unordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{} = {}",
+          outputContext.shuffleId(),
           outputContext.getTaskIndex(),
           outputContext.getTaskAttemptNumber(), partition, rssBuffer.size());
 

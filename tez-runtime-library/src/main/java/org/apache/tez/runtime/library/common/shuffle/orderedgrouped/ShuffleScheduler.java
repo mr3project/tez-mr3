@@ -1088,7 +1088,7 @@ class ShuffleScheduler {
     MapHost host = mapLocations.get(identifier);
     if (host == null) {
       host = new MapHost(inputHostName, port, partitionId, srcAttempt.getInputIdentifierCount(),
-          inputContext.readPartitionAllOnce(), inputContext.getSourceVertexNumTasks());
+          inputContext.readPartitionAllOnce(), inputContext.getSourceVertexNumTasks(), inputContext.shuffleId());
       mapLocations.put(identifier, host);
     }
 
@@ -1545,7 +1545,8 @@ class ShuffleScheduler {
         List<CompositeInputAttemptIdentifier> childInputAttemptIdentifiers = inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce();
         for (CompositeInputAttemptIdentifier cinput: childInputAttemptIdentifiers) {
           assert cinput.getTaskIndex() != -1;
-           LOG.info("Ordered - revert for:  Ordered_taskIndex_attemptNumber={}_{}_{}, dataLength={}",
+           LOG.info("Ordered - revert for:  Ordered_shuffleId_taskIndex_attemptNumber={}_{}_{}, dataLength={}",
+              inputContext.shuffleId(),
               cinput.getTaskIndex(), cinput.getAttemptNumber(), partitionId,
               cinput.getPartitionSize(partitionId));
           RssFetcherOrderedGrouped rssFetcher = createRssFetcherForIndividualInput(

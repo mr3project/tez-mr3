@@ -170,8 +170,8 @@ public class RssFetcher implements FetcherBase {
       RssShuffleUtils.shuffleToMemory(rssShuffleInputStream, fetchedInput.getBytes(), dataLength);
     } catch (IOException e) {
       for (int i = mapIndexStart; i < mapIndexEnd; i++) {
-      LOG.error("Failed to read shuffle data from rssShuffleInputStream, Memory, unordered_taskIndex_attemptNumber={}_{}_{}",
-         i, srcAttemptId.getAttemptNumber(), partitionId, e);
+      LOG.error("Failed to read shuffle data from rssShuffleInputStream, Memory, unordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{}",
+         shuffleId, i, srcAttemptId.getAttemptNumber(), partitionId, e);
       }
       throw e;
     } finally {
@@ -189,8 +189,8 @@ public class RssFetcher implements FetcherBase {
       RssShuffleUtils.shuffleToDisk(rssShuffleInputStream, diskOutputStream, dataLength);
     } catch (IOException e) {
       for (int i = mapIndexStart; i < mapIndexEnd; i++) {
-        LOG.error("Failed to read shuffle data from rssShuffleInputStream, Disk, unordered_taskIndex_attemptNumber={}_{}_{}",
-            i, srcAttemptId.getAttemptNumber(), partitionId, e);
+        LOG.error("Failed to read shuffle data from rssShuffleInputStream, Disk, unordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{}",
+            shuffleId, i, srcAttemptId.getAttemptNumber(), partitionId, e);
       }
       throw e;
     } finally {
