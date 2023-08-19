@@ -21,7 +21,6 @@ package org.apache.tez.runtime.library.common.shuffle;
 import org.apache.celeborn.client.ShuffleClient;
 import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
-import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -171,7 +170,7 @@ public class RssFetcher implements FetcherBase {
       RssShuffleUtils.shuffleToMemory(rssShuffleInputStream, fetchedInput.getBytes(), dataLength);
     } catch (IOException e) {
       for (int i = mapIndexStart; i < mapIndexEnd; i++) {
-      LOG.error("Failed to read shuffle data from rssShuffleInputStream, unordered_taskIndex_attemptNumber={}_{}_{}",
+      LOG.error("Failed to read shuffle data from rssShuffleInputStream, Memory, unordered_taskIndex_attemptNumber={}_{}_{}",
          i, srcAttemptId.getAttemptNumber(), partitionId, e);
       }
       throw e;
@@ -188,6 +187,12 @@ public class RssFetcher implements FetcherBase {
   private void shuffleToDisk(DiskFetchedInput fetchedInput) throws IOException {
     try (OutputStream diskOutputStream = fetchedInput.getOutputStream()) {
       RssShuffleUtils.shuffleToDisk(rssShuffleInputStream, diskOutputStream, dataLength);
+    } catch (IOException e) {
+      for (int i = mapIndexStart; i < mapIndexEnd; i++) {
+        LOG.error("Failed to read shuffle data from rssShuffleInputStream, Disk, unordered_taskIndex_attemptNumber={}_{}_{}",
+            i, srcAttemptId.getAttemptNumber(), partitionId, e);
+      }
+      throw e;
     } finally {
       synchronized (lock) {
         if (!rssShuffleInputStreamClosed) {

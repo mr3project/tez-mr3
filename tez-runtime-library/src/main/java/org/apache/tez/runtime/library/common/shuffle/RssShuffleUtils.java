@@ -63,13 +63,18 @@ public class RssShuffleUtils {
     byte[] buffer = new byte[ShuffleUtils.BUFFER_SIZE];
     long remaining = dataLength;
     long bytesWritten = 0L;
+
+    final long dataLengthCopy = dataLength;
+    LOG.info("shuffleToDisk initial dataLength = {}, {}", dataLength, dataLengthCopy);
+
     while (remaining > 0) {
       int curBytesRead = inputStream.read(buffer, 0, (int) Math.min(remaining, ShuffleUtils.BUFFER_SIZE));
-
+      if (dataLength != dataLengthCopy) {
+        LOG.error("dataLength corrupted = {} {}", dataLength, dataLengthCopy);
+      }
       if (curBytesRead < 0) {
         throw new EOFException("Expected size: " + dataLength + ", Received size: " + bytesWritten);
       }
-
       outputStream.write(buffer, 0, curBytesRead);
       bytesWritten += curBytesRead;
       remaining -= curBytesRead;
