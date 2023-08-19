@@ -95,7 +95,10 @@ public class RssFetcher implements FetcherBase {
 
     LOG.info("RssFetcher beginning with readPartitionAllOnce={}: {}, num={}, partitionId={}, dataLength={}, from={}, to={}",
         readPartitionAllOnce,
-        srcAttemptId, srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().size(), partitionId, dataLength,
+        srcAttemptId,
+        !readPartitionAllOnce ? 0 :
+        srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().size(),
+        partitionId, dataLength,
         mapIndexStart, mapIndexEnd);
 
     if (fetchedInput.getType() == FetchedInput.Type.MEMORY) {
@@ -127,7 +130,10 @@ public class RssFetcher implements FetcherBase {
 
     LOG.info("RssFetcher finished with readPartitionAllOnce={}: {}, num={}, partitionId={}, dataLength={}, from={}, to={}",
         readPartitionAllOnce,
-        srcAttemptId, srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().size(), partitionId, dataLength,
+        srcAttemptId,
+        !readPartitionAllOnce ? 0 :
+        srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().size(),
+        partitionId, dataLength,
         mapIndexStart, mapIndexEnd);
 
     return new FetchResult(host, port, partitionId, 1, new ArrayList<>());
