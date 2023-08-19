@@ -949,11 +949,9 @@ public class PipelinedSorter extends ExternalSorter {
 
           IOUtils.readFully(finalMergedInputStream, buffer, Long.BYTES, partitionSize);
 
-          if (outputContext.getTaskAttemptNumber() > 0) {
-          LOG.info("Ordered output pushData() - taskIndex_attemptNumber={}_{}_{} = {} or {}",
+          LOG.info("Ordered output pushData() - Ordered_taskIndex_attemptNumber={}_{}_{} = {} or {}",
               outputContext.getTaskIndex(),
               outputContext.getTaskAttemptNumber(), part, partitionSize, partitionSize + Long.BYTES);
-          }
 
           rssShuffleClient.pushData(
               outputContext.shuffleId(),

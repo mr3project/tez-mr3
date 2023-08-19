@@ -151,8 +151,8 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
     CompositeInputAttemptIdentifier srcAttemptIdentifier = constructInputAttemptIdentifier(
         dmEvent.getTargetIndex(), 1, dmEvent.getVersion(), shufflePayload);
 
-    if (rssShuffleClient != null && dmEvent.getVersion() != 0) {
-      LOG.info("Ordered - processDataMovementEvent with non-zero attemptNumber: taskIndex_attemptNumber={}_{}_{}, dataLength={}",
+    if (rssShuffleClient != null) {
+      LOG.info("Ordered - processDataMovementEvent: Ordered_taskIndex_attemptNumber={}_{}_{}, dataLength={}",
           srcAttemptIdentifier.getTaskIndex(),
           srcAttemptIdentifier.getAttemptNumber(),
           partitionId,

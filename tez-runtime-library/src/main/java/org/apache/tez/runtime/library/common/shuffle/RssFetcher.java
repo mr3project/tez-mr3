@@ -91,11 +91,12 @@ public class RssFetcher implements FetcherBase {
     long actualSize = dataLength + RssShuffleUtils.EOF_MARKERS_SIZE;
     fetchedInput = inputAllocator.allocate(actualSize, actualSize, srcAttemptId);
 
-    if (readPartitionAllOnce) {
-      LOG.info("RssFetcher beginning with readPartitionAllOnce: {}, num={}, partitionId={}, dataLength={}, from={}, to={}",
-          srcAttemptId, srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().size(), partitionId, dataLength,
-          mapIndexStart, mapIndexEnd);
-    }
+    // TODO: optimize for mapIndexEnd == mapIndexStart + 1 and readPartitionAllOnce == true
+
+    LOG.info("RssFetcher beginning with readPartitionAllOnce={}: {}, num={}, partitionId={}, dataLength={}, from={}, to={}",
+        readPartitionAllOnce,
+        srcAttemptId, srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().size(), partitionId, dataLength,
+        mapIndexStart, mapIndexEnd);
 
     if (fetchedInput.getType() == FetchedInput.Type.MEMORY) {
       setupRssShuffleInputStream(mapIndexStart, mapIndexEnd, srcAttemptId.getAttemptNumber(), partitionId);
@@ -109,8 +110,6 @@ public class RssFetcher implements FetcherBase {
 
     long copyDuration = System.currentTimeMillis() - startTime;
     if (readPartitionAllOnce) {
-      LOG.info("RssFetcher finished with readPartitionAllOnce: {}, num={}, partitionId={}, dataLength={}, copyDuration={}",
-          srcAttemptId, srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().size(), partitionId, dataLength, copyDuration);
       // ShuffleManager.getNextInput() should not get stuck in completedInputs.take():
       //   1. mark completion for every InputAttemptIdentifier except srcAttemptId
       //   2. call fetchSucceeded() on srcAttemptId and fetchedInput
@@ -125,6 +124,11 @@ public class RssFetcher implements FetcherBase {
     } else {
       fetcherCallback.fetchSucceeded(host, srcAttemptId, fetchedInput, dataLength, dataLength, copyDuration);
     }
+
+    LOG.info("RssFetcher finished with readPartitionAllOnce={}: {}, num={}, partitionId={}, dataLength={}, from={}, to={}",
+        readPartitionAllOnce,
+        srcAttemptId, srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().size(), partitionId, dataLength,
+        mapIndexStart, mapIndexEnd);
 
     return new FetchResult(host, port, partitionId, 1, new ArrayList<>());
   }
@@ -160,7 +164,10 @@ public class RssFetcher implements FetcherBase {
     try {
       RssShuffleUtils.shuffleToMemory(rssShuffleInputStream, fetchedInput.getBytes(), dataLength);
     } catch (IOException e) {
-      LOG.error("Failed to read shuffle data from rssShuffleInputStream", e);
+      for (int i = mapIndexStart; i < mapIndexEnd; i++) {
+      LOG.error("Failed to read shuffle data from rssShuffleInputStream, unordered_taskIndex_attemptNumber={}_{}_{}",
+         i, srcAttemptId.getAttemptNumber(), partitionId, e);
+      }
       throw e;
     } finally {
       synchronized (lock) {

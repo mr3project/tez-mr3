@@ -139,7 +139,7 @@ public class RssShuffleUtils {
       int mapIndexStart = mapIndexOrigin;
       int mapIndexEnd = -1;
 
-      LOG.info("{} - Splitting InputAttemptIdentifiers to {} RssFetchers: {} / {}, task index from {} to {}",
+      LOG.info("{} - Splitting InputAttemptIdentifiers to {} RssFetchers: {} / {}, task index {} - {}",
           ordered ? "Ordered" : "Unordered",
           numFetchers, partitionTotalSize, numIdentifiers,
           mapIndexStart, inputAttemptIdentifiers.get(numIdentifiers - 1).getTaskIndex());
@@ -161,6 +161,8 @@ public class RssShuffleUtils {
               i, cid.getTaskIndex(), cid.getPartitionSize(partitionId));
         }
         LOG.info("Fetcher batch #{} --- total partition size = {}", i, subTotalSize);
+
+        // TODO: optimize for mapIndexEnd == mapIndexStart + 1 (where numIdentifiersToConsume == 1)
 
         // optimize partitionSizes[] because only partitionId is used and other fields are never used
         long[] partitionSizes = new long[1];
