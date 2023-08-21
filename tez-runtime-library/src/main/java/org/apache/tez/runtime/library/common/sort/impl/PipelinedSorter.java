@@ -607,8 +607,7 @@ public class PipelinedSorter extends ExternalSorter {
       }
 
       // create spill file
-      final long size = capacity +
-          + (partitions * APPROX_HEADER_LENGTH);
+      final long size = capacity + (partitions * APPROX_HEADER_LENGTH);
       final TezSpillRecord spillRec = new TezSpillRecord(partitions);
       final Path filename =
         mapOutputFile.getSpillFileForWrite(numSpills, size);
@@ -849,7 +848,7 @@ public class PipelinedSorter extends ExternalSorter {
         }
       }
 
-      if (segmentLengthSum > MAX_PUSH_SIZE) {
+      if (rssShuffleClient != null && segmentLengthSum > MAX_PUSH_SIZE) {
         pushedPartitions.add(part);
         pushUnmergedPartition(part);
       } else {
@@ -1013,6 +1012,7 @@ public class PipelinedSorter extends ExternalSorter {
 
   private void pushUnmergedPartition(int partition) throws IOException {
     assert partitionStats[partition] == 0L;
+    assert rssShuffleClient != null;
 
     int bufferSize = 0;
     for (int i = 0; i < numSpills; i++) {
