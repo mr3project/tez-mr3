@@ -220,7 +220,6 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
 
         MapOutput mapOutput = allocator.reserve(fakeIAI, decompressedSize, compressedSize, fetcherId, true);
 
-        // FIXME! - use original ShuffleUtils
         if (mapOutput.getType() == MapOutput.Type.MEMORY) {
           ShuffleUtils.shuffleToMemory(mapOutput.getMemory(), rssShuffleInputStream, (int) decompressedSize,
               (int) compressedSize, codec, ifileReadAhead, ifileReadAheadLength, LOG, fakeIAI, inputContext);
