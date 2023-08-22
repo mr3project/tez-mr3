@@ -865,14 +865,6 @@ public class IFile {
       this.dataIn = new DataInputStream(in);
     }
 
-
-    public static void readToMemory(byte[] buffer, InputStream in, int compressedLength,
-        CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLength, DecompressorPool inputContext)
-        throws IOException {
-      readToMemory(buffer, 0, buffer.length, in, compressedLength, codec, ifileReadAhead,
-          ifileReadAheadLength, inputContext);
-    }
-
     /**
      * Read entire ifile content to memory.
      *
@@ -884,9 +876,9 @@ public class IFile {
      * @param ifileReadAheadLength
      * @throws IOException
      */
-    public static void readToMemory(byte[] buffer, int bufferStartOffset, int decompressedLength,
-        InputStream in, int compressedLength, CompressionCodec codec, boolean ifileReadAhead,
-        int ifileReadAheadLength, DecompressorPool decompressorPool) throws IOException {
+    public static void readToMemory(byte[] buffer, InputStream in, int compressedLength,
+        CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLength, InputContext inputContext)
+        throws IOException {
       boolean isCompressed = IFile.Reader.isCompressedFlagEnabled(in);
       IFileInputStream checksumIn = new IFileInputStream(in,
           compressedLength - IFile.HEADER.length, ifileReadAhead,
@@ -894,8 +886,8 @@ public class IFile {
       in = checksumIn;
       Decompressor decompressor = null;
       if (isCompressed && codec != null) {
-        if (decompressorPool != null) {
-          decompressor = decompressorPool.getDecompressor(codec);
+        if (inputContext != null) {
+          decompressor = inputContext.getDecompressor(codec);
         } else {
           decompressor = CodecUtils.getDecompressor(codec);
         }
@@ -909,7 +901,7 @@ public class IFile {
         }
       }
       try {
-        IOUtils.readFully(in, buffer, bufferStartOffset, decompressedLength - IFile.HEADER.length);
+        IOUtils.readFully(in, buffer, 0, buffer.length - IFile.HEADER.length);
         /*
          * We've gotten the amount of data we were expecting. Verify the
          * decompressor has nothing more to offer. This action also forces the
@@ -933,8 +925,8 @@ public class IFile {
       } finally {
         if (decompressor != null) {
           decompressor.reset();
-          if (decompressorPool != null) {
-            decompressorPool.returnDecompressor(codec.getCompressorType(), decompressor);
+          if (inputContext != null) {
+            inputContext.returnDecompressor(codec.getCompressorType(), decompressor);
           } else {
             CodecPool.returnDecompressor(decompressor);
           }

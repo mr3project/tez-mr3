@@ -57,6 +57,7 @@ import org.apache.tez.runtime.library.api.IOInterruptedException;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.ConfigUtils;
 import org.apache.tez.runtime.library.common.comparator.ProxyComparator;
+import org.apache.tez.runtime.library.common.shuffle.RssShuffleUtils;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Writer;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger.DiskSegment;
@@ -813,10 +814,9 @@ public class PipelinedSorter extends ExternalSorter {
     FSDataOutputStream finalOut = rfs.create(finalOutputFile, true, 4096);
     ensureSpillFilePermissions(finalOutputFile, rfs);
 
-    TezSpillRecord spillRec = null;
+    TezSpillRecord spillRec = new TezSpillRecord(partitions);
     if (rssShuffleClient == null) {
       finalIndexFile = mapOutputFile.getOutputIndexFileForWrite(0); //TODO
-      spillRec = new TezSpillRecord(partitions);
     }
 
     if (LOG.isDebugEnabled()) {
@@ -849,8 +849,8 @@ public class PipelinedSorter extends ExternalSorter {
       }
 
       if (rssShuffleClient != null && segmentLengthSum > MAX_PUSH_SIZE) {
-        pushedPartitions.add(part);
         pushUnmergedPartition(part);
+        pushedPartitions.add(part);
       } else {
         if (segmentList.size() > 0) {
           // sort the segments only if there are intermediate merges
@@ -865,18 +865,9 @@ public class PipelinedSorter extends ExternalSorter {
               null, spilledRecordsCounter, additionalSpillBytesRead,
               null, merger.needsRLE()); // Not using any Progress in TezMerger. Should just work.
 
-          Writer writer;
-          if (rssShuffleClient == null) {
-            writer = new Writer(serializationContext.getKeySerialization(),
-                serializationContext.getValSerialization(), finalOut,
-                serializationContext.getKeyClass(), serializationContext.getValueClass(), codec,
-                spilledRecordsCounter, null, merger.needsRLE());
-          } else {
-            writer = new Writer(serializationContext.getKeySerialization(),
-                serializationContext.getValSerialization(), finalOut,
-                serializationContext.getKeyClass(), serializationContext.getValueClass(),
-                spilledRecordsCounter, null, merger.needsRLE(), true);
-          }
+          Writer writer = new Writer(serializationContext.getKeySerialization(),
+              serializationContext.getValSerialization(), finalOut, serializationContext.getKeyClass(),
+              serializationContext.getValueClass(), codec, spilledRecordsCounter, null, merger.needsRLE());
 
           if (combiner == null || numSpills < minSpillsForCombine) {
             TezMerger.writeFile(kvIter, writer, progressable,
@@ -888,18 +879,16 @@ public class PipelinedSorter extends ExternalSorter {
           writer.close();
           rawLength = writer.getRawLength();
           partLength = writer.getCompressedLength(); // available after writer.close() called.
-
-          assert !(rssShuffleClient != null) || rawLength == partLength;
         }
 
         partitionToMergedSize.put(part, partLength);
 
         if (rssShuffleClient != null) {
           if (partLength > MAX_PUSH_SIZE) {
-            pushedPartitions.add(part);
             pushUnmergedPartition(part);
+            pushedPartitions.add(part);
           } else {
-            outputBytesWithOverheadCounter.increment(rawLength + Long.BYTES);
+            outputBytesWithOverheadCounter.increment(rawLength + RssShuffleUtils.ORDERED_SHUFFLE_HEADER_SIZE);
             partitionStats[part] += partLength;
           }
         } else  {
@@ -908,10 +897,10 @@ public class PipelinedSorter extends ExternalSorter {
           if (reportPartitionStats()) {
             partitionStats[part] += partLength;
           }
-
-          final TezIndexRecord rec = new TezIndexRecord(segmentStart, rawLength, partLength);
-          spillRec.putIndex(rec, part);
         }
+
+        final TezIndexRecord rec = new TezIndexRecord(segmentStart, rawLength, partLength);
+        spillRec.putIndex(rec, part);
       }
     }
 
@@ -950,11 +939,11 @@ public class PipelinedSorter extends ExternalSorter {
         }
       }
 
-      bufferSize += Long.BYTES;
+      bufferSize += RssShuffleUtils.ORDERED_SHUFFLE_HEADER_SIZE;
       assert bufferSize <= Integer.MAX_VALUE - 8; // This is known as the maximum size of array in most JVMs.
 
       byte[] buffer = new byte[(int) bufferSize];
-      ByteBuffer lengthBuffer = ByteBuffer.allocate(Long.BYTES);
+      ByteBuffer lengthBuffer = ByteBuffer.allocate(RssShuffleUtils.ORDERED_SHUFFLE_HEADER_SIZE);
 
       for (int part = 0; part < partitions; part++) {
         if (pushedPartitions.contains(part)) {
@@ -968,19 +957,21 @@ public class PipelinedSorter extends ExternalSorter {
         } else {
           int partitionSize = (int) partitionStats[part];
           if (partitionSize != 0) {
-            // We assume that the number of bytes read by DataInputStream.readLong() is equal to Long.BYTES.
+            int pushedBytes = partitionSize + RssShuffleUtils.ORDERED_SHUFFLE_HEADER_SIZE;
 
-            // TODO: Use 4 bytes instead of 8 bytes
             lengthBuffer.putLong(partitionSize);
-            System.arraycopy(lengthBuffer.array(), 0, buffer, 0, Long.BYTES);
+            lengthBuffer.putLong(spillRec.getIndex(part).getRawLength());
+            System.arraycopy(lengthBuffer.array(), 0, buffer, 0, RssShuffleUtils.ORDERED_SHUFFLE_HEADER_SIZE);
             lengthBuffer.clear();
 
-            IOUtils.readFully(finalMergedInputStream, buffer, Long.BYTES, partitionSize);
+            IOUtils.readFully(finalMergedInputStream, buffer, RssShuffleUtils.ORDERED_SHUFFLE_HEADER_SIZE,
+                partitionSize);
 
-            LOG.info("Ordered output pushData() - Ordered_shuffleId_taskIndex_attemptNumber={}_{}_{} = {} or {}",
-                outputContext.shuffleId(),
-                outputContext.getTaskIndex(),
-                outputContext.getTaskAttemptNumber(), part, partitionSize, partitionSize + Long.BYTES);
+            LOG.info(
+                "Ordered output - push merged data. " +
+                    "shuffleId={} taskIndex={} attemptNumber={} partitionId={} pushedSize={}",
+                outputContext.shuffleId(), outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber(),
+                part, pushedBytes);
 
             rssShuffleClient.pushData(
                 outputContext.shuffleId(),
@@ -989,11 +980,11 @@ public class PipelinedSorter extends ExternalSorter {
                 part,
                 buffer,
                 0,
-                Long.BYTES + partitionSize,
+                pushedBytes,
                 outputContext.getVertexParallelism(),
                 partitions);
 
-            partitionStats[part] += Long.BYTES;
+            partitionStats[part] = pushedBytes;
           }
         }
       }
@@ -1017,26 +1008,26 @@ public class PipelinedSorter extends ExternalSorter {
     int bufferSize = 0;
     for (int i = 0; i < numSpills; i++) {
       TezIndexRecord indexRecord = indexCacheList.get(i).getIndex(partition);
-      long spillRawLength = indexRecord.getRawLength();
-      if (spillRawLength > MAX_PUSH_SIZE) {
+      long spillLength = indexRecord.getPartLength();
+      if (spillLength > MAX_PUSH_SIZE) {
         throw new IOException("Individual spill length exceeds 2GB. Cannot push spill to RSS.");
       }
 
-      if (indexRecord.getRawLength() > bufferSize) {
-        bufferSize = (int) indexRecord.getRawLength();
+      if (indexRecord.getPartLength() > bufferSize) {
+        bufferSize = (int) indexRecord.getPartLength();
       }
     }
-    bufferSize += Long.BYTES;
+    bufferSize += RssShuffleUtils.ORDERED_SHUFFLE_HEADER_SIZE;
 
     byte[] buffer = new byte[bufferSize];
-    ByteBuffer lengthBuffer = ByteBuffer.allocate(Long.BYTES);
+    ByteBuffer lengthBuffer = ByteBuffer.allocate(RssShuffleUtils.ORDERED_SHUFFLE_HEADER_SIZE);
     for (int i = 0; i < numSpills; i++) {
       TezIndexRecord indexRecord = indexCacheList.get(i).getIndex(partition);
-      int decompressedLength = (int) indexRecord.getRawLength();
       int compressedLength = (int) indexRecord.getPartLength();
 
-      lengthBuffer.putLong(decompressedLength);
-      System.arraycopy(lengthBuffer.array(), 0, buffer, 0, Long.BYTES);
+      lengthBuffer.putLong(compressedLength);
+      lengthBuffer.putLong(indexRecord.getRawLength());
+      System.arraycopy(lengthBuffer.array(), 0, buffer, 0, RssShuffleUtils.ORDERED_SHUFFLE_HEADER_SIZE);
       lengthBuffer.clear();
 
       InputStream spillInputStream = rfs.open(spillFilePaths.get(i));
@@ -1045,14 +1036,16 @@ public class PipelinedSorter extends ExternalSorter {
         throw new IOException("Failed to set the position of spill file.");
       }
 
-      IFile.Reader.readToMemory(buffer, Long.BYTES, decompressedLength, spillInputStream, compressedLength,
-          codec, ifileReadAhead, ifileReadAheadLength, outputContext);
+      IOUtils.readFully(spillInputStream, buffer, RssShuffleUtils.ORDERED_SHUFFLE_HEADER_SIZE,
+          compressedLength);
 
-      LOG.info("Ordered output pushData() - Ordered_shuffleId_taskIndex_attemptNumber={}_{}_{} = {} or {}",
-          outputContext.shuffleId(),
-          outputContext.getTaskIndex(),
-          outputContext.getTaskAttemptNumber(),
-          partition, decompressedLength, decompressedLength + Long.BYTES);
+      int pushedBytes = compressedLength + RssShuffleUtils.ORDERED_SHUFFLE_HEADER_SIZE;
+
+      LOG.info(
+          "Ordered output - push unmerged data. " +
+              "shuffleId={} taskIndex={} attemptNumber={} partitionId={} spillInfo=({}/{}) pushedSize={}",
+          outputContext.shuffleId(), outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber(),
+          partition, i, numSpills, pushedBytes);
 
       rssShuffleClient.pushData(
           outputContext.shuffleId(),
@@ -1061,12 +1054,12 @@ public class PipelinedSorter extends ExternalSorter {
           partition,
           buffer,
           0,
-          Long.BYTES + decompressedLength,
+          pushedBytes,
           outputContext.getVertexParallelism(),
           partitions);
 
-      partitionStats[partition] += Long.BYTES + decompressedLength;
-      outputBytesWithOverheadCounter.increment(Long.BYTES + decompressedLength);
+      partitionStats[partition] += pushedBytes;
+      outputBytesWithOverheadCounter.increment(pushedBytes);
     }
   }
 

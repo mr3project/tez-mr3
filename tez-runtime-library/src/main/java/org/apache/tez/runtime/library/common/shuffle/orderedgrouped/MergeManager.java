@@ -159,8 +159,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
   private SerializationContext serializationContext;
 
-  private final boolean isRssEnabled;
-
   /**
    * Construct the MergeManager. Must call start before it becomes usable.
    */
@@ -177,8 +175,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       long initialMemoryAvailable,
       CompressionCodec codec,
       boolean ifileReadAheadEnabled,
-      int ifileReadAheadLength,
-      boolean isRssEnabled) {
+      int ifileReadAheadLength) {
     this.inputContext = inputContext;
     this.conf = conf;
     this.localDirAllocator = localDirAllocator;
@@ -216,8 +213,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     }
     this.ifileBufferSize = conf.getInt("io.file.buffer.size",
         TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_BUFFER_SIZE_DEFAULT);
-
-    this.isRssEnabled = isRssEnabled;
 
     // Figure out initial memory req start
     final float maxInMemCopyUse =
@@ -419,10 +414,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   final private MapOutput stallShuffle = MapOutput.createWaitMapOutput(null);
 
   @Override
-  public synchronized MapOutput reserve(InputAttemptIdentifier srcAttemptIdentifier, 
-                                        long requestedSize,
-                                        long compressedLength,
-                                        int fetcher, boolean useRssFetcher) throws IOException {
+  public synchronized MapOutput reserve(InputAttemptIdentifier srcAttemptIdentifier, long requestedSize,
+      long compressedLength, int fetcher, boolean useRssFetcher) throws IOException {
     if (!canShuffleToMemory(requestedSize)) {
       if (LOG.isDebugEnabled()) {
         LOG.debug(srcAttemptIdentifier + ": Shuffling to disk since " + requestedSize +
@@ -430,9 +423,9 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
             maxSingleShuffleLimit + ")");
       }
       return MapOutput.createDiskMapOutput(srcAttemptIdentifier, this, compressedLength, conf,
-          fetcher, true, mapOutputFile, isRssEnabled);
+          fetcher, true, mapOutputFile);
     }
-    
+
     // Stall shuffle if we are above the memory limit
 
     // It is possible that all threads could just be stalling and not make
@@ -447,7 +440,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     // (usedMemory + requestedSize > memoryLimit). When this thread is done
     // fetching, this will automatically trigger a merge thereby unlocking
     // all the stalled threads
-    
+
     if (usedMemory > memoryLimit) {
       if (LOG.isDebugEnabled()) {
         LOG.debug(srcAttemptIdentifier + ": Stalling shuffle since usedMemory (" + usedMemory
@@ -456,12 +449,12 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       }
       if (useRssFetcher) {
         return MapOutput.createDiskMapOutput(srcAttemptIdentifier, this, compressedLength, conf,
-            fetcher, true, mapOutputFile, isRssEnabled);
+            fetcher, true, mapOutputFile);
       } else {
         return stallShuffle;
       }
     }
-    
+
     // Allow the in-memory shuffle to progress
     if (LOG.isDebugEnabled()) {
       LOG.debug(srcAttemptIdentifier + ": Proceeding with shuffle since usedMemory ("
@@ -470,7 +463,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     }
     return unconditionalReserve(srcAttemptIdentifier, requestedSize, true);
   }
-  
+
   /**
    * Unconditional Reserve is used by the Memory-to-Memory thread
    */
@@ -1002,15 +995,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         }
         final Path file = fileChunk.getPath();
         approxOutputSize += size;
-        DiskSegment segment;
-        if (fileChunk.isFromRss()) {
-          assert offset == 0;
-          assert !preserve;
-          segment = new DiskSegment(rfs, file, size, null);
-        } else {
-          segment = new DiskSegment(rfs, file, offset, size, codec, ifileReadAhead,
-              ifileReadAheadLength, ifileBufferSize, preserve);
-        }
+        DiskSegment segment = new DiskSegment(rfs, file, offset, size, codec, ifileReadAhead,
+            ifileReadAheadLength, ifileBufferSize, preserve);
         inputSegments.add(segment);
       }
 
@@ -1268,16 +1254,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
       final long fileOffset = fileChunk.getOffset();
       final boolean preserve = fileChunk.isLocalFile();
-      DiskSegment segment;
-      if (fileChunk.isFromRss()) {
-        assert fileOffset == 0;
-        assert !preserve;
-        segment = new DiskSegment(fs, file, fileLength, counter);
-      } else {
-        segment = new DiskSegment(fs, file, fileOffset, fileLength, codec, ifileReadAhead,
-            ifileReadAheadLength, ifileBufferSize, preserve, counter);
-      }
-      diskSegments.add(segment);
+      diskSegments.add(new DiskSegment(fs, file, fileOffset, fileLength, codec, ifileReadAhead,
+          ifileReadAheadLength, ifileBufferSize, preserve, counter));
     }
     if (LOG.isInfoEnabled()) {
       finalMergeLog.append(". DiskSeg: " + onDisk.length + ", " + onDiskBytes);

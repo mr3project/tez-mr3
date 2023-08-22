@@ -60,7 +60,7 @@ abstract class MapOutput {
 
   public static MapOutput createDiskMapOutput(InputAttemptIdentifier attemptIdentifier,
       FetchedInputAllocatorOrderedGrouped callback, long size, Configuration conf, int fetcher,
-      boolean primaryMapOutput, TezTaskOutputFiles mapOutputFile, boolean fromRss) throws IOException {
+      boolean primaryMapOutput, TezTaskOutputFiles mapOutputFile) throws IOException {
     FileSystem fs = FileSystem.getLocal(conf).getRaw();
     Path outputPath = mapOutputFile.getInputFileForWrite(
         attemptIdentifier.getInputIdentifier(), attemptIdentifier.getSpillEventId(), size);
@@ -70,7 +70,7 @@ abstract class MapOutput {
     long offset = 0;
 
     DiskMapOutput mapOutput = new DiskMapOutput(attemptIdentifier, callback, size, outputPath, offset,
-        primaryMapOutput, tmpOutputPath, fromRss);
+        primaryMapOutput, tmpOutputPath);
     mapOutput.disk = fs.create(tmpOutputPath);
 
     return mapOutput;
@@ -168,7 +168,7 @@ abstract class MapOutput {
     private DiskDirectMapOutput(InputAttemptIdentifier attemptIdentifier, FetchedInputAllocatorOrderedGrouped callback,
                       long size, Path outputPath, long offset, boolean primaryMapOutput) {
       super(attemptIdentifier, callback, primaryMapOutput);
-      this.outputPath = new FileChunk(outputPath, offset, size, true, attemptIdentifier, false);
+      this.outputPath = new FileChunk(outputPath, offset, size, true, attemptIdentifier);
     }
 
     @Override
@@ -209,13 +209,12 @@ abstract class MapOutput {
         Path outputPath,
         long offset,
         boolean primaryMapOutput,
-        Path tmpOutputPath,
-        boolean fromRss) {
+        Path tmpOutputPath) {
       super(attemptIdentifier, callback, primaryMapOutput);
 
       this.tmpOutputPath = tmpOutputPath;
       this.disk = null;
-      this.outputPath = new FileChunk(outputPath, offset, size, false, attemptIdentifier, fromRss);
+      this.outputPath = new FileChunk(outputPath, offset, size, false, attemptIdentifier);
     }
 
     @Override

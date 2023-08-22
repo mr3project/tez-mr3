@@ -42,6 +42,8 @@ public class RssShuffleUtils {
 
   public static final int EOF_MARKERS_SIZE = 2 * WritableUtils.getVIntSize(IFile.EOF_MARKER);
 
+  public static final int ORDERED_SHUFFLE_HEADER_SIZE = 2 * Long.BYTES;
+
   public static void shuffleToMemory(InputStream inputStream, byte[] buffer, long dataLength)
       throws IOException {
     IOUtils.readFully(inputStream, buffer, 0, (int) dataLength);

@@ -18,18 +18,20 @@
 package org.apache.tez.runtime.library.common.shuffle.orderedgrouped;
 
 import org.apache.celeborn.client.ShuffleClient;
+import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.tez.dag.api.TezUncheckedException;
+import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier.SPILL_INFO;
 import org.apache.tez.runtime.library.common.shuffle.RssShuffleUtils;
+import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.concurrent.atomic.AtomicInteger;
 
 class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
@@ -59,6 +61,13 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
   private final int mapIndexStart, mapIndexEnd;
   private final boolean readPartitionAllOnce;
 
+  // For decompress/decode InputStream
+  private final CompressionCodec codec;
+  private final boolean ifileReadAhead;
+  private final int ifileReadAheadLength;
+  private final InputContext inputContext;
+  private final boolean verifyDiskChecksum;
+
   public RssFetcherOrderedGrouped(
       FetchedInputAllocatorOrderedGrouped allocator,
       ShuffleScheduler shuffleScheduler,
@@ -68,8 +77,15 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
       int shuffleId,
       int partitionId,
       CompositeInputAttemptIdentifier srcAttemptId,
-      long blockLength, int mapIndexStart, int mapIndexEnd,
-      boolean readPartitionAllOnce) {
+      long blockLength,
+      int mapIndexStart,
+      int mapIndexEnd,
+      boolean readPartitionAllOnce,
+      CompressionCodec codec,
+      boolean ifileReadAhead,
+      int ifileReadAheadLength,
+      InputContext inputContext,
+      boolean verifyDiskChecksum) {
     this.allocator = allocator;
     this.shuffleScheduler = shuffleScheduler;
     this.exceptionReporter = exceptionReporter;
@@ -83,6 +99,12 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
     this.mapIndexStart = mapIndexStart;
     this.mapIndexEnd = mapIndexEnd;
     this.readPartitionAllOnce = readPartitionAllOnce;
+
+    this.codec = codec;
+    this.ifileReadAhead = ifileReadAhead;
+    this.ifileReadAheadLength = ifileReadAheadLength;
+    this.inputContext = inputContext;
+    this.verifyDiskChecksum = verifyDiskChecksum;
 
     assert blockLength >= 0;
     assert !readPartitionAllOnce || srcAttemptId.getInputIdentifiersForReadPartitionAllOnce() != null;
@@ -139,45 +161,10 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
           srcAttemptId.getPartitionSize(partitionId));
 
     if (blockLength == 0) {
-      shuffleScheduler.copySucceeded(srcAttemptId, null, blockLength, blockLength, 0L, null,
-          false);
-      return;
+      shuffleScheduler.copySucceeded(srcAttemptId, null, blockLength, blockLength, 0L, null, false);
+    } else {
+      doFetch(srcAttemptId);
     }
-
-    long actualSize = blockLength + RssShuffleUtils.EOF_MARKERS_SIZE - Long.BYTES;
-    MapOutput mapOutput = allocator.reserve(srcAttemptId, actualSize, actualSize, fetcherId, true);
-    assert mapOutput.getType() != MapOutput.Type.WAIT;
-
-    long startTime = System.currentTimeMillis();
-
-    setupRssShuffleInputStream(mapIndexStart, mapIndexEnd, srcAttemptId.getAttemptNumber(), partitionId);
-
-    try {
-      long dataLength = getLengthFromHeader(rssShuffleInputStream);
-      if (dataLength + Long.BYTES != blockLength) {
-        String message =
-            "The length of blocks coming from DME and InputStream does not match. " +
-            String.format("DME: %d, InputStream: %d", blockLength, dataLength + Long.BYTES);
-        LOG.error(message);
-        throw new IOException(message);
-      }
-
-      if (mapOutput.getType() == MapOutput.Type.MEMORY) {
-        RssShuffleUtils.shuffleToMemory(rssShuffleInputStream, mapOutput.getMemory(), dataLength);
-      } else if (mapOutput.getType() == MapOutput.Type.DISK) {
-        try (OutputStream outputStream = mapOutput.getDisk()) {
-          RssShuffleUtils.shuffleToDisk(rssShuffleInputStream, outputStream, dataLength);
-        }
-      } else {
-        throw new TezUncheckedException("Unexpected MapOutput.Type: " + mapOutput);
-      }
-    } finally {
-      closeRssShuffleInputStream();
-    }
-
-    long copyDuration = System.currentTimeMillis() - startTime;
-    shuffleScheduler.copySucceeded(srcAttemptId, null, blockLength, blockLength, copyDuration, mapOutput,
-        false);
   }
 
   private void fetchMultipleBlocks() throws IOException {
@@ -186,87 +173,78 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
         numBlocks, mapIndexStart, mapIndexEnd, blockLength);
 
     if (blockLength == 0) {
-      for (InputAttemptIdentifier inputAttemptId : srcAttemptId.getInputIdentifiersForReadPartitionAllOnce()) {
-          shuffleScheduler.copySucceeded(inputAttemptId, null, 0L, 0L, 0, null, false);
+      for (InputAttemptIdentifier iai : srcAttemptId.getInputIdentifiersForReadPartitionAllOnce()) {
+          shuffleScheduler.copySucceeded(iai, null, 0L, 0L, 0, null, false);
       }
       return;
     }
 
-    setupRssShuffleInputStream(mapIndexStart, mapIndexEnd, srcAttemptId.getAttemptNumber(), partitionId);
-
     CompositeInputAttemptIdentifier dummyInputAttemptId =
         srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().get(0);
+    doFetch(dummyInputAttemptId);
+
+    for (int i = 1; i < numBlocks; i++) {
+      InputAttemptIdentifier inputAttemptId =
+          srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().get(i);
+      shuffleScheduler.copySucceeded(inputAttemptId, null, 0L, 0L, 0, null, false);
+    }
+  }
+
+  private void doFetch(InputAttemptIdentifier baseInputAttemptIdentifier) throws IOException {
+    setupRssShuffleInputStream(mapIndexStart, mapIndexEnd, srcAttemptId.getAttemptNumber(), partitionId);
+    DataInputStream dis = new DataInputStream(rssShuffleInputStream);
+
     long totalReceivedBytes = 0L;
     int numFetchedBlocks = 0;
     try {
       while (totalReceivedBytes < blockLength) {
-        // 'index' (Mapper index) does not match InputAttemptIdentifier that is generated by the
-        // Mapper because Celeborn does not order Mapper output blocks with their indexes.
-        // Still this is safe for our purpose because we only have to process 'numBlocks' output blocks.
-
         int index = numFetchedBlocks;
         numFetchedBlocks++;
 
         long startTime = System.currentTimeMillis();
 
-        long dataLength = getLengthFromHeader(rssShuffleInputStream);
-        totalReceivedBytes += Long.BYTES;
+        // We assume that the number of bytes read by DataInputStream.readLong() is equal to Long.BYTES.
+        long compressedSize = dis.readLong();
+        long decompressedSize = dis.readLong();
+        totalReceivedBytes += RssShuffleUtils.ORDERED_SHUFFLE_HEADER_SIZE;
 
-        boolean isLastBlock = totalReceivedBytes + dataLength >= blockLength;
-        // if totalReceivedBytes + dataLength > blockLength, then IOException will be thrown later.
+        boolean isLastBlock = totalReceivedBytes + compressedSize >= blockLength;
+        // if totalReceivedBytes + compressedSize > blockLength, then IOException will be thrown later.
         InputAttemptIdentifier fakeIAI = new InputAttemptIdentifier(
-            dummyInputAttemptId.getInputIdentifier(),
-            dummyInputAttemptId.getAttemptNumber(),
-            dummyInputAttemptId.getPathComponent(),
+            baseInputAttemptIdentifier.getInputIdentifier(),
+            baseInputAttemptIdentifier.getAttemptNumber(),
+            baseInputAttemptIdentifier.getPathComponent(),
             false,
             isLastBlock ? SPILL_INFO.FINAL_UPDATE : SPILL_INFO.INCREMENTAL_UPDATE,
             index);
 
-        long actualSize = dataLength + RssShuffleUtils.EOF_MARKERS_SIZE;
-        MapOutput mapOutput = allocator.reserve(fakeIAI, actualSize, actualSize, fetcherId, true);
+        MapOutput mapOutput = allocator.reserve(fakeIAI, decompressedSize, compressedSize, fetcherId, true);
 
+        // FIXME! - use original ShuffleUtils
         if (mapOutput.getType() == MapOutput.Type.MEMORY) {
-          RssShuffleUtils.shuffleToMemory(rssShuffleInputStream, mapOutput.getMemory(), dataLength);
+          ShuffleUtils.shuffleToMemory(mapOutput.getMemory(), rssShuffleInputStream, (int) decompressedSize,
+              (int) compressedSize, codec, ifileReadAhead, ifileReadAheadLength, LOG, fakeIAI, inputContext);
         } else if (mapOutput.getType() == MapOutput.Type.DISK) {
-          try (OutputStream outputStream = mapOutput.getDisk()) {
-            RssShuffleUtils.shuffleToDisk(rssShuffleInputStream, outputStream, dataLength);
-          }
+          ShuffleUtils.shuffleToDisk(mapOutput.getDisk(), "RSS", rssShuffleInputStream, compressedSize,
+              decompressedSize, LOG, fakeIAI, ifileReadAhead, ifileReadAheadLength, verifyDiskChecksum);
         } else {
           throw new TezUncheckedException("Unexpected MapOutput.Type: " + mapOutput);
         }
-        totalReceivedBytes += dataLength;
-
-        /*
-        // wrong because ordering is not guaranteed
-        if (currentPartitionSize != Long.BYTES + dataLength) {
-          String message = String.format("Ordered - RssFetcher for %d received only %d bytes. Expected size: %d",
-             currentMapIndex, Long.BYTES + dataLength, currentPartitionSize);
-          LOG.error(message);
-          throw new IOException(message);
-        }
-         */
+        totalReceivedBytes += compressedSize;
 
         long copyDuration = System.currentTimeMillis() - startTime;
-        shuffleScheduler.copySucceeded(fakeIAI, null, dataLength, dataLength, copyDuration, mapOutput, false);
+        shuffleScheduler.copySucceeded(fakeIAI, null, compressedSize, decompressedSize, copyDuration,
+            mapOutput, false);
       }
     } finally {
       closeRssShuffleInputStream();
     }
-
-    LOG.info("Ordered - RssFetcher finished fetching {} concatenated blocks from RSS. # of partitions = {}",
-        numFetchedBlocks, numBlocks);
 
     if (totalReceivedBytes != blockLength) {
       String message = String.format("Ordered - RssFetcher received only %d bytes. Expected size: %d",
           totalReceivedBytes, blockLength);
       LOG.error(message);
       throw new IOException(message);
-    }
-
-    for (int i = 1; i < numBlocks; i++) {
-      InputAttemptIdentifier inputAttemptId =
-          srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().get(i);
-      shuffleScheduler.copySucceeded(inputAttemptId, null, 0L, 0L, 0, null, false);
     }
   }
 
@@ -283,11 +261,6 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
         throw new IllegalStateException("Detected shutdown");
       }
     }
-  }
-
-  private long getLengthFromHeader(InputStream inputStream) throws IOException {
-    DataInputStream dis = new DataInputStream(inputStream);
-    return dis.readLong();
   }
 
   private void closeRssShuffleInputStream() {

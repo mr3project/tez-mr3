@@ -156,8 +156,7 @@ public class Shuffle implements ExceptionReporter {
         initialMemoryAvailable,
         codec,
         ifileReadAhead,
-        ifileReadAheadLength,
-        rssShuffleClient != null);
+        ifileReadAheadLength);
 
     scheduler = new ShuffleScheduler(
         this.inputContext,

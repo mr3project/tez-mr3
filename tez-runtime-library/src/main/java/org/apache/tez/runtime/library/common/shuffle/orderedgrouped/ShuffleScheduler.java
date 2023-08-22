@@ -1583,7 +1583,8 @@ class ShuffleScheduler {
           rssShuffleClient,
           inputContext.shuffleId(),
           partitionId, mergedCid,
-          subTotalSize, mapIndexStart, mapIndexEnd, true);
+          subTotalSize, mapIndexStart, mapIndexEnd, true,
+          codec, ifileReadAhead, ifileReadAheadLength, inputContext, verifyDiskChecksum);
       rssFetchers.add(rssFetcher);
     };
     RssShuffleUtils.createRssFetchersForReadPartitionAllOnce(
@@ -1604,7 +1605,8 @@ class ShuffleScheduler {
         rssShuffleClient,
         inputContext.shuffleId(),
         partitionId, inputAttemptIdentifier,
-        partitionTotalSize, mapIndexStart, mapIndexEnd, false);
+        partitionTotalSize, mapIndexStart, mapIndexEnd, false,
+        codec, ifileReadAhead, ifileReadAheadLength, inputContext, verifyDiskChecksum);
   }
 
   private class FetchFutureCallback implements FutureCallback<Void> {
