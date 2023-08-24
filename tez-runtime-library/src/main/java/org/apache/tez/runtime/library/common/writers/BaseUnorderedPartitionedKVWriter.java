@@ -63,7 +63,7 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
   protected final Serialization keySerialization;
   protected final Serialization valSerialization;
   protected final int numPartitions;
-  protected final CompressionCodec codec;           // null if using RSS ShuffleClient
+  protected final CompressionCodec codec;
   protected final TezTaskOutput outputFileHandler;  // null if using RSS ShuffleClient
   
   protected final boolean ifileReadAhead;
@@ -147,7 +147,7 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
 
     // compression
     try {
-      this.codec = rssShuffleClient != null ? null : CodecUtils.getCodec(conf);
+      this.codec = CodecUtils.getCodec(conf);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }

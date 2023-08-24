@@ -19,14 +19,18 @@
 package org.apache.tez.runtime.library.common.shuffle;
 
 import org.apache.celeborn.client.ShuffleClient;
+import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.tez.dag.api.TezUncheckedException;
+import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
+import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
+import org.apache.tez.runtime.library.common.InputAttemptIdentifier.SPILL_INFO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.ArrayList;
 
 public class RssFetcher implements FetcherBase {
@@ -54,6 +58,13 @@ public class RssFetcher implements FetcherBase {
   private final int mapIndexStart, mapIndexEnd;
   private final boolean readPartitionAllOnce;
 
+  // For decompress/decode InputStream
+  private final CompressionCodec codec;
+  private final boolean ifileReadAhead;
+  private final int ifileReadAheadLength;
+  private final InputContext inputContext;
+  private final boolean verifyDiskChecksum;
+
   public RssFetcher(
       FetcherCallback fetcherCallback,
       FetchedInputAllocator inputAllocator,
@@ -63,8 +74,15 @@ public class RssFetcher implements FetcherBase {
       int port,
       int partitionId,
       CompositeInputAttemptIdentifier srcAttemptId,
-      long dataLength, int mapIndexStart, int mapIndexEnd,
-      boolean readPartitionAllOnce) {
+      long dataLength,
+      int mapIndexStart,
+      int mapIndexEnd,
+      boolean readPartitionAllOnce,
+      CompressionCodec codec,
+      boolean ifileReadAhead,
+      int ifileReadAheadLength,
+      InputContext inputContext,
+      boolean verifyDiskChecksum) {
     this.fetcherCallback = fetcherCallback;
     this.inputAllocator = inputAllocator;
     this.rssShuffleClient = rssShuffleClient;
@@ -77,54 +95,20 @@ public class RssFetcher implements FetcherBase {
     this.mapIndexStart = mapIndexStart;
     this.mapIndexEnd = mapIndexEnd;
     this.readPartitionAllOnce = readPartitionAllOnce;
+    this.codec = codec;
+    this.ifileReadAhead = ifileReadAhead;
+    this.ifileReadAheadLength = ifileReadAheadLength;
+    this.inputContext = inputContext;
+    this.verifyDiskChecksum = verifyDiskChecksum;
 
     assert dataLength >= 0;
   }
 
   public FetchResult call() throws Exception {
-    long startTime = System.currentTimeMillis();
-
-    // do not optimize for dataLength==0 because we have to use fetchedInput when calling fetchSucceeded()
-
-    FetchedInput fetchedInput;
-    long actualSize = dataLength + RssShuffleUtils.EOF_MARKERS_SIZE;
-    fetchedInput = inputAllocator.allocate(actualSize, actualSize, srcAttemptId);
-
-    // TODO: optimize for mapIndexEnd == mapIndexStart + 1 and readPartitionAllOnce == true
-
-    LOG.info("RssFetcher beginning with readPartitionAllOnce={}: {}, num={}, partitionId={}, dataLength={}, from={}, to={}",
-        readPartitionAllOnce,
-        srcAttemptId,
-        !readPartitionAllOnce ? 0 :
-        srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().size(),
-        partitionId, dataLength,
-        mapIndexStart, mapIndexEnd);
-
-    if (fetchedInput.getType() == FetchedInput.Type.MEMORY) {
-      setupRssShuffleInputStream(mapIndexStart, mapIndexEnd, srcAttemptId.getAttemptNumber(), partitionId);
-      shuffleToMemory((MemoryFetchedInput) fetchedInput);
-    } else if (fetchedInput.getType() == FetchedInput.Type.DISK) {
-      setupRssShuffleInputStream(mapIndexStart, mapIndexEnd, srcAttemptId.getAttemptNumber(), partitionId);
-      shuffleToDisk((DiskFetchedInput) fetchedInput);
-    } else {
-      throw new TezUncheckedException("Unknown FetchedInput.Type: " + fetchedInput);
-    }
-
-    long copyDuration = System.currentTimeMillis() - startTime;
     if (readPartitionAllOnce) {
-      // ShuffleManager.getNextInput() should not get stuck in completedInputs.take():
-      //   1. mark completion for every InputAttemptIdentifier except srcAttemptId
-      //   2. call fetchSucceeded() on srcAttemptId and fetchedInput
-      // Note that InputAttemptIdentifier's have the same partitionId, but different inputIdentifiers.
-      for (CompositeInputAttemptIdentifier inputIdentifier: srcAttemptId.getInputIdentifiersForReadPartitionAllOnce()) {
-        if (inputIdentifier.getInputIdentifier() != srcAttemptId.getInputIdentifier()) {
-          // fetchedInput == null, so mark completion only
-          fetcherCallback.fetchSucceeded(host, inputIdentifier, null, 0L, 0L, 0L);
-        }
-      }
-      fetcherCallback.fetchSucceeded(host, srcAttemptId, fetchedInput, dataLength, dataLength, copyDuration);
+      fetchMultipleBlocks(srcAttemptId);
     } else {
-      fetcherCallback.fetchSucceeded(host, srcAttemptId, fetchedInput, dataLength, dataLength, copyDuration);
+      fetchMultipleBlocks(srcAttemptId);
     }
 
     LOG.info("RssFetcher finished with readPartitionAllOnce={}: {}, num={}, partitionId={}, dataLength={}, from={}, to={}",
@@ -136,6 +120,84 @@ public class RssFetcher implements FetcherBase {
         mapIndexStart, mapIndexEnd);
 
     return new FetchResult(host, port, partitionId, 1, new ArrayList<>());
+  }
+
+  private void fetchMultipleBlocks(InputAttemptIdentifier baseInputAttemptIdentifier) throws IOException {
+    setupRssShuffleInputStream(mapIndexStart, mapIndexEnd, srcAttemptId.getAttemptNumber(), partitionId);
+    DataInputStream dis = new DataInputStream(rssShuffleInputStream);
+
+    long totalReceivedBytes = 0L;
+    int numFetchedBlocks = 0;
+    try {
+      while (totalReceivedBytes < dataLength) {
+        int index = numFetchedBlocks;
+        numFetchedBlocks++;
+
+        long startTime = System.currentTimeMillis();
+
+        // We assume that the number of bytes read by DataInputStream.readLong() is equal to Long.BYTES.
+        long compressedSize = dis.readLong();
+        long decompressedSize = dis.readLong();
+        totalReceivedBytes += RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE;
+
+        boolean isLastBlock = totalReceivedBytes + compressedSize >= dataLength;
+
+        InputAttemptIdentifier fakeIAI = new InputAttemptIdentifier(
+            baseInputAttemptIdentifier.getInputIdentifier(),
+            baseInputAttemptIdentifier.getAttemptNumber(),
+            baseInputAttemptIdentifier.getPathComponent(),
+            false,
+            isLastBlock ? SPILL_INFO.FINAL_UPDATE : SPILL_INFO.INCREMENTAL_UPDATE,
+            index);
+
+        FetchedInput fetchedInput = inputAllocator.allocate(decompressedSize, compressedSize, fakeIAI);
+
+        if (fetchedInput.getType() == FetchedInput.Type.MEMORY) {
+          MemoryFetchedInput mfi = (MemoryFetchedInput) fetchedInput;
+          ShuffleUtils.shuffleToMemory(mfi.getBytes(), rssShuffleInputStream, (int) decompressedSize,
+              (int) compressedSize, codec, ifileReadAhead, ifileReadAheadLength, LOG, fakeIAI, inputContext);
+        } else if (fetchedInput.getType() == FetchedInput.Type.DISK) {
+          ShuffleUtils.shuffleToDisk(fetchedInput.getOutputStream(), host, rssShuffleInputStream,
+              compressedSize, decompressedSize, LOG, fakeIAI, ifileReadAhead, ifileReadAheadLength,
+              verifyDiskChecksum);
+        } else {
+          throw new TezUncheckedException("Unknown FetchedInput.Type: " + fetchedInput);
+        }
+
+        totalReceivedBytes += compressedSize;
+        long copyDuration = System.currentTimeMillis() - startTime;
+
+        fetcherCallback.fetchSucceeded(host, fakeIAI, fetchedInput, compressedSize, decompressedSize,
+            copyDuration);
+      }
+    } finally {
+      synchronized (lock) {
+        if (!rssShuffleInputStreamClosed) {
+          rssShuffleInputStreamClosed = true;
+          rssShuffleInputStream.close();
+        }
+      }
+    }
+
+    if (totalReceivedBytes != dataLength) {
+      String message = String.format("Ordered - RssFetcher received only %d bytes. Expected size: %d",
+          totalReceivedBytes, dataLength);
+      LOG.error(message);
+      throw new IOException(message);
+    }
+
+    if (readPartitionAllOnce) {
+      // ShuffleManager.getNextInput() should not get stuck in completedInputs.take():
+      //   1. mark completion for every InputAttemptIdentifier except srcAttemptId
+      //   2. call fetchSucceeded() on srcAttemptId and fetchedInput
+      // Note that InputAttemptIdentifier's have the same partitionId, but different inputIdentifiers.
+      for (CompositeInputAttemptIdentifier iai : srcAttemptId.getInputIdentifiersForReadPartitionAllOnce()) {
+        if (iai.getInputIdentifier() != baseInputAttemptIdentifier.getInputIdentifier()) {
+          // fetchedInput == null, so mark completion only
+          fetcherCallback.fetchSucceeded(host, iai, null, 0L, 0L, 0L);
+        }
+      }
+    }
   }
 
   public void shutdown() {
@@ -161,44 +223,6 @@ public class RssFetcher implements FetcherBase {
       } else {
         LOG.warn("RssFetcher.shutdown() is called before it connects to RSS. Stop running RssFetcher");
         throw new IllegalStateException("Detected shutdown");
-      }
-    }
-  }
-
-  private void shuffleToMemory(MemoryFetchedInput fetchedInput) throws IOException {
-    try {
-      RssShuffleUtils.shuffleToMemory(rssShuffleInputStream, fetchedInput.getBytes(), dataLength);
-    } catch (IOException e) {
-      for (int i = mapIndexStart; i < mapIndexEnd; i++) {
-      LOG.error("Failed to read shuffle data from rssShuffleInputStream, Memory, unordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{}",
-         shuffleId, i, srcAttemptId.getAttemptNumber(), partitionId, e);
-      }
-      throw e;
-    } finally {
-      synchronized (lock) {
-        if (!rssShuffleInputStreamClosed) {
-          rssShuffleInputStreamClosed = true;
-          rssShuffleInputStream.close();
-        }
-      }
-    }
-  }
-
-  private void shuffleToDisk(DiskFetchedInput fetchedInput) throws IOException {
-    try (OutputStream diskOutputStream = fetchedInput.getOutputStream()) {
-      RssShuffleUtils.shuffleToDisk(rssShuffleInputStream, diskOutputStream, dataLength);
-    } catch (IOException e) {
-      for (int i = mapIndexStart; i < mapIndexEnd; i++) {
-        LOG.error("Failed to read shuffle data from rssShuffleInputStream, Disk, unordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{}",
-            shuffleId, i, srcAttemptId.getAttemptNumber(), partitionId, e);
-      }
-      throw e;
-    } finally {
-      synchronized (lock) {
-        if (!rssShuffleInputStreamClosed) {
-          rssShuffleInputStreamClosed = true;
-          rssShuffleInputStream.close();
-        }
       }
     }
   }

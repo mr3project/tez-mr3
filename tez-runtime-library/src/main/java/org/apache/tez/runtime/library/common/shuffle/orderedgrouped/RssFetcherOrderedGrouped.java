@@ -206,7 +206,7 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
         // We assume that the number of bytes read by DataInputStream.readLong() is equal to Long.BYTES.
         long compressedSize = dis.readLong();
         long decompressedSize = dis.readLong();
-        totalReceivedBytes += RssShuffleUtils.ORDERED_SHUFFLE_HEADER_SIZE;
+        totalReceivedBytes += RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE;
 
         boolean isLastBlock = totalReceivedBytes + compressedSize >= blockLength;
         // if totalReceivedBytes + compressedSize > blockLength, then IOException will be thrown later.

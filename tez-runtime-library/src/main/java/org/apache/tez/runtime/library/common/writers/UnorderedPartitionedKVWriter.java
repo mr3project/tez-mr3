@@ -72,6 +72,7 @@ import org.apache.tez.runtime.library.api.IOInterruptedException;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration.ReportPartitionStats;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.Constants;
+import org.apache.tez.runtime.library.common.shuffle.RssShuffleUtils;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.apache.tez.runtime.library.common.sort.impl.TezIndexRecord;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Writer;
@@ -214,6 +215,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   private final ShuffleClient rssShuffleClient;
   private final ArrayBlockingQueue<ByteArrayOutputStream> rssBufferPool;
   private final int numPhysicalOutputs;
+  private final long[] compressedSizePerPartition;
 
   public UnorderedPartitionedKVWriter(OutputContext outputContext, Configuration conf,
       int numOutputs, long availableMemoryBytes, @Nullable ShuffleClient sc, int numPartitions)
@@ -349,6 +351,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         rssBufferPool.offer(new ByteArrayOutputStream());
       }
     }
+
+    compressedSizePerPartition = rssShuffleClient != null ? new long[numPartitions] : null;
 
     if (this.rssShuffleClient != null) {
       LOG.info("Registering shuffleId = " + outputContext.shuffleId());
@@ -756,8 +760,13 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
             if (writer == null) {
               rssBuffer.reset();
               DataOutputStream out = new DataOutputStream(rssBuffer);
-              writer =
-                  new Writer(keySerialization, valSerialization, out, keyClass, valClass, null, null, true);
+
+              // Make a space for writing compressed and decompressed length of block.
+              out.writeLong(0L);
+              out.writeLong(0L);
+
+              writer = new Writer(keySerialization, valSerialization, out, keyClass, valClass, codec,
+                  null, null, false, true);
             }
 
             numRecords += writePartition(buffer.partitionPositions[i], buffer, writer, key, val);
@@ -773,11 +782,23 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
             }
 
             writer.close();
-            long curPartitionLength = writer.getCompressedLength();
+            long compressedLength = writer.getCompressedLength();
+            long rawLength = writer.getRawLength();
             writer = null;
 
-            totalPushedDataLength += curPartitionLength;
-            sizePerPartition[i] += curPartitionLength;
+            totalPushedDataLength += compressedLength;
+            sizePerPartition[i] += rawLength;
+
+            assert compressedLength + RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE == rssBuffer.size();
+
+            compressedSizePerPartition[i] += compressedLength + RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE;
+
+            byte[] data = rssBuffer.toByteArray();
+
+            ByteBuffer lengthBuffer = ByteBuffer.allocate(RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE);
+            lengthBuffer.putLong(compressedLength);
+            lengthBuffer.putLong(rawLength);
+            System.arraycopy(lengthBuffer.array(), 0, data, 0, RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE);
 
             LOG.info("Unordered output pushData() - unordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{} = {}",
               outputContext.shuffleId(),
@@ -787,7 +808,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
             rssShuffleClient.pushData(
                 outputContext.shuffleId(),
                 outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber(), i,
-                rssBuffer.toByteArray(), 0, rssBuffer.size(), outputContext.getVertexParallelism(),
+                data, 0, data.length, outputContext.getVertexParallelism(),
                 numPhysicalOutputs);
           }
         } finally {
@@ -1087,17 +1108,17 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
       long maxPartitionSize = 0L;
       for (int i = 0; i < numPhysicalOutputs; i++) {
-        if (maxPartitionSize < sizePerPartition[i]) {
-          maxPartitionSize = sizePerPartition[i];
+        if (maxPartitionSize < compressedSizePerPartition[i]) {
+          maxPartitionSize = compressedSizePerPartition[i];
         }
       }
       if (maxPartitionSize < Integer.MAX_VALUE) {
         for (int i = 0; i < numPhysicalOutputs; i++) {
-          payloadBuilder.addPartitionSizes((int)sizePerPartition[i]);
+          payloadBuilder.addPartitionSizes((int) compressedSizePerPartition[i]);
         }
       } else {
         for (int i = 0; i < numPhysicalOutputs; i++) {
-          payloadBuilder.addPartitionSizesLong(sizePerPartition[i]);
+          payloadBuilder.addPartitionSizesLong(compressedSizePerPartition[i]);
         }
       }
       payloadBuilder.setTaskIndex(outputContext.getTaskIndex());
@@ -1178,7 +1199,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       SpillCallable spillCallable;
       if (rssShuffleClient != null) {
         int spillIndex = numSpills.getAndIncrement();
-        spillCallable = new SpillCallable(filledBuffers, null, null, spillIndex);
+        spillCallable = new SpillCallable(filledBuffers, codec, null, spillIndex);
       } else {
         //setup output file and index file
         SpillPathDetails spillPathDetails = getSpillPathDetails(true, -1);
@@ -1461,7 +1482,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
     // acquire buffer
 
-    long outSize = 0;
+    long compressedLength = 0;
 
     Writer writer = null;
     ByteArrayOutputStream rssBuffer = null;
@@ -1475,8 +1496,12 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       }
       DataOutputStream out = new DataOutputStream(rssBuffer);
 
-      writer =
-          new IFile.Writer(keySerialization, valSerialization, out, keyClass, valClass, null, null, true);
+      // Make a space for writing compressed and decompressed length of block.
+      out.writeLong(0L);
+      out.writeLong(0L);
+
+      writer = new IFile.Writer(keySerialization, valSerialization, out, keyClass, valClass, codec, null,
+          null, false, true);
       writer.append(key, value);
 
       outputLargeRecordsCounter.increment(1);
@@ -1486,13 +1511,24 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       }
 
       writer.close();
-      outSize = writer.getCompressedLength();
+      long rawLength = writer.getRawLength();
+      compressedLength = writer.getCompressedLength();
+
+      assert compressedLength + RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE == rssBuffer.size();
+
+      compressedSizePerPartition[partition] += compressedLength + RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE;
 
       synchronized (additionalSpillBytesWritternCounter) {
-        additionalSpillBytesWritternCounter.increment(outSize);
+        additionalSpillBytesWritternCounter.increment(compressedLength);
       }
 
       writer = null;
+      byte[] data = rssBuffer.toByteArray();
+
+      ByteBuffer lengthBuffer = ByteBuffer.allocate(RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE);
+      lengthBuffer.putLong(compressedLength);
+      lengthBuffer.putLong(rawLength);
+      System.arraycopy(lengthBuffer.array(), 0, data, 0, RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE);
 
       LOG.info("Unordered output pushData() - large unordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{} = {}",
           outputContext.shuffleId(),
@@ -1502,7 +1538,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       rssShuffleClient.pushData(
           outputContext.shuffleId(),
           outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber(), partition,
-          rssBuffer.toByteArray(), 0, rssBuffer.size(), outputContext.getVertexParallelism(),
+          data, 0, data.length, outputContext.getVertexParallelism(),
           numPhysicalOutputs);
 
       rssBuffer.reset();
@@ -1528,7 +1564,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     mayBeSendEventsForSpill(emptyPartitions, sizePerPartitionToReport(), spillIndex, false);
 
     LOG.info("{}: Finished pushing large record of size {}. (Spill index: {})",
-        destNameTrimmed, outSize, spillIndex);
+        destNameTrimmed, compressedLength, spillIndex);
   }
 
   private void handleSpillIndex(SpillPathDetails spillPathDetails, TezSpillRecord spillRecord)

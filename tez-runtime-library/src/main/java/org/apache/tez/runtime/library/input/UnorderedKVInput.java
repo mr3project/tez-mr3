@@ -113,7 +113,7 @@ public class UnorderedKVInput extends AbstractLogicalInput {
     if (!isClosed && !isStarted.get()) {
       ////// Initial configuration
       memoryUpdateCallbackHandler.validateUpdateReceived();
-      CompressionCodec codec = rssShuffleClient != null ? null : CodecUtils.getCodec(conf);
+      CompressionCodec codec = CodecUtils.getCodec(conf);
 
       boolean compositeFetch = rssShuffleClient != null || ShuffleUtils.isTezShuffleHandler(conf);
       boolean ifileReadAhead = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD,

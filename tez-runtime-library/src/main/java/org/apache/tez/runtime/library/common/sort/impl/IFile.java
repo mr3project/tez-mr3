@@ -32,6 +32,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.io.BoundedByteArrayOutputStream;
 import org.apache.tez.runtime.api.DecompressorPool;
 import org.apache.tez.runtime.api.InputContext;
+import org.apache.tez.runtime.library.common.shuffle.RssShuffleUtils;
 import org.apache.tez.runtime.library.common.task.local.output.TezTaskOutput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -192,7 +193,7 @@ public class IFile {
       this.rawOut = newRawOut;
       this.ownOutputStream = true;
 
-      setupOutputStream(fileCodec);
+      setupOutputStream(fileCodec, this.rawOut);
 
       // Write header to file
       headerWritten = false;
@@ -315,6 +316,7 @@ public class IFile {
     protected final boolean rle;
 
     private final boolean useRSS;
+    private final DataOutputStream rssRawOut;
 
     public Writer(Serialization keySerialization, Serialization valSerialization, FileSystem fs, Path file,
                   Class keyClass, Class valueClass,
@@ -330,7 +332,9 @@ public class IFile {
       writtenRecordsCounter = writesCounter;
       serializedUncompressedBytes = serializedBytesCounter;
       this.rle = rle;
+
       this.useRSS = false;
+      this.rssRawOut = null;
     }
 
     public Writer(Serialization keySerialization, Serialization valSerialization, FSDataOutputStream outputStream,
@@ -341,20 +345,19 @@ public class IFile {
     }
 
     public Writer(Serialization keySerialization, Serialization valSerialization,
-        DataOutputStream outputStream, Class keyClass, Class valueClass, TezCounter writesCounter,
-        TezCounter serializedBytesCounter, boolean useRSS) throws IOException {
-      this(keySerialization, valSerialization, outputStream, keyClass, valueClass, writesCounter,
-          serializedBytesCounter, false, useRSS);
-    }
-
-    public Writer(Serialization keySerialization, Serialization valSerialization,
-        DataOutputStream outputStream, Class keyClass, Class valueClass, TezCounter writesCounter,
-        TezCounter serializedBytesCounter, boolean rle, boolean useRSS) throws IOException {
-      this.out = outputStream;
+        DataOutputStream outputStream, Class keyClass, Class valueClass, CompressionCodec codec,
+        TezCounter writesCounter, TezCounter serializedBytesCounter, boolean rle, boolean useRSS)
+        throws IOException {
+      this.rssRawOut = outputStream;
       this.writtenRecordsCounter = writesCounter;
       this.serializedUncompressedBytes = serializedBytesCounter;
       this.rle = rle;
       this.useRSS = useRSS;
+
+      assert rssRawOut.size() == RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE;
+
+      setupOutputStream(codec, rssRawOut);
+      writeHeader(rssRawOut);
 
       if (keyClass != null) {
         this.closeSerializers = true;
@@ -376,9 +379,11 @@ public class IFile {
       this.serializedUncompressedBytes = serializedBytesCounter;
       this.start = this.rawOut.getPos();
       this.rle = rle;
-      this.useRSS = false;
 
-      setupOutputStream(codec);
+      this.useRSS = false;
+      this.rssRawOut = null;
+
+      setupOutputStream(codec, rawOut);
 
       writeHeader(outputStream);
 
@@ -393,8 +398,8 @@ public class IFile {
       }
     }
 
-    void setupOutputStream(CompressionCodec codec) throws IOException {
-      this.checksumOut = new IFileOutputStream(this.rawOut);
+    void setupOutputStream(CompressionCodec codec, OutputStream baseOut) throws IOException {
+      this.checksumOut = new IFileOutputStream(baseOut);
       if (codec != null) {
         this.compressor = CodecUtils.getCompressor(codec);
         if (this.compressor != null) {
@@ -439,14 +444,14 @@ public class IFile {
       // write V_END_MARKER as needed
       writeValueMarker(out);
 
-      if (!useRSS) {
-        // Write EOF_MARKER for key/value length
-        WritableUtils.writeVInt(out, EOF_MARKER);
-        WritableUtils.writeVInt(out, EOF_MARKER);
-        decompressedBytesWritten += 2 * WritableUtils.getVIntSize(EOF_MARKER);
-        //account for header bytes
-        decompressedBytesWritten += HEADER.length;
-      }
+      // Write EOF_MARKER for key/value length
+      WritableUtils.writeVInt(out, EOF_MARKER);
+      WritableUtils.writeVInt(out, EOF_MARKER);
+      decompressedBytesWritten += 2 * WritableUtils.getVIntSize(EOF_MARKER);
+
+      assert headerWritten;
+      //account for header bytes
+      decompressedBytesWritten += HEADER.length;
 
       // Close the underlying stream iff we own it...
       if (ownOutputStream) {
@@ -458,24 +463,20 @@ public class IFile {
           compressedOut.resetState();
         }
 
-        if (!useRSS) {
-          // Write the checksum and flush the buffer
-          checksumOut.finish();
-        }
+        checksumOut.finish();
       }
 
       if (useRSS) {
-        // We do not use Compressor with RSS.
-        compressedBytesWritten = decompressedBytesWritten;
+        compressedBytesWritten = rssRawOut.size() - RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE;
       } else {
         //header bytes are already included in rawOut
         compressedBytesWritten = rawOut.getPos() - start;
+      }
 
-        if (compressOutput) {
-          // Return back the compressor
-          CodecPool.returnCompressor(compressor);
-          compressor = null;
-        }
+      if (compressOutput) {
+        // Return back the compressor
+        CodecPool.returnCompressor(compressor);
+        compressor = null;
       }
 
       out = null;

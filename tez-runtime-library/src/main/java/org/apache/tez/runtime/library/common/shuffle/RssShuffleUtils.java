@@ -18,20 +18,11 @@
 
 package org.apache.tez.runtime.library.common.shuffle;
 
-import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.io.WritableUtils;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
-import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
-import java.io.EOFException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -40,53 +31,7 @@ public class RssShuffleUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(RssShuffleUtils.class);
 
-  public static final int EOF_MARKERS_SIZE = 2 * WritableUtils.getVIntSize(IFile.EOF_MARKER);
-
-  public static final int ORDERED_SHUFFLE_HEADER_SIZE = 2 * Long.BYTES;
-
-  public static void shuffleToMemory(InputStream inputStream, byte[] buffer, long dataLength)
-      throws IOException {
-    IOUtils.readFully(inputStream, buffer, 0, (int) dataLength);
-
-    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    DataOutputStream dos = new DataOutputStream(baos);
-    WritableUtils.writeVInt(dos, IFile.EOF_MARKER);
-    WritableUtils.writeVInt(dos, IFile.EOF_MARKER);
-    byte[] eofMarker = baos.toByteArray();
-
-    System.arraycopy(eofMarker, 0, buffer, (int) dataLength, EOF_MARKERS_SIZE);
-  }
-
-  // shuffleToDisk() reads precisely dataLength bytes from inputStream and does not inspect the remaining data.
-  // inputStream may have more than dataLength bytes because in the case of ordered edges,
-  // we may have subsequent calls to shuffleToDisk() from RssFetcherOrderedGrouped.fetchMultipleBlocks().
-  public static long shuffleToDisk(InputStream inputStream, OutputStream outputStream,
-      long dataLength) throws IOException {
-    byte[] buffer = new byte[ShuffleUtils.BUFFER_SIZE];
-    long remaining = dataLength;
-    long bytesWritten = 0L;
-
-    while (remaining > 0) {
-      int curBytesRead = inputStream.read(buffer, 0, (int) Math.min(remaining, ShuffleUtils.BUFFER_SIZE));
-      if (curBytesRead < 0) {
-        throw new EOFException("Expected size: " + dataLength + ", Received size: " + bytesWritten);
-      }
-      outputStream.write(buffer, 0, curBytesRead);
-      bytesWritten += curBytesRead;
-      remaining -= curBytesRead;
-    }
-
-    if (dataLength != -1L && dataLength != bytesWritten) {
-      throw new IOException("shuffleToDisk() mismatch: " + dataLength + " != " + bytesWritten);
-    }
-
-    DataOutputStream dos = new DataOutputStream(outputStream);
-    WritableUtils.writeVInt(dos, IFile.EOF_MARKER);
-    WritableUtils.writeVInt(dos, IFile.EOF_MARKER);
-    bytesWritten += EOF_MARKERS_SIZE;
-
-    return bytesWritten;
-  }
+  public static final int RSS_SHUFFLE_HEADER_SIZE = 2 * Long.BYTES;
 
   public static boolean checkUseSameAttemptNumber(CompositeInputAttemptIdentifier inputAttemptIdentifier) {
     List<CompositeInputAttemptIdentifier> childInputAttemptIdentifiers = inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce();

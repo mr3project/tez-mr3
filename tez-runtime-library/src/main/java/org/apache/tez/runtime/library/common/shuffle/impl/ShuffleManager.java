@@ -711,10 +711,9 @@ public class ShuffleManager implements FetcherCallback {
       CompositeInputAttemptIdentifier inputAttemptIdentifier, int sourceVertexNumTasks,
       final int partitionId, final InputHost inputHost, List<RssFetcher> rssFetchers) {
     RssShuffleUtils.FetcherCreate createFn = (mergedCid, subTotalSize, mapIndexStart, mapIndexEnd) -> {
-      RssFetcher rssFetcher = new RssFetcher(this, inputManager, rssShuffleClient,
-          inputContext.shuffleId(), inputHost.getHost(), inputHost.getPort(),
-          partitionId, mergedCid,
-          subTotalSize, mapIndexStart, mapIndexEnd, true);
+      RssFetcher rssFetcher = new RssFetcher(this, inputManager, rssShuffleClient, inputContext.shuffleId(),
+          inputHost.getHost(), inputHost.getPort(), partitionId, mergedCid, subTotalSize, mapIndexStart,
+          mapIndexEnd, true, codec, ifileReadAhead, ifileReadAheadLength, inputContext, verifyDiskChecksum);
       rssFetchers.add(rssFetcher);
     };
     RssShuffleUtils.createRssFetchersForReadPartitionAllOnce(
@@ -727,10 +726,9 @@ public class ShuffleManager implements FetcherCallback {
       int partitionId, InputHost inputHost, int mapIndexStart) {
     int mapIndexEnd = mapIndexStart + 1;
     long partitionTotalSize = inputAttemptIdentifier.getPartitionSize(partitionId);
-    return new RssFetcher(this, inputManager, rssShuffleClient,
-        inputContext.shuffleId(), inputHost.getHost(), inputHost.getPort(),
-        partitionId, inputAttemptIdentifier,
-        partitionTotalSize, mapIndexStart, mapIndexEnd, false);
+    return new RssFetcher(this, inputManager, rssShuffleClient, inputContext.shuffleId(), inputHost.getHost(),
+        inputHost.getPort(), partitionId, inputAttemptIdentifier, partitionTotalSize, mapIndexStart,
+        mapIndexEnd, false, codec, ifileReadAhead, ifileReadAheadLength, inputContext, verifyDiskChecksum);
   }
 
   /////////////////// Methods for InputEventHandler
@@ -780,9 +778,9 @@ public class ShuffleManager implements FetcherCallback {
         }
         // simulate a call to addCompletedInputWithNoData() -> registerCompletedInputForPipelinedShuffle()
         // eventInfo.spillProcessed() is called outside lock.lock(), so do not get lock.lock()
-        ShuffleEventInfo eventInfo = shuffleInfoEventsMap.get(srcAttemptIdentifier.getInputIdentifier());
-        eventInfo.spillProcessed(srcAttemptIdentifier.getSpillEventId());
-        numFetchedSpills.getAndIncrement();
+        // ShuffleEventInfo eventInfo = shuffleInfoEventsMap.get(srcAttemptIdentifier.getInputIdentifier());
+        // eventInfo.spillProcessed(srcAttemptIdentifier.getSpillEventId());
+        // numFetchedSpills.getAndIncrement();
         return;
       }
     }
