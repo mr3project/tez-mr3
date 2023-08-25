@@ -852,7 +852,7 @@ public class PipelinedSorter extends ExternalSorter {
         pushedPartitions.add(part);
         pushUnmergedPartition(part);
       } else {
-        if (segmentList.size() > 0) {
+        if (!segmentList.isEmpty()) {
           // sort the segments only if there are intermediate merges
           boolean sortSegments = segmentList.size() > mergeFactor;
 
@@ -895,6 +895,8 @@ public class PipelinedSorter extends ExternalSorter {
         partitionToMergedSize.put(part, partLength);
 
         if (rssShuffleClient != null) {
+          // compare again with MAX_PUSH_SIZE because the behavior of combiner is unknown and thus
+          // the total size may have increased after using combiner
           if (partLength > MAX_PUSH_SIZE) {
             pushedPartitions.add(part);
             pushUnmergedPartition(part);
