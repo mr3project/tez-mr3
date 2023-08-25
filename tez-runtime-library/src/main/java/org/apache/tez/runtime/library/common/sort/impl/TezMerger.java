@@ -368,8 +368,6 @@ public class TezMerger {
     int ifileReadAheadLength;
     int bufferSize = -1;
 
-    private final boolean useRss;
-
     public DiskSegment(FileSystem fs, Path file,
         CompressionCodec codec, boolean ifileReadAhead,
         int ifileReadAheadLength, int bufferSize, boolean preserve)
@@ -412,20 +410,6 @@ public class TezMerger {
 
       this.segmentOffset = segmentOffset;
       this.segmentLength = segmentLength;
-
-      this.useRss = false;
-    }
-
-    public DiskSegment(FileSystem fs, Path file, long segmentLength,TezCounter mergedMapOutputsCounter) {
-      super(null, mergedMapOutputsCounter);
-
-      this.fs = fs;
-      this.file = file;
-      this.segmentOffset = 0;
-      this.segmentLength = segmentLength;
-      this.preserve = false;
-
-      this.useRss = true;
     }
 
     @Override
@@ -434,12 +418,8 @@ public class TezMerger {
       FSDataInputStream in = fs.open(file);
       in.seek(segmentOffset);
 
-      if (useRss) {
-        reader = new Reader(in, segmentLength, null, null);
-      } else {
-        reader = new Reader(in, segmentLength, codec, readsCounter, bytesReadCounter, ifileReadAhead,
-            ifileReadAheadLength, bufferSize, null);
-      }
+      reader = new Reader(in, segmentLength, codec, readsCounter, bytesReadCounter, ifileReadAhead,
+          ifileReadAheadLength, bufferSize, null);
     }
 
     @Override

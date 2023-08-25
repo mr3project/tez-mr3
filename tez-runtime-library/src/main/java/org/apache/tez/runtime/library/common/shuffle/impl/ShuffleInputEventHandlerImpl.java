@@ -192,8 +192,7 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
       if (emptyPartitionsBitSet.get(partitionId)) {
         CompositeInputAttemptIdentifier srcAttemptIdentifier =
             constructInputAttemptIdentifier(dme.getTargetIndex(), 1, dme.getVersion(), shufflePayload, false);
-        if (rssShuffleClient != null &&
-            srcAttemptIdentifier.getFetchTypeInfo() == InputAttemptIdentifier.SPILL_INFO.FINAL_UPDATE) {
+        if (rssShuffleClient != null) {
           if (LOG.isDebugEnabled()) {
             LOG.debug("Last spill is empty, but notify ShuffleManager later by calling addKnownInput(): {} {}", partitionId, srcAttemptIdentifier);
           }

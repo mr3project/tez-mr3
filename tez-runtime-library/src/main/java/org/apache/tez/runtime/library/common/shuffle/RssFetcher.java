@@ -105,11 +105,7 @@ public class RssFetcher implements FetcherBase {
   }
 
   public FetchResult call() throws Exception {
-    if (readPartitionAllOnce) {
-      fetchMultipleBlocks(srcAttemptId);
-    } else {
-      fetchMultipleBlocks(srcAttemptId);
-    }
+    fetchMultipleBlocks(srcAttemptId);
 
     LOG.info("RssFetcher finished with readPartitionAllOnce={}: {}, num={}, partitionId={}, dataLength={}, from={}, to={}",
         readPartitionAllOnce,

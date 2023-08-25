@@ -760,8 +760,6 @@ public class IFile {
     private CompressionCodec codec;
     private DecompressorPool inputOutputContext;
 
-    private final boolean useRSS;
-
     /**
      * Construct an IFile Reader.
      *
@@ -851,19 +849,6 @@ public class IFile {
       this.bytesReadCounter = bytesReadCounter;
       this.fileLength = length;
       this.bufferSize = Math.max(0, bufferSize);
-      this.useRSS = false;
-    }
-
-    public Reader(InputStream in, long length, TezCounter readsCounter, TezCounter bytesReadCounter) {
-      this.in = in;
-      this.fileLength = length;
-      this.readRecordsCounter = readsCounter;
-      this.bytesReadCounter = bytesReadCounter;
-
-      this.useRSS = true;
-
-      assert in != null;
-      this.dataIn = new DataInputStream(in);
     }
 
     /**
@@ -973,19 +958,11 @@ public class IFile {
     }
 
     public long getLength() {
-      if (useRSS) {
-        return fileLength;
-      } else {
-        return fileLength - checksumIn.getSize();
-      }
+      return fileLength - checksumIn.getSize();
     }
 
     public long getPosition() throws IOException {
-      if (useRSS) {
-        return bytesRead;
-      } else {
-        return checksumIn.getPosition();
-      }
+      return checksumIn.getPosition();
     }
 
     /**

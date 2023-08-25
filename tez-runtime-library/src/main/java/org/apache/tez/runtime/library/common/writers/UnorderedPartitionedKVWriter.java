@@ -789,21 +789,19 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
             totalPushedDataLength += compressedLength;
             sizePerPartition[i] += rawLength;
 
-            assert compressedLength + RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE == rssBuffer.size();
-
-            compressedSizePerPartition[i] += compressedLength + RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE;
-
             byte[] data = rssBuffer.toByteArray();
-
             ByteBuffer lengthBuffer = ByteBuffer.allocate(RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE);
             lengthBuffer.putLong(compressedLength);
             lengthBuffer.putLong(rawLength);
             System.arraycopy(lengthBuffer.array(), 0, data, 0, RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE);
 
+            assert compressedLength + RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE == data.length;
+            compressedSizePerPartition[i] += data.length;
+
             LOG.info("Unordered output pushData() - unordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{} = {}",
               outputContext.shuffleId(),
               outputContext.getTaskIndex(),
-              outputContext.getTaskAttemptNumber(), i, rssBuffer.size());
+              outputContext.getTaskAttemptNumber(), i, data.length);
 
             rssShuffleClient.pushData(
                 outputContext.shuffleId(),
@@ -1514,26 +1512,25 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       long rawLength = writer.getRawLength();
       compressedLength = writer.getCompressedLength();
 
-      assert compressedLength + RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE == rssBuffer.size();
-
-      compressedSizePerPartition[partition] += compressedLength + RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE;
-
       synchronized (additionalSpillBytesWritternCounter) {
         additionalSpillBytesWritternCounter.increment(compressedLength);
       }
 
       writer = null;
-      byte[] data = rssBuffer.toByteArray();
 
+      byte[] data = rssBuffer.toByteArray();
       ByteBuffer lengthBuffer = ByteBuffer.allocate(RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE);
       lengthBuffer.putLong(compressedLength);
       lengthBuffer.putLong(rawLength);
       System.arraycopy(lengthBuffer.array(), 0, data, 0, RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE);
 
+      assert compressedLength + RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE == data.length;
+      compressedSizePerPartition[partition] += data.length;
+
       LOG.info("Unordered output pushData() - large unordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{} = {}",
           outputContext.shuffleId(),
           outputContext.getTaskIndex(),
-          outputContext.getTaskAttemptNumber(), partition, rssBuffer.size());
+          outputContext.getTaskAttemptNumber(), partition, data.length);
 
       rssShuffleClient.pushData(
           outputContext.shuffleId(),

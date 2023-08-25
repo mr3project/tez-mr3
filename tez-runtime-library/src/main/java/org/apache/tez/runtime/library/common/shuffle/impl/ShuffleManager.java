@@ -776,11 +776,9 @@ public class ShuffleManager implements FetcherCallback {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Fetching spill considered complete: " + srcAttemptIdentifier);
         }
-        // simulate a call to addCompletedInputWithNoData() -> registerCompletedInputForPipelinedShuffle()
-        // eventInfo.spillProcessed() is called outside lock.lock(), so do not get lock.lock()
-        // ShuffleEventInfo eventInfo = shuffleInfoEventsMap.get(srcAttemptIdentifier.getInputIdentifier());
-        // eventInfo.spillProcessed(srcAttemptIdentifier.getSpillEventId());
-        // numFetchedSpills.getAndIncrement();
+        // ignore incremental spill updates because we create fake IAIs in RssFetcher.
+        // If readPartitionAllOnce is enabled, only 1 IAI out of getInputIdentifiersForReadPartitionAllOnce()
+        // is used to report FetchedInput, and the others report only 1 null FetchedInput.
         return;
       }
     }
@@ -914,6 +912,7 @@ public class ShuffleManager implements FetcherCallback {
     }
 
     void setFinalEventId(int spillId) {
+      assert eventsProcessed.cardinality() <= spillId + 1;
       finalEventId = spillId;
     }
 
@@ -1086,33 +1085,35 @@ public class ShuffleManager implements FetcherCallback {
   private void registerCompletedInputForPipelinedShuffleMarkOnly(InputAttemptIdentifier srcAttemptIdentifier) {
     int inputIdentifier = srcAttemptIdentifier.getInputIdentifier();
     ShuffleEventInfo eventInfo = shuffleInfoEventsMap.get(inputIdentifier);
+    assert eventInfo != null;
 
-    // TODO: assert eventInfo != null (???)
-    if (eventInfo == null) {
-      eventInfo = new ShuffleEventInfo(srcAttemptIdentifier);
-      shuffleInfoEventsMap.put(inputIdentifier, eventInfo);
-    }
-
-    eventInfo.spillProcessed(srcAttemptIdentifier.getSpillEventId());
-    numFetchedSpills.getAndIncrement();
-
+    // Ignore spillId as we did not add any incremental update to eventInfo and calling this method means that
+    // RssFetcher did not choose this IAI to fetch data.
     assert srcAttemptIdentifier.getFetchTypeInfo() == InputAttemptIdentifier.SPILL_INFO.FINAL_UPDATE;
-    eventInfo.setFinalEventId(srcAttemptIdentifier.getSpillEventId());
+    assert eventInfo.eventsProcessed.isEmpty();
+
+    eventInfo.spillProcessed(0);
+    numFetchedSpills.getAndIncrement();
+    eventInfo.setFinalEventId(0);
+
+    assert eventInfo.isDone();
 
     lock.lock();
     try {
-      if (eventInfo.isDone()) {
-        completedInputSet.set(srcAttemptIdentifier.getInputIdentifier());
-        numCompletedInputs.incrementAndGet();
-        shuffleInfoEventsMap.remove(srcAttemptIdentifier.getInputIdentifier());
+      completedInputSet.set(srcAttemptIdentifier.getInputIdentifier());
+      int numComplete = numCompletedInputs.incrementAndGet();
+      shuffleInfoEventsMap.remove(srcAttemptIdentifier.getInputIdentifier());
+
+      // Add poison pill in order to notify that we processed all inputs.
+      if (numComplete == numInputs) {
+        completedInputs.add(new NullFetchedInput(srcAttemptIdentifier));
       }
     } finally {
       lock.unlock();
     }
-    if (eventInfo.isDone()) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Mark completion okay: {}/{}, {}", numCompletedInputs.get(), numInputs, srcAttemptIdentifier);
-      }
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Mark completion okay: {}/{}, {}", numCompletedInputs.get(), numInputs, srcAttemptIdentifier);
     }
 
     if (LOG.isTraceEnabled()) {
