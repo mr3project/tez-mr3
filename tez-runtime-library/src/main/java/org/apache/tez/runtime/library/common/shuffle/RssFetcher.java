@@ -182,6 +182,10 @@ public class RssFetcher implements FetcherBase {
       throw new IOException(message);
     }
 
+    if (dataLength == 0) {
+      fetcherCallback.fetchSucceeded(host, baseInputAttemptIdentifier, null, 0L, 0L, 0L);
+    }
+
     if (readPartitionAllOnce) {
       // ShuffleManager.getNextInput() should not get stuck in completedInputs.take():
       //   1. mark completion for every InputAttemptIdentifier except srcAttemptId
