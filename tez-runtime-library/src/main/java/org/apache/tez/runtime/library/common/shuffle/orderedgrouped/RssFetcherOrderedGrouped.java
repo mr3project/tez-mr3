@@ -179,11 +179,12 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
       return;
     }
 
-    CompositeInputAttemptIdentifier dummyInputAttemptId =
+    CompositeInputAttemptIdentifier firstInputAttemptIdentifier =
         srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().get(0);
-    doFetch(dummyInputAttemptId);
-
-    for (int i = 1; i < numBlocks; i++) {
+    doFetch(firstInputAttemptIdentifier);
+    // doFetch() reads the entire set of blocks, but marks only firstInputAttemptIdentifier as finished.
+    // hence we should mark all the remaining InputAttemptIdentifiers as finished as well
+    for (int i = 0; i < numBlocks; i++) {
       InputAttemptIdentifier inputAttemptId =
           srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().get(i);
       shuffleScheduler.copySucceeded(inputAttemptId, null, 0L, 0L, 0, null, false);
@@ -210,7 +211,7 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
 
         boolean isLastBlock = totalReceivedBytes + compressedSize >= blockLength;
         // if totalReceivedBytes + compressedSize > blockLength, then IOException will be thrown later.
-        InputAttemptIdentifier fakeIAI = new InputAttemptIdentifier(
+        InputAttemptIdentifier identifierForCurrentBlock = new InputAttemptIdentifier(
             baseInputAttemptIdentifier.getInputIdentifier(),
             baseInputAttemptIdentifier.getAttemptNumber(),
             baseInputAttemptIdentifier.getPathComponent(),
@@ -218,21 +219,24 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
             isLastBlock ? SPILL_INFO.FINAL_UPDATE : SPILL_INFO.INCREMENTAL_UPDATE,
             index);
 
-        MapOutput mapOutput = allocator.reserve(fakeIAI, decompressedSize, compressedSize, fetcherId, true);
+        MapOutput mapOutput = allocator.reserve(identifierForCurrentBlock, decompressedSize, compressedSize, fetcherId, true);
 
         if (mapOutput.getType() == MapOutput.Type.MEMORY) {
           ShuffleUtils.shuffleToMemory(mapOutput.getMemory(), rssShuffleInputStream, (int) decompressedSize,
-              (int) compressedSize, codec, ifileReadAhead, ifileReadAheadLength, LOG, fakeIAI, inputContext);
+              (int) compressedSize, codec, ifileReadAhead, ifileReadAheadLength, LOG, identifierForCurrentBlock, inputContext);
         } else if (mapOutput.getType() == MapOutput.Type.DISK) {
           ShuffleUtils.shuffleToDisk(mapOutput.getDisk(), "RSS", rssShuffleInputStream, compressedSize,
-              decompressedSize, LOG, fakeIAI, ifileReadAhead, ifileReadAheadLength, verifyDiskChecksum);
+              decompressedSize, LOG, identifierForCurrentBlock, ifileReadAhead, ifileReadAheadLength, verifyDiskChecksum);
         } else {
           throw new TezUncheckedException("Unexpected MapOutput.Type: " + mapOutput);
         }
         totalReceivedBytes += compressedSize;
 
         long copyDuration = System.currentTimeMillis() - startTime;
-        shuffleScheduler.copySucceeded(fakeIAI, null, compressedSize, decompressedSize, copyDuration,
+        // copySucceeded() should be called in order to call mapOutput.commit().
+        // The last block marks baseInputAttemptIdentifier (which is the first InputAttemptIdentifier
+        // belonging to srcAttemptId) as finished.
+        shuffleScheduler.copySucceeded(identifierForCurrentBlock, null, compressedSize, decompressedSize, copyDuration,
             mapOutput, false);
       }
     } finally {
