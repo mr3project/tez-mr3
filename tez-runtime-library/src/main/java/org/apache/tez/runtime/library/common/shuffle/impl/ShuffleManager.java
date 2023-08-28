@@ -1096,18 +1096,14 @@ public class ShuffleManager implements FetcherCallback {
     numFetchedSpills.getAndIncrement();
     eventInfo.setFinalEventId(0);
 
-    assert eventInfo.isDone();
-
     lock.lock();
     try {
-      completedInputSet.set(srcAttemptIdentifier.getInputIdentifier());
-      int numComplete = numCompletedInputs.incrementAndGet();
-      shuffleInfoEventsMap.remove(srcAttemptIdentifier.getInputIdentifier());
+      FetchedInput fetchedInput = new NullFetchedInput(srcAttemptIdentifier);
+      maybeInformInputReady(fetchedInput);
 
-      // Add poison pill in order to notify that we processed all inputs.
-      if (numComplete == numInputs) {
-        completedInputs.add(new NullFetchedInput(srcAttemptIdentifier));
-      }
+      assert eventInfo.isDone();
+      adjustCompletedInputs(fetchedInput);
+      shuffleInfoEventsMap.remove(srcAttemptIdentifier.getInputIdentifier());
     } finally {
       lock.unlock();
     }
