@@ -743,7 +743,8 @@ public class ShuffleManager implements FetcherCallback {
     InputHost host = knownSrcHosts.get(identifier);
     if (host == null) {
       host = new InputHost(identifier,
-          inputContext.readPartitionAllOnce(), inputContext.getSourceVertexNumTasks(),
+          rssShuffleClient != null && inputContext.readPartitionAllOnce(),
+          inputContext.getSourceVertexNumTasks(),
           inputContext.shuffleId());
       InputHost old = knownSrcHosts.putIfAbsent(identifier, host);
       if (old != null) {
@@ -944,7 +945,7 @@ public class ShuffleManager implements FetcherCallback {
       if (!completedInputSet.get(inputIdentifier)) {
         if (fetchedInput != null) {
           fetchedInput.commit();
-          if (!inputContext.readPartitionAllOnce()) {
+          if (!(rssShuffleClient != null && inputContext.readPartitionAllOnce())) {
             fetchStatsLogger.logIndividualFetchComplete(copyDuration,
                 fetchedBytes, decompressedLength, fetchedInput.getType().toString(), srcAttemptIdentifier);
           }
@@ -974,7 +975,7 @@ public class ShuffleManager implements FetcherCallback {
           wakeLoop.signal();
         } else {
           // only mark completion
-          assert inputContext.readPartitionAllOnce();
+          assert (rssShuffleClient != null && inputContext.readPartitionAllOnce());
           shuffledInputsCounter.increment(1);
           registerCompletedInputForPipelinedShuffleMarkOnly(srcAttemptIdentifier);
           logProgress();

@@ -183,7 +183,8 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
           numDmeEventsNoData.getAndIncrement();
 
           // We have to call addKnownMapOutput() if readPartitionAllOnce is enabled.
-          if (!inputContext.readPartitionAllOnce()) {
+          // If not, calling copySucceeded() is enough.
+          if (!(rssShuffleClient != null && inputContext.readPartitionAllOnce())) {
             scheduler.copySucceeded(srcAttemptIdentifier.expand(0), null, 0, 0, 0, null, true);
             return;
           }

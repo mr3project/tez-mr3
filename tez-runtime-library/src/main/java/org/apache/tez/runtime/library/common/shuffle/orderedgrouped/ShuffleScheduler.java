@@ -1088,7 +1088,8 @@ class ShuffleScheduler {
     MapHost host = mapLocations.get(identifier);
     if (host == null) {
       host = new MapHost(inputHostName, port, partitionId, srcAttempt.getInputIdentifierCount(),
-          inputContext.readPartitionAllOnce(), inputContext.getSourceVertexNumTasks(), inputContext.shuffleId());
+          rssShuffleClient != null && inputContext.readPartitionAllOnce(),
+          inputContext.getSourceVertexNumTasks(), inputContext.shuffleId());
       mapLocations.put(identifier, host);
     }
 
