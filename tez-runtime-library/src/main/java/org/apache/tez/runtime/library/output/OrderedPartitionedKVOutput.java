@@ -144,13 +144,13 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
             + ", validValues=" + Arrays.asList(SorterImpl.values()));
       }
 
-      finalMergeEnabled = conf.getBoolean(
+      finalMergeEnabled = rssShuffleClient != null || conf.getBoolean(
           TezRuntimeConfiguration.TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT,
           TezRuntimeConfiguration.TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT_DEFAULT);
 
-      pipelinedShuffle = this.conf.getBoolean(TezRuntimeConfiguration
-          .TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED, TezRuntimeConfiguration
-          .TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT);
+      pipelinedShuffle = rssShuffleClient == null && conf.getBoolean(
+          TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED,
+          TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT);
 
       if (pipelinedShuffle) {
         if (finalMergeEnabled) {
@@ -166,10 +166,8 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
       }
 
       if (rssShuffleClient != null) {
-        Preconditions.checkArgument(!pipelinedShuffle,
-            "OrderedGrouped shuffle does not support pipelined shuffle when RSS is enabled.");
-        Preconditions.checkArgument(finalMergeEnabled,
-            "OrderedGrouped shuffle should be used with final merge if RSS is enabled.");
+        assert finalMergeEnabled;
+        assert !pipelinedShuffle;
         Preconditions.checkArgument(sorterImpl.equals(SorterImpl.PIPELINED),
             "OrderedGrouped shuffle only works with PipelinedSorter if RSS is enabled.");
       }
