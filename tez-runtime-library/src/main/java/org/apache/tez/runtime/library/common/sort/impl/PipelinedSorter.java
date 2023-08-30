@@ -1045,7 +1045,7 @@ public class PipelinedSorter extends ExternalSorter {
 
       LOG.info(
           "Ordered output - push unmerged data. " +
-              "shuffleId={} taskIndex={} attemptNumber={} partitionId={} spillInfo=({}/{}) pushedSize={}",
+              "shuffleId_taskIndex_attemptNumber={}_{}_{}_{} (spillInfo=({}/{}) pushedSize={}",
           outputContext.shuffleId(), outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber(),
           partition, i, numSpills, pushedBytes);
 
