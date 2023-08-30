@@ -144,16 +144,21 @@ class MapHost {
   }
 
   public synchronized void addKnownMap(InputAttemptIdentifier srcAttempt) {
-    if (readPartitionAllOnce) {   // for InputSpec, readPartitionAllOnce == true implies useRssShuffle == true
-      tempMaps.removeIf(input -> {
-        if (input.getInputIdentifier() == srcAttempt.getInputIdentifier()) {
-          LOG.warn("DEBUG: MapHost should remove InputAttemptIdentifier with the same partitionId and a different attemptNumber: {}, {}, {} != {}",
-              partitionId, input.getInputIdentifier(), input.getAttemptNumber(), srcAttempt.getAttemptNumber());
-          return false;
-        } else {
-          return false;
-        }
-      });
+    if (readPartitionAllOnce) {   // readPartitionAllOnce == true implies useRssShuffle == true
+      // The following code checks for duplicate InputAttemptIdentifier's with different attemptNumbers.
+      // This is unnecessary because we do not use VertexRerun for RSS.
+      boolean checkForDuplicateWithDifferentAttemptNumbers = false;
+      if (checkForDuplicateWithDifferentAttemptNumbers) {
+        tempMaps.removeIf(input -> {
+          if (input.getInputIdentifier() == srcAttempt.getInputIdentifier()) {
+            LOG.warn("MapHost should remove InputAttemptIdentifier with the same partitionId and a different attemptNumber: {}, {}, {} != {}",
+                partitionId, input.getInputIdentifier(), input.getAttemptNumber(), srcAttempt.getAttemptNumber());
+            return false;
+          } else {
+            return false;
+          }
+        });
+      }
       tempMaps.add((CompositeInputAttemptIdentifier) srcAttempt);
     } else {  // either we do not use RSS or we have readPartitionAllOnce == false
       maps.add(srcAttempt);

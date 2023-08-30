@@ -137,18 +137,8 @@ public class InputHost extends HostPort {
       tempPartitionToInputs.put(partitionRange, inputs);
     }
 
-    inputs.removeIf(input -> {
-      if (input.getInputIdentifier() == srcAttempt.getInputIdentifier()) {
-        LOG.warn("DEBUG: InputHost should remove InputAttemptIdentifier with the same partitionId and a different attemptNumber: {}, {}, {} != {}",
-            partitionId, input.getInputIdentifier(), input.getAttemptNumber(), srcAttempt.getAttemptNumber());
-        return false;
-      } else {
-        return false;
-      }
-    });
-
     // The following code checks for duplicate InputAttemptIdentifier's with different attemptNumbers.
-    // For now, this is unnecessary because we do not use VertexRerun for RSS.
+    // This is unnecessary because we do not use VertexRerun for RSS.
     boolean checkForDuplicateWithDifferentAttemptNumbers = false;
     if (checkForDuplicateWithDifferentAttemptNumbers) {
       inputs.removeIf(input -> {
