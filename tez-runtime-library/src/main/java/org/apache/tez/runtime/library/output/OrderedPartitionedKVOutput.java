@@ -303,12 +303,12 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
       payloadBuilder.setEmptyPartitions(emptyPartitionByteString);
     }
 
-      for (int i = 0; i < numPartitions; i++) {
-        LOG.info("Ordered output partitionSizes[] - Ordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{} = {}",
-            getContext().shuffleId(),
-            getContext().getTaskIndex(),
-            getContext().getTaskAttemptNumber(), i, partitionStats[i]);
-      }
+    for (int i = 0; i < numPartitions; i++) {
+      LOG.info("Ordered output partitionSizes[] - Ordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{} = {}",
+          getContext().shuffleId(),
+          getContext().getTaskIndex(),
+          getContext().getTaskAttemptNumber(), i, partitionStats[i]);
+    }
 
     if (exceedsIntegerRange) {
       for (int i = 0; i < numPartitions; i++) {
@@ -362,6 +362,7 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_SORTER_CLASS);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT);
     confKeys.add(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID);
+    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_ORDERED_EDGE_ENABLED);
   }
 
   // TODO Maybe add helper methods to extract keys

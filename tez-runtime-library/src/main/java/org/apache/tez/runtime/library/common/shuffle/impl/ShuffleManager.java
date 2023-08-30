@@ -758,8 +758,11 @@ public class ShuffleManager implements FetcherCallback {
     HostPort identifier = new HostPort(hostName, port);
     InputHost host = knownSrcHosts.get(identifier);
     if (host == null) {
-      host = new InputHost(identifier, inputContext.readPartitionAllOnce(),
-          inputContext.getSourceVertexNumTasks(), inputContext.shuffleId(), rssShuffleClient != null);
+      host = new InputHost(identifier,
+          rssShuffleClient != null && inputContext.readPartitionAllOnce(),
+          inputContext.getSourceVertexNumTasks(),
+          inputContext.shuffleId(),
+          rssShuffleClient != null);
       InputHost old = knownSrcHosts.putIfAbsent(identifier, host);
       if (old != null) {
         host = old;

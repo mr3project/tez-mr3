@@ -418,6 +418,7 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput {
     confKeys.add(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_FETCH_SPLIT_THRESHOLD);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_SHUFFLE_PARALLEL_COPIES);
+    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_ORDERED_EDGE_ENABLED);
   }
 
   // TODO Maybe add helper methods to extract keys
