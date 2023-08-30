@@ -19,6 +19,7 @@
 package org.apache.tez.runtime.library.common.shuffle;
 
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -75,6 +76,75 @@ public class InputHost extends HostPort {
     }
   }
 
+  private static class PipelinedInputInfo {
+    private boolean isFirstUpdate = true;
+    private int inputIdentifier;
+    private int attemptNumber;
+    private int taskIndex;
+    private String pathComponent;
+
+    private int finalSpillId = -1;
+    private BitSet spillIds = new BitSet();
+    private long partitionSize = -1;
+    private final List<CompositeInputAttemptIdentifier> nonEmptyInputList = new ArrayList<>();
+
+    public void addEmptyInput(CompositeInputAttemptIdentifier inputAttemptIdentifier, int partitionId) {
+      update(inputAttemptIdentifier, partitionId);
+    }
+
+    public void addNonEmptyInput(CompositeInputAttemptIdentifier inputAttemptIdentifier, int partitionId) {
+      nonEmptyInputList.add(inputAttemptIdentifier);
+      update(inputAttemptIdentifier, partitionId);
+    }
+
+    private void update(CompositeInputAttemptIdentifier inputAttemptIdentifier, int partitionId) {
+      if (isFirstUpdate) {
+        inputIdentifier = inputAttemptIdentifier.getInputIdentifier();
+        attemptNumber = inputAttemptIdentifier.getAttemptNumber();
+        taskIndex = inputAttemptIdentifier.getTaskIndex();
+        pathComponent = inputAttemptIdentifier.getPathComponent();
+        isFirstUpdate = false;
+      } else {
+        assert inputAttemptIdentifier.getInputIdentifier() == inputIdentifier;
+        assert inputAttemptIdentifier.getAttemptNumber() == attemptNumber;
+        assert inputAttemptIdentifier.getTaskIndex() == taskIndex;
+      }
+
+      int spillId = inputAttemptIdentifier.getSpillEventId();
+      assert !spillIds.get(spillId);
+      spillIds.set(spillId);
+
+      if (inputAttemptIdentifier.getFetchTypeInfo() == InputAttemptIdentifier.SPILL_INFO.FINAL_UPDATE) {
+        assert finalSpillId == -1;
+        assert spillId + 1 >= spillIds.cardinality();
+
+        finalSpillId = spillId;
+        partitionSize = inputAttemptIdentifier.getPartitionSize(partitionId);
+      }
+    }
+
+    public boolean isAllInputsReady() {
+      return finalSpillId != -1 && finalSpillId + 1 == spillIds.cardinality();
+    }
+
+    public CompositeInputAttemptIdentifier createMergedInput() {
+      assert isAllInputsReady();
+      assert !(partitionSize == 0) || nonEmptyInputList.isEmpty();
+      assert !(partitionSize != 0) || !nonEmptyInputList.isEmpty();
+
+      // Pass singleton array to use CompositeInputAttemptIdentifier.partitionSizes optimization.
+      long[] partitionSizes = new long[1];
+      partitionSizes[0] = partitionSize;
+
+      CompositeInputAttemptIdentifier mergedCid = new CompositeInputAttemptIdentifier(inputIdentifier,
+          attemptNumber, pathComponent, false, InputAttemptIdentifier.SPILL_INFO.FINAL_UPDATE, 0, 1,
+          partitionSizes, taskIndex);
+      mergedCid.setInputIdentifiersForReadPartitionAllOnce(nonEmptyInputList);
+
+      return mergedCid;
+    }
+  }
+
   private String additionalInfo;
 
   // Each input host can support more than one partition.
@@ -93,12 +163,24 @@ public class InputHost extends HostPort {
   private final Map<PartitionRange, List<CompositeInputAttemptIdentifier>> tempPartitionToInputs;
   private final int shuffleId;    // TODO: remove
 
-  public InputHost(HostPort hostPort, boolean readPartitionAllOnce,
-                   int srcVertexNumTasks, int shuffleId) {
+  // We use this map only if RSS is enabled.
+  // Only ShuffleInputEventHandler thread updates this map, so it should not be ConcurrentHashMap.
+  private final Map<Integer, PipelinedInputInfo> pipelinedEventsMap;
+
+  public InputHost(HostPort hostPort, boolean readPartitionAllOnce, int srcVertexNumTasks, int shuffleId,
+      boolean useRss) {
     super(hostPort.getHost(), hostPort.getPort());
     this.readPartitionAllOnce = readPartitionAllOnce;
     this.srcVertexNumTasks = srcVertexNumTasks;
     this.shuffleId = shuffleId;
+
+    if (useRss) {
+      pipelinedEventsMap = new HashMap<>();
+    } else {
+      pipelinedEventsMap = null;
+    }
+
+    assert !readPartitionAllOnce || useRss;
     if (readPartitionAllOnce) {
       tempPartitionToInputs = new HashMap<PartitionRange, List<CompositeInputAttemptIdentifier>>();
     } else {
@@ -118,13 +200,58 @@ public class InputHost extends HostPort {
     return partitionToInputs.size();
   }
 
+  public void addEmptyInput(int partitionId, CompositeInputAttemptIdentifier srcAttempt) {
+    assert pipelinedEventsMap != null;
+    assert srcAttempt.getInputIdentifierCount() == 1;
+
+    PartitionRange partitionRange = new PartitionRange(partitionId, 1);
+
+    PipelinedInputInfo inputInfo = pipelinedEventsMap.get(srcAttempt.getInputIdentifier());
+    if (inputInfo == null) {
+      inputInfo = new PipelinedInputInfo();
+      pipelinedEventsMap.put(srcAttempt.getInputIdentifier(), inputInfo);
+    }
+
+    inputInfo.addEmptyInput(srcAttempt, partitionId);
+
+    if (inputInfo.isAllInputsReady()) {
+      CompositeInputAttemptIdentifier mergedIAI = inputInfo.createMergedInput();
+      if (readPartitionAllOnce) {
+        addKnownInputForReadPartitionAllOnce(partitionId, mergedIAI);
+      } else {
+        if (!mergedIAI.getInputIdentifiersForReadPartitionAllOnce().isEmpty()) {
+          addToPartitionToInputs(partitionRange, mergedIAI);
+        } else {
+          LOG.debug("Skip adding merged InputAttemptIdentifier as all of its child are empty.");
+        }
+      }
+    }
+  }
+
   public synchronized void addKnownInput(int partitionId, int partitionCount,
       InputAttemptIdentifier srcAttempt) {
-    if (readPartitionAllOnce) {
-      assert partitionCount == 1;
-      addKnownInputForReadPartitionAllOnce(partitionId, (CompositeInputAttemptIdentifier) srcAttempt);
+    PartitionRange partitionRange = new PartitionRange(partitionId, partitionCount);
+
+    if (pipelinedEventsMap != null) {
+      PipelinedInputInfo inputInfo = pipelinedEventsMap.get(srcAttempt.getInputIdentifier());
+      if (inputInfo == null) {
+        inputInfo = new PipelinedInputInfo();
+        pipelinedEventsMap.put(srcAttempt.getInputIdentifier(), inputInfo);
+      }
+
+      inputInfo.addNonEmptyInput((CompositeInputAttemptIdentifier) srcAttempt, partitionId);
+
+      if (inputInfo.isAllInputsReady()) {
+        CompositeInputAttemptIdentifier mergedIAI = inputInfo.createMergedInput();
+        assert !mergedIAI.getInputIdentifiersForReadPartitionAllOnce().isEmpty();
+        if (readPartitionAllOnce) {
+          addKnownInputForReadPartitionAllOnce(partitionId, mergedIAI);
+        } else {
+          addToPartitionToInputs(partitionRange, mergedIAI);
+        }
+      }
     } else {
-      PartitionRange partitionRange = new PartitionRange(partitionId, partitionCount);
+      assert !readPartitionAllOnce;
       addToPartitionToInputs(partitionRange, srcAttempt);
     }
   }

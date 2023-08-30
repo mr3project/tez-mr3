@@ -1090,11 +1090,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       payloadBuilder.setLastEvent(isLastSpill);
     }
 
-    if (rssShuffleClient != null && addSpillDetails && isLastSpill) {
-      assert pipelinedShuffle == true;
-      // If RSS is enabled, reader fetches data when it gets a DME with isLastSpill == true.
-      // Therefore, the last event must contain mapId.
-
+    if (rssShuffleClient != null) {
       if (outputContext.readPartitionAllOnce()) {
         // host = vertex name (so that all DMEs from mappers are sent to the same InputHost)
         payloadBuilder.setHost(outputContext.getTaskVertexName());
@@ -1103,6 +1099,14 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         // consumed in ShuffleManager.constructRssFetcher()
         payloadBuilder.setHost(String.valueOf(outputContext.getTaskIndex()));
       }
+
+      payloadBuilder.setTaskIndex(outputContext.getTaskIndex());
+    }
+
+    if (rssShuffleClient != null && addSpillDetails && isLastSpill) {
+      assert pipelinedShuffle == true;
+      // If RSS is enabled, reader fetches data when it gets a DME with isLastSpill == true.
+      // Therefore, the last event must contain mapId.
 
       long maxPartitionSize = 0L;
       for (int i = 0; i < numPhysicalOutputs; i++) {
@@ -1119,7 +1123,6 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           payloadBuilder.addPartitionSizesLong(compressedSizePerPartition[i]);
         }
       }
-      payloadBuilder.setTaskIndex(outputContext.getTaskIndex());
     }
 
     if (canSendDataOverDME()) {

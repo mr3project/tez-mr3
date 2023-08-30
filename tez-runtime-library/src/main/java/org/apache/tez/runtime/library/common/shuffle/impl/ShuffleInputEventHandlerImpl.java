@@ -192,19 +192,16 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
       if (emptyPartitionsBitSet.get(partitionId)) {
         CompositeInputAttemptIdentifier srcAttemptIdentifier =
             constructInputAttemptIdentifier(dme.getTargetIndex(), 1, dme.getVersion(), shufflePayload, false);
-        if (rssShuffleClient != null) {
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("Last spill is empty, but notify ShuffleManager later by calling addKnownInput(): {} {}", partitionId, srcAttemptIdentifier);
-          }
-        } else {
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("Source partition: " + partitionId + " did not generate any data. SrcAttempt: ["
-                + srcAttemptIdentifier + "]. Not fetching.");
-          }
-          numDmeEventsNoData.getAndIncrement();
-          shuffleManager.addCompletedInputWithNoData(srcAttemptIdentifier.expand(0));
-          return;
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Source partition: " + partitionId + " did not generate any data. SrcAttempt: ["
+              + srcAttemptIdentifier + "]. Not fetching.");
         }
+        numDmeEventsNoData.getAndIncrement();
+        shuffleManager.addCompletedInputWithNoData(srcAttemptIdentifier.expand(0));
+        if (rssShuffleClient != null) {
+          shuffleManager.markEmptyInputForRSS(shufflePayload.getHost(), 0, srcAttemptIdentifier, partitionId);
+        }
+        return;
       } else {
         shuffleManager.updateApproximateInputRecords(shufflePayload.getNumRecord());
       }
@@ -343,7 +340,8 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
           .FINAL_UPDATE : InputAttemptIdentifier.SPILL_INFO.INCREMENTAL_UPDATE;
 
       long[] partitionSizes = null;
-      int taskIndex = -1;
+      int taskIndex = shufflePayload.getTaskIndex();
+
       if (lastEvent) {
         if (shufflePayload.getPartitionSizesLongCount() > 0) {
           partitionSizes = shufflePayload.getPartitionSizesLongList().stream()
@@ -354,7 +352,6 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
               .mapToLong(Integer::longValue)
               .toArray();
         }
-        taskIndex = shufflePayload.getTaskIndex();
       }
 
       srcAttemptIdentifier =

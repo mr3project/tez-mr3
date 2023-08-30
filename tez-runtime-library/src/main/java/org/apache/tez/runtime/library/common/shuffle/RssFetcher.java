@@ -23,8 +23,6 @@ import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
-import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
-import org.apache.tez.runtime.library.common.InputAttemptIdentifier.SPILL_INFO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,6 +30,7 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.List;
 
 public class RssFetcher implements FetcherBase {
   private final FetcherCallback fetcherCallback;
@@ -105,30 +104,44 @@ public class RssFetcher implements FetcherBase {
   }
 
   public FetchResult call() throws Exception {
-    fetchMultipleBlocks(srcAttemptId);
+    List<CompositeInputAttemptIdentifier> inputList;
+    if (readPartitionAllOnce) {
+      inputList = new ArrayList<>();
+      for (CompositeInputAttemptIdentifier iai: srcAttemptId.getInputIdentifiersForReadPartitionAllOnce()) {
+        inputList.addAll(iai.getInputIdentifiersForReadPartitionAllOnce());
+      }
+    } else {
+      inputList = srcAttemptId.getInputIdentifiersForReadPartitionAllOnce();
+    }
 
-    LOG.info("RssFetcher finished with readPartitionAllOnce={}: {}, num={}, partitionId={}, dataLength={}, from={}, to={}",
+    assert !inputList.isEmpty() || readPartitionAllOnce;
+    assert inputList.stream().allMatch(i -> i.getInputIdentifiersForReadPartitionAllOnce() == null);
+
+    if (!inputList.isEmpty()) {
+      fetchMultipleBlocks(inputList);
+    }
+
+    LOG.info("RssFetcher finished with readPartitionAllOnce={}: {}, numInputs={}, numBlocks={}, " +
+            "partitionId={}, dataLength={}, from={}, to={}",
         readPartitionAllOnce,
         srcAttemptId,
-        !readPartitionAllOnce ? 0 :
-        srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().size(),
-        partitionId, dataLength,
-        mapIndexStart, mapIndexEnd);
+        !readPartitionAllOnce ? 1 : srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().size(),
+        inputList.size(),
+        partitionId,
+        dataLength,
+        mapIndexStart,
+        mapIndexEnd);
 
     return new FetchResult(host, port, partitionId, 1, new ArrayList<>());
   }
 
-  private void fetchMultipleBlocks(InputAttemptIdentifier baseInputAttemptIdentifier) throws IOException {
+  private void fetchMultipleBlocks(List<CompositeInputAttemptIdentifier> inputList) throws IOException {
     setupRssShuffleInputStream(mapIndexStart, mapIndexEnd, srcAttemptId.getAttemptNumber(), partitionId);
     DataInputStream dis = new DataInputStream(rssShuffleInputStream);
 
     long totalReceivedBytes = 0L;
-    int numFetchedBlocks = 0;
     try {
-      while (totalReceivedBytes < dataLength) {
-        int index = numFetchedBlocks;
-        numFetchedBlocks++;
-
+      for (CompositeInputAttemptIdentifier iai: inputList) {
         long startTime = System.currentTimeMillis();
 
         // We assume that the number of bytes read by DataInputStream.readLong() is equal to Long.BYTES.
@@ -136,25 +149,15 @@ public class RssFetcher implements FetcherBase {
         long decompressedSize = dis.readLong();
         totalReceivedBytes += RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE;
 
-        boolean isLastBlock = totalReceivedBytes + compressedSize >= dataLength;
-
-        InputAttemptIdentifier fakeIAI = new InputAttemptIdentifier(
-            baseInputAttemptIdentifier.getInputIdentifier(),
-            baseInputAttemptIdentifier.getAttemptNumber(),
-            baseInputAttemptIdentifier.getPathComponent(),
-            false,
-            isLastBlock ? SPILL_INFO.FINAL_UPDATE : SPILL_INFO.INCREMENTAL_UPDATE,
-            index);
-
-        FetchedInput fetchedInput = inputAllocator.allocate(decompressedSize, compressedSize, fakeIAI);
+        FetchedInput fetchedInput = inputAllocator.allocate(decompressedSize, compressedSize, iai);
 
         if (fetchedInput.getType() == FetchedInput.Type.MEMORY) {
           MemoryFetchedInput mfi = (MemoryFetchedInput) fetchedInput;
           ShuffleUtils.shuffleToMemory(mfi.getBytes(), rssShuffleInputStream, (int) decompressedSize,
-              (int) compressedSize, codec, ifileReadAhead, ifileReadAheadLength, LOG, fakeIAI, inputContext);
+              (int) compressedSize, codec, ifileReadAhead, ifileReadAheadLength, LOG, iai, inputContext);
         } else if (fetchedInput.getType() == FetchedInput.Type.DISK) {
           ShuffleUtils.shuffleToDisk(fetchedInput.getOutputStream(), host, rssShuffleInputStream,
-              compressedSize, decompressedSize, LOG, fakeIAI, ifileReadAhead, ifileReadAheadLength,
+              compressedSize, decompressedSize, LOG, iai, ifileReadAhead, ifileReadAheadLength,
               verifyDiskChecksum);
         } else {
           throw new TezUncheckedException("Unknown FetchedInput.Type: " + fetchedInput);
@@ -163,8 +166,15 @@ public class RssFetcher implements FetcherBase {
         totalReceivedBytes += compressedSize;
         long copyDuration = System.currentTimeMillis() - startTime;
 
-        fetcherCallback.fetchSucceeded(host, fakeIAI, fetchedInput, compressedSize, decompressedSize,
+        fetcherCallback.fetchSucceeded(host, iai, fetchedInput, compressedSize, decompressedSize,
             copyDuration);
+      }
+
+      int eof = rssShuffleInputStream.read();
+      if (eof != -1) {
+        String message = "RssFetcher finished reading blocks, but ShuffleInputStream has remaining bytes.";
+        LOG.error(message);
+        throw new IOException(message);
       }
     } finally {
       synchronized (lock) {
@@ -176,27 +186,10 @@ public class RssFetcher implements FetcherBase {
     }
 
     if (totalReceivedBytes != dataLength) {
-      String message = String.format("Ordered - RssFetcher received only %d bytes. Expected size: %d",
+      String message = String.format("RssFetcher fetched %d bytes, which is not equal to expected length: %d",
           totalReceivedBytes, dataLength);
       LOG.error(message);
       throw new IOException(message);
-    }
-
-    if (dataLength == 0) {
-      fetcherCallback.fetchSucceeded(host, baseInputAttemptIdentifier, null, 0L, 0L, 0L);
-    }
-
-    if (readPartitionAllOnce) {
-      // ShuffleManager.getNextInput() should not get stuck in completedInputs.take():
-      //   1. mark completion for every InputAttemptIdentifier except srcAttemptId
-      //   2. call fetchSucceeded() on srcAttemptId and fetchedInput
-      // Note that InputAttemptIdentifier's have the same partitionId, but different inputIdentifiers.
-      for (CompositeInputAttemptIdentifier iai : srcAttemptId.getInputIdentifiersForReadPartitionAllOnce()) {
-        if (iai.getInputIdentifier() != baseInputAttemptIdentifier.getInputIdentifier()) {
-          // fetchedInput == null, so mark completion only
-          fetcherCallback.fetchSucceeded(host, iai, null, 0L, 0L, 0L);
-        }
-      }
     }
   }
 
