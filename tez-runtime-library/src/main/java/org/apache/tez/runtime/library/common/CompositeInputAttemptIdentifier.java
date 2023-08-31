@@ -33,22 +33,27 @@ public class CompositeInputAttemptIdentifier extends InputAttemptIdentifier {
   // fields for using RSS
   //
 
-  // both fields are set if shufflePayload.getLastEvent() == true
-  // optimization: partitionSizes.length == 1 if only a single entry is used
-  private final long[] partitionSizes;
+  // taskIndex == -1 if this CompositeInputAttemptIdentifier combines InputIdentifiers from different mappers.
   private final int taskIndex;
 
-  // only for readPartitionAllOnce
+  // partitionSizes is set if shufflePayload.getLastEvent() == true
+  // optimization: partitionSizes.length == 1 if only a single entry is used
+  private final long[] partitionSizes;
+
+  // for readPartitionAllOnce and grouping pipelined DMEs between unordered edge
   // InputAttemptIdentifiers in childInputIdentifiers[] are combined and replaced with
   // this CompositeInputAttemptIdentifier.
   private List<CompositeInputAttemptIdentifier> childInputIdentifiers;
 
   // Invariant for partitionSizes[], taskIndex, childInputIdentifiers[]
-  // 1. taskIndex >= 0:
+  // 1. taskIndex >= 0 && childInputIdentifiers == null:
   //    this CompositeInputAttemptIdentifier originates from a mapper.
   //    partitionSizes[] is fully loaded.
-  //    childInputIdentifiers == null
-  // 2. taskIndex == -1:
+  // 2. taskIndex >= 0 && childInputIdentifiers != null:
+  //    this CompositeInputAttemptIdentifier combines childInputIdentifiers[] that come from the same mapper.
+  //    partitionSizes[] is compact.
+  //    All childInputIdentifiers have the same inputIdentifier, attemptNumber, and taskIndex.
+  // 3. taskIndex == -1:
   //    this CompositeInputAttemptIdentifier combines childInputIdentifiers[].
   //    partitionSizes[] is compact.
   //    childInputIdentifiers != null
