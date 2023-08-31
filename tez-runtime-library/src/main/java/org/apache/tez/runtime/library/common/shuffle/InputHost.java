@@ -304,10 +304,12 @@ public class InputHost extends HostPort {
           1, partitionSizes, -1);
       mergedCid.setInputIdentifiersForReadPartitionAllOnce(inputs);
 
-      LOG.info("Unordered InputHost - merged unordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{} = {}",
-          shuffleId,
-          firstId.getTaskIndex(),
-          firstId.getAttemptNumber(), partitionId, partitionTotalSize);
+      if (LOG.isDebugEnabled()) {
+        LOG.info("Unordered InputHost - merged unordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{} = {}",
+            shuffleId,
+            firstId.getTaskIndex(),
+            firstId.getAttemptNumber(), partitionId, partitionTotalSize);
+      }
 
       LOG.info("Merging {} partition inputs for partitionId={} with total size {}: {} ",
           srcVertexNumTasks, partitionId, partitionTotalSize, mergedCid);

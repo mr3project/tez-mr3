@@ -155,10 +155,14 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
   }
 
   private void fetchSingleBlock() throws IOException {
-      LOG.info("Ordered - fetchSingleBlock : Ordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{}, dataLength={}",
+    LOG.info("Ordered - RssFetcher starts fetching from RSS, map index = {}, block length={}",
+        srcAttemptId.getTaskIndex(), srcAttemptId.getPartitionSize(partitionId));
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Ordered - fetchSingleBlock : Ordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{}, dataLength={}",
           shuffleId,
           srcAttemptId.getTaskIndex(), srcAttemptId.getAttemptNumber(), partitionId,
           srcAttemptId.getPartitionSize(partitionId));
+    }
 
     if (blockLength == 0) {
       shuffleScheduler.copySucceeded(srcAttemptId, null, blockLength, blockLength, 0L, null, false);

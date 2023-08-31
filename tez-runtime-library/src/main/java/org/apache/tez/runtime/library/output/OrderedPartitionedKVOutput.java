@@ -301,11 +301,13 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
       payloadBuilder.setEmptyPartitions(emptyPartitionByteString);
     }
 
-    for (int i = 0; i < numPartitions; i++) {
-      LOG.info("Ordered output partitionSizes[] - Ordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{} = {}",
-          getContext().shuffleId(),
-          getContext().getTaskIndex(),
-          getContext().getTaskAttemptNumber(), i, partitionStats[i]);
+    if (LOG.isDebugEnabled()) {
+      for (int i = 0; i < numPartitions; i++) {
+        LOG.debug("Ordered output partitionSizes[] - Ordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{} = {}",
+            getContext().shuffleId(),
+            getContext().getTaskIndex(),
+            getContext().getTaskAttemptNumber(), i, partitionStats[i]);
+      }
     }
 
     if (exceedsIntegerRange) {

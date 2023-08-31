@@ -118,6 +118,11 @@ public class RssFetcher implements FetcherBase {
     assert inputList.stream().allMatch(i -> i.getInputIdentifiersForReadPartitionAllOnce() == null);
 
     if (!inputList.isEmpty()) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Unordered - fetchMultipleBlocks : unordered_shuffleId_taskIndex_attemptNumber={}_{}[{}-{}]_{}_{}, dataLength={}",
+            shuffleId, srcAttemptId.getTaskIndex(), mapIndexStart, mapIndexEnd,
+            srcAttemptId.getAttemptNumber(), partitionId, dataLength);
+      }
       fetchMultipleBlocks(inputList);
     }
 

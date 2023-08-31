@@ -774,7 +774,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
           if (writer != null) {
             if (numRecordsCounter != null) {
-              // TezCounter is not threadsafe; Since numRecordsCounter would be updated from
+              // TezCounter is not thread-safe; Since numRecordsCounter would be updated from
               // multiple threads, it is good to synchronize it when incrementing it for correctness.
               synchronized (numRecordsCounter) {
                 numRecordsCounter.increment(numRecords);
@@ -907,6 +907,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       spillLock.unlock();
     }
     if (spillException != null) {
+      // Do not call mapperEnd() which should be called only if all data sent by pushData() should be committed.
+      // If a single pushData() fails or the data should not committed, mapperEnd() should not be called.
+
       LOG.error(destNameTrimmed + ": Error during spill, throwing");
       // Assuming close will be called on the same thread as the write
       cleanup();
@@ -1332,7 +1335,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
               // For the same reason, this not memory leak because reader.decompressor is eventually garbage collected.
               while (reader.nextRawKey(keyBufferIFile)) {
                 // TODO Inefficient. If spills are not compressed, a direct copy should be possible
-                // given the current IFile format. Also exteremely inefficient for large records,
+                // given the current IFile format. Also extremely inefficient for large records,
                 // since the entire record will be read into memory.
                 reader.nextRawValue(valBufferIFile);
                 writer.append(keyBufferIFile, valBufferIFile);
@@ -1530,10 +1533,12 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       assert compressedLength + RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE == data.length;
       compressedSizePerPartition[partition] += data.length;
 
-      LOG.info("Unordered output pushData() - large unordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{} = {}",
-          outputContext.shuffleId(),
-          outputContext.getTaskIndex(),
-          outputContext.getTaskAttemptNumber(), partition, data.length);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Unordered output pushData() - large unordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{} = {}",
+            outputContext.shuffleId(),
+            outputContext.getTaskIndex(),
+            outputContext.getTaskAttemptNumber(), partition, data.length);
+      }
 
       rssShuffleClient.pushData(
           outputContext.shuffleId(),
@@ -1563,7 +1568,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
     mayBeSendEventsForSpill(emptyPartitions, sizePerPartitionToReport(), spillIndex, false);
 
-    LOG.info("{}: Finished pushing large record of size {}. (Spill index: {})",
+    LOG.info("{}: Finished pushing large record of size {}. Spill index: {}",
         destNameTrimmed, compressedLength, spillIndex);
   }
 

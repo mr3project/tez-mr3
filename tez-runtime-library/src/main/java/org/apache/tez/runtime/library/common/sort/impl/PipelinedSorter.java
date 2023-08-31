@@ -1043,11 +1043,13 @@ public class PipelinedSorter extends ExternalSorter {
 
       int pushedBytes = compressedLength + RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE;
 
-      LOG.info(
-          "Ordered output - push unmerged data. " +
-              "shuffleId_taskIndex_attemptNumber={}_{}_{}_{} (spillInfo=({}/{}) pushedSize={}",
-          outputContext.shuffleId(), outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber(),
-          partition, i, numSpills, pushedBytes);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(
+            "Ordered output - push unmerged data. " +
+                "shuffleId_taskIndex_attemptNumber={}_{}_{}_{} (spillInfo=({}/{}) pushedSize={}",
+            outputContext.shuffleId(), outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber(),
+            partition, i, numSpills, pushedBytes);
+      }
 
       rssShuffleClient.pushData(
           outputContext.shuffleId(),

@@ -1546,10 +1546,12 @@ class ShuffleScheduler {
         List<CompositeInputAttemptIdentifier> childInputAttemptIdentifiers = inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce();
         for (CompositeInputAttemptIdentifier cinput: childInputAttemptIdentifiers) {
           assert cinput.getTaskIndex() != -1;
-           LOG.info("Ordered - revert for:  Ordered_shuffleId_taskIndex_attemptNumber={}_{}_{}, dataLength={}",
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Ordered - revert for:  Ordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{}, dataLength={}",
               inputContext.shuffleId(),
               cinput.getTaskIndex(), cinput.getAttemptNumber(), partitionId,
               cinput.getPartitionSize(partitionId));
+          }
           RssFetcherOrderedGrouped rssFetcher = createRssFetcherForIndividualInput(
               cinput, partitionId, mapHost, cinput.getTaskIndex());
           rssFetchers.add(rssFetcher);
