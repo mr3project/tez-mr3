@@ -85,10 +85,11 @@ public class RssShuffleUtils {
       int mapIndexStart = mapIndexOrigin;
       int mapIndexEnd = -1;
 
-      LOG.info("{} - Splitting InputAttemptIdentifiers to {} RssFetchers: {} / {}, task index {} - {}",
+      LOG.info("{} - Splitting InputAttemptIdentifiers to {} RssFetchers: {} / {}, task index {} - {}, attemptNumber={}",
           ordered ? "Ordered" : "Unordered",
           numFetchers, partitionTotalSize, numIdentifiers,
-          mapIndexStart, inputAttemptIdentifiers.get(numIdentifiers - 1).getTaskIndex());
+          mapIndexStart, inputAttemptIdentifiers.get(numIdentifiers - 1).getTaskIndex(),
+          inputAttemptIdentifier.getAttemptNumber());
       assert mapIndexStart + numIdentifiers - 1 == inputAttemptIdentifiers.get(numIdentifiers - 1).getTaskIndex();
 
       for (int i = 0; i < numFetchers; i++) {
@@ -133,9 +134,10 @@ public class RssShuffleUtils {
       }
     } else {
       createFn.operate(inputAttemptIdentifier, partitionTotalSize, mapIndexOrigin, mapIndexLast);
-      LOG.info("{} - Created a single RssFetcher: {} / {}, from {} to {}",
+      LOG.info("{} - Created a single RssFetcher: {} / {}, from {} to {}, attemptNumber={}",
           ordered ? "Ordered" : "Unordered",
-          partitionTotalSize, numIdentifiers, mapIndexOrigin, mapIndexLast);
+          partitionTotalSize, numIdentifiers, mapIndexOrigin, mapIndexLast,
+          inputAttemptIdentifier.getAttemptNumber());
     }
   }
 }
