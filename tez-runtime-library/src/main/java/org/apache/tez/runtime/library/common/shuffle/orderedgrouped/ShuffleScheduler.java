@@ -60,6 +60,7 @@ import org.apache.tez.common.counters.TaskCounter;
 import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.common.security.JobTokenSecretManager;
 import org.apache.tez.dag.api.TezConfiguration;
+import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.InputContext;
@@ -1546,15 +1547,24 @@ class ShuffleScheduler {
         List<CompositeInputAttemptIdentifier> childInputAttemptIdentifiers = inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce();
         for (CompositeInputAttemptIdentifier cinput: childInputAttemptIdentifiers) {
           assert cinput.getTaskIndex() != -1;
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("Ordered - revert for:  Ordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{}, dataLength={}",
-              inputContext.shuffleId(),
-              cinput.getTaskIndex(), cinput.getAttemptNumber(), partitionId,
-              cinput.getPartitionSize(partitionId));
+          if (cinput.getPartitionSize(partitionId) > 0) {
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Ordered - revert for:  Ordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{}, dataLength={}",
+                  inputContext.shuffleId(),
+                  cinput.getTaskIndex(), cinput.getAttemptNumber(), partitionId,
+                  cinput.getPartitionSize(partitionId));
+            }
+            RssFetcherOrderedGrouped rssFetcher = createRssFetcherForIndividualInput(
+                cinput, partitionId, mapHost, cinput.getTaskIndex());
+            rssFetchers.add(rssFetcher);
+          } else {
+            LOG.info("Ordered - Skipped creating a single RssFetcher: {}", cinput);
+            try {
+              copySucceeded(cinput, null, 0, 0, 0L, null, false);
+            } catch (IOException e) {
+              throw new TezUncheckedException(e);
+            }
           }
-          RssFetcherOrderedGrouped rssFetcher = createRssFetcherForIndividualInput(
-              cinput, partitionId, mapHost, cinput.getTaskIndex());
-          rssFetchers.add(rssFetcher);
         }
       }
 
@@ -1565,10 +1575,19 @@ class ShuffleScheduler {
     } else {
       int mapIndexStart = Integer.parseInt(mapHost.getHost());
       assert mapIndexStart == inputAttemptIdentifier.getTaskIndex();
-      LOG.info("Ordered - Creating a single RssFetcher: {}", mapIndexStart);
-      RssFetcherOrderedGrouped rssFetcher = createRssFetcherForIndividualInput(
-          inputAttemptIdentifier, partitionId, mapHost, mapIndexStart);
-      rssFetchers.add(rssFetcher);
+      if (inputAttemptIdentifier.getPartitionSize(partitionId) > 0) {
+        LOG.info("Ordered - Creating a single RssFetcher: {}", mapIndexStart);
+        RssFetcherOrderedGrouped rssFetcher = createRssFetcherForIndividualInput(
+            inputAttemptIdentifier, partitionId, mapHost, mapIndexStart);
+        rssFetchers.add(rssFetcher);
+      } else {
+        LOG.info("Ordered - Skipped creating a single RssFetcher: {}", inputAttemptIdentifier);
+        try {
+          copySucceeded(inputAttemptIdentifier, null, 0, 0, 0L, null, false);
+        } catch (IOException e) {
+          throw new TezUncheckedException(e);
+        }
+      }
     }
 
     return rssFetchers;
@@ -1578,26 +1597,39 @@ class ShuffleScheduler {
       CompositeInputAttemptIdentifier inputAttemptIdentifier,
       final int partitionId, final MapHost mapHost, List<RssFetcherOrderedGrouped> rssFetchers) {
     RssShuffleUtils.FetcherCreate createFn = (mergedCid, subTotalSize, mapIndexStart, mapIndexEnd) -> {
-      RssFetcherOrderedGrouped rssFetcher = new RssFetcherOrderedGrouped(
-          allocator,
-          ShuffleScheduler.this,
-          exceptionReporter,
-          mapHost,
-          rssShuffleClient,
-          inputContext.shuffleId(),
-          partitionId, mergedCid,
-          subTotalSize, mapIndexStart, mapIndexEnd, true,
-          codec, ifileReadAhead, ifileReadAheadLength, inputContext, verifyDiskChecksum);
-      rssFetchers.add(rssFetcher);
+      if (subTotalSize > 0) {
+        RssFetcherOrderedGrouped rssFetcher = new RssFetcherOrderedGrouped(
+            allocator,
+            ShuffleScheduler.this,
+            exceptionReporter,
+            mapHost,
+            rssShuffleClient,
+            inputContext.shuffleId(),
+            partitionId, mergedCid,
+            subTotalSize, mapIndexStart, mapIndexEnd, true,
+            codec, ifileReadAhead, ifileReadAheadLength, inputContext, verifyDiskChecksum);
+        rssFetchers.add(rssFetcher);
+      } else {
+        LOG.info("Ordered - Skipped creating merged RssFetcher from {} to {} for partition={}",
+            mapIndexStart, mapIndexEnd, partitionId);
+        try {
+          for (CompositeInputAttemptIdentifier ciai: mergedCid.getInputIdentifiersForReadPartitionAllOnce()) {
+            copySucceeded(ciai, null, 0, 0, 0L, null, false);
+          }
+        } catch (IOException e) {
+          throw new TezUncheckedException(e);
+        }
+      }
     };
     RssShuffleUtils.createRssFetchersForReadPartitionAllOnce(
-        inputAttemptIdentifier, partitionId, inputContext.getSourceVertexNumTasks(), rssFetchSplitThresholdSize,
-        createFn, true);
+          inputAttemptIdentifier, partitionId, inputContext.getSourceVertexNumTasks(), rssFetchSplitThresholdSize,
+          createFn, true);
   }
 
   private RssFetcherOrderedGrouped createRssFetcherForIndividualInput(
       CompositeInputAttemptIdentifier inputAttemptIdentifier,
       int partitionId, MapHost mapHost, int mapIndexStart) {
+    assert inputAttemptIdentifier.getPartitionSize(partitionId) > 0;
     int mapIndexEnd = mapIndexStart + 1;
     long partitionTotalSize = inputAttemptIdentifier.getPartitionSize(partitionId);
     return new RssFetcherOrderedGrouped(

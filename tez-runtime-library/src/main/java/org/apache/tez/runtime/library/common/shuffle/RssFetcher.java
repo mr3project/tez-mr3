@@ -100,7 +100,7 @@ public class RssFetcher implements FetcherBase {
     this.inputContext = inputContext;
     this.verifyDiskChecksum = verifyDiskChecksum;
 
-    assert dataLength >= 0;
+    assert dataLength > 0;
   }
 
   public FetchResult call() throws Exception {
@@ -114,17 +114,15 @@ public class RssFetcher implements FetcherBase {
       inputList = srcAttemptId.getInputIdentifiersForReadPartitionAllOnce();
     }
 
-    assert !inputList.isEmpty() || readPartitionAllOnce;
+    assert !inputList.isEmpty();
     assert inputList.stream().allMatch(i -> i.getInputIdentifiersForReadPartitionAllOnce() == null);
 
-    if (!inputList.isEmpty()) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Unordered - fetchMultipleBlocks : unordered_shuffleId_taskIndex_attemptNumber={}_{}[{}-{}]_{}_{}, dataLength={}",
-            shuffleId, srcAttemptId.getTaskIndex(), mapIndexStart, mapIndexEnd,
-            srcAttemptId.getAttemptNumber(), partitionId, dataLength);
-      }
-      fetchMultipleBlocks(inputList);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Unordered - fetchMultipleBlocks : unordered_shuffleId_taskIndex_attemptNumber={}_{}[{}-{}]_{}_{}, dataLength={}",
+          shuffleId, srcAttemptId.getTaskIndex(), mapIndexStart, mapIndexEnd,
+          srcAttemptId.getAttemptNumber(), partitionId, dataLength);
     }
+    fetchMultipleBlocks(inputList);
 
     LOG.info("RssFetcher finished with readPartitionAllOnce={}: {}, numInputs={}, numBlocks={}, " +
             "partitionId={}, dataLength={}, from={}, to={}",

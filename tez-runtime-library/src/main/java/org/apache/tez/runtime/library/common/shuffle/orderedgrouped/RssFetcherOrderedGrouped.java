@@ -106,7 +106,7 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
     this.inputContext = inputContext;
     this.verifyDiskChecksum = verifyDiskChecksum;
 
-    assert blockLength >= 0;
+    assert blockLength > 0;
     assert !readPartitionAllOnce || srcAttemptId.getInputIdentifiersForReadPartitionAllOnce() != null;
     assert !readPartitionAllOnce ||
         srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().size() == mapIndexEnd - mapIndexStart;
@@ -164,11 +164,7 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
           srcAttemptId.getPartitionSize(partitionId));
     }
 
-    if (blockLength == 0) {
-      shuffleScheduler.copySucceeded(srcAttemptId, null, blockLength, blockLength, 0L, null, false);
-    } else {
-      doFetch(srcAttemptId);
-    }
+    doFetch(srcAttemptId);
   }
 
   private void fetchMultipleBlocks() throws IOException {
@@ -176,19 +172,12 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
     LOG.info("Ordered - RssFetcher starts fetching {} concatenated blocks from RSS: {} to {}, total block length={}",
         numBlocks, mapIndexStart, mapIndexEnd, blockLength);
 
-    if (blockLength == 0) {
-      for (InputAttemptIdentifier iai : srcAttemptId.getInputIdentifiersForReadPartitionAllOnce()) {
-          shuffleScheduler.copySucceeded(iai, null, 0L, 0L, 0, null, false);
-      }
-      return;
-    }
-
     CompositeInputAttemptIdentifier firstInputAttemptIdentifier =
         srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().get(0);
     doFetch(firstInputAttemptIdentifier);
     // doFetch() reads the entire set of blocks, but marks only firstInputAttemptIdentifier as finished.
     // hence we should mark all the remaining InputAttemptIdentifiers as finished as well
-    for (int i = 0; i < numBlocks; i++) {
+    for (int i = 1; i < numBlocks; i++) {
       InputAttemptIdentifier inputAttemptId =
           srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().get(i);
       shuffleScheduler.copySucceeded(inputAttemptId, null, 0L, 0L, 0, null, false);
@@ -242,6 +231,13 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
         // belonging to srcAttemptId) as finished.
         shuffleScheduler.copySucceeded(identifierForCurrentBlock, null, compressedSize, decompressedSize, copyDuration,
             mapOutput, false);
+      }
+
+      int eof = rssShuffleInputStream.read();
+      if (eof != -1) {
+        String message = "RssFetcherOG finished reading blocks, but ShuffleInputStream has remaining bytes.";
+        LOG.error(message);
+        throw new IOException(message);
       }
     } catch (Exception e) {
       LOG.error("Ordered - RssFetcher failed: from {} to {}, attemptNumber={}, partitionId={}, expected data={}",
