@@ -736,7 +736,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     }
 
     private SpillResult pushToRSS() throws IOException, InterruptedException {
-      LOG.info("Start pushing spill {} to RSS", spillNumber);
+      LOG.info("Start pushing spill {} to RSS: shuffleId={}, taskIndex={}, attemptNumber={}", spillNumber,
+        outputContext.shuffleId(),
+        outputContext.getTaskIndex(),
+        outputContext.getTaskAttemptNumber());
 
       ByteArrayOutputStream rssBuffer = null;
       DataInputBuffer key = new DataInputBuffer();
@@ -798,10 +801,12 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
             assert compressedLength + RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE == data.length;
             compressedSizePerPartition[i] += data.length;
 
-            LOG.info("Unordered output pushData() - unordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{} = {}",
-              outputContext.shuffleId(),
-              outputContext.getTaskIndex(),
-              outputContext.getTaskAttemptNumber(), i, data.length);
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Unordered output pushData() - unordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{} = {}",
+                outputContext.shuffleId(),
+                outputContext.getTaskIndex(),
+                outputContext.getTaskAttemptNumber(), i, data.length);
+            }
 
             rssShuffleClient.pushData(
                 outputContext.shuffleId(),
