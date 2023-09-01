@@ -175,8 +175,10 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
     CompositeInputAttemptIdentifier firstInputAttemptIdentifier =
         srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().get(0);
     doFetch(firstInputAttemptIdentifier);
+
     // doFetch() reads the entire set of blocks, but marks only firstInputAttemptIdentifier as finished.
     // hence we should mark all the remaining InputAttemptIdentifiers as finished as well
+    // i.e., we have already called copySucceeded() for i = 0.
     for (int i = 1; i < numBlocks; i++) {
       InputAttemptIdentifier inputAttemptId =
           srcAttemptId.getInputIdentifiersForReadPartitionAllOnce().get(i);
