@@ -180,8 +180,8 @@ public class RssFetcher implements FetcherBase {
         throw new IOException(message);
       }
     } catch (Exception e) {
-      LOG.error("Unordered - RssFetcher failed: from {} to {}, attemptNumber={}, partitionId={}, expected data={}",
-          mapIndexStart, mapIndexEnd, srcAttemptId.getAttemptNumber(), partitionId, dataLength, e);
+      LOG.error("Unordered - RssFetcher failed: shuffleId={}, from {} to {}, attemptNumber={}, partitionId={}, expected data={}",
+          shuffleId, mapIndexStart, mapIndexEnd, srcAttemptId.getAttemptNumber(), partitionId, dataLength, e);
       throw e;
     } finally {
       synchronized (lock) {
