@@ -214,6 +214,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   // use rssShuffleClient if and only if it is not null
   private final ShuffleClient rssShuffleClient;
   private final ArrayBlockingQueue<ByteArrayOutputStream> rssBufferPool;
+  private final ByteArrayOutputStream rssBufferForLargeRecord;
   private final int numPhysicalOutputs;
   private final long[] compressedSizePerPartition;
 
@@ -344,12 +345,15 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
     if (rssShuffleClient == null) {
       rssBufferPool = null;
+      rssBufferForLargeRecord = null;
     } else {
       int numBuffer = 2;
       rssBufferPool = new ArrayBlockingQueue<>(numBuffer);
       for (int i = 0; i < numBuffer; i++) {
         rssBufferPool.offer(new ByteArrayOutputStream());
       }
+
+      rssBufferForLargeRecord = new ByteArrayOutputStream();
     }
 
     compressedSizePerPartition = rssShuffleClient != null ? new long[numPartitions] : null;
@@ -741,88 +745,84 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         outputContext.getTaskIndex(),
         outputContext.getTaskAttemptNumber());
 
-      ByteArrayOutputStream rssBuffer = null;
+      ByteArrayOutputStream rssBuffer = rssBufferPool.take();
       DataInputBuffer key = new DataInputBuffer();
       DataInputBuffer val = new DataInputBuffer();
       long totalPushedDataLength = 0;
-      for (int i = 0; i < numPartitions; i++) {
-        IFile.Writer writer = null;
+      try {
+        for (int i = 0; i < numPartitions; i++) {
+          IFile.Writer writer = null;
 
-        try {
-          long numRecords = 0;
-          for (WrappedBuffer buffer: filledBuffers) {
-            if (buffer.partitionPositions[i] == WrappedBuffer.PARTITION_ABSENT_POSITION) {
-              // Skip empty partition.
-              continue;
-            }
-
-            if (rssBuffer == null) {
-              rssBuffer = rssBufferPool.take();
-            }
-
-            if (writer == null) {
-              rssBuffer.reset();
-              DataOutputStream out = new DataOutputStream(rssBuffer);
-
-              // Make a space for writing compressed and decompressed length of block.
-              out.writeLong(0L);
-              out.writeLong(0L);
-
-              writer = new Writer(keySerialization, valSerialization, out, keyClass, valClass, codec,
-                  null, null, false, true);
-            }
-
-            numRecords += writePartition(buffer.partitionPositions[i], buffer, writer, key, val);
-          }
-
-          if (writer != null) {
-            if (numRecordsCounter != null) {
-              // TezCounter is not thread-safe; Since numRecordsCounter would be updated from
-              // multiple threads, it is good to synchronize it when incrementing it for correctness.
-              synchronized (numRecordsCounter) {
-                numRecordsCounter.increment(numRecords);
+          try {
+            long numRecords = 0;
+            for (WrappedBuffer buffer: filledBuffers) {
+              if (buffer.partitionPositions[i] == WrappedBuffer.PARTITION_ABSENT_POSITION) {
+                // Skip empty partition.
+                continue;
               }
+
+              if (writer == null) {
+                rssBuffer.reset();
+                DataOutputStream out = new DataOutputStream(rssBuffer);
+
+                // Make a space for writing compressed and decompressed length of block.
+                out.writeLong(0L);
+                out.writeLong(0L);
+
+                writer = new Writer(keySerialization, valSerialization, out, keyClass, valClass, codec,
+                    null, null, false, true);
+              }
+
+              numRecords += writePartition(buffer.partitionPositions[i], buffer, writer, key, val);
             }
 
-            writer.close();
-            long compressedLength = writer.getCompressedLength();
-            long rawLength = writer.getRawLength();
-            writer = null;
+            if (writer != null) {
+              if (numRecordsCounter != null) {
+                // TezCounter is not thread-safe; Since numRecordsCounter would be updated from
+                // multiple threads, it is good to synchronize it when incrementing it for correctness.
+                synchronized (numRecordsCounter) {
+                  numRecordsCounter.increment(numRecords);
+                }
+              }
 
-            totalPushedDataLength += compressedLength;
-            sizePerPartition[i] += rawLength;
+              writer.close();
+              long compressedLength = writer.getCompressedLength();
+              long rawLength = writer.getRawLength();
+              writer = null;
 
-            byte[] data = rssBuffer.toByteArray();
-            ByteBuffer lengthBuffer = ByteBuffer.allocate(RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE);
-            lengthBuffer.putLong(compressedLength);
-            lengthBuffer.putLong(rawLength);
-            System.arraycopy(lengthBuffer.array(), 0, data, 0, RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE);
+              totalPushedDataLength += compressedLength;
+              sizePerPartition[i] += rawLength;
 
-            assert compressedLength + RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE == data.length;
-            compressedSizePerPartition[i] += data.length;
+              byte[] data = rssBuffer.toByteArray();
+              ByteBuffer lengthBuffer = ByteBuffer.allocate(RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE);
+              lengthBuffer.putLong(compressedLength);
+              lengthBuffer.putLong(rawLength);
+              System.arraycopy(lengthBuffer.array(), 0, data, 0, RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE);
 
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("Unordered output pushData() - unordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{} = {}",
-                outputContext.shuffleId(),
-                outputContext.getTaskIndex(),
-                outputContext.getTaskAttemptNumber(), i, data.length);
+              assert compressedLength + RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE == data.length;
+              compressedSizePerPartition[i] += data.length;
+
+              if (LOG.isDebugEnabled()) {
+                LOG.debug("Unordered output pushData() - unordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{} = {}",
+                    outputContext.shuffleId(),
+                    outputContext.getTaskIndex(),
+                    outputContext.getTaskAttemptNumber(), i, data.length);
+              }
+
+              rssShuffleClient.pushData(
+                  outputContext.shuffleId(),
+                  outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber(), i,
+                  data, 0, data.length, outputContext.getVertexParallelism(),
+                  numPhysicalOutputs);
             }
-
-            rssShuffleClient.pushData(
-                outputContext.shuffleId(),
-                outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber(), i,
-                data, 0, data.length, outputContext.getVertexParallelism(),
-                numPhysicalOutputs);
-          }
-        } finally {
-          if (writer != null) {
-            writer.close();
-          }
-
-          if (rssBuffer != null) {
-            rssBufferPool.offer(rssBuffer);
+          } finally {
+            if (writer != null) {
+              writer.close();
+            }
           }
         }
+      } finally {
+        rssBufferPool.offer(rssBuffer);
       }
 
       key.close();
@@ -1494,16 +1494,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     long compressedLength = 0;
 
     Writer writer = null;
-    ByteArrayOutputStream rssBuffer = null;
 
     try {
-      try {
-        rssBuffer = rssBufferPool.take();
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw new IOInterruptedException("Interrupted while waiting for next rssBuffer", e);
-      }
-      DataOutputStream out = new DataOutputStream(rssBuffer);
+      rssBufferForLargeRecord.reset();
+      DataOutputStream out = new DataOutputStream(rssBufferForLargeRecord);
 
       // Make a space for writing compressed and decompressed length of block.
       out.writeLong(0L);
@@ -1529,7 +1523,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
       writer = null;
 
-      byte[] data = rssBuffer.toByteArray();
+      byte[] data = rssBufferForLargeRecord.toByteArray();
       ByteBuffer lengthBuffer = ByteBuffer.allocate(RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE);
       lengthBuffer.putLong(compressedLength);
       lengthBuffer.putLong(rawLength);
@@ -1550,18 +1544,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber(), partition,
           data, 0, data.length, outputContext.getVertexParallelism(),
           numPhysicalOutputs);
-
-      rssBuffer.reset();
-      rssBufferPool.offer(rssBuffer);
-      rssBuffer = null;
     } finally {
       if (writer != null) {
         writer.close();
-      }
-
-      if (rssBuffer != null) {
-        rssBuffer.reset();
-        rssBufferPool.offer(rssBuffer);
       }
     }
 
