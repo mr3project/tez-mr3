@@ -181,6 +181,10 @@ public class RssFetcher implements FetcherBase {
         LOG.error(message);
         throw new IOException(message);
       }
+    } catch (Exception e) {
+      LOG.error("Unordered - RssFetcher failed: from {} to {}, attemptNumber={}, partitionId={}, expected data={}",
+          mapIndexStart, mapIndexEnd, srcAttemptId.getAttemptNumber(), partitionId, dataLength, e);
+      throw e;
     } finally {
       synchronized (lock) {
         if (!rssShuffleInputStreamClosed) {

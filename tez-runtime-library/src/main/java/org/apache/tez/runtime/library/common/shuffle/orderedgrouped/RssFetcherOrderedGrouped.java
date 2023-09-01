@@ -243,6 +243,10 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
         shuffleScheduler.copySucceeded(identifierForCurrentBlock, null, compressedSize, decompressedSize, copyDuration,
             mapOutput, false);
       }
+    } catch (Exception e) {
+      LOG.error("Ordered - RssFetcher failed: from {} to {}, attemptNumber={}, partitionId={}, expected data={}",
+          mapIndexStart, mapIndexEnd, srcAttemptId.getAttemptNumber(), partitionId, blockLength, e);
+      throw e;
     } finally {
       closeRssShuffleInputStream();
     }
