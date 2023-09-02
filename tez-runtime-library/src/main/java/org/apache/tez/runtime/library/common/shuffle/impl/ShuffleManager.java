@@ -300,8 +300,6 @@ public class ShuffleManager implements FetcherCallback {
             TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_FETCH_SPLIT_THRESHOLD,
             TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_FETCH_SPLIT_THRESHOLD_DEFAULT);
       }
-      com.datamonad.mr3.MR3Runtime.env().registerShuffleId(inputContext.getDagId(), inputContext.shuffleId());
-      LOG.info("Registered shuffleId = " + inputContext.shuffleId());
     }
 
     LOG.info("{}: numInputs={}, numFetchers={}, rssShuffleClient={}",

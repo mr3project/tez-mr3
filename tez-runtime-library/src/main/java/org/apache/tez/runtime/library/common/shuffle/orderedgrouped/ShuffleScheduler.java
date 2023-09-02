@@ -432,8 +432,6 @@ class ShuffleScheduler {
             TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_FETCH_SPLIT_THRESHOLD,
             TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_FETCH_SPLIT_THRESHOLD_DEFAULT);
       }
-      com.datamonad.mr3.MR3Runtime.env().registerShuffleId(inputContext.getDagId(), inputContext.shuffleId());
-      LOG.info("Ordered - Registered shuffleId = " + inputContext.shuffleId());
     }
 
     pipelinedShuffleInfoEventsMap = Maps.newConcurrentMap();
