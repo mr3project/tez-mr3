@@ -219,9 +219,8 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
           throw new TezUncheckedException("Unexpected MapOutput.Type: " + mapOutput);
         }
         totalReceivedBytes += compressedSize;
-        long copyDuration = System.currentTimeMillis() - startTime;
 
-        // this can be checked before performing I/O, but okay because this is an error
+        // this can be checked before performing I/O, but okay because this is an error case
         if (totalReceivedBytes > blockLength) {
           String message = String.format("Ordered - RssFetcher received %d bytes. Expected size: %d",
               totalReceivedBytes, blockLength);
@@ -234,6 +233,7 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
         //
         // copySucceeded() may trigger ShuffleScheduler shutdown, which calls ShuffleScheduler.close()
         // which in turn calls this.shutDown().
+        long copyDuration = System.currentTimeMillis() - startTime;
         shuffleScheduler.copySucceeded(identifierForCurrentBlock, null, compressedSize, decompressedSize, copyDuration,
             mapOutput, false);
       }

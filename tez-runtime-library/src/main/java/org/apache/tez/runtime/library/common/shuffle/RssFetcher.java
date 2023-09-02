@@ -165,52 +165,47 @@ public class RssFetcher implements FetcherBase {
         } else {
           throw new TezUncheckedException("Unknown FetchedInput.Type: " + fetchedInput);
         }
-
         totalReceivedBytes += compressedSize;
-        long copyDuration = System.currentTimeMillis() - startTime;
 
+        // this can be checked before performing I/O, but okay because this is an error case
+        if (totalReceivedBytes > dataLength) {
+          String message = String.format("Unordered - RssFetcher received %d bytes. Expected size: %d",
+              totalReceivedBytes, dataLength);
+          throw new IOException(message);
+        }
+
+        // TODO: check if copySucceeded() can trigger ShuffleManager shutdown
+        long copyDuration = System.currentTimeMillis() - startTime;
         fetcherCallback.fetchSucceeded(host, iai, fetchedInput, compressedSize, decompressedSize,
             copyDuration);
       }
 
-      int eof = rssShuffleInputStream.read();
-      if (eof != -1) {
-        String message = "RssFetcher finished reading blocks, but ShuffleInputStream has remaining bytes.";
-        LOG.error(message);
+      if (totalReceivedBytes < dataLength) {
+        String message = String.format("Unordered - RssFetcher received only %d bytes. Expected size: %d",
+            totalReceivedBytes, dataLength);
         throw new IOException(message);
       }
+
+      // We take an optimistic approach and do not check 'rssShuffleInputStream.read() == -1' to see if there are
+      // remaining bytes.
+      // TODO: If copySucceeded() triggers ShuffleManager shutdown, rssShuffleInputStream.read() should not be called.
     } catch (Exception e) {
       LOG.error("Unordered - RssFetcher failed: shuffleId={}, from {} to {}, attemptNumber={}, partitionId={}, expected data={}",
           shuffleId, mapIndexStart, mapIndexEnd, srcAttemptId.getAttemptNumber(), partitionId, dataLength, e);
       throw e;
     } finally {
       synchronized (lock) {
-        if (!rssShuffleInputStreamClosed) {
-          rssShuffleInputStreamClosed = true;
-          rssShuffleInputStream.close();
-        }
+        closeRssShuffleInputStream();
       }
-    }
-
-    if (totalReceivedBytes != dataLength) {
-      String message = String.format("RssFetcher fetched %d bytes, which is not equal to expected length: %d",
-          totalReceivedBytes, dataLength);
-      LOG.error(message);
-      throw new IOException(message);
     }
   }
 
   public void shutdown() {
-    try {
-      synchronized (lock) {
+    synchronized (lock) {
+      if (!isShutdown) {
         isShutdown = true;
-        if (rssShuffleInputStream != null && !rssShuffleInputStreamClosed) {
-          rssShuffleInputStreamClosed = true;
-          rssShuffleInputStream.close();
-        }
+        closeRssShuffleInputStream();
       }
-    } catch (IOException e) {
-      LOG.warn("Failed to close rssShuffleInputStream while shutting down RssFetcher.", e);
     }
   }
 
@@ -221,9 +216,21 @@ public class RssFetcher implements FetcherBase {
         rssShuffleInputStream = rssShuffleClient.readPartition(shuffleId, partitionId, mapAttemptNumber,
             mapIndexStart, mapIndexEnd);
       } else {
-        LOG.warn("RssFetcher.shutdown() is called before it connects to RSS. Stop running RssFetcher");
-        throw new IllegalStateException("Detected shutdown");
+        LOG.warn("RssFetcher.shutdown() is called before it connects to RSS");
+        throw new IllegalStateException("RssFetcher - shutdown detected");
       }
+    }
+  }
+
+  // Invariant: inside synchronized (lock)
+  private void closeRssShuffleInputStream() {
+    if (rssShuffleInputStream != null && !rssShuffleInputStreamClosed) {
+      try {
+        rssShuffleInputStream.close();
+      } catch (IOException e) {
+        LOG.error("Failed to close rssShuffleInputStream", e);
+      }
+      rssShuffleInputStreamClosed = true;
     }
   }
 }
