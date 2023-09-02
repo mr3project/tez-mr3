@@ -740,10 +740,11 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     }
 
     private SpillResult pushToRSS() throws IOException, InterruptedException {
-      LOG.info("Start pushing spill {} to RSS: shuffleId={}, taskIndex={}, attemptNumber={}", spillNumber,
-        outputContext.shuffleId(),
-        outputContext.getTaskIndex(),
-        outputContext.getTaskAttemptNumber());
+      LOG.info("Unordered output - start push data: spill={}, shuffleId={}, taskIndex={}, attemptNumber={}",
+          spillNumber,
+          outputContext.shuffleId(),
+          outputContext.getTaskIndex(),
+          outputContext.getTaskAttemptNumber());
 
       ByteArrayOutputStream rssBuffer = rssBufferPool.take();
       DataInputBuffer key = new DataInputBuffer();
@@ -802,13 +803,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
               assert compressedLength + RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE == data.length;
               compressedSizePerPartition[i] += data.length;
 
-              if (LOG.isDebugEnabled()) {
-                LOG.debug("Unordered output pushData() - unordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{} = {}",
-                    outputContext.shuffleId(),
-                    outputContext.getTaskIndex(),
-                    outputContext.getTaskAttemptNumber(), i, data.length);
-              }
-
+              // shuffleId, taskIndex, attemptNumber are printed above
+              LOG.info("Unordered output - push data: partitionId={}, size={}", i, data.length);
               rssShuffleClient.pushData(
                   outputContext.shuffleId(),
                   outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber(), i,
@@ -1532,13 +1528,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       assert compressedLength + RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE == data.length;
       compressedSizePerPartition[partition] += data.length;
 
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Unordered output pushData() - large unordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{} = {}",
-            outputContext.shuffleId(),
-            outputContext.getTaskIndex(),
-            outputContext.getTaskAttemptNumber(), partition, data.length);
-      }
-
+      LOG.info("Unordered output - push large record: shuffleId={}, taskIndex={}, attemptNumber={}, partitionId={}, size={}",
+          outputContext.shuffleId(),
+          outputContext.getTaskIndex(),
+          outputContext.getTaskAttemptNumber(), partition, data.length);
       rssShuffleClient.pushData(
           outputContext.shuffleId(),
           outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber(), partition,

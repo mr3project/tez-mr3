@@ -924,9 +924,8 @@ public class PipelinedSorter extends ExternalSorter {
       LOG.debug("Write an index file for merged shuffle data");
       spillRec.writeToFile(finalIndexFile, conf, localFs);
     } else {
-      LOG.info("Start pushing data to Shuffle Server: from {} to {}, {}, {}",
-          outputContext.getTaskVertexName(),
-          outputContext.getDestinationVertexName(),
+      LOG.info("Ordered output - start push data: shuffleId={}, taskIndex={}, attemptNumber={}",
+          outputContext.shuffleId(),
           outputContext.getTaskIndex(),
           outputContext.getTaskAttemptNumber());
 
@@ -969,12 +968,8 @@ public class PipelinedSorter extends ExternalSorter {
             IOUtils.readFully(finalMergedInputStream, buffer, RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE,
                 partitionSize);
 
-            LOG.info(
-                "Ordered output - push merged data. " +
-                    "shuffleId={} taskIndex={} attemptNumber={} partitionId={} pushedSize={}",
-                outputContext.shuffleId(), outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber(),
-                part, pushedBytes);
-
+            // shuffleId, taskIndex, attemptNumber are printed above
+            LOG.info("Ordered output - push data: partitionId={}, size={}", part, pushedBytes);
             rssShuffleClient.pushData(
                 outputContext.shuffleId(),
                 outputContext.getTaskIndex(),
@@ -1021,6 +1016,10 @@ public class PipelinedSorter extends ExternalSorter {
     }
     bufferSize += RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE;
 
+    LOG.info(
+        "Ordered output - start push unmerged data: shuffleId={}, taskIndex={}, attemptNumber={}, partitionId={}",
+        outputContext.shuffleId(), outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber(), partition);
+
     byte[] buffer = new byte[bufferSize];
     ByteBuffer lengthBuffer = ByteBuffer.allocate(RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE);
     for (int i = 0; i < numSpills; i++) {
@@ -1043,14 +1042,8 @@ public class PipelinedSorter extends ExternalSorter {
 
       int pushedBytes = compressedLength + RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE;
 
-      if (LOG.isDebugEnabled()) {
-        LOG.debug(
-            "Ordered output - push unmerged data. " +
-                "shuffleId_taskIndex_attemptNumber={}_{}_{}_{} (spillInfo=({}/{}) pushedSize={}",
-            outputContext.shuffleId(), outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber(),
-            partition, i, numSpills, pushedBytes);
-      }
-
+      LOG.info(
+          "Ordered output - push unmerged data: spill={}/{}, size={}", i, numSpills, pushedBytes);
       rssShuffleClient.pushData(
           outputContext.shuffleId(),
           outputContext.getTaskIndex(),

@@ -237,13 +237,13 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
 
       int eof = rssShuffleInputStream.read();
       if (eof != -1) {
-        String message = "RssFetcherOG finished reading blocks, but ShuffleInputStream has remaining bytes.";
+        String message = "RssFetcherOrderedGrouped finished reading blocks, but ShuffleInputStream has remaining bytes.";
         LOG.error(message);
         throw new IOException(message);
       }
     } catch (Exception e) {
-      LOG.error("Ordered - RssFetcher failed: from {} to {}, attemptNumber={}, partitionId={}, expected data={}",
-          mapIndexStart, mapIndexEnd, srcAttemptId.getAttemptNumber(), partitionId, blockLength, e);
+      LOG.error("Ordered - RssFetcher failed: shuffleId={}, from {} to {}, attemptNumber={}, partitionId={}, expected data={}",
+          shuffleId, mapIndexStart, mapIndexEnd, srcAttemptId.getAttemptNumber(), partitionId, blockLength, e);
       throw e;
     } finally {
       closeRssShuffleInputStream();
