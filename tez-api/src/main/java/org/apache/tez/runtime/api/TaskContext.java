@@ -25,6 +25,7 @@ import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 
 import com.datamonad.mr3.api.DAGID;
+import com.datamonad.mr3.api.VertexID;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
@@ -70,6 +71,8 @@ public interface TaskContext {
   public String getDAGName();
 
   public DAGID getDagId();
+
+  public VertexID getVertexId();
 
   /**
    * Get the name of the Vertex in which the task is running

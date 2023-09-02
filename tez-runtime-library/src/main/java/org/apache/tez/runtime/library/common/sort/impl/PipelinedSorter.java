@@ -231,7 +231,7 @@ public class PipelinedSorter extends ExternalSorter {
     if (this.rssShuffleClient != null) {
       LOG.info("Registering shuffleId = " + outputContext.shuffleId());
       com.datamonad.mr3.MR3Runtime.env()
-          .registerShuffleId(outputContext.getDagId(), outputContext.shuffleId());
+          .registerShuffleId(outputContext.getVertexId(), outputContext.shuffleId());
     }
 
     initialSetupLogLine.append("#blocks=").append(maxNumberOfBlocks);
