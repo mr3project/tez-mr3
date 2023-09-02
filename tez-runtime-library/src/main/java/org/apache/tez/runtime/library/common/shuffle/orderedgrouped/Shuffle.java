@@ -385,7 +385,7 @@ public class Shuffle implements ExceptionReporter {
   public synchronized void reportException(Throwable t) {
     // RunShuffleCallable onFailure deals with ignoring errors on shutdown.
     if (throwable.get() == null) {
-      LOG.info(srcNameTrimmed + ": " + "Setting throwable in reportException with message [" + t.getMessage() +
+      LOG.info(srcNameTrimmed + ": Setting throwable in reportException with message [" + t.getMessage() +
           "] from thread [" + Thread.currentThread().getName());
       throwable.set(t);
       throwingThreadName = Thread.currentThread().getName();

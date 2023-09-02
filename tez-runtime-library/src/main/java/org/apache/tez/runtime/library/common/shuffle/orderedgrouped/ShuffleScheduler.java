@@ -514,7 +514,7 @@ class ShuffleScheduler {
         fetcherExecutor.shutdownNow();
       }
       long endTime = System.currentTimeMillis();
-      LOG.info("Shutting down fetchers for input: {}, shutdown timetaken: {} ms, hasFetcherExecutorStopped: {}",
+      LOG.info("Shutting down fetchers for input: {}, shutdown time taken: {} ms, hasFetcherExecutorStopped: {}",
           srcNameTrimmed, (endTime - startTime), hasFetcherExecutorStopped());
     }
   }
@@ -1657,8 +1657,6 @@ class ShuffleScheduler {
         ShuffleScheduler.this.notifyAll();
       }
     }
-
-
 
     @Override
     public void onSuccess(Void result) {

@@ -141,16 +141,11 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
 
   @Override
   public void shutDown() {
-    try {
-      synchronized (lock) {
+    synchronized (lock) {
+      if (!isShutdown) {
         isShutdown = true;
-        if (rssShuffleInputStream != null && !rssShuffleInputStreamClosed) {
-          rssShuffleInputStreamClosed = true;
-          rssShuffleInputStream.close();
-        }
+        closeRssShuffleInputStream();
       }
-    } catch (IOException e) {
-      LOG.warn("Failed to close rssShuffleInputStream while shutting down RssFetcherOrderedGrouped.", e);
     }
   }
 
@@ -196,7 +191,6 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
       while (totalReceivedBytes < blockLength) {
         int index = numFetchedBlocks;
         numFetchedBlocks++;
-
         long startTime = System.currentTimeMillis();
 
         // We assume that the number of bytes read by DataInputStream.readLong() is equal to Long.BYTES.
@@ -205,7 +199,6 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
         totalReceivedBytes += RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE;
 
         boolean isLastBlock = totalReceivedBytes + compressedSize >= blockLength;
-        // if totalReceivedBytes + compressedSize > blockLength, then IOException will be thrown later.
         InputAttemptIdentifier identifierForCurrentBlock = new InputAttemptIdentifier(
             baseInputAttemptIdentifier.getInputIdentifier(),
             baseInputAttemptIdentifier.getAttemptNumber(),
@@ -226,34 +219,38 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
           throw new TezUncheckedException("Unexpected MapOutput.Type: " + mapOutput);
         }
         totalReceivedBytes += compressedSize;
-
         long copyDuration = System.currentTimeMillis() - startTime;
+
+        // this can be checked before performing I/O, but okay because this is an error
+        if (totalReceivedBytes > blockLength) {
+          String message = String.format("Ordered - RssFetcher received %d bytes. Expected size: %d",
+              totalReceivedBytes, blockLength);
+          throw new IOException(message);
+        }
+
         // copySucceeded() should be called in order to call mapOutput.commit().
         // The last block marks baseInputAttemptIdentifier (which is the first InputAttemptIdentifier
         // belonging to srcAttemptId) as finished.
+        //
+        // copySucceeded() may trigger ShuffleScheduler shutdown, which calls ShuffleScheduler.close()
+        // which in turn calls this.shutDown().
         shuffleScheduler.copySucceeded(identifierForCurrentBlock, null, compressedSize, decompressedSize, copyDuration,
             mapOutput, false);
       }
+      assert totalReceivedBytes == blockLength;
 
-      int eof = rssShuffleInputStream.read();
-      if (eof != -1) {
-        String message = "RssFetcherOrderedGrouped finished reading blocks, but ShuffleInputStream has remaining bytes.";
-        LOG.error(message);
-        throw new IOException(message);
-      }
+      // If copySucceeded() triggers ShuffleScheduler shutdown, rssShuffleInputStream may have already been closed.
+      // We take an optimistic approach and do not check 'rssShuffleInputStream.read() == -1' to see if there are
+      // remaining bytes. This makes sense because copySucceeded() may trigger ShuffleScheduler shutdown,
+      // in which case there is no point in checking 'rssShuffleInputStream.read() == -1'.
     } catch (Exception e) {
       LOG.error("Ordered - RssFetcher failed: shuffleId={}, from {} to {}, attemptNumber={}, partitionId={}, expected data={}",
           shuffleId, mapIndexStart, mapIndexEnd, srcAttemptId.getAttemptNumber(), partitionId, blockLength, e);
       throw e;
     } finally {
-      closeRssShuffleInputStream();
-    }
-
-    if (totalReceivedBytes != blockLength) {
-      String message = String.format("Ordered - RssFetcher received only %d bytes. Expected size: %d",
-          totalReceivedBytes, blockLength);
-      LOG.error(message);
-      throw new IOException(message);
+      synchronized (lock) {
+        closeRssShuffleInputStream();
+      }
     }
   }
 
@@ -263,25 +260,26 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
       if (!isShutdown) {
         rssShuffleInputStream = rssShuffleClient.readPartition(shuffleId, partitionId, mapAttemptNumber,
             mapIndexStart, mapIndexEnd);
-        // now rssShuffleInputStream.close() should be called inside the current thread
+        // rssShuffleInputStream.close() is usually called inside the current thread, but it may
+        // be called ShuffleScheduler.close() thread
       } else {
-        LOG.warn("RssFetcherOrderedGrouped.shutdown() is called before it connects to RSS. " +
-            "Stop running RssFetcherOrderedGrouped");
-        throw new IllegalStateException("Detected shutdown");
+        LOG.warn("RssFetcherOrderedGrouped.shutDown() is called before it connects to RSS");
+        throw new IllegalStateException("RssFetcherOrderedGrouped - shutdown detected");
       }
     }
   }
 
+  // Invariant: inside synchronized (lock)
   private void closeRssShuffleInputStream() {
-    synchronized (lock) {
-      if (!rssShuffleInputStreamClosed) {
-        rssShuffleInputStreamClosed = true;
-        try {
-          rssShuffleInputStream.close();
-        } catch (IOException e) {
-          LOG.error("Failed to close rssShuffleInputStream", e);
-        }
+    if (rssShuffleInputStream != null && !rssShuffleInputStreamClosed) {
+      try {
+        rssShuffleInputStream.close();
+      } catch (IOException e) {
+        LOG.error("Failed to close rssShuffleInputStream", e);
       }
+      rssShuffleInputStreamClosed = true;
+      // Do not set rssShuffleInputStream to null because if this call is from shutDown(),
+      // rssShuffleInputStream may still be read in doFetch() and we do not want to see NPE.
     }
   }
 }
