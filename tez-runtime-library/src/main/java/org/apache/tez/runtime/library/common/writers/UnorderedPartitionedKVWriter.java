@@ -915,8 +915,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       LOG.error(destNameTrimmed + ": Error during spill, throwing");
       // Assuming close will be called on the same thread as the write
       cleanup();
+      if (rssShuffleClient != null) {
+        cleanupRssShuffleClient();
+      }
       cleanupCurrentBuffer();
-      cleanupRssShuffleClient();
       if (spillException instanceof IOException) {
         throw (IOException) spillException;
       } else {
@@ -924,7 +926,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       }
     } else {
       if (LOG.isDebugEnabled()) {
-        LOG.info(destNameTrimmed + ": All spills complete");
+        LOG.debug(destNameTrimmed + ": All spills complete");
       }
       // Assuming close will be called on the same thread as the write
       cleanup();
@@ -1017,14 +1019,17 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       }
 
       if (rssShuffleClient != null) {
-        rssShuffleClient.mapperEnd(
-            outputContext.shuffleId(),
-            outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber(), outputContext.getVertexParallelism());
+        try {
+          rssShuffleClient.mapperEnd(
+              outputContext.shuffleId(),
+              outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber(), outputContext.getVertexParallelism());
+        } finally {
+          cleanupRssShuffleClient();  // should be called after rssShuffleClient.mapperEnd()
+        }
       }
 
       updateTezCountersAndNotify();
       cleanupCurrentBuffer();
-      cleanupRssShuffleClient();  // should be called after rssShuffleClient.mapperEnd()
       return events;
     }
   }
@@ -1167,11 +1172,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   }
 
   private void cleanupRssShuffleClient() {
-    if (rssShuffleClient != null) {
-      rssShuffleClient.cleanup(
-         outputContext.shuffleId(),
-         outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber());
-    }
+    rssShuffleClient.cleanup(
+       outputContext.shuffleId(),
+       outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber());
   }
 
   private SpillResult finalSpill() throws IOException {
