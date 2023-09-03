@@ -360,7 +360,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
     if (this.rssShuffleClient != null) {
       LOG.info("Registering shuffleId = " + outputContext.shuffleId());
-      com.datamonad.mr3.MR3Runtime.env().registerShuffleId(outputContext.getVertexId(), outputContext.shuffleId());
+      com.datamonad.mr3.MR3Runtime.env()
+          .registerShuffleIdOutgoing(outputContext.getVertexId(), outputContext.shuffleId());
     }
 
     LOG.info("{}: numBuffers={}, sizePerBuffer={}, skipBuffers={}, numPartitions={}, rssShuffleClient={}",
