@@ -148,7 +148,7 @@ public interface VertexManagerPluginContext {
    * Get the number of nodes in the cluster
    * @return Number of nodes
    */
-  int getNumClusterNodes();
+  // int getNumClusterNodes();
   
   /**
    * Set the new parallelism (number of tasks) of this vertex,
