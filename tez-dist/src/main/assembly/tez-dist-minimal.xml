@@ -46,8 +46,9 @@
               <exclude>org.apache.hadoop:hadoop-yarn-api</exclude>
               <exclude>org.apache.hadoop:hadoop-yarn-client</exclude>
               <exclude>org.apache.hadoop:hadoop-yarn-common</exclude>
+              <exclude>org.apache.hadoop:hadoop-hdfs-client</exclude>
+              <exclude>org.apache.hadoop:hadoop-distcp</exclude>
               <exclude>org.apache.hadoop:hadoop-mapreduce-client-core</exclude>
-              <exclude>org.apache.hadoop:hadoop-mapreduce-client-common</exclude>
               <exclude>org.apache.hadoop:hadoop-mapreduce-client-common</exclude>
               <exclude>org.apache.tez:*</exclude>
               <exclude>com.datamonad.mr3:*</exclude>
