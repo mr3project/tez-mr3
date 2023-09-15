@@ -767,6 +767,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
                 rssBuffer.reset();
                 DataOutputStream out = new DataOutputStream(rssBuffer);
 
+                // Make a space for Celeborn internal shuffle header.
+                byte[] emptyArr = new byte[RssShuffleUtils.CELEBORN_SHUFFLE_HEADER_SIZE];
+                out.write(emptyArr);
+
                 // Make a space for writing compressed and decompressed length of block.
                 out.writeLong(0L);
                 out.writeLong(0L);
@@ -796,20 +800,30 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
               sizePerPartition[i] += rawLength;
 
               byte[] data = rssBuffer.toByteArray();
-              ByteBuffer lengthBuffer = ByteBuffer.allocate(RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE);
+              int dataLength = data.length - RssShuffleUtils.CELEBORN_SHUFFLE_HEADER_SIZE;
+
+              ByteBuffer lengthBuffer = ByteBuffer.allocate(RssShuffleUtils.TEZ_RSS_SHUFFLE_HEADER_SIZE);
               lengthBuffer.putLong(compressedLength);
               lengthBuffer.putLong(rawLength);
-              System.arraycopy(lengthBuffer.array(), 0, data, 0, RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE);
+              System.arraycopy(
+                  lengthBuffer.array(), 0,
+                  data, RssShuffleUtils.CELEBORN_SHUFFLE_HEADER_SIZE,
+                  RssShuffleUtils.TEZ_RSS_SHUFFLE_HEADER_SIZE);
 
-              assert compressedLength + RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE == data.length;
-              compressedSizePerPartition[i] += data.length;
+              assert compressedLength + RssShuffleUtils.TEZ_RSS_SHUFFLE_HEADER_SIZE == dataLength;
+              compressedSizePerPartition[i] += dataLength;
 
               // shuffleId, taskIndex, attemptNumber are printed above
-              LOG.info("Unordered output - push data: partitionId={}, size={}", i, data.length);
+              LOG.info("Unordered output - push data: partitionId={}, size={}", i, dataLength);
               rssShuffleClient.pushData(
                   outputContext.shuffleId(),
-                  outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber(), i,
-                  data, 0, data.length, outputContext.getVertexParallelism(),
+                  outputContext.getTaskIndex(),
+                  outputContext.getTaskAttemptNumber(),
+                  i,
+                  data,
+                  RssShuffleUtils.CELEBORN_SHUFFLE_HEADER_SIZE,
+                  dataLength,
+                  outputContext.getVertexParallelism(),
                   numPhysicalOutputs);
             }
           } finally {
@@ -1499,6 +1513,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       rssBufferForLargeRecord.reset();
       DataOutputStream out = new DataOutputStream(rssBufferForLargeRecord);
 
+      // Make a space for Celeborn internal shuffle header.
+      byte[] emptyArr = new byte[RssShuffleUtils.CELEBORN_SHUFFLE_HEADER_SIZE];
+      out.write(emptyArr);
+
       // Make a space for writing compressed and decompressed length of block.
       out.writeLong(0L);
       out.writeLong(0L);
@@ -1524,22 +1542,32 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       writer = null;
 
       byte[] data = rssBufferForLargeRecord.toByteArray();
-      ByteBuffer lengthBuffer = ByteBuffer.allocate(RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE);
+      int dataLength = data.length - RssShuffleUtils.CELEBORN_SHUFFLE_HEADER_SIZE;
+
+      ByteBuffer lengthBuffer = ByteBuffer.allocate(RssShuffleUtils.TEZ_RSS_SHUFFLE_HEADER_SIZE);
       lengthBuffer.putLong(compressedLength);
       lengthBuffer.putLong(rawLength);
-      System.arraycopy(lengthBuffer.array(), 0, data, 0, RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE);
+      System.arraycopy(
+          lengthBuffer.array(), 0,
+          data, RssShuffleUtils.CELEBORN_SHUFFLE_HEADER_SIZE,
+          RssShuffleUtils.TEZ_RSS_SHUFFLE_HEADER_SIZE);
 
-      assert compressedLength + RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE == data.length;
-      compressedSizePerPartition[partition] += data.length;
+      assert compressedLength + RssShuffleUtils.TEZ_RSS_SHUFFLE_HEADER_SIZE == dataLength;
+      compressedSizePerPartition[partition] += dataLength;
 
       LOG.info("Unordered output - push large record: shuffleId={}, taskIndex={}, attemptNumber={}, partitionId={}, size={}",
           outputContext.shuffleId(),
           outputContext.getTaskIndex(),
-          outputContext.getTaskAttemptNumber(), partition, data.length);
+          outputContext.getTaskAttemptNumber(), partition, dataLength);
       rssShuffleClient.pushData(
           outputContext.shuffleId(),
-          outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber(), partition,
-          data, 0, data.length, outputContext.getVertexParallelism(),
+          outputContext.getTaskIndex(),
+          outputContext.getTaskAttemptNumber(),
+          partition,
+          data,
+          RssShuffleUtils.CELEBORN_SHUFFLE_HEADER_SIZE,
+          dataLength,
+          outputContext.getVertexParallelism(),
           numPhysicalOutputs);
     } finally {
       if (writer != null) {

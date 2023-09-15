@@ -354,7 +354,7 @@ public class IFile {
       this.rle = rle;
       this.useRSS = useRSS;
 
-      assert rssRawOut.size() == RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE;
+      this.start = rssRawOut.size();
 
       setupOutputStream(codec, rssRawOut);
       writeHeader(rssRawOut);
@@ -467,7 +467,7 @@ public class IFile {
       }
 
       if (useRSS) {
-        compressedBytesWritten = rssRawOut.size() - RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE;
+        compressedBytesWritten = rssRawOut.size() - start;
       } else {
         //header bytes are already included in rawOut
         compressedBytesWritten = rawOut.getPos() - start;

@@ -150,7 +150,7 @@ public class RssFetcher implements FetcherBase {
         // We assume that the number of bytes read by DataInputStream.readLong() is equal to Long.BYTES.
         long compressedSize = dis.readLong();
         long decompressedSize = dis.readLong();
-        totalReceivedBytes += RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE;
+        totalReceivedBytes += RssShuffleUtils.TEZ_RSS_SHUFFLE_HEADER_SIZE;
 
         FetchedInput fetchedInput = inputAllocator.allocate(decompressedSize, compressedSize, iai);
 

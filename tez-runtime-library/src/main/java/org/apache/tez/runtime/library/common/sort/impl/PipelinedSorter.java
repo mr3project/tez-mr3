@@ -890,7 +890,7 @@ public class PipelinedSorter extends ExternalSorter {
             pushUnmergedPartition(part);
             pushedPartitions.add(part);
           } else {
-            outputBytesWithOverheadCounter.increment(rawLength + RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE);
+            outputBytesWithOverheadCounter.increment(rawLength + RssShuffleUtils.TEZ_RSS_SHUFFLE_HEADER_SIZE);
             partitionStats[part] += partLength;
           }
         } else  {
@@ -933,18 +933,7 @@ public class PipelinedSorter extends ExternalSorter {
       // create a piped stream, pass OS to IFile.writer, and use IS instead of finalMergedInputStream here.
       InputStream finalMergedInputStream = rfs.open(finalOutputFile);
 
-      long bufferSize = 0L;
-      for (int part = 0; part < partitions; part++) {
-        if (!pushedPartitions.contains(part) && partitionStats[part] > bufferSize) {
-          bufferSize = partitionStats[part];
-        }
-      }
-
-      bufferSize += RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE;
-      assert bufferSize <= Integer.MAX_VALUE - 8; // This is known as the maximum size of array in most JVMs.
-
-      byte[] buffer = new byte[(int) bufferSize];
-      ByteBuffer lengthBuffer = ByteBuffer.allocate(RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE);
+      ByteBuffer lengthBuffer = ByteBuffer.allocate(RssShuffleUtils.TEZ_RSS_SHUFFLE_HEADER_SIZE);
 
       for (int part = 0; part < partitions; part++) {
         if (pushedPartitions.contains(part)) {
@@ -956,16 +945,31 @@ public class PipelinedSorter extends ExternalSorter {
             }
           }
         } else {
+          int bufferSize = (int) partitionStats[part] + RssShuffleUtils.CELEBORN_SHUFFLE_HEADER_SIZE +
+              RssShuffleUtils.TEZ_RSS_SHUFFLE_HEADER_SIZE;
+
+          // "Integer.MAX_VALUE - 8" is known as the maximum size of array in most JVMs.
+          assert bufferSize <= Integer.MAX_VALUE - 8;
+
+          // Allocate byte[] inside the loop because Celeborn uses this array until it finishes pushing.
+          byte[] buffer = new byte[(int) bufferSize];
+
           int partitionSize = (int) partitionStats[part];
           if (partitionSize != 0) {
-            int pushedBytes = partitionSize + RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE;
+            int pushedBytes = partitionSize + RssShuffleUtils.TEZ_RSS_SHUFFLE_HEADER_SIZE;
 
             lengthBuffer.putLong(partitionSize);
             lengthBuffer.putLong(spillRec.getIndex(part).getRawLength());
-            System.arraycopy(lengthBuffer.array(), 0, buffer, 0, RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE);
+            System.arraycopy(
+                lengthBuffer.array(), 0,
+                buffer, RssShuffleUtils.CELEBORN_SHUFFLE_HEADER_SIZE,
+                RssShuffleUtils.TEZ_RSS_SHUFFLE_HEADER_SIZE);
             lengthBuffer.clear();
 
-            IOUtils.readFully(finalMergedInputStream, buffer, RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE,
+            IOUtils.readFully(
+                finalMergedInputStream,
+                buffer,
+                RssShuffleUtils.CELEBORN_SHUFFLE_HEADER_SIZE + RssShuffleUtils.TEZ_RSS_SHUFFLE_HEADER_SIZE,
                 partitionSize);
 
             // shuffleId, taskIndex, attemptNumber are printed above
@@ -976,7 +980,7 @@ public class PipelinedSorter extends ExternalSorter {
                 outputContext.getTaskAttemptNumber(),
                 part,
                 buffer,
-                0,
+                RssShuffleUtils.CELEBORN_SHUFFLE_HEADER_SIZE,
                 pushedBytes,
                 outputContext.getVertexParallelism(),
                 partitions);
@@ -1002,33 +1006,29 @@ public class PipelinedSorter extends ExternalSorter {
     assert partitionStats[partition] == 0L;
     assert rssShuffleClient != null;
 
-    int bufferSize = 0;
-    for (int i = 0; i < numSpills; i++) {
-      TezIndexRecord indexRecord = indexCacheList.get(i).getIndex(partition);
-      long spillLength = indexRecord.getPartLength();
-      if (spillLength > MAX_PUSH_SIZE) {
-        throw new IOException("Individual spill length exceeds 2GB. Cannot push spill to RSS.");
-      }
-
-      if (indexRecord.getPartLength() > bufferSize) {
-        bufferSize = (int) indexRecord.getPartLength();
-      }
-    }
-    bufferSize += RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE;
-
     LOG.info(
         "Ordered output - start push unmerged data: shuffleId={}, taskIndex={}, attemptNumber={}, partitionId={}",
         outputContext.shuffleId(), outputContext.getTaskIndex(), outputContext.getTaskAttemptNumber(), partition);
 
-    byte[] buffer = new byte[bufferSize];
-    ByteBuffer lengthBuffer = ByteBuffer.allocate(RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE);
+    ByteBuffer lengthBuffer = ByteBuffer.allocate(RssShuffleUtils.TEZ_RSS_SHUFFLE_HEADER_SIZE);
     for (int i = 0; i < numSpills; i++) {
       TezIndexRecord indexRecord = indexCacheList.get(i).getIndex(partition);
       int compressedLength = (int) indexRecord.getPartLength();
+      if (compressedLength > MAX_PUSH_SIZE) {
+        throw new IOException("Individual spill length exceeds 2GB. Cannot push spill to RSS.");
+      }
+
+      int bufferSize = compressedLength + RssShuffleUtils.CELEBORN_SHUFFLE_HEADER_SIZE +
+          RssShuffleUtils.TEZ_RSS_SHUFFLE_HEADER_SIZE;
+      // Allocate byte[] inside the loop because Celeborn uses this array until it finishes pushing.
+      byte[] buffer = new byte[bufferSize];
 
       lengthBuffer.putLong(compressedLength);
       lengthBuffer.putLong(indexRecord.getRawLength());
-      System.arraycopy(lengthBuffer.array(), 0, buffer, 0, RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE);
+      System.arraycopy(
+          lengthBuffer.array(), 0,
+          buffer, RssShuffleUtils.CELEBORN_SHUFFLE_HEADER_SIZE,
+          RssShuffleUtils.TEZ_RSS_SHUFFLE_HEADER_SIZE);
       lengthBuffer.clear();
 
       InputStream spillInputStream = rfs.open(spillFilePaths.get(i));
@@ -1037,10 +1037,13 @@ public class PipelinedSorter extends ExternalSorter {
         throw new IOException("Failed to set the position of spill file.");
       }
 
-      IOUtils.readFully(spillInputStream, buffer, RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE,
+      IOUtils.readFully(
+          spillInputStream,
+          buffer,
+          RssShuffleUtils.CELEBORN_SHUFFLE_HEADER_SIZE + RssShuffleUtils.TEZ_RSS_SHUFFLE_HEADER_SIZE,
           compressedLength);
 
-      int pushedBytes = compressedLength + RssShuffleUtils.RSS_SHUFFLE_HEADER_SIZE;
+      int pushedBytes = compressedLength + RssShuffleUtils.TEZ_RSS_SHUFFLE_HEADER_SIZE;
 
       LOG.info(
           "Ordered output - push unmerged data: spill={}/{}, size={}", i, numSpills, pushedBytes);
@@ -1050,7 +1053,7 @@ public class PipelinedSorter extends ExternalSorter {
           outputContext.getTaskAttemptNumber(),
           partition,
           buffer,
-          0,
+          RssShuffleUtils.CELEBORN_SHUFFLE_HEADER_SIZE,
           pushedBytes,
           outputContext.getVertexParallelism(),
           partitions);

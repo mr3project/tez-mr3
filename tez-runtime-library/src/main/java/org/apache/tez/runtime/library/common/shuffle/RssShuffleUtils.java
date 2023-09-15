@@ -18,6 +18,7 @@
 
 package org.apache.tez.runtime.library.common.shuffle;
 
+import org.apache.celeborn.client.ShuffleClientImpl;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.slf4j.Logger;
@@ -31,7 +32,8 @@ public class RssShuffleUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(RssShuffleUtils.class);
 
-  public static final int RSS_SHUFFLE_HEADER_SIZE = 2 * Long.BYTES;
+  public static final int CELEBORN_SHUFFLE_HEADER_SIZE = ShuffleClientImpl.BATCH_HEADER_SIZE;
+  public static final int TEZ_RSS_SHUFFLE_HEADER_SIZE = 2 * Long.BYTES;
 
   public static boolean checkUseSameAttemptNumber(CompositeInputAttemptIdentifier inputAttemptIdentifier) {
     List<CompositeInputAttemptIdentifier> childInputAttemptIdentifiers = inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce();
