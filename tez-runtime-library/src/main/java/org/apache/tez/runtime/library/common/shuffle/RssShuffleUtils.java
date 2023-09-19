@@ -41,7 +41,7 @@ public class RssShuffleUtils {
     boolean useSameAttemptNumber = true;
     for (CompositeInputAttemptIdentifier input: childInputAttemptIdentifiers) {
       if (input.getAttemptNumber() != attemptNumber) {
-        LOG.error("Different attemptNumber found: {}, {}, {}",
+        LOG.info("Different attemptNumber found: {}, {}, taskIndex={}",
             input.getAttemptNumber(), attemptNumber, input.getTaskIndex());
         useSameAttemptNumber = false;
         break;
