@@ -142,6 +142,10 @@ public class RssFetcher implements FetcherBase {
     setupRssShuffleInputStream(mapIndexStart, mapIndexEnd, srcAttemptId.getAttemptNumber(), partitionId);
     DataInputStream dis = new DataInputStream(rssShuffleInputStream);
 
+    // rssShuffleInputStream can be closed at any time because shutdown() can be callled
+    // at any time. In such a case, java.lang.NullPointerException or java.io.EOFException
+    // is generated.
+
     long totalReceivedBytes = 0L;
     try {
       for (CompositeInputAttemptIdentifier iai: inputList) {
