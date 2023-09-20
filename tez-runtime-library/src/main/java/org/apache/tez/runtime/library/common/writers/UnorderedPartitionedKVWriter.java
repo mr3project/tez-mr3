@@ -347,9 +347,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       rssBufferPool = null;
       rssBufferForLargeRecord = null;
     } else {
-      int numBuffer = 2;
-      rssBufferPool = new ArrayBlockingQueue<>(numBuffer);
-      for (int i = 0; i < numBuffer; i++) {
+      // use 'maxThreads - 1' because availableSlots allows up to 'maxThreads - 1' spill threads
+      int numRssBuffers = maxThreads - 1;
+      rssBufferPool = new ArrayBlockingQueue<>(numRssBuffers);
+      for (int i = 0; i < numRssBuffers; i++) {
         rssBufferPool.offer(new ByteArrayOutputStream());
       }
 
