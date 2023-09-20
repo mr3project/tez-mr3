@@ -1559,7 +1559,9 @@ class ShuffleScheduler {
                 cinput, partitionId, mapHost, cinput.getTaskIndex());
             rssFetchers.add(rssFetcher);
           } else {
-            LOG.info("Ordered - Skipped creating a single RssFetcher: {}", cinput);
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Ordered - Skipped creating a single RssFetcher: {}", cinput);
+            }
             try {
               copySucceeded(cinput, null, 0, 0, 0L, null, false);
             } catch (IOException e) {
@@ -1582,7 +1584,9 @@ class ShuffleScheduler {
             inputAttemptIdentifier, partitionId, mapHost, mapIndexStart);
         rssFetchers.add(rssFetcher);
       } else {
-        LOG.info("Ordered - Skipped creating a single RssFetcher: {}", inputAttemptIdentifier);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Ordered - Skipped creating a single RssFetcher: {}", inputAttemptIdentifier);
+        }
         try {
           copySucceeded(inputAttemptIdentifier, null, 0, 0, 0L, null, false);
         } catch (IOException e) {
