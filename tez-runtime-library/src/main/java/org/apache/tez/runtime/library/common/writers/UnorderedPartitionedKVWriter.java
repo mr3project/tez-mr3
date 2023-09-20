@@ -214,7 +214,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   // use rssShuffleClient if and only if it is not null
   private final ShuffleClient rssShuffleClient;
   private final ArrayBlockingQueue<ByteArrayOutputStream> rssBufferPool;
-  private final ByteArrayOutputStream rssBufferForLargeRecord;
+  private ByteArrayOutputStream rssBufferForLargeRecord;
   private final int numPhysicalOutputs;
   private final long[] compressedSizePerPartition;
 
@@ -354,7 +354,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         rssBufferPool.offer(new ByteArrayOutputStream());
       }
 
-      rssBufferForLargeRecord = new ByteArrayOutputStream();
+      rssBufferForLargeRecord = null;   // to be initialized in pushLargeRecord() on demand
     }
 
     compressedSizePerPartition = rssShuffleClient != null ? new long[numPartitions] : null;
@@ -1511,7 +1511,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     long compressedLength = 0;
 
     Writer writer = null;
-
+    if (rssBufferForLargeRecord == null) {
+      rssBufferForLargeRecord = new ByteArrayOutputStream();
+    }
     try {
       rssBufferForLargeRecord.reset();
       DataOutputStream out = new DataOutputStream(rssBufferForLargeRecord);
