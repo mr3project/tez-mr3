@@ -973,7 +973,9 @@ public class PipelinedSorter extends ExternalSorter {
                 partitionSize);
 
             // shuffleId, taskIndex, attemptNumber are printed above
-            LOG.info("Ordered output - push data: partitionId={}, size={}", part, pushedBytes);
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Ordered output - push data: partitionId={}, size={}", part, pushedBytes);
+            }
             rssShuffleClient.pushData(
                 outputContext.shuffleId(),
                 outputContext.getTaskIndex(),

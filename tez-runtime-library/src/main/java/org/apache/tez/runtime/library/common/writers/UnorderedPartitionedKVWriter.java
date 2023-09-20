@@ -814,7 +814,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
               compressedSizePerPartition[i] += dataLength;
 
               // shuffleId, taskIndex, attemptNumber are printed above
-              LOG.info("Unordered output - push data: partitionId={}, size={}", i, dataLength);
+              if (LOG.isDebugEnabled()) {
+                LOG.debug("Unordered output - push data: partitionId={}, size={}", i, dataLength);
+              }
               rssShuffleClient.pushData(
                   outputContext.shuffleId(),
                   outputContext.getTaskIndex(),
