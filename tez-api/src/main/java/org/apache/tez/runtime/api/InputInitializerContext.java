@@ -93,7 +93,7 @@ public interface InputInitializerContext {
    * Get the number of nodes in the cluster
    * @return Number of nodes
    */
-  int getNumClusterNodes();
+  // int getNumClusterNodes();
 
   /**
    * @return DAG Attempt number

@@ -994,7 +994,7 @@ Author: Laszlo Bodor <bodorlaszlo0202@gmail.com>
 Date:   Tue Sep 1 12:42:10 2020 +0200
 
     TEZ-4228: TezClassLoader should be used in TezChild and for Configuration objects
-    --> not related
+    --> not related (Cf. TEZ-4223)
 
 commit d90b1042e97993eb103f161b40e523638e317f9a
 Author: Jonathan Turner Eagles <jeagles@apache.org>
@@ -1062,7 +1062,7 @@ Date:   Thu Aug 13 11:59:40 2020 +0530
     TEZ-4223 - Adding new jars or resources after the first DAG runs does not work.
     
     Signed-off-by: Rajesh Balamohan <rbalamohan@apache.org>
-    --> no need
+    --> MR3 uses a different solution that does not close DAGClassLoader.
 
 commit 59419dd3e3817d52f3a7ace34f122c92bea03d33
 Author: Harish JP <harishjp@apache.org>
