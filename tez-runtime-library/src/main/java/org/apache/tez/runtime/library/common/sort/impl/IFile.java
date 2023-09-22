@@ -760,6 +760,8 @@ public class IFile {
     private CompressionCodec codec;
     private DecompressorPool inputOutputContext;
 
+    private final boolean isSharedInputStream;
+
     /**
      * Construct an IFile Reader.
      *
@@ -796,10 +798,17 @@ public class IFile {
         int bufferSize, DecompressorPool inputOutputContext) throws IOException {
       this(in, ((in != null) ? (length - HEADER.length) : length), codec,
           readsCounter, bytesReadCounter, readAhead, readAheadLength,
-          bufferSize, inputOutputContext, ((in != null) ? isCompressedFlagEnabled(in) : false));
+          bufferSize, inputOutputContext, ((in != null) ? isCompressedFlagEnabled(in) : false), false);
       if (in != null && bytesReadCounter != null) {
         bytesReadCounter.increment(IFile.HEADER.length);
       }
+    }
+
+    public Reader(InputStream in, long length, CompressionCodec codec, boolean readAhead, int readAheadLength,
+        int bufferSize, DecompressorPool inputOutputContext) throws IOException {
+      this(in, ((in != null) ? (length - HEADER.length) : length), codec, null, null, readAhead,
+          readAheadLength, bufferSize, inputOutputContext,
+          ((in != null) ? isCompressedFlagEnabled(in) : false), true);
     }
 
     /**
@@ -812,11 +821,10 @@ public class IFile {
      * @param readsCounter Counter for records read from disk
      * @throws IOException
      */
-    public Reader(InputStream in, long length,
-                  CompressionCodec codec,
-                  TezCounter readsCounter, TezCounter bytesReadCounter,
-                  boolean readAhead, int readAheadLength,
-                  int bufferSize, DecompressorPool inputOutputContext, boolean isCompressed) throws IOException {
+    public Reader(InputStream in, long length, CompressionCodec codec, TezCounter readsCounter,
+        TezCounter bytesReadCounter, boolean readAhead, int readAheadLength, int bufferSize,
+        DecompressorPool inputOutputContext, boolean isCompressed, boolean isSharedInputStream)
+        throws IOException {
       if (in != null) {
         checksumIn = new IFileInputStream(in, length, readAhead,
             readAheadLength/* , isCompressed */);
@@ -849,6 +857,8 @@ public class IFile {
       this.bytesReadCounter = bytesReadCounter;
       this.fileLength = length;
       this.bufferSize = Math.max(0, bufferSize);
+
+      this.isSharedInputStream = isSharedInputStream;
     }
 
     /**
@@ -1130,7 +1140,10 @@ public class IFile {
 
     public void close() throws IOException {
       // Close the underlying stream
-      in.close();
+      if (!isSharedInputStream) {
+        // If InputStream is shared by multiple inputs, let InputStream closed by the last input among them.
+        in.close();
+      }
 
       // Release the buffer
       dataIn = null;

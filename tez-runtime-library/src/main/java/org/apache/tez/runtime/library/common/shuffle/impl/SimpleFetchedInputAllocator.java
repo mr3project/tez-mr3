@@ -20,6 +20,7 @@ package org.apache.tez.runtime.library.common.shuffle.impl;
 
 import java.io.IOException;
 
+import org.apache.tez.runtime.library.common.shuffle.NetworkFetchedInput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -65,12 +66,18 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
   
   private volatile long usedMemory = 0;
 
-  public SimpleFetchedInputAllocator(String srcNameTrimmed,
-                                     String uniqueIdentifier, int dagID,
-                                     Configuration conf,
-                                     long maxTaskAvailableMemory,
-                                     long memoryAvailable,
-                                     String containerId, int vertexId) {
+  private final boolean useRss;
+
+  public SimpleFetchedInputAllocator(
+      String srcNameTrimmed,
+      String uniqueIdentifier,
+      int dagID,
+      Configuration conf,
+      long maxTaskAvailableMemory,
+      long memoryAvailable,
+      String containerId,
+      int vertexId,
+      boolean useRss) {
     this.srcNameTrimmed = srcNameTrimmed;
     this.conf = conf;    
     this.maxAvailableTaskMemory = maxTaskAvailableMemory;
@@ -112,6 +119,8 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
     this.maxSingleShuffleLimit = (long) Math.min((memoryLimit * singleShuffleMemoryLimitPercent),
         Integer.MAX_VALUE);
 
+    this.useRss = useRss;
+
     LOG.info(srcNameTrimmed + ": "
         + "RequestedMemory=" + memReq
         + ", AssignedMemory=" + this.memoryLimit
@@ -139,9 +148,13 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
       InputAttemptIdentifier inputAttemptIdentifier) throws IOException {
     if (actualSize > maxSingleShuffleLimit
         || this.usedMemory + actualSize > this.memoryLimit) {
-      return new DiskFetchedInput(compressedSize,
-          inputAttemptIdentifier, this, conf, localDirAllocator,
-          fileNameAllocator);
+      if (useRss) {
+        return new NetworkFetchedInput(inputAttemptIdentifier, this);
+      } else {
+        return new DiskFetchedInput(compressedSize,
+            inputAttemptIdentifier, this, conf, localDirAllocator,
+            fileNameAllocator);
+      }
     } else {
       this.usedMemory += actualSize;
       if (LOG.isDebugEnabled()) {
@@ -158,10 +171,11 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
       throws IOException {
 
     switch (type) {
-    case DISK:
-      return new DiskFetchedInput(compressedSize,
-          inputAttemptIdentifier, this, conf, localDirAllocator,
-          fileNameAllocator);
+      case DISK:
+        return new DiskFetchedInput(compressedSize, inputAttemptIdentifier, this, conf, localDirAllocator,
+            fileNameAllocator);
+      case NETWORK:
+        return new NetworkFetchedInput(inputAttemptIdentifier, this);
     default:
       return allocate(actualSize, compressedSize, inputAttemptIdentifier);
     }

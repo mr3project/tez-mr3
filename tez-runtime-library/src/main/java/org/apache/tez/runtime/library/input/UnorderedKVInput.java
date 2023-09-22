@@ -135,7 +135,8 @@ public class UnorderedKVInput extends AbstractLogicalInput {
           getContext().getTotalMemoryAvailableToTask(),
           memoryUpdateCallbackHandler.getMemoryAssigned(),
           getContext().getExecutionContext().getContainerId(),
-          getContext().getTaskVertexIndex());
+          getContext().getTaskVertexIndex(),
+          rssShuffleClient != null);
 
       this.shuffleManager = new ShuffleManager(getContext(), conf, getNumPhysicalInputs(), ifileBufferSize,
           ifileReadAhead, ifileReadAheadLength, codec, inputManager, rssShuffleClient);

@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class RssFetcher implements FetcherBase {
   private final FetcherCallback fetcherCallback;
@@ -122,7 +123,7 @@ public class RssFetcher implements FetcherBase {
           shuffleId, srcAttemptId.getTaskIndex(), mapIndexStart, mapIndexEnd,
           srcAttemptId.getAttemptNumber(), partitionId, dataLength);
     }
-    fetchMultipleBlocks(inputList);
+    createNetworkFetchedInputs(inputList);
 
     LOG.info("RssFetcher finished with readPartitionAllOnce={}: {}, numInputs={}, numBlocks={}, " +
             "partitionId={}, dataLength={}, from={}, to={}",
@@ -136,6 +137,34 @@ public class RssFetcher implements FetcherBase {
         mapIndexEnd);
 
     return new FetchResult(host, port, partitionId, 1, new ArrayList<>());
+  }
+
+  private void createNetworkFetchedInputs(List<CompositeInputAttemptIdentifier> inputs) throws IOException {
+    setupRssShuffleInputStream(mapIndexStart, mapIndexEnd, srcAttemptId.getAttemptNumber(), partitionId);
+
+    int numInputs = inputs.size();
+    AtomicInteger latch = new AtomicInteger(numInputs);
+
+    try {
+      for (CompositeInputAttemptIdentifier iai: inputs) {
+        NetworkFetchedInput fetchedInput =
+            (NetworkFetchedInput) inputAllocator.allocateType(FetchedInput.Type.NETWORK, 0, 0, iai);
+        fetchedInput.initialize(rssShuffleInputStream, latch);
+        fetcherCallback.fetchSucceeded(host, iai, fetchedInput, 0, 0, 0);
+      }
+    } catch (Exception e) {
+      LOG.error("Unordered - RssFetcher failed: shuffleId={}, from {} to {}, attemptNumber={}, partitionId={}, expected data={}",
+          shuffleId, mapIndexStart, mapIndexEnd, srcAttemptId.getAttemptNumber(), partitionId, dataLength, e);
+      throw e;
+    }
+
+    // mark rssShuffleInputStream as closed so that NetworkFetchedInput can read data from it.
+    synchronized (lock) {
+      if (!rssShuffleInputStreamClosed) {
+        rssShuffleInputStream = null;
+        rssShuffleInputStreamClosed = true;
+      }
+    }
   }
 
   private void fetchMultipleBlocks(List<CompositeInputAttemptIdentifier> inputList) throws IOException {

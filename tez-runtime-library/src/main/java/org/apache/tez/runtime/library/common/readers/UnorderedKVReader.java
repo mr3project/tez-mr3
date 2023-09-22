@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
+import org.apache.tez.runtime.library.common.shuffle.NetworkFetchedInput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -212,13 +213,18 @@ public class UnorderedKVReader<K, V> extends KeyValueReader {
     }
   }
 
-  public IFile.Reader openIFileReader(FetchedInput fetchedInput)
-      throws IOException {
+  public IFile.Reader openIFileReader(FetchedInput fetchedInput) throws IOException {
     if (fetchedInput.getType() == Type.MEMORY) {
       MemoryFetchedInput mfi = (MemoryFetchedInput) fetchedInput;
 
       return new InMemoryReader(null, mfi.getInputAttemptIdentifier(),
           mfi.getBytes(), 0, (int) mfi.getSize());
+    } else if (fetchedInput.getType() == Type.NETWORK) {
+      NetworkFetchedInput nfi = (NetworkFetchedInput) fetchedInput;
+      nfi.start();
+
+      return new IFile.Reader(fetchedInput.getInputStream(), fetchedInput.getSize(), codec,
+          ifileReadAhead, ifileReadAheadLength, ifileBufferSize, context);
     } else {
       return new IFile.Reader(fetchedInput.getInputStream(), fetchedInput.getSize(), codec, null, null,
           ifileReadAhead, ifileReadAheadLength, ifileBufferSize, context);
