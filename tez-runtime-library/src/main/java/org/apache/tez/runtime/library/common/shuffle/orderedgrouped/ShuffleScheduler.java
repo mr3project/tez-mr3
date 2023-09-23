@@ -1543,7 +1543,8 @@ class ShuffleScheduler {
         LOG.info("Ordered - Merging {} RssFetchers to a single RssFetcher: {}",
             inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce().size(),
             inputAttemptIdentifier.getAttemptNumber());
-        createRssFetchersForReadPartitionAllOnce(inputAttemptIdentifier, partitionId, mapHost, rssFetchers);
+        createRssFetchersForReadPartitionAllOnce(
+            inputAttemptIdentifier, inputContext.getSourceVertexNumTasks(), partitionId, mapHost, rssFetchers);
       } else {
         LOG.info("Ordered - Reverting to {} individual RssFetchers because of different attemptNumbers",
             inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce().size());
@@ -1578,7 +1579,7 @@ class ShuffleScheduler {
   }
 
   private void createRssFetchersForReadPartitionAllOnce(
-      CompositeInputAttemptIdentifier inputAttemptIdentifier,
+      CompositeInputAttemptIdentifier inputAttemptIdentifier, int sourceVertexNumTasks,
       final int partitionId, final MapHost mapHost, List<RssFetcherOrderedGrouped> rssFetchers) {
     RssShuffleUtils.FetcherCreate createFn = (mergedCid, subTotalSize, mapIndexStart, mapIndexEnd) -> {
       if (subTotalSize > 0) {
@@ -1606,7 +1607,7 @@ class ShuffleScheduler {
       }
     };
     RssShuffleUtils.createRssFetchersForReadPartitionAllOnce(
-          inputAttemptIdentifier, partitionId, inputContext.getSourceVertexNumTasks(), rssFetchSplitThresholdSize,
+          inputAttemptIdentifier, partitionId, sourceVertexNumTasks, rssFetchSplitThresholdSize,
           createFn, true);
   }
 
@@ -1695,7 +1696,8 @@ class ShuffleScheduler {
               firstId.getSpillEventId(),
               1, partitionSizes, -1);
           mergedCid.setInputIdentifiersForReadPartitionAllOnce(inputs);
-          createRssFetchersForReadPartitionAllOnce(mergedCid, partitionId, mapHost, rssFetchers);
+          createRssFetchersForReadPartitionAllOnce(
+              mergedCid, mapIndexEnd - mapIndexStart, partitionId, mapHost, rssFetchers);
         }
       }
     }
