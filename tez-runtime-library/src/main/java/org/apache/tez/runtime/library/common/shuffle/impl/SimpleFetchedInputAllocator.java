@@ -66,8 +66,6 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
   
   private volatile long usedMemory = 0;
 
-  private final boolean useRss;
-
   public SimpleFetchedInputAllocator(
       String srcNameTrimmed,
       String uniqueIdentifier,
@@ -76,8 +74,7 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
       long maxTaskAvailableMemory,
       long memoryAvailable,
       String containerId,
-      int vertexId,
-      boolean useRss) {
+      int vertexId) {
     this.srcNameTrimmed = srcNameTrimmed;
     this.conf = conf;    
     this.maxAvailableTaskMemory = maxTaskAvailableMemory;
@@ -119,8 +116,6 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
     this.maxSingleShuffleLimit = (long) Math.min((memoryLimit * singleShuffleMemoryLimitPercent),
         Integer.MAX_VALUE);
 
-    this.useRss = useRss;
-
     LOG.info(srcNameTrimmed + ": "
         + "RequestedMemory=" + memReq
         + ", AssignedMemory=" + this.memoryLimit
@@ -148,13 +143,9 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
       InputAttemptIdentifier inputAttemptIdentifier) throws IOException {
     if (actualSize > maxSingleShuffleLimit
         || this.usedMemory + actualSize > this.memoryLimit) {
-      if (useRss) {
-        return new NetworkFetchedInput(inputAttemptIdentifier, this);
-      } else {
-        return new DiskFetchedInput(compressedSize,
-            inputAttemptIdentifier, this, conf, localDirAllocator,
-            fileNameAllocator);
-      }
+      return new DiskFetchedInput(compressedSize,
+          inputAttemptIdentifier, this, conf, localDirAllocator,
+          fileNameAllocator);
     } else {
       this.usedMemory += actualSize;
       if (LOG.isDebugEnabled()) {

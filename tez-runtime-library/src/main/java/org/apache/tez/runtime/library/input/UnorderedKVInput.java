@@ -135,8 +135,7 @@ public class UnorderedKVInput extends AbstractLogicalInput {
           getContext().getTotalMemoryAvailableToTask(),
           memoryUpdateCallbackHandler.getMemoryAssigned(),
           getContext().getExecutionContext().getContainerId(),
-          getContext().getTaskVertexIndex(),
-          rssShuffleClient != null);
+          getContext().getTaskVertexIndex());
 
       this.shuffleManager = new ShuffleManager(getContext(), conf, getNumPhysicalInputs(), ifileBufferSize,
           ifileReadAhead, ifileReadAheadLength, codec, inputManager, rssShuffleClient);
@@ -285,6 +284,7 @@ public class UnorderedKVInput extends AbstractLogicalInput {
     confKeys.add(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_FETCH_SPLIT_THRESHOLD);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_SHUFFLE_PARALLEL_COPIES);
+    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_UNORDERED_FETCH_SPILL_ENABLE);
   }
 
   // TODO Maybe add helper methods to extract keys

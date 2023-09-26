@@ -181,6 +181,7 @@ public class ShuffleManager implements FetcherCallback {
   private final ShuffleClient rssShuffleClient;
 
   private long rssFetchSplitThresholdSize;
+  private boolean rssFetchSpillEnabled;
 
   public ShuffleManager(InputContext inputContext, Configuration conf, int numInputs,
       int bufferSize, boolean ifileReadAheadEnabled, int ifileReadAheadLength,
@@ -300,6 +301,11 @@ public class ShuffleManager implements FetcherCallback {
             TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_FETCH_SPLIT_THRESHOLD,
             TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_FETCH_SPLIT_THRESHOLD_DEFAULT);
       }
+
+      rssFetchSpillEnabled = conf.getBoolean(
+          TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_UNORDERED_FETCH_SPILL_ENABLE,
+          TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_UNORDERED_FETCH_SPILL_ENABLE_DEFAULT);
+
       com.datamonad.mr3.MR3Runtime.env().registerShuffleIdIncoming(
           inputContext.getVertexId(), inputContext.shuffleId());
       LOG.info("Registered shuffleId (Incoming) = " + inputContext.shuffleId());
@@ -735,7 +741,8 @@ public class ShuffleManager implements FetcherCallback {
       if (subTotalSize > 0) {
         RssFetcher rssFetcher = new RssFetcher(this, inputManager, rssShuffleClient, inputContext.shuffleId(),
             inputHost.getHost(), inputHost.getPort(), partitionId, mergedCid, subTotalSize, mapIndexStart,
-            mapIndexEnd, true, codec, ifileReadAhead, ifileReadAheadLength, inputContext, verifyDiskChecksum);
+            mapIndexEnd, true, codec, ifileReadAhead, ifileReadAheadLength, inputContext, verifyDiskChecksum,
+            rssFetchSpillEnabled);
         rssFetchers.add(rssFetcher);
       }
     };
@@ -752,7 +759,8 @@ public class ShuffleManager implements FetcherCallback {
     long partitionTotalSize = inputAttemptIdentifier.getPartitionSize(partitionId);
     return new RssFetcher(this, inputManager, rssShuffleClient, inputContext.shuffleId(), inputHost.getHost(),
         inputHost.getPort(), partitionId, inputAttemptIdentifier, partitionTotalSize, mapIndexStart,
-        mapIndexEnd, false, codec, ifileReadAhead, ifileReadAheadLength, inputContext, verifyDiskChecksum);
+        mapIndexEnd, false, codec, ifileReadAhead, ifileReadAheadLength, inputContext, verifyDiskChecksum,
+        rssFetchSpillEnabled);
   }
 
   /////////////////// Methods for InputEventHandler

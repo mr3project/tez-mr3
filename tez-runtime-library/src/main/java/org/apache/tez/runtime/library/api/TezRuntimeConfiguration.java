@@ -586,6 +586,11 @@ public class TezRuntimeConfiguration {
       "celeborn.ordered.edge.enabled";
   public static final boolean TEZ_RUNTIME_CELEBORN_ORDERED_EDGE_ENABLED_DEFAULT = true;
 
+  @ConfigurationProperty(type = "boolean")
+  public static final String TEZ_RUNTIME_CELEBORN_UNORDERED_FETCH_SPILL_ENABLE = TEZ_RUNTIME_PREFIX +
+      "celeborn.unordered.fetch.spill.enabled";
+  public static final boolean TEZ_RUNTIME_CELEBORN_UNORDERED_FETCH_SPILL_ENABLE_DEFAULT = true;
+
   static {
     tezRuntimeKeys.add(TEZ_RUNTIME_IFILE_READAHEAD);
     tezRuntimeKeys.add(TEZ_RUNTIME_IFILE_READAHEAD_BYTES);
@@ -655,6 +660,7 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_CELEBORN_FETCH_SPLIT_THRESHOLD);
     tezRuntimeKeys.add(TEZ_RUNTIME_CELEBORN_SHUFFLE_PARALLEL_COPIES);
     tezRuntimeKeys.add(TEZ_RUNTIME_CELEBORN_ORDERED_EDGE_ENABLED);
+    tezRuntimeKeys.add(TEZ_RUNTIME_CELEBORN_UNORDERED_FETCH_SPILL_ENABLE);
 
     // Do not keep defaultConf as a static member because it holds a reference to ClassLoader
     // of the Thread that is active at the time of loading this class. The active Thread usually

@@ -65,6 +65,8 @@ public class RssFetcher implements FetcherBase {
   private final InputContext inputContext;
   private final boolean verifyDiskChecksum;
 
+  private final boolean fetchSpillEnabled;
+
   public RssFetcher(
       FetcherCallback fetcherCallback,
       FetchedInputAllocator inputAllocator,
@@ -82,7 +84,8 @@ public class RssFetcher implements FetcherBase {
       boolean ifileReadAhead,
       int ifileReadAheadLength,
       InputContext inputContext,
-      boolean verifyDiskChecksum) {
+      boolean verifyDiskChecksum,
+      boolean fetchSpillEnabled) {
     this.fetcherCallback = fetcherCallback;
     this.inputAllocator = inputAllocator;
     this.rssShuffleClient = rssShuffleClient;
@@ -100,6 +103,7 @@ public class RssFetcher implements FetcherBase {
     this.ifileReadAheadLength = ifileReadAheadLength;
     this.inputContext = inputContext;
     this.verifyDiskChecksum = verifyDiskChecksum;
+    this.fetchSpillEnabled = fetchSpillEnabled;
 
     assert dataLength > 0;
   }
@@ -123,7 +127,12 @@ public class RssFetcher implements FetcherBase {
           shuffleId, srcAttemptId.getTaskIndex(), mapIndexStart, mapIndexEnd,
           srcAttemptId.getAttemptNumber(), partitionId, dataLength);
     }
-    createNetworkFetchedInputs(inputList);
+
+    if (fetchSpillEnabled) {
+      fetchMultipleBlocks(inputList);
+    } else {
+      createNetworkFetchedInputs(inputList);
+    }
 
     LOG.info("RssFetcher finished with readPartitionAllOnce={}: {}, numInputs={}, numBlocks={}, " +
             "partitionId={}, dataLength={}, from={}, to={}",
