@@ -619,18 +619,10 @@ public class ShuffleManager implements FetcherCallback {
       int partitionId = pendingInputs.getPartition();
 
       if (inputContext.readPartitionAllOnce()) {
-        boolean useSameAttemptNumber = RssShuffleUtils.checkUseSameAttemptNumber(inputAttemptIdentifier);
-        if (useSameAttemptNumber) {
-          LOG.info("Unordered - Merging {} RssFetchers to a single RssFetcher: {}",
-              inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce().size(),
-              inputAttemptIdentifier.getAttemptNumber());
-          createRssFetchersForReadPartitionAllOnce(
-              inputAttemptIdentifier, inputContext.getSourceVertexNumTasks(), partitionId, inputHost, rssFetchers);
-        } else {
-          LOG.info("Unordered - Reverting to {} individual RssFetchers because of different attemptNumbers",
-             inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce().size());
-          createRssFetchersForMultipleAttemptNumbers(inputAttemptIdentifier, partitionId, inputHost, rssFetchers);
-        }
+        LOG.info("Unordered - Merging {} RssFetchers to a single RssFetcher",
+            inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce().size());
+        createRssFetchersForReadPartitionAllOnce(
+            inputAttemptIdentifier, inputContext.getSourceVertexNumTasks(), partitionId, inputHost, rssFetchers);
       } else {
         if (inputAttemptIdentifier.getPartitionSize(partitionId) != 0) {
           int mapIndexStart = Integer.parseInt(inputHost.getHost());
@@ -649,83 +641,6 @@ public class ShuffleManager implements FetcherCallback {
     }
 
     return rssFetchers;
-  }
-
-  private void createRssFetchersForMultipleAttemptNumbers(
-      CompositeInputAttemptIdentifier inputAttemptIdentifier,
-      final int partitionId, final InputHost inputHost, List<RssFetcher> rssFetchers) {
-    List<CompositeInputAttemptIdentifier> childInputAttemptIdentifiers =
-        inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce();
-
-    // Group-By InputAttemptIdentifier.getAttemptNumber()
-    Map<Integer, List<CompositeInputAttemptIdentifier>> groupedByAttemptNumber = childInputAttemptIdentifiers.stream()
-        .collect(Collectors.groupingBy(InputAttemptIdentifier::getAttemptNumber));
-    assert groupedByAttemptNumber.size() > 1;
-
-    for (Map.Entry<Integer, List<CompositeInputAttemptIdentifier>> entry : groupedByAttemptNumber.entrySet()) {
-      int attemptNumber = entry.getKey();
-      List<CompositeInputAttemptIdentifier> inputAttemptIdentifiers = entry.getValue();
-
-      Collections.sort(inputAttemptIdentifiers,
-          Comparator.comparingInt(CompositeInputAttemptIdentifier::getTaskIndex));
-
-      // store consecutive InputAttemptIdentifiers (by getTaskIndex()) in result<>
-      List<List<CompositeInputAttemptIdentifier>> result = new ArrayList<>();
-
-      List<CompositeInputAttemptIdentifier> currentSublist = new ArrayList<>();
-      currentSublist.add(inputAttemptIdentifiers.get(0));
-      for (int i = 1; i < inputAttemptIdentifiers.size(); i++) {
-        CompositeInputAttemptIdentifier current = inputAttemptIdentifiers.get(i);
-        int currentNum = current.getTaskIndex();
-        int prevNum = inputAttemptIdentifiers.get(i - 1).getTaskIndex();
-        if (currentNum == prevNum + 1) {
-          currentSublist.add(current);
-        } else {
-          result.add(currentSublist);
-          currentSublist = new ArrayList<>();
-          currentSublist.add(current);
-        }
-      }
-      result.add(currentSublist);
-
-      for (List<CompositeInputAttemptIdentifier> inputs: result) {
-        // consume the pair of (inputs[], attemptNumber)
-        int mapIndexStart = inputs.get(0).getTaskIndex();
-        int mapIndexEnd = inputs.get(inputs.size() - 1).getTaskIndex() + 1;
-        assert mapIndexStart < mapIndexEnd;
-
-        if (mapIndexStart + 1 == mapIndexEnd) {
-          CompositeInputAttemptIdentifier cid = inputs.get(0);
-          if (cid.getPartitionSize(partitionId) > 0) {
-            LOG.info("Unordered - Creating RssFetcher: {}, attemptNumber={}", mapIndexStart, attemptNumber);
-            RssFetcher rssFetcher = createRssFetcherForIndividualInput(
-                inputs.get(0), partitionId, inputHost, mapIndexStart);
-            rssFetchers.add(rssFetcher);
-          }
-        } else {
-          long subTotalSize = 0L;
-          for (CompositeInputAttemptIdentifier cid: inputs) {
-            subTotalSize += cid.getPartitionSize(partitionId);
-          }
-          long[] partitionSizes = new long[1];
-          partitionSizes[0] = subTotalSize;
-
-          CompositeInputAttemptIdentifier firstId = inputs.get(0);
-          assert attemptNumber == firstId.getAttemptNumber();
-          CompositeInputAttemptIdentifier mergedCid = new CompositeInputAttemptIdentifier(
-              firstId.getInputIdentifier(),
-              firstId.getAttemptNumber(),
-              firstId.getPathComponent(),
-              firstId.isShared(),
-              firstId.getFetchTypeInfo(),
-              firstId.getSpillEventId(),
-              1, partitionSizes, -1);
-          mergedCid.setInputIdentifiersForReadPartitionAllOnce(inputs);
-          createRssFetchersForReadPartitionAllOnce(
-              mergedCid, mapIndexEnd - mapIndexStart, partitionId, inputHost, rssFetchers);
-        }
-      }
-    }
   }
 
   private void createRssFetchersForReadPartitionAllOnce(

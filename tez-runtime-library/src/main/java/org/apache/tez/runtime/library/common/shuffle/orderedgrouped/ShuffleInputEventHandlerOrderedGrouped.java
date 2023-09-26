@@ -156,10 +156,9 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
 
     if (LOG.isDebugEnabled()) {
       if (rssShuffleClient != null) {
-        LOG.debug("Ordered - processDataMovementEvent: Ordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{}, dataLength={}",
+        LOG.debug("Ordered - processDataMovementEvent: Ordered_shuffleId_taskIndex={}_{}_{}, dataLength={}",
             shuffleId,
             srcAttemptIdentifier.getTaskIndex(),
-            srcAttemptIdentifier.getAttemptNumber(),
             partitionId,
             srcAttemptIdentifier.getPartitionSize(partitionId));
       }
