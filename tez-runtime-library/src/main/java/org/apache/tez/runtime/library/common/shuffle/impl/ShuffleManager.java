@@ -697,7 +697,7 @@ public class ShuffleManager implements FetcherCallback {
         if (mapIndexStart + 1 == mapIndexEnd) {
           CompositeInputAttemptIdentifier cid = inputs.get(0);
           if (cid.getPartitionSize(partitionId) > 0) {
-            LOG.info("Unordered - Creating a single RssFetcher: {}, attemptNumber={}", mapIndexStart, attemptNumber);
+            LOG.info("Unordered - Creating RssFetcher: {}, attemptNumber={}", mapIndexStart, attemptNumber);
             RssFetcher rssFetcher = createRssFetcherForIndividualInput(
                 inputs.get(0), partitionId, inputHost, mapIndexStart);
             rssFetchers.add(rssFetcher);
