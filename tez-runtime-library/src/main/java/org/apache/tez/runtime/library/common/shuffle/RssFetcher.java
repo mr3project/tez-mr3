@@ -20,6 +20,8 @@ package org.apache.tez.runtime.library.common.shuffle;
 
 import org.apache.celeborn.client.ShuffleClient;
 import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.tez.common.counters.TaskCounter;
+import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
@@ -149,16 +151,26 @@ public class RssFetcher implements FetcherBase {
   }
 
   private void createNetworkFetchedInputs(List<CompositeInputAttemptIdentifier> inputs) throws IOException {
-    setupRssShuffleInputStream(mapIndexStart, mapIndexEnd, srcAttemptId.getAttemptNumber(), partitionId);
-
     int numInputs = inputs.size();
     AtomicInteger latch = new AtomicInteger(numInputs);
 
     try {
+      NetworkFetchedInput.SharedInputStream sharedInputStream = new NetworkFetchedInput.SharedInputStream(
+          rssShuffleClient,
+          shuffleId,
+          mapIndexStart,
+          mapIndexEnd,
+          srcAttemptId.getAttemptNumber(),
+          partitionId,
+          numInputs);
+      TezCounter compressedBytesCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES);
+      TezCounter decompressedBytesCounter =
+          inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_DECOMPRESSED);
+
       for (CompositeInputAttemptIdentifier iai: inputs) {
         NetworkFetchedInput fetchedInput =
             (NetworkFetchedInput) inputAllocator.allocateType(FetchedInput.Type.NETWORK, 0, 0, iai);
-        fetchedInput.initialize(rssShuffleInputStream, latch);
+        fetchedInput.initialize(sharedInputStream, compressedBytesCounter, decompressedBytesCounter);
         fetcherCallback.fetchSucceeded(host, iai, fetchedInput, 0, 0, 0);
       }
     } catch (Exception e) {
@@ -167,13 +179,7 @@ public class RssFetcher implements FetcherBase {
       throw e;
     }
 
-    // mark rssShuffleInputStream as closed so that NetworkFetchedInput can read data from it.
-    synchronized (lock) {
-      if (!rssShuffleInputStreamClosed) {
-        rssShuffleInputStream = null;
-        rssShuffleInputStreamClosed = true;
-      }
-    }
+    assert rssShuffleInputStream == null;
   }
 
   private void fetchMultipleBlocks(List<CompositeInputAttemptIdentifier> inputList) throws IOException {

@@ -22,9 +22,10 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.celeborn.client.ShuffleClient;
 import org.apache.tez.common.Preconditions;
+import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,12 +36,11 @@ public class NetworkFetchedInput extends FetchedInput {
 
   private boolean fetchStarted = false;
   private long compressedSize;
-  private long decompressedSize;
 
-  private InputStream inputStream = null;
-  private boolean inputStreamClosed = false;
+  private TezCounter compressedBytesCounter;
+  private TezCounter decompressedBytesCounter;
 
-  private AtomicInteger latch = null;
+  SharedInputStream sharedInputStream;
 
   public NetworkFetchedInput(
       InputAttemptIdentifier inputAttemptIdentifier,
@@ -69,20 +69,25 @@ public class NetworkFetchedInput extends FetchedInput {
 
   @Override
   public InputStream getInputStream() throws IOException {
-    return inputStream;
+    return sharedInputStream.getInputStream();
   }
 
-  public void initialize(InputStream inputStream, AtomicInteger latch) {
-    this.inputStream = inputStream;
-    this.latch = latch;
+  public void initialize(SharedInputStream sharedInputStream, TezCounter compressedBytesCounter,
+      TezCounter decompressedBytesCounter) {
+    this.sharedInputStream = sharedInputStream;
+    this.compressedBytesCounter = compressedBytesCounter;
+    this.decompressedBytesCounter = decompressedBytesCounter;
   }
 
   public void start() throws IOException {
     if (!fetchStarted) {
       fetchStarted = true;
-      DataInputStream dis = new DataInputStream(inputStream);
+      DataInputStream dis = new DataInputStream(sharedInputStream.getInputStream());
       compressedSize = dis.readLong();
-      decompressedSize = dis.readLong();
+      long decompressedSize = dis.readLong();
+
+      compressedBytesCounter.increment(compressedSize);
+      decompressedBytesCounter.increment(decompressedSize);
     }
   }
 
@@ -97,7 +102,7 @@ public class NetworkFetchedInput extends FetchedInput {
   public void abort() throws IOException {
     if (isState(State.PENDING)) {
       setState(State.ABORTED);
-      closeInputStream();
+      sharedInputStream.abort();
     }
   }
 
@@ -109,21 +114,10 @@ public class NetworkFetchedInput extends FetchedInput {
     if (isState(State.COMMITTED)) {
       setState(State.FREED);
       try {
-        int numPendingInputs = latch.decrementAndGet();
-        if (numPendingInputs == 0) {
-          closeInputStream();
-        }
+        sharedInputStream.finish();
       } catch (IOException e) {
         LOG.warn("Failed to close input stream");
       }
-    }
-  }
-
-  private void closeInputStream() throws IOException {
-    assert isState(State.FREED) || isState(State.ABORTED);
-    if (inputStream != null && !inputStreamClosed) {
-      inputStream.close();
-      inputStreamClosed = true;
     }
   }
 
@@ -133,5 +127,76 @@ public class NetworkFetchedInput extends FetchedInput {
         + ", inputAttemptIdentifier=" + getInputAttemptIdentifier()
         + ", type=" + getType() + ", id=" + getId() + ", state=" + getState() + "]";
   }
-}
 
+  public static class SharedInputStream {
+    private final ShuffleClient rssShuffleClient;
+    private final int shuffleId;
+    private final int mapIndexStart;
+    private final int mapIndexEnd;
+    private final int reduceAttemptNumber;
+    private final int reducePartitionId;
+
+    private final Object lock = new Object();
+
+    // guarded by lock
+    private InputStream inputStream = null;
+    private boolean isClosed = false;
+    private int numRecipient;
+
+    public SharedInputStream(
+        ShuffleClient rssShuffleClient,
+        int shuffleId,
+        int mapIndexStart,
+        int mapIndexEnd,
+        int reduceAttemptNumber,
+        int reducePartitionId,
+        int numRecipient) {
+      this.rssShuffleClient = rssShuffleClient;
+      this.shuffleId = shuffleId;
+      this.mapIndexStart = mapIndexStart;
+      this.mapIndexEnd = mapIndexEnd;
+      this.reduceAttemptNumber = reduceAttemptNumber;
+      this.reducePartitionId = reducePartitionId;
+      this.numRecipient = numRecipient;
+    }
+
+    public InputStream getInputStream() throws IOException {
+      synchronized (lock) {
+        if (isClosed) {
+          throw new IOException("RSS InputStream already closed");
+        }
+
+        if (inputStream == null) {
+          inputStream = rssShuffleClient.readPartition(shuffleId, reducePartitionId, reduceAttemptNumber,
+              mapIndexStart, mapIndexEnd);
+        }
+
+        return inputStream;
+      }
+    }
+
+    public void finish() throws IOException {
+      synchronized (lock) {
+        if (isClosed) {
+          throw new IOException("RSS InputStream already closed");
+        }
+
+        numRecipient = numRecipient - 1;
+        if (numRecipient == 0) {
+          assert inputStream != null;
+          inputStream.close();
+          isClosed = true;
+        }
+      }
+    }
+
+    public void abort() throws IOException {
+      synchronized (lock) {
+        if (!isClosed && inputStream != null) {
+          inputStream.close();
+          isClosed = true;
+        }
+      }
+    }
+  }
+}
