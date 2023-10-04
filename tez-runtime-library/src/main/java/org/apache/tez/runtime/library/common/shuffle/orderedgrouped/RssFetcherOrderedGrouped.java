@@ -153,9 +153,9 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
     LOG.info("Ordered - RssFetcher starts fetching from RSS, map index = {}, block length={}",
         srcAttemptId.getTaskIndex(), srcAttemptId.getPartitionSize(partitionId));
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Ordered - fetchSingleBlock : Ordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{}, dataLength={}",
+      LOG.debug("Ordered - fetchSingleBlock : Ordered_shuffleId_taskIndex={}_{}_{}, dataLength={}",
           shuffleId,
-          srcAttemptId.getTaskIndex(), srcAttemptId.getAttemptNumber(), partitionId,
+          srcAttemptId.getTaskIndex(), partitionId,
           srcAttemptId.getPartitionSize(partitionId));
     }
 
@@ -182,7 +182,7 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
   }
 
   private void doFetch(InputAttemptIdentifier baseInputAttemptIdentifier) throws IOException {
-    setupRssShuffleInputStream(mapIndexStart, mapIndexEnd, srcAttemptId.getAttemptNumber(), partitionId);
+    setupRssShuffleInputStream(mapIndexStart, mapIndexEnd, partitionId);
     DataInputStream dis = new DataInputStream(rssShuffleInputStream);
 
     // rssShuffleInputStream can be closed at any time because shutdown() can be callled
@@ -248,8 +248,8 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
       // remaining bytes. This makes sense because copySucceeded() may trigger ShuffleScheduler shutdown,
       // in which case there is no point in checking 'rssShuffleInputStream.read() == -1'.
     } catch (Exception e) {
-      LOG.error("Ordered - RssFetcher failed: shuffleId={}, from {} to {}, attemptNumber={}, partitionId={}, expected data={}",
-          shuffleId, mapIndexStart, mapIndexEnd, srcAttemptId.getAttemptNumber(), partitionId, blockLength, e);
+      LOG.error("Ordered - RssFetcher failed: shuffleId={}, from {} to {}, partitionId={}, expected data={}",
+          shuffleId, mapIndexStart, mapIndexEnd, partitionId, blockLength, e);
       throw e;
     } finally {
       synchronized (lock) {
@@ -258,12 +258,12 @@ class RssFetcherOrderedGrouped implements FetcherOrderedGroupedBase {
     }
   }
 
-  private void setupRssShuffleInputStream(int mapIndexStart, int mapIndexEnd, int mapAttemptNumber, int partitionId)
+  private void setupRssShuffleInputStream(int mapIndexStart, int mapIndexEnd, int partitionId)
       throws IOException {
     synchronized (lock) {
       if (!isShutdown) {
-        rssShuffleInputStream = rssShuffleClient.readPartition(shuffleId, partitionId, mapAttemptNumber,
-            mapIndexStart, mapIndexEnd);
+        rssShuffleInputStream = rssShuffleClient.readPartition(
+            shuffleId, partitionId, inputContext.getTaskAttemptNumber(), mapIndexStart, mapIndexEnd);
         // rssShuffleInputStream.close() is usually called inside the current thread, but it may
         // be called ShuffleScheduler.close() thread
       } else {

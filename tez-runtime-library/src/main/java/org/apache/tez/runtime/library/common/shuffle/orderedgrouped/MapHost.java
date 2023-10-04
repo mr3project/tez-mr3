@@ -189,10 +189,8 @@ class MapHost {
         mergedCid.setInputIdentifiersForReadPartitionAllOnce(tempMaps);
 
         if (LOG.isDebugEnabled()) {
-          LOG.info("Ordered MapHost - merged Ordered_shuffleId_taskIndex_attemptNumber={}_{}_{}_{} = {}",
-              shuffleId,
-              firstId.getTaskIndex(),
-              firstId.getAttemptNumber(), partitionId, partitionTotalSize);
+          LOG.info("Ordered MapHost - merged Ordered_shuffleId_taskIndex={}_{}_{} = {}",
+              shuffleId, firstId.getTaskIndex(), partitionId, partitionTotalSize);
         }
 
         LOG.info("Ordered - Merging {} partition inputs for partitionId={} with total size {}: {} ",

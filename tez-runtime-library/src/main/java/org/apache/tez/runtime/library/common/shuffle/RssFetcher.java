@@ -123,9 +123,9 @@ public class RssFetcher implements FetcherBase {
     assert inputList.stream().allMatch(i -> i.getInputIdentifiersForReadPartitionAllOnce() == null);
 
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Unordered - fetchMultipleBlocks : unordered_shuffleId_taskIndex_attemptNumber={}_{}[{}-{}]_{}_{}, dataLength={}",
+      LOG.debug("Unordered - fetchMultipleBlocks : unordered_shuffleId_taskIndex={}_{}[{}-{}]_{}, dataLength={}",
           shuffleId, srcAttemptId.getTaskIndex(), mapIndexStart, mapIndexEnd,
-          srcAttemptId.getAttemptNumber(), partitionId, dataLength);
+          partitionId, dataLength);
     }
 
     if (fetchSpillEnabled) {
@@ -177,7 +177,7 @@ public class RssFetcher implements FetcherBase {
   }
 
   private void fetchMultipleBlocks(List<CompositeInputAttemptIdentifier> inputList) throws IOException {
-    setupRssShuffleInputStream(mapIndexStart, mapIndexEnd, srcAttemptId.getAttemptNumber(), partitionId);
+    setupRssShuffleInputStream(mapIndexStart, mapIndexEnd, partitionId);
     DataInputStream dis = new DataInputStream(rssShuffleInputStream);
 
     // rssShuffleInputStream can be closed at any time because shutdown() can be callled
@@ -232,8 +232,8 @@ public class RssFetcher implements FetcherBase {
       // remaining bytes.
       // TODO: If copySucceeded() triggers ShuffleManager shutdown, rssShuffleInputStream.read() should not be called.
     } catch (Exception e) {
-      LOG.error("Unordered - RssFetcher failed: shuffleId={}, from {} to {}, attemptNumber={}, partitionId={}, expected data={}",
-          shuffleId, mapIndexStart, mapIndexEnd, srcAttemptId.getAttemptNumber(), partitionId, dataLength, e);
+      LOG.error("Unordered - RssFetcher failed: shuffleId={}, from {} to {}, partitionId={}, expected data={}",
+          shuffleId, mapIndexStart, mapIndexEnd, partitionId, dataLength, e);
       throw e;
     } finally {
       synchronized (lock) {
@@ -251,12 +251,11 @@ public class RssFetcher implements FetcherBase {
     }
   }
 
-  private void setupRssShuffleInputStream(int mapIndexStart, int mapIndexEnd, int mapAttemptNumber,
-      int partitionId) throws IOException {
+  private void setupRssShuffleInputStream(int mapIndexStart, int mapIndexEnd, int partitionId) throws IOException {
     synchronized (lock) {
       if (!isShutdown) {
-        rssShuffleInputStream = rssShuffleClient.readPartition(shuffleId, partitionId, mapAttemptNumber,
-            mapIndexStart, mapIndexEnd);
+        rssShuffleInputStream = rssShuffleClient.readPartition(
+            shuffleId, partitionId, inputContext.getTaskAttemptNumber(), mapIndexStart, mapIndexEnd);
       } else {
         LOG.warn("RssFetcher.shutdown() is called before it connects to RSS");
         throw new IllegalStateException("RssFetcher - shutdown detected");

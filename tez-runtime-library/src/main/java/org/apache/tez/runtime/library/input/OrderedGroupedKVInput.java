@@ -101,15 +101,6 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput {
   public synchronized List<Event> initialize() throws IOException {
     this.conf = TezUtils.createConfFromUserPayload(getContext().getUserPayload());
 
-    if (rssShuffleClient != null) {
-      boolean orderedEdgeEnabled = this.conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_ORDERED_EDGE_ENABLED,
-          TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_ORDERED_EDGE_ENABLED_DEFAULT);
-      if (!orderedEdgeEnabled) {
-        LOG.warn("Do not use RSS for ordered edge to input: " + getContext().getSourceVertexName());
-        rssShuffleClient = null;
-      }
-    }
-
     this.conf.setBoolean(ShuffleUtils.TEZ_CELEBORN_ENABLED_INTERNAL, rssShuffleClient != null);
 
     if (this.getNumPhysicalInputs() == 0) {
@@ -418,7 +409,6 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput {
     confKeys.add(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_FETCH_SPLIT_THRESHOLD);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_SHUFFLE_PARALLEL_COPIES);
-    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_ORDERED_EDGE_ENABLED);
   }
 
   // TODO Maybe add helper methods to extract keys

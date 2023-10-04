@@ -35,21 +35,6 @@ public class RssShuffleUtils {
   public static final int CELEBORN_SHUFFLE_HEADER_SIZE = ShuffleClientImpl.BATCH_HEADER_SIZE;
   public static final int TEZ_RSS_SHUFFLE_HEADER_SIZE = 2 * Long.BYTES;
 
-  public static boolean checkUseSameAttemptNumber(CompositeInputAttemptIdentifier inputAttemptIdentifier) {
-    List<CompositeInputAttemptIdentifier> childInputAttemptIdentifiers = inputAttemptIdentifier.getInputIdentifiersForReadPartitionAllOnce();
-    int attemptNumber = childInputAttemptIdentifiers.get(0).getAttemptNumber();
-    boolean useSameAttemptNumber = true;
-    for (CompositeInputAttemptIdentifier input: childInputAttemptIdentifiers) {
-      if (input.getAttemptNumber() != attemptNumber) {
-        LOG.info("Different attemptNumber found: {}, {}, taskIndex={}",
-            input.getAttemptNumber(), attemptNumber, input.getTaskIndex());
-        useSameAttemptNumber = false;
-        break;
-      }
-    }
-    return useSameAttemptNumber;
-  }
-
   public interface FetcherCreate {
     void operate(
         CompositeInputAttemptIdentifier mergedCid,
@@ -87,11 +72,10 @@ public class RssShuffleUtils {
       int mapIndexStart = mapIndexOrigin;
       int mapIndexEnd = -1;
 
-      LOG.info("{} - Splitting InputAttemptIdentifiers to {} RssFetchers: {} / {}, task index {} - {}, attemptNumber={}",
+      LOG.info("{} - Splitting InputAttemptIdentifiers to {} RssFetchers: {} / {}, task index {} - {}",
           ordered ? "Ordered" : "Unordered",
           numFetchers, partitionTotalSize, numIdentifiers,
-          mapIndexStart, inputAttemptIdentifiers.get(numIdentifiers - 1).getTaskIndex(),
-          inputAttemptIdentifier.getAttemptNumber());
+          mapIndexStart, inputAttemptIdentifiers.get(numIdentifiers - 1).getTaskIndex());
       assert mapIndexStart + numIdentifiers - 1 == inputAttemptIdentifiers.get(numIdentifiers - 1).getTaskIndex();
 
       for (int i = 0; i < numFetchers; i++) {
@@ -136,10 +120,9 @@ public class RssShuffleUtils {
       }
     } else {
       createFn.operate(inputAttemptIdentifier, partitionTotalSize, mapIndexOrigin, mapIndexLast);
-      LOG.info("{} - Created a single RssFetcher: {} / {}, from {} to {}, attemptNumber={}",
+      LOG.info("{} - Created a single RssFetcher: {} / {}, from {} to {}",
           ordered ? "Ordered" : "Unordered",
-          partitionTotalSize, numIdentifiers, mapIndexOrigin, mapIndexLast,
-          inputAttemptIdentifier.getAttemptNumber());
+          partitionTotalSize, numIdentifiers, mapIndexOrigin, mapIndexLast);
     }
   }
 }
