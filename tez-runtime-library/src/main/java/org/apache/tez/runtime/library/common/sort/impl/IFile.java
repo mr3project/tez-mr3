@@ -1141,7 +1141,7 @@ public class IFile {
     public void close() throws IOException {
       // Close the underlying stream
       if (!isSharedInputStream) {
-        // If InputStream is shared by multiple inputs, let InputStream closed by the last input among them.
+        // Close InputStream only if it is not shared by multiple inputs.
         in.close();
       }
 

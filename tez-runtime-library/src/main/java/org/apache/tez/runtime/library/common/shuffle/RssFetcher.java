@@ -33,7 +33,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class RssFetcher implements FetcherBase {
   private final FetcherCallback fetcherCallback;
@@ -152,7 +151,6 @@ public class RssFetcher implements FetcherBase {
 
   private void createNetworkFetchedInputs(List<CompositeInputAttemptIdentifier> inputs) throws IOException {
     int numInputs = inputs.size();
-    AtomicInteger latch = new AtomicInteger(numInputs);
 
     try {
       NetworkFetchedInput.SharedInputStream sharedInputStream = new NetworkFetchedInput.SharedInputStream(
