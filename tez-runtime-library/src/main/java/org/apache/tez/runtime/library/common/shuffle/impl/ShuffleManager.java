@@ -296,15 +296,20 @@ public class ShuffleManager implements FetcherCallback {
 
     this.rssShuffleClient = rssShuffleClient;
     if (this.rssShuffleClient != null) {
-      if (inputContext.readPartitionAllOnce()) {
-        rssFetchSplitThresholdSize = conf.getLong(
-            TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_FETCH_SPLIT_THRESHOLD,
-            TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_FETCH_SPLIT_THRESHOLD_DEFAULT);
-      }
-
       rssFetchSpillEnabled = conf.getBoolean(
           TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_UNORDERED_FETCH_SPILL_ENABLE,
           TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_UNORDERED_FETCH_SPILL_ENABLE_DEFAULT);
+
+      if (inputContext.readPartitionAllOnce()) {
+        if (rssFetchSpillEnabled) {
+          rssFetchSplitThresholdSize = conf.getLong(
+              TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_FETCH_SPLIT_THRESHOLD,
+              TezRuntimeConfiguration.TEZ_RUNTIME_CELEBORN_FETCH_SPLIT_THRESHOLD_DEFAULT);
+        } else {
+          // don't split RssFetcher if we use NetworkFetchedInput
+          rssFetchSplitThresholdSize = Long.MAX_VALUE;
+        }
+      }
 
       com.datamonad.mr3.MR3Runtime.env().registerShuffleIdIncoming(
           inputContext.getVertexId(), inputContext.shuffleId());
