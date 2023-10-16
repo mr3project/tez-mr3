@@ -1027,6 +1027,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         return eventList;
       }
 
+      // Update Counters before call finalSpill() because it may send VME when pipelined shuffle ie enabled.
+      updateTezCountersAndNotify();
+
       //For pipelined case, send out an event in case finalspill generated a spill file.
       if (finalSpill() != null) {
         // VertexManagerEvent is only sent at the end and thus sizePerPartition is used
@@ -1045,7 +1048,6 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         }
       }
 
-      updateTezCountersAndNotify();
       cleanupCurrentBuffer();
       return events;
     }
