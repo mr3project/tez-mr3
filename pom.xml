@@ -67,7 +67,6 @@
     <commons-cli.version>1.2</commons-cli.version>
     <log4j2.version>2.17.1</log4j2.version>
     <snappy.version>1.1.4</snappy.version>
-    <netty3.version>3.10.6.Final</netty3.version>
   </properties>
   <scm>
     <connection>${scm.url}</connection>
