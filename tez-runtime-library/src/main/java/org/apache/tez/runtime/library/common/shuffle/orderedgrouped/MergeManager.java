@@ -811,7 +811,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
                        inMemorySegments, inMemorySegments.size(),
                        new Path(inputContext.getUniqueIdentifier()),
                        (RawComparator)ConfigUtils.getIntermediateInputKeyComparator(conf),
-                       progressable, null, null, null, null); 
+                       progressable, null, null, null, null, inputContext);
       TezMerger.writeFile(rIter, writer, progressable, TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
       writer.close();
 
@@ -901,7 +901,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
             serializationContext,
             inMemorySegments, inMemorySegments.size(),
             tmpDir, (RawComparator)ConfigUtils.getIntermediateInputKeyComparator(conf),
-            progressable, spilledRecordsCounter, null, additionalBytesRead, null);
+            progressable, spilledRecordsCounter, null, additionalBytesRead, null, inputContext);
         // spilledRecordsCounter is tracking the number of keys that will be
         // read from each of the segments being merged - which is essentially
         // what will be written to disk.
@@ -997,7 +997,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         final Path file = fileChunk.getPath();
         approxOutputSize += size;
         DiskSegment segment = new DiskSegment(rfs, file, offset, size, codec, ifileReadAhead,
-            ifileReadAheadLength, ifileBufferSize, preserve);
+            ifileReadAheadLength, ifileBufferSize, preserve, inputContext);
         inputSegments.add(segment);
       }
 
@@ -1036,7 +1036,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
             ioSortFactor, tmpDir,
             (RawComparator)ConfigUtils.getIntermediateInputKeyComparator(conf),
             progressable, true, spilledRecordsCounter, null,
-            mergedMapOutputsCounter, null);
+            mergedMapOutputsCounter, null, inputContext);
 
         // TODO Maybe differentiate between data written because of Merges and
         // the finalMerge (i.e. final mem available may be different from
@@ -1188,7 +1188,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
               inMemToDiskBytes).suffix(Constants.MERGED_OUTPUT_PREFIX);
         final TezRawKeyValueIterator rIter = TezMerger.merge(job, fs, serContext,
             memDiskSegments, numMemDiskSegments, tmpDir, comparator, progressable,
-            spilledRecordsCounter, null, additionalBytesRead, null);
+            spilledRecordsCounter, null, additionalBytesRead, null, inputContext);
         final Writer writer = new Writer(serContext.getKeySerialization(),
             serContext.getValSerialization(), fs, outputPath, serContext.getKeyClass(),
             serContext.getValueClass(), codec, null, null);
@@ -1256,7 +1256,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       final long fileOffset = fileChunk.getOffset();
       final boolean preserve = fileChunk.isLocalFile();
       diskSegments.add(new DiskSegment(fs, file, fileOffset, fileLength, codec, ifileReadAhead,
-                                   ifileReadAheadLength, ifileBufferSize, preserve, counter));
+                                   ifileReadAheadLength, ifileBufferSize, preserve, counter, inputContext));
     }
     if (LOG.isInfoEnabled()) {
       finalMergeLog.append(". DiskSeg: " + onDisk.length + ", " + onDiskBytes);
@@ -1293,7 +1293,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       TezRawKeyValueIterator diskMerge = TezMerger.merge(
           job, fs, serContext, codec, diskSegments,
           ioSortFactor, numInMemSegments, tmpDir, comparator,
-          progressable, false, spilledRecordsCounter, null, additionalBytesRead, null);
+          progressable, false, spilledRecordsCounter, null, additionalBytesRead, null, inputContext);
       diskSegments.clear();
       if (0 == finalSegments.size()) {
         return diskMerge;
@@ -1308,7 +1308,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     return TezMerger.merge(job, fs, serContext, codec,
         finalSegments, finalSegments.size(), tmpDir,
         comparator, progressable, spilledRecordsCounter, null,
-        additionalBytesRead, null);
+        additionalBytesRead, null, inputContext);
   }
 
 

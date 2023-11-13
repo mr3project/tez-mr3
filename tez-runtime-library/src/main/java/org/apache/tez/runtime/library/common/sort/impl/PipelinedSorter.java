@@ -799,7 +799,7 @@ public class PipelinedSorter extends ExternalSorter {
             DiskSegment s =
                 new DiskSegment(rfs, spillFilename, indexRecord.getStartOffset(),
                     indexRecord.getPartLength(), codec, ifileReadAhead,
-                    ifileReadAheadLength, ifileBufferSize, true);
+                    ifileReadAheadLength, ifileBufferSize, true, outputContext);
             segmentList.add(s);
           }
         }
@@ -817,7 +817,7 @@ public class PipelinedSorter extends ExternalSorter {
             (RawComparator) ConfigUtils.getIntermediateOutputKeyComparator(conf),
             progressable, sortSegments, true,
             null, spilledRecordsCounter, additionalSpillBytesRead,
-            null, merger.needsRLE()); // Not using any Progress in TezMerger. Should just work.
+            null, merger.needsRLE(), outputContext); // Not using any Progress in TezMerger. Should just work.
         //write merged output to disk
         long segmentStart = finalOut.getPos();
         long rawLength = 0;

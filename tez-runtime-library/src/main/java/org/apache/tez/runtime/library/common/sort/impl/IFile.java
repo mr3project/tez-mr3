@@ -779,6 +779,7 @@ public class IFile {
         checksumIn = new IFileInputStream(in, length, readAhead,
             readAheadLength/* , isCompressed */);
         if (isCompressed && codec != null) {
+          assert inputOutputContext != null;
           if (inputOutputContext != null) {
             this.codec = codec;
             this.inputOutputContext = inputOutputContext;
@@ -830,6 +831,7 @@ public class IFile {
       in = checksumIn;
       Decompressor decompressor = null;
       if (isCompressed && codec != null) {
+        assert inputContext != null;
         if (inputContext != null) {
           decompressor = inputContext.getDecompressor(codec);
         } else {

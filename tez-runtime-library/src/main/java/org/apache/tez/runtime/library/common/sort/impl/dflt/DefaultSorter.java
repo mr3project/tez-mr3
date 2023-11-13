@@ -1331,7 +1331,7 @@ public final class DefaultSorter extends ExternalSorter implements IndexedSortab
             DiskSegment s =
               new DiskSegment(rfs, filename[i], indexRecord.getStartOffset(),
                                indexRecord.getPartLength(), codec, ifileReadAhead,
-                               ifileReadAheadLength, ifileBufferSize, true);
+                               ifileReadAheadLength, ifileBufferSize, true, outputContext);
             segmentList.add(s);
           }
           if (LOG.isDebugEnabled()) {
@@ -1356,7 +1356,7 @@ public final class DefaultSorter extends ExternalSorter implements IndexedSortab
                        (RawComparator)ConfigUtils.getIntermediateOutputKeyComparator(conf),
                        progressable, sortSegments, true,
                        null, spilledRecordsCounter, additionalSpillBytesRead,
-                       null); // Not using any Progress in TezMerger. Should just work.
+                       null, outputContext); // Not using any Progress in TezMerger. Should just work.
 
         //write merged output to disk
         long segmentStart = finalOut.getPos();
