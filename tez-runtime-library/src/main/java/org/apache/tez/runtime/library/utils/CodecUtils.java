@@ -139,6 +139,7 @@ public final class CodecUtils {
     }
   }
 
+  // never used because MR3 TezDecompressorPool calls CodecPool.getDecompressor()
   public static Decompressor getDecompressor(CompressionCodec codec) {
     synchronized (((Configurable) codec).getConf()) {
       return CodecPool.getDecompressor(codec);
