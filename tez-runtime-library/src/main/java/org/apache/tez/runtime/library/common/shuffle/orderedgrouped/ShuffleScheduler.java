@@ -169,8 +169,6 @@ class ShuffleScheduler {
   private final Referee referee;
   @VisibleForTesting
   final Map<InputAttemptIdentifier, IntWritable> failureCounts = new HashMap<InputAttemptIdentifier,IntWritable>();
-  final Set<HostPort> uniqueHosts = Sets.newHashSet();
-  private final Map<HostPort,IntWritable> hostFailures = new HashMap<HostPort,IntWritable>();
   private final InputContext inputContext;
   private final TezCounter shuffledInputsCounter;
   private final TezCounter skippedInputCounter;
@@ -583,9 +581,6 @@ class ShuffleScheduler {
       if (output != null) {
 
         failureCounts.remove(srcAttemptIdentifier);
-        if (host != null) {
-          hostFailures.remove(new HostPort(host.getHost(), host.getPort()));
-        }
 
         output.commit();
         fetchStatsLogger.logIndividualFetchComplete(millis, bytesCompressed, bytesDecompressed,
@@ -823,17 +818,6 @@ class ShuffleScheduler {
   private synchronized void penalizeHost(MapHost host, int failures) {
     host.penalize();
 
-    HostPort hostPort = new HostPort(host.getHost(), host.getPort());
-    // TODO TEZ-922 hostFailures isn't really used for anything apart from
-    // hasFailedAcrossNodes().Factor it into error
-    // reporting / potential blacklisting of hosts.
-    if (hostFailures.containsKey(hostPort)) {
-      IntWritable x = hostFailures.get(hostPort);
-      x.set(x.get() + 1);
-    } else {
-      hostFailures.put(hostPort, new IntWritable(1));
-    }
-
     long delay = (long) (INITIAL_PENALTY *
         Math.pow(PENALTY_GROWTH_RATE, failures));
     long penaltyDelay = Math.min(delay, maxPenaltyTime);
@@ -882,38 +866,6 @@ class ShuffleScheduler {
     inputContext.sendEvents(failedEvents);
   }
 
-  /**
-   * To determine if failures happened across nodes or not. This will help in
-   * determining whether this task needs to be restarted or source needs to
-   * be restarted.
-   *
-   * @param logContext context info for logging
-   * @return boolean true indicates this task needs to be restarted
-   */
-  private boolean hasFailedAcrossNodes(String logContext) {
-    int numUniqueHosts = uniqueHosts.size();
-    Preconditions.checkArgument(numUniqueHosts > 0, "No values in unique hosts");
-    int threshold = Math.max(3,
-        (int) Math.ceil(numUniqueHosts * hostFailureFraction));
-    int total = 0;
-    boolean failedAcrossNodes = false;
-    for(HostPort host : uniqueHosts) {
-      IntWritable failures = hostFailures.get(host);
-      if (failures != null && failures.get() > minFailurePerHost) {
-        total++;
-        failedAcrossNodes = (total > (threshold * minFailurePerHost));
-        if (failedAcrossNodes) {
-          break;
-        }
-      }
-    }
-
-    LOG.info("{}, numUniqueHosts={}, hostFailureThreshold={}, hostFailuresCount={}, hosts crossing threshold={}, reducerFetchIssues={}",
-        logContext, numUniqueHosts, threshold, hostFailures.size(), total, failedAcrossNodes);
-
-    return failedAcrossNodes;
-  }
-
   private boolean allEventsReceived() {
     if (!pipelinedShuffleInfoEventsMap.isEmpty()) {
       return (pipelinedShuffleInfoEventsMap.size() == numInputs);
@@ -946,12 +898,8 @@ class ShuffleScheduler {
     if (fetcherHealthy) {
       //Compute this logic only when all events are received
       if (allEventsReceived()) {
-        if (hostFailureFraction > 0) {
-          boolean failedAcrossNodes = hasFailedAcrossNodes(logContext);
-          if (failedAcrossNodes) {
-            return false; //not healthy
-          }
-        }
+        // We do not check whether failures happened across nodes or not (as in Tez).
+        // That is, we assume that nodes are healthy collectively.
 
         if (checkFailedFetchSinceLastCompletion) {
           /**
@@ -1042,9 +990,6 @@ class ShuffleScheduler {
             .append(", reducerProgressedEnough=").append(reducerProgressedEnough)
             .append(", reducerStalled=").append(reducerStalled).toString();
         LOG.error(errorMsg);
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Host failures=" + hostFailures.keySet());
-        }
         result = false;
       } else {
         result = true;
@@ -1063,7 +1008,6 @@ class ShuffleScheduler {
                                              int port,
                                              int partitionId,
                                              CompositeInputAttemptIdentifier srcAttempt) {
-    uniqueHosts.add(new HostPort(inputHostName, port));
     HostPortPartition identifier = new HostPortPartition(inputHostName, port, partitionId);
 
     MapHost host = mapLocations.get(identifier);
