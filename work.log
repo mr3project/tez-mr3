@@ -977,8 +977,7 @@ Author: Laszlo Bodor <bodorlaszlo0202@gmail.com>
 Date:   Mon Sep 28 08:28:53 2020 +0200
 
     TEZ-4233: Map task should be blamed earlier for local fetch failures (Laszlo Bdoor reviewed by Rajesh Balamohan)
-    --> not related
-    --> because in Hive-MR3, ContainerWorker Pod does not retain its name when it gets restarted, and we have our own way of handling fetch failures
+    --> applied partially
 
 commit 1fba8f71a0f496e1fcb67a223fb32b389bdfb2e0
 Author: László Bodor <bodorlaszlo0202@gmail.com>

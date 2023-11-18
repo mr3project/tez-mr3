@@ -41,7 +41,6 @@ import org.apache.tez.common.Preconditions;
 import com.google.common.collect.LinkedListMultimap;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -71,7 +70,6 @@ import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.TezRuntimeUtils;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils.FetchStatsLogger;
-import org.apache.tez.runtime.library.common.shuffle.HostPort;
 import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.MapHost.HostPortPartition;
 import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.MapOutput.Type;
 
@@ -849,7 +847,7 @@ class ShuffleScheduler {
   }
 
   // Notify AM
-  private void informAM(InputAttemptIdentifier srcAttempt) {
+  public void informAM(InputAttemptIdentifier srcAttempt) {
     LOG.info("{}: Reporting fetch failure for InputIdentifier: {} taskAttemptIdentifier: {} to AM.",
         srcNameTrimmed, srcAttempt,
         TezRuntimeUtils.getTaskAttemptIdentifier(

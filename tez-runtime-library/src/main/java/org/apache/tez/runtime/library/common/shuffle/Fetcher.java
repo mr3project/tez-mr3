@@ -48,6 +48,7 @@ import org.apache.tez.http.BaseHttpConnection;
 import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
+import org.apache.tez.runtime.library.common.shuffle.api.ShuffleHandlerError;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.commons.lang3.StringUtils;
@@ -890,6 +891,11 @@ public class Fetcher implements Callable<FetchResult> {
           header.readFields(input);
           pathComponent = header.getMapId();
           if (!pathComponent.startsWith(InputAttemptIdentifier.PATH_PREFIX_MR3) && !pathComponent.startsWith(InputAttemptIdentifier.PATH_PREFIX)) {
+            if (pathComponent.startsWith(ShuffleHandlerError.DISK_ERROR_EXCEPTION.toString())) {
+              LOG.warn("ShuffleHandler error - " + pathComponent + ", while fetching " + inputAttemptIdentifier);
+              // this should be treated as local fetch failure in order to send InputReadError
+              return new InputAttemptIdentifier[]{ inputAttemptIdentifier };
+            }
             throw new IllegalArgumentException("Invalid map id: " + header.getMapId() + ", expected to start with " +
                 InputAttemptIdentifier.PATH_PREFIX_MR3 + "/" + InputAttemptIdentifier.PATH_PREFIX + ", partition: " + header.getPartition()
                 + " while fetching " + inputAttemptIdentifier);

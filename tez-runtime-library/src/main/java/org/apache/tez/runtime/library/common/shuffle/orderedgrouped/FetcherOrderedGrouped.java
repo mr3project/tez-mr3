@@ -36,6 +36,7 @@ import org.apache.hadoop.io.WritableUtils;
 import org.apache.tez.http.BaseHttpConnection;
 import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.InputContext;
+import org.apache.tez.runtime.library.common.shuffle.api.ShuffleHandlerError;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -473,8 +474,13 @@ class FetcherOrderedGrouped implements Callable<Void> {
           if (!header.mapId.startsWith(InputAttemptIdentifier.PATH_PREFIX_MR3) && !header.mapId.startsWith(InputAttemptIdentifier.PATH_PREFIX)) {
             if (!stopped) {
               badIdErrs.increment(1);
-              LOG.warn("Invalid map id: " + header.mapId + ", expected to start with " +
-                  InputAttemptIdentifier.PATH_PREFIX_MR3 + "/" + InputAttemptIdentifier.PATH_PREFIX + ", partition: " + header.forReduce);
+              if (header.mapId.startsWith(ShuffleHandlerError.DISK_ERROR_EXCEPTION.toString())) {
+                LOG.warn("ShuffleHandler error - " + header.mapId + ", while fetching " + inputAttemptIdentifier);
+                scheduler.informAM(inputAttemptIdentifier);   // send InputReadError
+              } else {
+                LOG.warn("Invalid map id: " + header.mapId + ", expected to start with " +
+                    InputAttemptIdentifier.PATH_PREFIX_MR3 + "/" + InputAttemptIdentifier.PATH_PREFIX + ", partition: " + header.forReduce);
+              }
               return new InputAttemptIdentifier[]{getNextRemainingAttempt()};
             } else {
               if (LOG.isDebugEnabled()) {
