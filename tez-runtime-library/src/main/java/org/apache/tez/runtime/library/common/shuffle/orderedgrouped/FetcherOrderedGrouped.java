@@ -330,7 +330,7 @@ class FetcherOrderedGrouped implements Callable<Void> {
         } else {
           LOG.warn("copyMapOutput failed for tasks " + Arrays.toString(failedTasks));
           for (InputAttemptIdentifier left : failedTasks) {
-            // readError == false and connectError == false, so we do not send InputReadError
+            // readError == false and connectError == false, so we only report fetch failure
             scheduler.copyFailed(left, host, false, false, false);
           }
         }

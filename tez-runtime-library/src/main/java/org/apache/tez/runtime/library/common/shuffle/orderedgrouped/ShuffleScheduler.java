@@ -767,6 +767,11 @@ class ShuffleScheduler {
      *    - Check whether individual attempt crossed failure threshold limits
      *    - Check overall shuffle health. Bail out if needed.*
      */
+    // If readError == false and connectError == false, we do not call informAM() right away.
+    // If FetcherOrderedGrouped repeatedly fails to read srcAttempt, however, isAbortLimitExceedFor()
+    // in isShuffleHealthy() eventually fails the current RuntimeTask, blaming the consumer.
+    // In such a case, we also report to AM by sending InputReadError so that the next TaskAttempt
+    // can read newly generated output.
 
     boolean shouldInformAM = readError || connectError;
     //TEZ-2890
@@ -776,12 +781,6 @@ class ShuffleScheduler {
       // informAM() does not need synchronized(this)
       informAM(srcAttempt);
     }
-
-    // If readError == false and connectError == false, we do not send InputReadError. If
-    // FetcherOrderedGrouped repeatedly fails to read srcAttempt, isShuffleHealthy() eventually fails the
-    // current RuntimeTask, blaming the consumer.
-
-    //Restart consumer in case shuffle is not healthy
     if (!isShuffleHealthy(srcAttempt)) {
       return;
     }
@@ -793,13 +792,15 @@ class ShuffleScheduler {
   private boolean isAbortLimitExceedFor(InputAttemptIdentifier srcAttempt) {
     int attemptFailures = getFailureCount(srcAttempt);
     if (attemptFailures >= abortFailureLimit) {
-      // This task has seen too many fetch failures - report it as failed. The
-      // AM may retry it if max failures has not been reached.
+      // This task has seen too many fetch failures - report it as failed.
+      // In addition, we send InputReadError to the AM.
+      // Ex.
+      //   1. ShuffleHandler.sendMapOutput() fails to read file.out.
+      //   2. ShuffleHandler.sendMap() sends NOT_FOUND.
+      //   3. IFile.verifyHeaderMagic() fails with 'Not a valid ifile header'.
+      //   4. FetcherOrderedGrouped repeatedly fails on srcAttempt.
+      informAM(srcAttempt);
 
-      // Between the task and the AM - someone needs to determine who is at
-      // fault. If there's enough errors seen on the task, before the AM informs
-      // it about source failure, the task considers itself to have failed and
-      // allows the AM to re-schedule it.
       String errorMsg = "Failed " + attemptFailures + " times trying to "
           + "download from " + TezRuntimeUtils.getTaskAttemptIdentifier(
           inputContext.getSourceVertexName(),
