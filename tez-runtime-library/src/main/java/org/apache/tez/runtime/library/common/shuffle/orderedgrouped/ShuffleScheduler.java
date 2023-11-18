@@ -774,9 +774,8 @@ class ShuffleScheduler {
     // can read newly generated output.
 
     boolean shouldInformAM = readError || connectError;
-    //TEZ-2890
     // Even if isObsoleteInputAttemptIdentifier(srcAttempt) returns true, we should call informAM.
-    //Inform AM. In case producer needs to be restarted, it is handled at AM.
+    // Inform AM. In case producer needs to be restarted, it is handled at AM.
     if (shouldInformAM) {
       // informAM() does not need synchronized(this)
       informAM(srcAttempt);
