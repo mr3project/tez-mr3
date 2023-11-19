@@ -33,6 +33,7 @@ Author: Ayush Saxena <ayushsaxena@apache.org>
 Date:   Tue Oct 3 21:07:34 2023 +0530
 
     TEZ-4514: Reduce Some FileSystem Calls. (#309) (Ayush Saxena reviewed by Laszlo Bodor)
+    --> not related
 
 commit 7855c1fe07961a4c3999edf9776d60326ac35337
 Author: Ayush Saxena <ayushsaxena@apache.org>
@@ -171,6 +172,7 @@ Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
 Date:   Mon Mar 6 16:30:14 2023 +0100
 
     TEZ-4334: Fix deadlock in ShuffleScheduler between ShuffleScheduler.close() and the ShufflePenaltyReferee thread (#273) (Laszlo Bodor,  Sungwoo Park, reviewed by Rajesh Balamohan)
+    --> already applied
 
 commit 6bd6f9cdcf47176ab78fb5aea555583af50cc2d3
 Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
@@ -246,6 +248,7 @@ Author: Dmitriy Fingerman <dmitriy.fingerman@gmail.com>
 Date:   Thu Jan 5 10:46:01 2023 -0500
 
     TEZ-4462: update common-codec to 1.13 to fix vulnerability SNYK-JAVA-COMMONSCODEC-561518 (#258) (Dmitriy Fingerman reviewed by Rajesh Balamohan)
+    --> already upgraded to 1.15
 
 commit 4fd2db36cee9e21ab41193e216e820bacadec157
 Author: Arnout Engelen <arnout@engelen.eu>

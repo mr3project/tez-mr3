@@ -19,10 +19,7 @@
 package org.apache.tez.dag.api;
 
 import java.lang.reflect.Field;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -34,7 +31,6 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.yarn.api.records.LocalResource;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -124,14 +120,6 @@ public class TezConfiguration extends Configuration {
       + System.getProperty("user.name") + "/tez/staging";
 
   /**
-   * String value that is a file path.
-   * Path to a credentials file (with serialized credentials) located on the local file system.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty
-  public static final String TEZ_CREDENTIALS_PATH = TEZ_PREFIX + "credentials.path";
-
-  /**
    * Boolean value. Execution mode for the Tez application. True implies session mode. If the client
    * code is written according to best practices then the same code can execute in either mode based
    * on this configuration. Session mode is more aggressive in reserving execution resources and is
@@ -155,54 +143,6 @@ public class TezConfiguration extends Configuration {
   public static final String TEZ_AM_LAUNCH_CMD_OPTS_DEFAULT = 
       "-XX:+PrintGCDetails -verbose:gc -XX:+PrintGCTimeStamps -XX:+UseNUMA -XX:+UseParallelGC";
 
-  /**
-   * String value. Command line options which will be prepended to {@link
-   * #TEZ_TASK_LAUNCH_CMD_OPTS} during the launch of Tez tasks.  This property will typically be configured to
-   * include default options meant to be used by all jobs in a cluster. If required, the values can
-   * be overridden per job.
-   */
-  @ConfigurationScope(Scope.AM) // TODO DAG/Vertex level
-  @ConfigurationProperty
-  public static final String TEZ_TASK_LAUNCH_CLUSTER_DEFAULT_CMD_OPTS =
-      TEZ_TASK_PREFIX + "launch.cluster-default.cmd-opts";
-  public static final String TEZ_TASK_LAUNCH_CLUSTER_DEFAULT_CMD_OPTS_DEFAULT =
-      "-server -Djava.net.preferIPv4Stack=true -Dhadoop.metrics.log.level=WARN";
-
-  /**
-   * String value. Command line options provided during the launch of Tez Task
-   * processes. Its recommended to not set any Xmx or Xms in these launch opts
-   * so that Tez can determine them automatically.
-   */
-  @ConfigurationScope(Scope.AM) // TODO DAG/Vertex level
-  @ConfigurationProperty
-  public static final String TEZ_TASK_LAUNCH_CMD_OPTS = TEZ_TASK_PREFIX
-      + "launch.cmd-opts";
-  public static final String TEZ_TASK_LAUNCH_CMD_OPTS_DEFAULT =
-      "-XX:+PrintGCDetails -verbose:gc -XX:+PrintGCTimeStamps -XX:+UseNUMA -XX:+UseParallelGC";
-
-  /**
-   * Double value. Tez automatically determines the Xmx for the JVMs used to run
-   * Tez tasks and app masters. This feature is enabled if the user has not
-   * specified Xmx or Xms values in the launch command opts. Doing automatic Xmx
-   * calculation is preferred because Tez can determine the best value based on
-   * actual allocation of memory to tasks the cluster. The value if used as a
-   * fraction that is applied to the memory allocated Factor to size Xmx based
-   * on container memory size. Value should be greater than 0 and less than 1.
-   *
-   * Set this value to -1 to allow Tez to use different default max heap fraction
-   * for different container memory size. Current policy is to use 0.7 for container
-   * smaller than 4GB and use 0.8 for larger container.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="float")
-  public static final String TEZ_CONTAINER_MAX_JAVA_HEAP_FRACTION =
-      TEZ_PREFIX + "container.max.java.heap.fraction";
-  public static final double TEZ_CONTAINER_MAX_JAVA_HEAP_FRACTION_DEFAULT = 0.8;
-
-  private static final String NATIVE_LIB_PARAM_DEFAULT = Shell.WINDOWS ?
-    "PATH=%PATH%;%HADOOP_COMMON_HOME%\\bin":
-    "LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HADOOP_COMMON_HOME/lib/native/";
-
   /** String value. Env settings for the Tez AppMaster process.
    * Should be specified as a comma-separated of key-value pairs where each pair
    * is defined as KEY=VAL
@@ -216,33 +156,6 @@ public class TezConfiguration extends Configuration {
   public static final String TEZ_AM_LAUNCH_ENV = TEZ_AM_PREFIX
       + "launch.env";
   public static final String TEZ_AM_LAUNCH_ENV_DEFAULT = "";
-
-  /**
-   * String value. Env settings will be merged with {@link #TEZ_TASK_LAUNCH_ENV}
-   * during the launch of the task process. This property will typically be configured to
-   * include default system env meant to be used by all jobs in a cluster. If required, the values can
-   * be appended to per job.
-   */
-  @ConfigurationScope(Scope.VERTEX)
-  @ConfigurationProperty
-  public static final String TEZ_TASK_LAUNCH_CLUSTER_DEFAULT_ENV =
-      TEZ_TASK_PREFIX + "launch.cluster-default.env";
-  public static final String TEZ_TASK_LAUNCH_CLUSTER_DEFAULT_ENV_DEFAULT =
-      NATIVE_LIB_PARAM_DEFAULT;
-
-  /** String value. Env settings for the Tez Task processes.
-   * Should be specified as a comma-separated of key-value pairs where each pair
-   * is defined as KEY=VAL
-   * e.g. "LD_LIBRARY_PATH=.,USERNAME=foo"
-   * These take least precedence compared to other methods of setting env
-   * These get added to the task environment prior to launching it.
-   * This setting will prepend existing settings in the cluster default
-   */
-  @ConfigurationScope(Scope.VERTEX)
-  @ConfigurationProperty
-  public static final String TEZ_TASK_LAUNCH_ENV = TEZ_TASK_PREFIX
-      + "launch.env";
-  public static final String TEZ_TASK_LAUNCH_ENV_DEFAULT = "";
 
   /**
    * Int value. The number of threads used to listen to task heartbeat requests.
@@ -398,53 +311,6 @@ public class TezConfiguration extends Configuration {
   public static final int TEZ_TASK_MAX_EVENTS_PER_HEARTBEAT_DEFAULT = 500;
 
   /**
-   * Int value. Maximum number of pending task events before a task will stop
-   * asking for more events in the task heartbeat.
-   * Expert level setting.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  public static final String TEZ_TASK_MAX_EVENT_BACKLOG = TEZ_TASK_PREFIX +
-      "max-event-backlog";
-  public static final int TEZ_TASK_MAX_EVENT_BACKLOG_DEFAULT = 10000;
-
-  /**
-   * Boolean value. Backwards compatibility setting for initializing IO processor before
-   * inputs and outputs.
-   * Expert level setting.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="boolean")
-  public static final String TEZ_TASK_INITIALIZE_PROCESSOR_FIRST = TEZ_TASK_PREFIX +
-      "initialize-processor-first";
-  public static final boolean TEZ_TASK_INITIALIZE_PROCESSOR_FIRST_DEFAULT = false;
-
-  /**
-   * Boolean value. Backwards compatibility setting for initializing inputs and outputs
-   * serially instead of the parallel default.
-   * Expert level setting.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="boolean")
-  public static final String TEZ_TASK_INITIALIZE_PROCESSOR_IO_SERIALLY = TEZ_TASK_PREFIX +
-      "initialize-processor-io-serially";
-  public static final boolean TEZ_TASK_INITIALIZE_PROCESSOR_IO_SERIALLY_DEFAULT = false;
-
-  /**
-   * Whether to generate counters per IO or not. Enabling this will rename
-   * CounterGroups / CounterNames to making them unique per Vertex +
-   * Src|Destination
-   */
-  @Unstable
-  @Private
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="boolean")
-  public static final String TEZ_TASK_GENERATE_COUNTERS_PER_IO = TEZ_TASK_PREFIX
-      + "generate.counters.per.io";
-  @Private
-  public static final boolean TEZ_TASK_GENERATE_COUNTERS_PER_IO_DEFAULT = false;
-
-  /**
    * Whether to scale down memory requested by each component if the total
    * exceeds the available JVM memory
    */
@@ -593,19 +459,6 @@ public class TezConfiguration extends Configuration {
   public static final String TEZ_LIB_URIS = TEZ_PREFIX + "lib.uris";
 
   /**
-   *
-   * Specify additional user classpath information to be used for Tez AM and all containers.
-   * This will be appended to the classpath after PWD
-   * 
-   * 'tez.lib.uris.classpath' defines the relative classpath into the archives
-   * that are set in 'tez.lib.uris'
-   *
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty
-  public static final String TEZ_LIB_URIS_CLASSPATH = TEZ_PREFIX + "lib.uris.classpath";
-
-  /**
    * Auxiliary resources to be localized for the Tez AM and all its containers.
    *
    * Value is comma-separated list of fully-resolved directories or file paths. All resources
@@ -653,50 +506,12 @@ public class TezConfiguration extends Configuration {
   public static final boolean TEZ_USER_CLASSPATH_FIRST_DEFAULT = true;
 
   /**
-   * String value.
-   *
-   * Specify additional classpath information to be used for Tez AM and all containers.
-   * If {@link #TEZ_USER_CLASSPATH_FIRST} is true then this will be added to the classpath
-   * before all framework specific components have been specified, otherwise this will
-   * be added after the framework specific components.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty
-  public static final String TEZ_CLUSTER_ADDITIONAL_CLASSPATH_PREFIX =
-      TEZ_PREFIX + "cluster.additional.classpath.prefix";
-
-  /**
-   * Boolean value.
-   * If this value is true then tez explicitly adds hadoop conf directory into classpath for AM and
-   * task containers. Default is false.
-   */
-  @Private
-  @Unstable
-  @ConfigurationScope(Scope.CLIENT)
-  @ConfigurationProperty(type="boolean")
-  public static final String TEZ_CLASSPATH_ADD_HADOOP_CONF = TEZ_PREFIX +
-      "classpath.add-hadoop-conf";
-  public static final boolean TEZ_CLASSPATH_ADD_HADOOP_CONF_DEFAULT = false;
-
-  /**
    * Session-related properties
    */
   @Private
   @ConfigurationProperty
   public static final String TEZ_SESSION_PREFIX =
       TEZ_PREFIX + "session.";
-
-  /**
-   * Int value. Time (in seconds) for which the Tez AM should wait for a DAG to be submitted before
-   * shutting down. Only relevant in session mode. Any negative value will disable this check and
-   * allow the AM to hang around forever in idle mode.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  public static final String TEZ_SESSION_AM_DAG_SUBMIT_TIMEOUT_SECS =
-      TEZ_SESSION_PREFIX + "am.dag.submit.timeout.secs";
-  public static final int TEZ_SESSION_AM_DAG_SUBMIT_TIMEOUT_SECS_DEFAULT =
-      300;
 
   /**
    * String value. The queue name for all jobs being submitted from a given client.
@@ -725,15 +540,6 @@ public class TezConfiguration extends Configuration {
     TEZ_PREFIX + "local.mode";
 
   public static final boolean TEZ_LOCAL_MODE_DEFAULT = false;
-
-  /**
-   * Int value.
-   * The maximium number of tasks running in parallel within the app master process.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  public static final String TEZ_AM_INLINE_TASK_EXECUTION_MAX_TASKS =
-    TEZ_AM_PREFIX + "inline.task.execution.max-tasks";
 
   // ACLs related configuration
   // Format supports a comma-separated list of users and groups with the users and groups separated
@@ -811,44 +617,6 @@ public class TezConfiguration extends Configuration {
   public static final String TEZ_TEST_MINI_CLUSTER_APP_WAIT_ON_SHUTDOWN_SECS =
       TEZ_PREFIX + "test.minicluster.app.wait.on.shutdown.secs";
   public static final long TEZ_TEST_MINI_CLUSTER_APP_WAIT_ON_SHUTDOWN_SECS_DEFAULT = 30;
-
-  /**
-   * String value. Determines what JVM properties will be logged for debugging purposes
-   * in the AM and Task runtime logs.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty
-  public static final String TEZ_JVM_SYSTEM_PROPERTIES_TO_LOG  =
-      TEZ_PREFIX + "tez.jvm.system-properties-to-log";
-  public static final List<String> TEZ_JVM_SYSTEM_PROPERTIES_TO_LOG_DEFAULT =
-      Collections.unmodifiableList(Arrays.asList(
-          "os.name","os.version","java.home","java.runtime.version",
-          "java.vendor","java.version","java.vm.name","java.class.path",
-          "java.io.tmpdir","user.dir","user.name"));
-
-  /**
-   * Int value. Time interval (in seconds). If the Tez AM does not receive a heartbeat from the
-   * client within this time interval, it will kill any running DAG and shut down. Required to
-   * re-cycle orphaned Tez applications where the client is no longer alive. A negative value
-   * can be set to disable this check. For a positive value, the minimum value is 10 seconds.
-   * Values between 0 and 10 seconds will be reset to the minimum value.
-   * Only relevant in session mode.
-   * This is disabled by default i.e. by default, the Tez AM will go on to
-   * complete the DAG and only kill itself after hitting the DAG submission timeout defined by
-   * {@link #TEZ_SESSION_AM_DAG_SUBMIT_TIMEOUT_SECS}
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  public static final String TEZ_AM_CLIENT_HEARTBEAT_TIMEOUT_SECS =
-      TEZ_PREFIX + "am.client.heartbeat.timeout.secs";
-  public static final int TEZ_AM_CLIENT_HEARTBEAT_TIMEOUT_SECS_DEFAULT = -1;
-
-
-  @Private
-  @ConfigurationScope(Scope.AM)
-  public static final String TEZ_AM_CLIENT_HEARTBEAT_POLL_INTERVAL_MILLIS =
-      TEZ_PREFIX + "am.client.heartbeat.poll.interval.millis";
-  public static final int TEZ_AM_CLIENT_HEARTBEAT_POLL_INTERVAL_MILLIS_DEFAULT = -1;
 
   /**
    * Int value. Minimum number of threads to be allocated by TezSharedExecutor.

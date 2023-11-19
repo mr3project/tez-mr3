@@ -21,10 +21,8 @@ package org.apache.tez.common;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Objects;
 
 import com.google.protobuf.ByteString;
@@ -34,11 +32,8 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.tez.client.TezClientUtils;
-import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.dag.api.UserPayload;
 import org.apache.tez.dag.api.records.DAGProtos;
-import org.codehaus.jettison.json.JSONException;
-import org.codehaus.jettison.json.JSONObject;
 import org.xerial.snappy.SnappyInputStream;
 import org.xerial.snappy.SnappyOutputStream;
 
@@ -109,7 +104,7 @@ public class TezUtils {
    */
   public static Configuration createConfFromByteString(ByteString byteString) throws IOException {
     Objects.requireNonNull(byteString, "ByteString must be specified");
-    try(SnappyInputStream uncompressIs = new SnappyInputStream(byteString.newInput());) {
+    try(SnappyInputStream uncompressIs = new SnappyInputStream(byteString.newInput())) {
       DAGProtos.ConfigurationProto confProto = DAGProtos.ConfigurationProto.parseFrom(uncompressIs);
       Configuration conf = new Configuration(false);
       readConfFromPB(confProto, conf);
@@ -160,22 +155,4 @@ public class TezUtils {
       }
     }
   }
-
-  /* Copy each Map.Entry with non-null value to DAGProtos.ConfigurationProto */
-  public static void populateConfProtoFromEntries(Iterable<Map.Entry<String, String>> params,
-                                              DAGProtos.ConfigurationProto.Builder confBuilder) {
-    for(Map.Entry<String, String> entry : params) {
-      String key = entry.getKey();
-      String val = entry.getValue();
-      if(val != null) {
-        DAGProtos.PlanKeyValuePair.Builder kvp = DAGProtos.PlanKeyValuePair.newBuilder();
-        kvp.setKey(key);
-        kvp.setValue(val);
-        confBuilder.addConfKeyValues(kvp);
-      } else {
-        LOG.debug("null value for key={}. Skipping.", key);
-      }
-    }
-  }
-
 }

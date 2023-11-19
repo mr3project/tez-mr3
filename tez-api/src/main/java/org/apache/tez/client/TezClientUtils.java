@@ -23,15 +23,11 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.tez.dag.api.TezConstants;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
 @Private
 public class TezClientUtils {
-
-  private static Logger LOG = LoggerFactory.getLogger(TezClientUtils.class);
 
   @Private
   @VisibleForTesting
