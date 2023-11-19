@@ -1,3 +1,331 @@
+commit 51d6f53967110e2b91b6d90b46f8e16bdc062091
+Author: Ayush Saxena <ayushsaxena@apache.org>
+Date:   Fri Oct 27 13:35:16 2023 +0530
+
+    TEZ-3821: Ability to fail fast tasks that write too much to local disk. (#314) (Ayush Saxena reviewed by Rajesh Balamohan)
+
+commit 4bc87e25069795f15da28f08b206b24d7eeea11d
+Author: Ayush Saxena <ayushsaxena@apache.org>
+Date:   Mon Oct 16 13:19:45 2023 +0530
+
+    TEZ-4110: Make Tez fail fast when DFS quota is exceeded. (#313)
+    
+    * TEZ-4110: Make Tez fail fast when DFS quota is exceeded.
+    
+    * Add Test.
+    
+    * Fix Typo.
+
+commit 5bba1fffdd290ae3242615c23ab3b75c24f15e88
+Author: Ayush Saxena <ayushsaxena@apache.org>
+Date:   Thu Oct 5 07:26:24 2023 +0530
+
+    TEZ-4516: Fix log lines with incorrect placeholders. (#310) (Ayush Saxena reviewed by Laszlo Bodor)
+
+commit f5beba989fa5c227f335413fca7163ef127e5fb4
+Author: Ayush Saxena <ayushsaxena@apache.org>
+Date:   Thu Oct 5 07:23:01 2023 +0530
+
+    TEZ-4517: Upgrade commons-collection4 to 4.4. (#311) (Ayush Saxena reviewed by Laszlo Bodor)
+
+commit 2ad10b61a0263770e4e78983939bb9d823d9dc27
+Author: Ayush Saxena <ayushsaxena@apache.org>
+Date:   Tue Oct 3 21:07:34 2023 +0530
+
+    TEZ-4514: Reduce Some FileSystem Calls. (#309) (Ayush Saxena reviewed by Laszlo Bodor)
+
+commit 7855c1fe07961a4c3999edf9776d60326ac35337
+Author: Ayush Saxena <ayushsaxena@apache.org>
+Date:   Fri Sep 1 14:46:23 2023 +0530
+
+    TEZ-4506: Report the node of a task attempt failure better. (#307) (Ayush Saxena reviewed by Laszlo Bodor)
+
+commit b643f9bcd267aa504dd734cd3c36ae9e299ae4db
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Thu Aug 24 22:29:55 2023 +0200
+
+    TEZ-2119: Counter for launched containers (#301) (Laszlo Bodor reviewed by Jonathan Eagles and Ayush Saxena)
+
+commit 4b97acb530be9de430601fd9702bf548a401ad09
+Author: Ayush Saxena <ayushsaxena@apache.org>
+Date:   Thu Aug 24 12:30:59 2023 +0530
+
+    TEZ-1037: Replace multiple members in TaskAttemptImpl for container related stuff with a single reference to the container. (#305) (Ayush Saxena reviewed by Laszlo Bodor)
+
+commit 5beab4ced9d07bc813a8d79ded111b72af5a2f02
+Author: Ayush Saxena <ayushsaxena@apache.org>
+Date:   Wed Jul 26 13:48:45 2023 +0530
+
+    TEZ-4504: Upgrade Guava to 32.0.1 due to CVE-2023-2976. (#303) (Ayush Saxena reviewed by Laszlo Bodor)
+
+commit a9c5365a5b03b3f343657d69eef8af915d6ea4f0
+Author: Ayush Saxena <ayushsaxena@apache.org>
+Date:   Tue Jul 18 11:39:29 2023 +0530
+
+    TEZ-4344: Collect jstack periodically from all containers. (#299) (Ayush Saxena reviewed by Laszlo Bodor)
+
+commit 50380751b7e7e628aeb40a985b94aba98d2a88db
+Author: Ayush Saxena <ayushsaxena@apache.org>
+Date:   Fri Jun 30 01:24:00 2023 +0530
+
+    TEZ-4493: Upgrade Hadoop to 3.3.6. (#285) (Ayush Saxena reviewed by Laszlo Bodor)
+
+commit 7a56e9bd9de0764f69854ca4d35e054bef70cc38
+Author: Ayush Saxena <ayushsaxena@apache.org>
+Date:   Fri Jun 23 20:43:03 2023 +0530
+
+    TEZ-4432: Remove useless maybeAddDefaultLoggingJavaOpts from TezClientUtils. (#297) (Ayush Saxena reviewed by Laszlo Bodor)
+
+commit 154fd341ddf9e53fc4e475d7a1db70a57d8914c3
+Author: Ayush Saxena <ayushsaxena@apache.org>
+Date:   Fri Jun 23 17:34:40 2023 +0530
+
+    TEZ-4472: Use unique DAG names in tests. (#293) (Ayush Saxena reviewed by Laszlo Bodor)
+
+commit 7e0448dac6662e3cf95da3cf6fe01cd9e706d6eb
+Author: Ayush Saxena <ayushsaxena@apache.org>
+Date:   Fri Jun 23 15:05:16 2023 +0530
+
+    TEZ-4473: Remove pointless MDC_LOGGING message from logs if there is no custom MDC key. (#294) (Ayush Saxena reviewed by Laszlo Bodor)
+
+commit 9aeb17b4b3a2ae227d33fb0b913b3d5952531329
+Author: Ayush Saxena <ayushsaxena@apache.org>
+Date:   Fri Jun 23 15:01:31 2023 +0530
+
+    TEZ-4250: Optimise TaskImpl::getCounters. (#295) (Ayush Saxena reviewed by Rajesh Balamohan)
+
+commit d20f3347d166d93c1bc03de33532d60918ff320d
+Author: Ayush Saxena <ayushsaxena@apache.org>
+Date:   Tue Jun 20 11:16:40 2023 +0530
+
+    TEZ-4478: Refactor dependency versions into properties in pom. (#291) (Ayush Saxena reviewed by Laszlo Bodor)
+
+commit a1a8f205068a23571b32aa763658f0260f61572e
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Mon Jun 19 23:20:47 2023 +0200
+
+    TEZ-4495: mvnsite fails for some modules - No public or protected classes found to document (#288)
+
+commit 86b11997b43b11a9699ce3817e8a6838f790b002
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Mon Jun 12 15:38:12 2023 +0200
+
+    TEZ-4496: Tez precommit fails while building yetus image - no alternatives for some executables (#289)
+
+commit 987ec5493cf1fc7237c4b6b9581d9d782a27c233
+Author: M Lorek <mlorek@users.noreply.github.com>
+Date:   Mon Jun 12 10:56:47 2023 +0100
+
+    TEZ-4470: typo fixes (#264) (Michal Lorek reviewed by Laszlo Bodor)
+
+commit 6722ef3343c167185f8d646025595a7d6c12adef
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Mon Jun 12 11:41:58 2023 +0200
+
+    TEZ-4467: Migrate from Travis CI to GitHub Actions - pt2: remove .travis.yml (Laszlo Bodor reviewed by Ayush Saxena)
+
+commit ccad71dabceb850b58ff38e77fd206e68f62ce4b
+Author: AnmolSun <124231245+AnmolSun@users.noreply.github.com>
+Date:   Thu May 4 13:26:14 2023 +0530
+
+    TEZ-4492: Update Bowerrc to use bower.herokuapp mirror to avoid Bower Registry CERT_EXPIRE issue (BOWER-2608) (#284) (Anmol Sundaram reviewed by Laszlo Bodor)
+
+commit 249e017b3f103874f819d2aec42c1fa88e2fa7a4
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Thu Apr 20 13:13:25 2023 +0200
+
+    TEZ-4488: TaskSchedulerManager might not be initialized when the first DAG comes (#280) (Laszlo Bodor reviewed by Rajesh Balamohan)
+
+commit 2fe3c461d0731ab21ef4640c6bb4fae2bb561253
+Author: Dmitriy Fingerman <dmitriy.fingerman@gmail.com>
+Date:   Wed Apr 19 10:58:33 2023 -0400
+
+    TEZ-4487: Add class name profiling option in ProfileServlet (#281) (Dmitriy Fingerman reviewed by Laszlo Bodor)
+
+commit 9a729cd62d2dabb79d54ff5b5bcc696bf7344489
+Author: Aman Raj <104416558+amanraj2520@users.noreply.github.com>
+Date:   Wed Apr 5 14:47:58 2023 +0530
+
+    TEZ-4483: [CVE-2017-20165, CVE-2017-20165] Upgrade debug to 2.6.9 to fix the vulnerability (Aman Raj reviewed by Laszlo Bodor)
+
+commit 6ca35c1b5aa6e1c9942276fae2421f5c6fde2b57
+Author: Aman Raj <104416558+amanraj2520@users.noreply.github.com>
+Date:   Wed Apr 5 14:13:24 2023 +0530
+
+    TEZ-4484: [CVE-2022-24999] Upgrade qs from 6.2.3 to 6.2.4 to fix the vulnerability (Aman Raj reviewed by Laszlo Bodor)
+
+commit f9a657c2d43afc5f4beb98b32bfdb3452a459d15
+Author: Mayank Kunwar <55212670+mayankkunwar@users.noreply.github.com>
+Date:   Wed Apr 5 13:41:04 2023 +0530
+
+    TEZ-4485: Upgrade jettison to 1.5.4 due to CVE-2023-1436 (#279) (Mayank Kunwar reviewed by Laszlo Bodor)
+
+commit c9ccf1c511620de42481aea60596f30d633dac7b
+Author: Mahesh Raju Somalaraju <maheshraju.onos@gmail.com>
+Date:   Thu Mar 30 15:07:35 2023 +0530
+
+    TEZ-4482: Upgrade JUnit to 4.13.2 due to medium CVEs (#276) (Mahesh Raju Somalaraju reviewed by Laszlo Bodor)
+
+commit 25a9536777af26fdb5aeae866c25524f03ffa997
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Mon Mar 6 16:30:14 2023 +0100
+
+    TEZ-4334: Fix deadlock in ShuffleScheduler between ShuffleScheduler.close() and the ShufflePenaltyReferee thread (#273) (Laszlo Bodor,  Sungwoo Park, reviewed by Rajesh Balamohan)
+
+commit 6bd6f9cdcf47176ab78fb5aea555583af50cc2d3
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Tue Feb 28 09:36:40 2023 +0100
+
+    TEZ-4460: Read timed out in shuffle handler - incorrect usage of EMPTY_LAST_CONTENT and channel write (#257) (Laszlo Bodor reviewed by Rajesh Balamohan, Syed Shameerur Rahman)
+
+commit 051e90f033bb4fb0d7b78ef625d4a3353b727b8c
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Tue Feb 28 09:35:34 2023 +0100
+
+    TEZ-4394: Netty4 ShuffleHandler: should use 1 boss thread (#256) (Laszlo Bodor reviewed by Rajesh Balamohan)
+
+commit b73cfcd30aa21f7bec031f0d64b4320f5cfd986d
+Author: BilwaST <Bilwa@apache.org>
+Date:   Fri Feb 24 18:09:19 2023 +0530
+
+    TEZ-4469: Upgrade jettison to 1.5.3 to fix CVE-2022-45685, CVE-2022-45693 (#271) (Bilwa S T reviewed by Laszlo Bodor)
+
+commit 88374f992b5f02fb589d8b0ddb85344146d60c4a
+Author: Laszlo Bodor <bodorlaszlo0202@gmail.com>
+Date:   Fri Feb 24 13:41:19 2023 +0100
+
+    Revert "Upgrade jettison to 1.5.3 to fix CVE-2022-45685, CVE-2022-45693 (#271) (Bilwa S T reviewed by Laszlo Bodor)" - missing JIRA
+    
+    This reverts commit fa51a590ca6cdbb007cf4f500f9598a279eb6387.
+
+commit fa51a590ca6cdbb007cf4f500f9598a279eb6387
+Author: BilwaST <Bilwa@apache.org>
+Date:   Fri Feb 24 18:09:19 2023 +0530
+
+    Upgrade jettison to 1.5.3 to fix CVE-2022-45685, CVE-2022-45693 (#271) (Bilwa S T reviewed by Laszlo Bodor)
+
+commit 3e194cb56fa38099e0b9c650682398e8a0ef93a0
+Author: mudit-97 <32608527+mudit-97@users.noreply.github.com>
+Date:   Fri Feb 24 15:34:12 2023 +0530
+
+    TEZ-4474: Added config to fail the DAG status when recovery data is missing (#266) (Mudit Sharma reviewed by Laszlo Bodor)
+
+commit db9eb1efc08046956d2efef2e80e242dcb9a1744
+Author: Aman Raj <104416558+amanraj2520@users.noreply.github.com>
+Date:   Fri Feb 24 13:08:44 2023 +0530
+
+    TEZ-4420 : Upgrade Hadoop to 3.3.4 (#272) (Aman Raj reviewed by Laszlo Bodor)
+
+commit be994890dadc3f118671439a717290cf03b471cc
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Wed Feb 15 16:20:03 2023 +0100
+
+    TEZ-4467: Migrate from Travis CI to GitHub Actions (#270) - initial commit started from GitHub UI
+
+commit 97cc788ce6743dbfcd3d0eac9c4d6272fdaa3ba9
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Tue Feb 14 09:09:01 2023 +0100
+
+    TEZ-4475: VertexStatus is missing in TestLocalMode if DAG finishes too early - causing NPE in unit test (#267) (Laszlo Bodor reviewed by Rajesh Balamohan)
+
+commit e3e91a150dad44a9daa3102da04542e2e365203d
+Author: Syed Shameerur Rahman <rhmanns@amazon.com>
+Date:   Mon Feb 13 17:41:28 2023 +0530
+
+    TEZ-4397: Open Tez Input splits asynchronously (#263) (Syed Shameerur Rahman reviewed by Laszlo Bodor, original patch by Ramesh Kumar)
+    --> do not apply until Hive patch is ready
+
+commit e236f51ef16ed8531251d77d8d64e6d508b208c1
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Mon Feb 13 10:50:32 2023 +0100
+
+    TEZ-4471: Precommit fails while building yetus image - upgrade to Ubuntu Jammy LTS (#265) (Laszlo Bodor reviewed by Rajesh Balamohan, Ayush Saxena)
+
+commit 39e5a8e71b7713a2e9de151e2ec96062c8dd29f8
+Author: Dmitriy Fingerman <dmitriy.fingerman@gmail.com>
+Date:   Thu Jan 5 10:46:01 2023 -0500
+
+    TEZ-4462: update common-codec to 1.13 to fix vulnerability SNYK-JAVA-COMMONSCODEC-561518 (#258) (Dmitriy Fingerman reviewed by Rajesh Balamohan)
+
+commit 4fd2db36cee9e21ab41193e216e820bacadec157
+Author: Arnout Engelen <arnout@engelen.eu>
+Date:   Mon Jan 2 09:49:20 2023 +0100
+
+    TEZ-4464: Update some links to https (#260) (Arnout Engelen reviewed by Laszlo Bodor)
+
+commit 34d68100737b6e83a43f2a6837d3026eea5070bf
+Author: Mayank Kunwar <55212670+mayankkunwar@users.noreply.github.com>
+Date:   Fri Dec 2 14:09:46 2022 +0530
+
+    TEZ-4458:Upgrade Bouncy Castle to 1.70 due to high CVEs (#253) (Mayank Kunwar reviewed by Laszlo Bodor)
+
+commit 25fc8c488bdffca979a846ee6f019c9fbcf6ea58
+Author: Aman Raj <104416558+amanraj2520@users.noreply.github.com>
+Date:   Mon Nov 28 16:45:59 2022 +0530
+
+    Upgraded is-my-json-valid version to 2.20.3 (#250) (Aman Raj reviewed Laszlo Bodor)
+
+commit 2fd7df4cf2b22c5ed1f34c5dc1c865fc75e3d832
+Author: ghanko <54805928+ghanko@users.noreply.github.com>
+Date:   Sat Nov 26 09:04:15 2022 +0100
+
+    TEZ-4396 Ensure utility classes have only private (default) constructors + several code refactors (#197) (Gergely Hanko reviewed by Laszlo Bodor)
+
+commit 65f9ee32a46518c89ad2347a8e39541d3e669e2d
+Author: Dmitriy Fingerman <dmitriy.fingerman@gmail.com>
+Date:   Wed Nov 23 14:25:58 2022 -0500
+
+    TEZ-4455: Add LoggingHandler in ShuffleHandler pipeline for better debuggability. (#249) (Dmitriy Fingerman reviewed by Laszlo Bodor)
+
+commit 8bb27b845ce103b8d02a9a9d7fe2a1af10097e9c
+Author: slfan1989 <55643692+slfan1989@users.noreply.github.com>
+Date:   Wed Nov 9 22:50:46 2022 +0800
+
+    TEZ-4454: remove extra commas. (#246) (slfan1989 reviewed by Laszlo Bodor)
+
+commit 8ebc4b00f1d66ee88475b1e96691f658dab967be
+Author: Ganesha Shreedhara <ganeshashree2@gmail.com>
+Date:   Wed Oct 26 13:40:12 2022 +0530
+
+    TEZ-4450: Shuffle data fetch fails when shuffle data is transferred via CompositeRoutedDataMovementEvent (#243) (Ganesha Shreedhara reviewed by Laszlo Bodor)
+    --> applied
+
+commit dbbd406aed3434e8866d1e1a64fce4ad9b3bf5a9
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Wed Oct 26 06:27:53 2022 +0200
+
+    TEZ-4039: Tez should inject dag id, query id into MDC (#98) (Laszlo Bodor reviewed by Rajesh Balamohan, Prasanth Jayachandran)
+
+commit fc5b6e9df08cc860037eeacba8c57c909b570e64
+Author: slfan1989 <55643692+slfan1989@users.noreply.github.com>
+Date:   Mon Oct 24 17:12:00 2022 +0800
+
+    TEZ-4453: Fix Typo of LocalClient. (#245) (slfan1989 reviewed by Laszlo Bodor)
+
+commit ddb53cb014b68cb5935daedba06938a676063b7c
+Author: Karel Kolman <kkolman@datameer.com>
+Date:   Sun Oct 23 10:41:27 2022 +0200
+
+    TEZ-4448: Cannot submit Tez job when dag size is exceeds `ipc.maximum.data.length` and S3A is the filesystem (#241) (Karel Kolman reviewed by Laszlo Bodor)
+
+commit 40e9e0f6ab4201011ce8beb27eb80c8634c28f0b
+Author: slfan1989 <55643692+slfan1989@users.noreply.github.com>
+Date:   Sun Oct 23 15:48:34 2022 +0800
+
+    TEZ-4449: Upgrade jettison to 1.5.1 to fix CVE-2022-40149. (#242) (fanshilun reviewed by Laszlo Bodor)
+
+commit 921de531f1f0a5b275844d693cb1b528595020ab
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Mon Oct 10 12:20:03 2022 +0200
+
+    TEZ-4431: Apache Tez Release 0.10.2: update SNAPSHOT versions, DOAP file (#234) (Laszlo Bodor reviewed by Rajesh Balamohan, Ayush Saxena)
+
+commit de88f2a2c5e8857360996c502f8827202d3e78ee
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Wed Sep 14 12:44:25 2022 +0200
+
+    TEZ-4447: Collect VertexStatus properly when DAGClientServer is not used (local mode without network) (#239) (Laszlo Bodor reviewed by Rajesh Balamohan)
+
 commit 55b6031fa2c38cd8af1d384414d29c4e19a875d7
 Author: zhengchenyu <zhengchenyu16@163.com>
 Date:   Mon Aug 29 19:52:29 2022 +0800
@@ -206,8 +534,7 @@ Date:   Wed Mar 23 21:34:47 2022 -0700
     TEZ-4397 Open Tez Input splits asynchronously
     
     Contributed by Ramesh Kumar Thangarajan
-    --> apply for Hive 3 
-    --> perhaps not for Hive 4 because it is reverted
+    --> do not apply because it is reverted
 
 commit 20873a3a1008d3572f0d0cfefe1c146f8f42449e
 Author: Syed Shameerur Rahman <rhmanns@amazon.com>
