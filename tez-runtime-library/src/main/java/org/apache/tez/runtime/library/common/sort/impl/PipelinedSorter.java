@@ -624,7 +624,7 @@ public class PipelinedSorter extends ExternalSorter {
             new TezIndexRecord(segmentStart, rawLength, partLength);
         spillRec.putIndex(rec, i);
         if (!isFinalMergeEnabled() && reportPartitionStats()) {
-          partitionStats[i] += partLength;
+          partitionStats[i] += rawLength;
         }
       }
 
@@ -754,7 +754,7 @@ public class PipelinedSorter extends ExternalSorter {
         TezSpillRecord spillRecord = new TezSpillRecord(finalIndexFile, localFs);
         if (reportPartitionStats()) {
           for (int i = 0; i < spillRecord.size(); i++) {
-            partitionStats[i] += spillRecord.getIndex(i).getPartLength();
+            partitionStats[i] += spillRecord.getIndex(i).getRawLength();
           }
         }
         numShuffleChunks.setValue(numSpills);
@@ -839,7 +839,7 @@ public class PipelinedSorter extends ExternalSorter {
             new TezIndexRecord(segmentStart, rawLength, partLength);
         spillRec.putIndex(rec, parts);
         if (reportPartitionStats()) {
-          partitionStats[parts] += partLength;
+          partitionStats[parts] += rawLength;
         }
       }
 
