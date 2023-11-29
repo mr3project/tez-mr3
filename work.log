@@ -474,8 +474,7 @@ Author: Murali Krishna <muralikrishna.dmmkr@gmail.com>
 Date:   Sun May 29 22:37:36 2022 +0530
 
     TEZ-4409: Upgrade async-http-client to 2.12.3 to resolve CVE (#204) (D M Murali Krishna Reddy reviewed by Laszlo Bodor)
-    --> apply when necessary
-    --> apply for Hive 4
+    --> async-http-client removed and irrelevant
 
 commit ba851fa06e4f57584b938706276797db9807e1d8
 Author: Mark Bathori <57758037+mbathori-cloudera@users.noreply.github.com>

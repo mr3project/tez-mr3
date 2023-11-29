@@ -104,7 +104,6 @@ class FetcherOrderedGrouped implements Callable<Void> {
   volatile DataInputStream input;
 
   volatile BaseHttpConnection httpConnection;
-  private final boolean asyncHttp;
   private final boolean compositeFetch;
   private final boolean localFetchComparePort;
 
@@ -134,7 +133,6 @@ class FetcherOrderedGrouped implements Callable<Void> {
                                TezCounter wrongReduceErrsCounter,
                                String applicationId,
                                int dagId,
-                               boolean asyncHttp,
                                boolean sslShuffle,
                                boolean verifyDiskChecksum,
                                boolean compositeFetch, boolean localFetchComparePort, InputContext inputContext) {
@@ -158,7 +156,6 @@ class FetcherOrderedGrouped implements Callable<Void> {
     this.ifileReadAhead = ifileReadAhead;
     this.ifileReadAheadLength = ifileReadAheadLength;
     this.httpConnectionParams = httpConnectionParams;
-    this.asyncHttp = asyncHttp;
     if (codec != null) {
       this.codec = codec;
     } else {
@@ -364,7 +361,7 @@ class FetcherOrderedGrouped implements Callable<Void> {
       StringBuilder baseURI = ShuffleUtils.constructBaseURIForShuffleHandler(finalHost,
           host.getPort(), host.getPartitionId(), host.getPartitionCount(), applicationId, dagId, sslShuffle);
       URL url = ShuffleUtils.constructInputURL(baseURI.toString(), attempts, httpConnectionParams.isKeepAlive());
-      httpConnection = ShuffleUtils.getHttpConnection(asyncHttp, url, httpConnectionParams,
+      httpConnection = ShuffleUtils.getHttpConnection(url, httpConnectionParams,
           logIdentifier, jobTokenSecretManager);
       connectSucceeded = httpConnection.connect();
 

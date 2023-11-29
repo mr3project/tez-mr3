@@ -130,7 +130,6 @@ public class ShuffleManager implements FetcherCallback {
   private final Condition wakeLoop = lock.newCondition();
   
   private final int numFetchers;
-  private final boolean asyncHttp;
   
   // Parameters required by Fetchers
   private final JobTokenSecretManager jobTokenSecretMgr;
@@ -262,7 +261,6 @@ public class ShuffleManager implements FetcherCallback {
         .getJobTokenSecretFromTokenBytes(inputContext
             .getServiceConsumerMetaData(auxiliaryService));
     this.jobTokenSecretMgr = new JobTokenSecretManager(shuffleSecret);
-    this.asyncHttp = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_USE_ASYNC_HTTP, false);
     httpConnectionParams = ShuffleUtils.getHttpConnectionParams(conf);
 
     this.localFs = (RawLocalFileSystem) FileSystem.getLocal(conf).getRaw();
@@ -297,8 +295,7 @@ public class ShuffleManager implements FetcherCallback {
           + ifileReadAhead + ", ifileReadAheadLength=" + ifileReadAheadLength +", "
           + "localDiskFetchEnabled=" + localDiskFetchEnabled + ", "
           + "sharedFetchEnabled=" + sharedFetchEnabled + ", "
-          + httpConnectionParams.toString() + ", maxTaskOutputAtOnce=" + maxTaskOutputAtOnce
-          + ", asyncHttp=" + asyncHttp);
+          + httpConnectionParams.toString() + ", maxTaskOutputAtOnce=" + maxTaskOutputAtOnce);
     }
   }
 
@@ -451,7 +448,7 @@ public class ShuffleManager implements FetcherCallback {
       httpConnectionParams, inputManager, inputContext.getApplicationId(), inputContext.getDagIdentifier(),
         jobTokenSecretMgr, srcNameTrimmed, conf, localFs, localDirAllocator,
         lockDisk, localDiskFetchEnabled, sharedFetchEnabled,
-        localhostName, localShufflePorts, asyncHttp, verifyDiskChecksum, compositeFetch, localFetchComparePort, inputContext);
+        localhostName, localShufflePorts, verifyDiskChecksum, compositeFetch, localFetchComparePort, inputContext);
 
     if (codec != null) {
       fetcherBuilder.setCompressionParameters(codec);

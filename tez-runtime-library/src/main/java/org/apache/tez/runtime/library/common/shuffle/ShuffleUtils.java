@@ -261,10 +261,10 @@ public class ShuffleUtils {
     return new URL(url.toString());
   }
 
-  public static BaseHttpConnection getHttpConnection(boolean asyncHttp, URL url,
+  public static BaseHttpConnection getHttpConnection(URL url,
       HttpConnectionParams params, String logIdentifier, JobTokenSecretManager jobTokenSecretManager)
       throws IOException {
-    return TezRuntimeUtils.getHttpConnection(asyncHttp, url, params, logIdentifier, jobTokenSecretManager);
+    return TezRuntimeUtils.getHttpConnection(url, params, logIdentifier, jobTokenSecretManager);
   }
 
   public static String stringify(DataMovementEventPayloadProto dmProto) {

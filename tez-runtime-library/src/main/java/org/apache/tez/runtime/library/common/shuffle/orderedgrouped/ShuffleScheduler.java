@@ -211,7 +211,6 @@ class ShuffleScheduler {
   public final int[] localShufflePorts;
   private final String applicationId;
   private final int dagId;
-  private final boolean asyncHttp;
   private final boolean sslShuffle;
 
   private final TezCounter ioErrsCounter;
@@ -372,7 +371,6 @@ class ShuffleScheduler {
 
     this.sslShuffle = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_ENABLE_SSL,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_ENABLE_SSL_DEFAULT);
-    this.asyncHttp = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_USE_ASYNC_HTTP, false);
     this.httpConnectionParams = ShuffleUtils.getHttpConnectionParams(conf);
     SecretKey jobTokenSecret = ShuffleUtils
         .getJobTokenSecretFromTokenBytes(inputContext
@@ -426,7 +424,6 @@ class ShuffleScheduler {
           + ", maxStallTimeFraction=" + maxStallTimeFraction
           + ", minReqProgressFraction=" + minReqProgressFraction
           + ", checkFailedFetchSinceLastCompletion=" + checkFailedFetchSinceLastCompletion
-          + ", asyncHttp=" + asyncHttp
       );
     }
   }
@@ -1418,7 +1415,7 @@ class ShuffleScheduler {
         exceptionReporter, jobTokenSecretManager, ifileReadAhead, ifileReadAheadLength,
         codec, conf, localFs, localDiskFetchEnabled, localHostname, localShufflePorts, srcNameTrimmed, mapHost,
         ioErrsCounter, wrongLengthErrsCounter, badIdErrsCounter, wrongMapErrsCounter,
-        connectionErrsCounter, wrongReduceErrsCounter, applicationId, dagId, asyncHttp, sslShuffle,
+        connectionErrsCounter, wrongReduceErrsCounter, applicationId, dagId, sslShuffle,
         verifyDiskChecksum, compositeFetch, localFetchComparePort, inputContext);
   }
 
