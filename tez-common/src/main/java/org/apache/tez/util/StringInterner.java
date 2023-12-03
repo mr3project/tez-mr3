@@ -14,23 +14,15 @@
 
 package org.apache.tez.util;
 
-import com.google.common.collect.Interner;
-import com.google.common.collect.Interners;
-
 /**
- * A class to replace the {@code String.intern()}. The {@code String.intern()}
- * has some well-known performance limitations, and should generally be avoided.
- * Prefer Google's interner over the JDK's implementation.
+ * String.intern() call, that performs very well starting from JDK 7
  */
 public final class StringInterner {
-
-  private static final Interner<String> STRING_INTERNER =
-      Interners.newWeakInterner();
 
   private StringInterner() {
   }
 
   public static String intern(final String str) {
-    return (str == null) ? null : STRING_INTERNER.intern(str);
+    return (str == null) ? null : str.intern();
   }
 }

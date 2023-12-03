@@ -31,7 +31,6 @@ import org.apache.tez.http.BaseHttpConnection;
 import org.apache.tez.http.HttpConnection;
 import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.http.SSLFactory;
-import org.apache.tez.http.async.netty.AsyncHttpConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -241,15 +240,10 @@ public class TezRuntimeUtils {
     return httpConnParams;
   }
 
-  public static BaseHttpConnection getHttpConnection(boolean asyncHttp, URL url,
+  public static BaseHttpConnection getHttpConnection(URL url,
                                                      HttpConnectionParams params, String logIdentifier, JobTokenSecretManager jobTokenSecretManager)
       throws IOException {
-    if (asyncHttp) {
-      //TODO: support other async packages? httpclient-async?
-      return new AsyncHttpConnection(url, params, logIdentifier, jobTokenSecretManager);
-    } else {
-      return new HttpConnection(url, params, logIdentifier, jobTokenSecretManager);
-    }
+    return new HttpConnection(url, params, logIdentifier, jobTokenSecretManager);
   }
 
   public static int[] deserializeShuffleProviderMetaData(ByteBuffer meta)

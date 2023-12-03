@@ -27,6 +27,7 @@ Author: Ayush Saxena <ayushsaxena@apache.org>
 Date:   Thu Oct 5 07:23:01 2023 +0530
 
     TEZ-4517: Upgrade commons-collection4 to 4.4. (#311) (Ayush Saxena reviewed by Laszlo Bodor)
+    --> applied
 
 commit 2ad10b61a0263770e4e78983939bb9d823d9dc27
 Author: Ayush Saxena <ayushsaxena@apache.org>
@@ -70,6 +71,16 @@ Author: Ayush Saxena <ayushsaxena@apache.org>
 Date:   Fri Jun 30 01:24:00 2023 +0530
 
     TEZ-4493: Upgrade Hadoop to 3.3.6. (#285) (Ayush Saxena reviewed by Laszlo Bodor)
+    --> New changes in ShortCircuitCache.java seem unstable (tested with TPC-DS 10TB)
+
+Caused by: java.lang.IllegalStateException: failed to make ShortCircuitReplica{key=1147649570_BP-40658082-192.168.10.101-1590047013747, metaHeader.version=1, metaHeader.checksum=DataChecksum(type=CRC32C, chunkSize=512), ident=0x43584805, creationTimeMs=8653570547} unevictable
+  at org.apache.hadoop.thirdparty.com.google.common.base.Preconditions.checkState(Preconditions.java:591)
+  at org.apache.hadoop.hdfs.shortcircuit.ShortCircuitCache.removeEvictable(ShortCircuitCache.java:622)
+  at org.apache.hadoop.hdfs.shortcircuit.ShortCircuitCache.removeEvictable(ShortCircuitCache.java:605)
+  at org.apache.hadoop.hdfs.shortcircuit.ShortCircuitCache.ref(ShortCircuitCache.java:430)
+  at org.apache.hadoop.hdfs.shortcircuit.ShortCircuitCache.fetch(ShortCircuitCache.java:784)
+  at org.apache.hadoop.hdfs.shortcircuit.ShortCircuitCache.fetchOrCreate(ShortCircuitCache.java:718)
+  at org.apache.hadoop.hdfs.client.impl.BlockReaderFactory.getBlockReaderLocal(BlockReaderFactory.java:483)
 
 commit 7a56e9bd9de0764f69854ca4d35e054bef70cc38
 Author: Ayush Saxena <ayushsaxena@apache.org>
@@ -217,6 +228,7 @@ Author: Aman Raj <104416558+amanraj2520@users.noreply.github.com>
 Date:   Fri Feb 24 13:08:44 2023 +0530
 
     TEZ-4420 : Upgrade Hadoop to 3.3.4 (#272) (Aman Raj reviewed by Laszlo Bodor)
+    --> TODO in MR3 1.9+
 
 commit be994890dadc3f118671439a717290cf03b471cc
 Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
@@ -462,8 +474,7 @@ Author: Murali Krishna <muralikrishna.dmmkr@gmail.com>
 Date:   Sun May 29 22:37:36 2022 +0530
 
     TEZ-4409: Upgrade async-http-client to 2.12.3 to resolve CVE (#204) (D M Murali Krishna Reddy reviewed by Laszlo Bodor)
-    --> apply when necessary
-    --> apply for Hive 4
+    --> async-http-client removed and irrelevant
 
 commit ba851fa06e4f57584b938706276797db9807e1d8
 Author: Mark Bathori <57758037+mbathori-cloudera@users.noreply.github.com>

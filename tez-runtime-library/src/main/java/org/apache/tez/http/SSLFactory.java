@@ -18,8 +18,6 @@
 
 package org.apache.tez.http;
 
-import org.asynchttpclient.DefaultAsyncHttpClientConfig;
-
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.JdkSslContext;
 import io.netty.handler.ssl.SupportedCipherSuiteFilter;
@@ -247,23 +245,5 @@ public class SSLFactory implements ConnectionConfigurator {
       conn = sslConn;
     }
     return conn;
-  }
-
-  /**
-   * Set ssl context for {@link org.asynchttpclient.DefaultAsyncHttpClientConfig.Builder}
-   *
-   * @param builder {@link org.asynchttpclient.DefaultAsyncHttpClientConfig.Builder} instance to
-   *                configure.
-   * @throws IOException if an IO error occurred.
-   */
-  public void configure(DefaultAsyncHttpClientConfig.Builder builder) throws IOException {
-    if (builder != null) {
-      JdkSslContext jdkSslContext =
-          new JdkSslContext(context, mode.equals(Mode.CLIENT), /* ciphers */null,
-              SupportedCipherSuiteFilter.INSTANCE, /* ApplicationProtocolConfig */ null,
-              requireClientCert ? ClientAuth.REQUIRE : ClientAuth.OPTIONAL, enabledProtocols,
-              /* startTls */ true);
-      builder.setSslContext(jdkSslContext);
-    }
   }
 }

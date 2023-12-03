@@ -188,7 +188,6 @@ public class Fetcher implements Callable<FetchResult> {
   // Initiative value is 0, which means it hasn't retried yet.
   private long retryStartTime = 0;
 
-  private final boolean asyncHttp;
   private final boolean compositeFetch;
 
   private final boolean verifyDiskChecksum;
@@ -208,9 +207,8 @@ public class Fetcher implements Callable<FetchResult> {
                   boolean localDiskFetchEnabled,
                   boolean sharedFetchEnabled,
                   String localHostname,
-                  int[] localShufflePorts, boolean asyncHttp, boolean verifyDiskChecksum, boolean compositeFetch,
+                  int[] localShufflePorts, boolean verifyDiskChecksum, boolean compositeFetch,
                   boolean localFetchComparePort, InputContext inputContext) {
-    this.asyncHttp = asyncHttp;
     this.verifyDiskChecksum = verifyDiskChecksum;
     this.fetcherCallback = fetcherCallback;
     this.inputManager = inputManager;
@@ -531,7 +529,7 @@ public class Fetcher implements Callable<FetchResult> {
       this.url = ShuffleUtils.constructInputURL(baseURI.toString(), attempts,
           httpConnectionParams.isKeepAlive());
 
-      httpConnection = ShuffleUtils.getHttpConnection(asyncHttp, url, httpConnectionParams,
+      httpConnection = ShuffleUtils.getHttpConnection(url, httpConnectionParams,
           logIdentifier, jobTokenSecretMgr);
       httpConnection.connect();
     } catch (IOException | InterruptedException e) {
@@ -1156,11 +1154,11 @@ public class Fetcher implements Callable<FetchResult> {
         Configuration conf, RawLocalFileSystem localFs,
         LocalDirAllocator localDirAllocator, Path lockPath,
         boolean localDiskFetchEnabled, boolean sharedFetchEnabled,
-        String localHostname, int[] localShufflePorts, boolean asyncHttp, boolean verifyDiskChecksum, boolean compositeFetch,
+        String localHostname, int[] localShufflePorts, boolean verifyDiskChecksum, boolean compositeFetch,
         boolean localFetchComparePort, InputContext inputContext) {
       this.fetcher = new Fetcher(fetcherCallback, params, inputManager, appId, dagIdentifier,
           jobTokenSecretMgr, srcNameTrimmed, conf, localFs, localDirAllocator,
-          lockPath, localDiskFetchEnabled, sharedFetchEnabled, localHostname, localShufflePorts, asyncHttp,
+          lockPath, localDiskFetchEnabled, sharedFetchEnabled, localHostname, localShufflePorts,
           verifyDiskChecksum, compositeFetch, localFetchComparePort, inputContext);
     }
 
