@@ -68,7 +68,7 @@
     <commons-lang3.version>3.9</commons-lang3.version>
     <commons-text.version>1.8</commons-text.version>
     <commons-math3.version>3.6.1</commons-math3.version>
-    <netty.version>4.1.77.Final</netty.version>
+    <netty.version>4.1.48.Final</netty.version>
   </properties>
   <scm>
     <connection>${scm.url}</connection>
