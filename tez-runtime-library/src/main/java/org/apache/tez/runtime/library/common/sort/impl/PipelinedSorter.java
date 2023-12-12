@@ -961,8 +961,10 @@ public class PipelinedSorter extends ExternalSorter {
       }
       ByteBuffer reserved = source.duplicate();
       reserved.mark();
-      LOG.info("{}: reserved.remaining()={}, reserved.metasize={}",
-          outputContext.getDestinationVertexName(), reserved.remaining(), metasize);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("{}: reserved.remaining()={}, reserved.metasize={}",
+            outputContext.getDestinationVertexName(), reserved.remaining(), metasize);
+      }
       reserved.position(metasize);
       kvbuffer = reserved.slice();
       reserved.flip();
@@ -1059,9 +1061,11 @@ public class PipelinedSorter extends ExternalSorter {
         }
         newSpan = new SortSpan(remaining, items, perItem, newComparator);
         newSpan.index = index+1;
-        LOG.info("{}, counter:{}",
-            String.format(outputContext.getDestinationVertexName() + ": New Span%d.length = %d, perItem = %d", newSpan.index, newSpan.length(), perItem),
-            mapOutputRecordCounter.getValue());
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("{}, counter:{}",
+              String.format(outputContext.getDestinationVertexName() + ": New Span%d.length = %d, perItem = %d", newSpan.index, newSpan.length(), perItem),
+              mapOutputRecordCounter.getValue());
+        }
         return newSpan;
       }
       return null;
@@ -1082,8 +1086,10 @@ public class PipelinedSorter extends ExternalSorter {
         return null;
       }
       int perItem = kvbuffer.position()/items;
-      LOG.info("{}: {}", outputContext.getDestinationVertexName(),
-          String.format("Span%d.length = %d, perItem = %d", index, length(), perItem));
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("{}: {}", outputContext.getDestinationVertexName(),
+            String.format("Span%d.length = %d, perItem = %d", index, length(), perItem));
+      }
       if(remaining.remaining() < METASIZE+perItem) {
         //Check if we can get the next Buffer from the main buffer list
         ByteBuffer space = allocateSpace();
@@ -1412,17 +1418,21 @@ public class PipelinedSorter extends ExternalSorter {
           this.add(iter);
         }
 
-        StringBuilder sb = new StringBuilder();
         if (heap.size() == 0) {
           return false;
         }
         for(SpanIterator sp: heap) {
-            sb.append(sp.toString());
-            sb.append(",");
-            total += sp.span.length();
-            eq += sp.span.getEq();
+          total += sp.span.length();
+          eq += sp.span.getEq();
         }
-        LOG.info("{}: Heap = {}", outputContext.getDestinationVertexName(), sb.toString());
+        if (LOG.isDebugEnabled()) {
+          StringBuilder sb = new StringBuilder();
+          for(SpanIterator sp: heap) {
+              sb.append(sp.toString());
+              sb.append(",");
+          }
+          LOG.debug("{}: Heap = {}", outputContext.getDestinationVertexName(), sb.toString());
+        }
         return true;
       } catch(ExecutionException e) {
         LOG.error("Heap size={}, total={}, eq={}, partition={}, gallop={}, totalItr={},"

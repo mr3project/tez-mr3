@@ -79,11 +79,13 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
 
   @Override
   public void logProgress(boolean updateOnClose) {
-    LOG.info(inputContext.getSourceVertexName() + ": "
-        + "numDmeEventsSeen=" + numDmeEvents.get()
-        + ", numDmeEventsSeenWithNoData=" + numDmeEventsNoData.get()
-        + ", numObsoletionEventsSeen=" + numObsoletionEvents.get()
-        + (updateOnClose == true ? ", updateOnClose" : ""));
+    StringBuilder s = new StringBuilder();
+    s.append(inputContext.getSourceVertexName());
+    s.append(", numDmeEventsSeen=" + numDmeEvents.get());
+    s.append(", numDmeEventsSeenWithNoData=" + numDmeEventsNoData.get());
+    s.append(", numObsoletionEventsSeen=" + numObsoletionEvents.get());
+    s.append(updateOnClose == true ? ", updateOnClose" : "");
+    LOG.info(s.toString());
   }
 
   private void handleEvent(Event event) throws IOException {
@@ -140,8 +142,8 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
     }
     if (numDmeEvents.get() + numObsoletionEvents.get() > nextToLogEventCount.get()) {
       logProgress(false);
-      // Log every 500 events seen.
-      nextToLogEventCount.addAndGet(500);
+      // Log every 1000 events seen.
+      nextToLogEventCount.addAndGet(1000);
     }
   }
 

@@ -718,12 +718,9 @@ class ShuffleScheduler {
     exceptionReporter.killSelf(exception, message);
   }
 
-  private final AtomicInteger nextProgressLineEventCount = new AtomicInteger(0);
-
   private void logProgress() {
     int inputsDone = numInputs - remainingMaps.get();
-    if (inputsDone > nextProgressLineEventCount.get() || inputsDone == numInputs || isShutdown.get()) {
-      nextProgressLineEventCount.addAndGet(1000);
+    if (inputsDone == numInputs || isShutdown.get()) {
       double mbs = (double) totalBytesShuffledTillNow / (1024 * 1024);
       long secsSinceStart = (System.currentTimeMillis() - startTime) / 1000 + 1;
 
