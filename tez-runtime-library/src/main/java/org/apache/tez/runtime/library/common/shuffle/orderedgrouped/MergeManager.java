@@ -222,8 +222,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     }
 
     // Allow unit tests to fix Runtime memory
-    long memLimit = conf.getLong(Constants.TEZ_RUNTIME_TASK_MEMORY, (long)(inputContext
-        .getTotalMemoryAvailableToTask() * maxInMemCopyUse));
+    long memLimit = (long)(inputContext.getTotalMemoryAvailableToTask() * maxInMemCopyUse);
 
     float maxRedPer = conf.getFloat(TezRuntimeConfiguration.TEZ_RUNTIME_INPUT_POST_MERGE_BUFFER_PERCENT,
         TezRuntimeConfiguration.TEZ_RUNTIME_INPUT_BUFFER_PERCENT_DEFAULT);
@@ -351,8 +350,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       }
 
       // Allow unit tests to fix Runtime memory
-      long memLimit = conf.getLong(Constants.TEZ_RUNTIME_TASK_MEMORY,
-          (long)(maxAvailableTaskMemory * maxInMemCopyUse));
+      long memLimit = (long)(maxAvailableTaskMemory * maxInMemCopyUse);
       
       float maxRedPer = conf.getFloat(TezRuntimeConfiguration.TEZ_RUNTIME_INPUT_POST_MERGE_BUFFER_PERCENT,
           TezRuntimeConfiguration.TEZ_RUNTIME_INPUT_BUFFER_PERCENT_DEFAULT);
