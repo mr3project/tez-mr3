@@ -837,8 +837,7 @@ public class Fetcher implements Callable<FetchResult> {
           httpConnection.cleanup(disconnect);
         }
       } catch (IOException e) {
-        LOG.info("Exception while shutting down fetcher on " + logIdentifier + " : "
-            + e.getMessage());
+        LOG.info("Exception while shutting down fetcher on {}: {}", logIdentifier, e.getMessage());
         if (isDebugEnabled) {
           LOG.debug(StringUtils.EMPTY, e);
         }
@@ -972,9 +971,8 @@ public class Fetcher implements Callable<FetchResult> {
         // No concept of WAIT at the moment.
         // // Check if we can shuffle *now* ...
         // if (fetchedInput.getType() == FetchedInput.WAIT) {
-        // LOG.info("fetcher#" + id +
-        // " - MergerManager returned Status.WAIT ...");
-        // //Not an error but wait to process data.
+        // LOG.info("fetcher#" + id + " - MergerManager returned Status.WAIT ...");
+        // // Not an error but wait to process data.
         // return EMPTY_ATTEMPT_ID_ARRAY;
         // }
 
@@ -1037,8 +1035,8 @@ public class Fetcher implements Callable<FetchResult> {
       }
       // ioErrs.increment(1);
       if (srcAttemptId == null || fetchedInput == null) {
-        LOG.info("fetcher" + " failed to read map header" + srcAttemptId
-            + " decomp: " + decompressedLength + ", " + compressedLength, ioe);
+        LOG.info("fetcher failed to read map header {} decomp: {}, {}",
+            srcAttemptId, decompressedLength, compressedLength, ioe);
         // Cleanup the fetchedInput before returning.
         cleanupFetchedInput(fetchedInput);
         if (srcAttemptId == null) {

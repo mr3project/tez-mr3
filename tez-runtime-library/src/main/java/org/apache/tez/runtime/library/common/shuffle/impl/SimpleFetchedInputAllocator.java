@@ -143,7 +143,7 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
     } else {
       this.usedMemory += actualSize;
       if (LOG.isDebugEnabled()) {
-        LOG.info(srcNameTrimmed + ": " + "Used memory after allocating " + actualSize + " : " +
+        LOG.debug(srcNameTrimmed + ": " + "Used memory after allocating " + actualSize + " : " +
             usedMemory);
       }
       return new MemoryFetchedInput(actualSize, inputAttemptIdentifier, this);

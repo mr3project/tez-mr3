@@ -527,9 +527,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   private void startMemToDiskMerge() {
     synchronized (inMemoryMerger) {
       if (!inMemoryMerger.isInProgress()) {
-        LOG.info(inputContext.getSourceVertexName() + ": " + "Starting inMemoryMerger's merge since commitMemory=" +
-            commitMemory + " > mergeThreshold=" + mergeThreshold +
-            ". Current usedMemory=" + usedMemory);
+        LOG.info("{}: Starting inMemoryMerger's merge since commitMemory={} > mergeThreshold={}. Current usedMemory={}",
+            inputContext.getSourceVertexName(), commitMemory, mergeThreshold, usedMemory);
         inMemoryMapOutputs.addAll(inMemoryMergedMapOutputs);
         inMemoryMergedMapOutputs.clear();
         inMemoryMerger.startMerge(inMemoryMapOutputs);

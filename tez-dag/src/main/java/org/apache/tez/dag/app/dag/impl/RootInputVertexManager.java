@@ -161,14 +161,13 @@ public class RootInputVertexManager extends VertexManagerPlugin {
       //track vertices with task count > 0
       int numTasks = getContext().getVertexNumTasks(srcVertex);
       if (numTasks > 0) {
-        LOG.info("Task count in " + srcVertex + ": " + numTasks);
+        LOG.info("Task count in {}: {}", srcVertex, numTasks);
         srcVertexInfo.put(srcVertex, createSourceVertexInfo(entry.getValue(),
             getContext().getVertexNumTasks(getContext().getVertexName())));
         getContext().registerForVertexStateUpdates(srcVertex,
             EnumSet.of(VertexState.CONFIGURED));
       } else {
-        LOG.info("Vertex: " + getContext().getVertexName() + "; Ignoring "
-            + srcVertex + " as it has " + numTasks + " tasks");
+        LOG.info("Vertex {}: Ignoring {} as it has {} tasks)", getContext().getVertexName(), srcVertex, numTasks);
       }
     }
     if (completions != null) {
@@ -184,12 +183,9 @@ public class RootInputVertexManager extends VertexManagerPlugin {
 
   @Override
   public void onVertexStateUpdated(VertexStateUpdate stateUpdate) {
-    Preconditions.checkArgument(stateUpdate.getVertexState() ==
-        VertexState.CONFIGURED,
-        "Received incorrect state notification : "
-        + stateUpdate.getVertexState() + " for vertex: "
-        + stateUpdate.getVertexName() + " in vertex: "
-        + getContext().getVertexName());
+    Preconditions.checkArgument(stateUpdate.getVertexState() == VertexState.CONFIGURED,
+        "Received incorrect state notification : {} for vertex: {} in vertex: {}",
+        stateUpdate.getVertexState(), stateUpdate.getVertexName(), getContext().getVertexName());
 
     SourceVertexInfo vInfo = srcVertexInfo.get(stateUpdate.getVertexName());
     if(vInfo != null) {
@@ -198,10 +194,9 @@ public class RootInputVertexManager extends VertexManagerPlugin {
       vInfo.numTasks = getContext().getVertexNumTasks(
           stateUpdate.getVertexName());
       totalNumSourceTasks += vInfo.numTasks;
-      LOG.info("Received configured notification : {}" + " for vertex: {} in" +
-          " vertex: {}" + " numjourceTasks: {}",
-        stateUpdate.getVertexState(), stateUpdate.getVertexName(),
-        getContext().getVertexName(), totalNumSourceTasks);
+      LOG.info("Received configured notification : {} for vertex {}: in vertex: {}, numSourceTasks: {}",
+          stateUpdate.getVertexState(), stateUpdate.getVertexName(),
+          getContext().getVertexName(), totalNumSourceTasks);
       processPendingTasks();
     }
   }

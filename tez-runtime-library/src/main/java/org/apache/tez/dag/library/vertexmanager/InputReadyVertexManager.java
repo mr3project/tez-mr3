@@ -83,7 +83,7 @@ public class InputReadyVertexManager extends VertexManagerPlugin {
   private void configure() {
     Preconditions.checkState(!configured.get(), "Vertex: " + getContext().getVertexName());
     int numManagedTasks = getContext().getVertexNumTasks(getContext().getVertexName());
-    LOG.info("Managing " + numManagedTasks + " tasks for vertex: " + getContext().getVertexName());
+    LOG.info("Managing {} tasks for vertex: {}", numManagedTasks, getContext().getVertexName());
 
     // find out about all input edge types. If there is a custom edge then 
     // TODO Until TEZ-1013 we cannot handle custom input formats
@@ -126,8 +126,8 @@ public class InputReadyVertexManager extends VertexManagerPlugin {
         int prevNumManagedTasks = numManagedTasks;
         numManagedTasks = oneToOneSrcTaskCount;
         // must change parallelism to make them the same
-        LOG.info("Update parallelism of vertex: " + getContext().getVertexName() + 
-            " to " + oneToOneSrcTaskCount + " to match source 1-1 vertices.");
+        LOG.info("Update parallelism of vertex: {} to {} to match source 1-1 vertices.",
+            getContext().getVertexName(), oneToOneSrcTaskCount);
         // TODO: assert { numManagedTasks < prevNumManagedTasks }
         if (bipartiteSources == 0) {
           getContext().reconfigureVertex(oneToOneSrcTaskCount, null, null);
@@ -229,9 +229,8 @@ public class InputReadyVertexManager extends VertexManagerPlugin {
   public synchronized void onVertexStateUpdated(VertexStateUpdate stateUpdate) throws Exception {
     numConfiguredSources++;
     int target = getContext().getInputVertexEdgeProperties().size();
-    LOG.info("For vertex: " + getContext().getVertexName() + " Received configured signal from: "
-        + stateUpdate.getVertexName() + " numConfiguredSources: " + numConfiguredSources
-        + " needed: " + target);
+    LOG.info("For vertex: {} Received configured signal from: {} numConfiguredSources: {} needed: {}",
+        getContext().getVertexName(), stateUpdate.getVertexName(), numConfiguredSources, target);
     Preconditions.checkState(numConfiguredSources <= target, "Vertex: " + getContext().getVertexName());
     if (numConfiguredSources == target) {
       configure();
@@ -310,7 +309,7 @@ public class InputReadyVertexManager extends VertexManagerPlugin {
     if (numOneToOneEdges == 0) {
       // no 1-1 dependency. Start all tasks
       int numTasks = taskIsStarted.length;
-      LOG.info("Starting all " + numTasks + "tasks for vertex: " + getContext().getVertexName());
+      LOG.info("Starting all {} tasks for vertex: {}", numTasks, getContext().getVertexName());
       tasksToStart = Lists.newArrayListWithCapacity(numTasks);
       for (int i=0; i<numTasks; ++i) {
         taskIsStarted[i] = true;
@@ -326,9 +325,9 @@ public class InputReadyVertexManager extends VertexManagerPlugin {
           if (oneToOneLocationHints[i] != null) {
             locationHint = oneToOneLocationHints[i];
           }
-          LOG.info("Starting task " + i + " for vertex: "
-              + getContext().getVertexName() + " with location: "
-              + ((locationHint != null) ? locationHint.getAffinitizedTask() : "null"));
+          LOG.info("Starting task {} for vertex: {} with location: {}",
+              i, getContext().getVertexName(),
+              (locationHint != null) ? locationHint.getAffinitizedTask() : "null");
           tasksToStart.add(ScheduleTaskRequest.create(Integer.valueOf(i), locationHint));
         }
       }

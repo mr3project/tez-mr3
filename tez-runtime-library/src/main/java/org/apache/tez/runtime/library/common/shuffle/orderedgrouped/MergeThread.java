@@ -79,8 +79,8 @@ abstract class MergeThread<T> extends Thread {
         this.inputs.add(iter.next());
         iter.remove();
       }
-      LOG.info(getName() + ": Starting merge with " + this.inputs.size() + 
-               " segments, while ignoring " + inputs.size() + " segments");
+      LOG.info("{}: Starting merge with {} segments, while ignoring {} segments",
+          getName(), this.inputs.size(), inputs.size());
       notifyAll();
     }
   }

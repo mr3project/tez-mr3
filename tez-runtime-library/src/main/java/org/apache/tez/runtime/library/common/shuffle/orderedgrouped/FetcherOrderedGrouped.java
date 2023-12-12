@@ -235,7 +235,7 @@ class FetcherOrderedGrouped implements Callable<Void> {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Exception while shutting down fetcher " + logIdentifier, e);
         } else {
-          LOG.info("Exception while shutting down fetcher " + logIdentifier + ": " + e.getMessage());
+          LOG.info("Exception while shutting down fetcher {}: {}", logIdentifier, e.getMessage());
         }
       }
     }
@@ -560,7 +560,7 @@ class FetcherOrderedGrouped implements Callable<Void> {
 
         // Check if we can shuffle *now* ...
         if (mapOutput.getType() == Type.WAIT) {
-          LOG.info("fetcher#" + id + " - MergerManager returned Status.WAIT ...");
+          LOG.info("fetcher# {} - MergerManager returned Status.WAIT ...", id);
           //Not an error but wait to process data.
           return EMPTY_ATTEMPT_ID_ARRAY;
         }
@@ -617,17 +617,15 @@ class FetcherOrderedGrouped implements Callable<Void> {
       }
       ioErrs.increment(1);
       if (srcAttemptId == null || mapOutput == null) {
-        LOG.info("fetcher#" + id + " failed to read map header" +
-            srcAttemptId + " decomp: " +
-            decompressedLength + ", " + compressedLength, ioe);
+        LOG.info("fetcher#{} failed to read map header{} decomp: {}, {}",
+            id, srcAttemptId, decompressedLength, compressedLength, ioe);
         if (srcAttemptId == null) {
           return remaining.values().toArray(new InputAttemptIdentifier[remaining.values().size()]);
         } else {
           return new InputAttemptIdentifier[]{srcAttemptId};
         }
       }
-      LOG.warn("Failed to shuffle output of " + srcAttemptId +
-          " from " + host.getHostIdentifier(), ioe);
+      LOG.warn("Failed to shuffle output of {} from {}", srcAttemptId, host.getHostIdentifier(), ioe);
 
       // Inform the shuffle-scheduler
       mapOutput.abort();

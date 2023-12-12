@@ -290,7 +290,7 @@ class FairCartesianProductVertexManager extends CartesianProductVertexManagerRea
     throws Exception {
     vertexStarted = true;
     if (completions != null) {
-      LOG.info("OnVertexStarted with " + completions.size() + " completed source task");
+      LOG.info("OnVertexStarted with {} completed source task", completions.size());
       for (TaskAttemptIdentifier attempt : completions) {
         addCompletedSrcTaskToProcess(attempt);
       }
@@ -401,10 +401,8 @@ class FairCartesianProductVertexManager extends CartesianProductVertexManagerRea
       }
     }
 
-    LOG.info("Start reconfiguring vertex " + getContext().getVertexName()
-      + ", max parallelism: " + maxParallelism
-      + ", min-ops-per-worker: " + minOpsPerWorker
-      + ", num partition: " + numPartitions);
+    LOG.info("Start reconfiguring vertex {}, max parallelism: {}, min-ops-per-worker: {}, num partition: {}",
+        getContext().getVertexName(), maxParallelism, minOpsPerWorker, numPartitions);
     for (Source src : sourcesByName.values()) {
       LOG.info(src.toString());
     }
@@ -413,7 +411,7 @@ class FairCartesianProductVertexManager extends CartesianProductVertexManagerRea
     for (Source src : sourcesByName.values()) {
       src.numRecord = src.estimateNumRecord();
       if (src.numRecord == 0) {
-        LOG.info("Set parallelism to 0 because source " + src.name + " has 0 output recorc");
+        LOG.info("Set parallelism to 0 because source {} has 0 output record", src.name);
         reconfigureWithZeroTask();
         return true;
       }
@@ -421,7 +419,7 @@ class FairCartesianProductVertexManager extends CartesianProductVertexManagerRea
       try {
         totalOps  = LongMath.checkedMultiply(totalOps, src.numRecord);
       } catch (ArithmeticException e) {
-        LOG.info("totalOps exceeds " + Long.MAX_VALUE + ", capping to " + Long.MAX_VALUE);
+        LOG.info("totalOps exceeds {}, capping to {}", Long.MAX_VALUE, Long.MAX_VALUE);
         totalOps = Long.MAX_VALUE;
       }
     }
@@ -432,7 +430,7 @@ class FairCartesianProductVertexManager extends CartesianProductVertexManagerRea
     } else {
       parallelism = (int) ((totalOps + minOpsPerWorker - 1) / minOpsPerWorker);
     }
-    LOG.info("Total ops " + totalOps + ", initial parallelism " + parallelism);
+    LOG.info("Total ops {}, initial parallelism {}", totalOps, parallelism);
 
     if (enableGrouping) {
       determineNumChunks(sourcesByName, parallelism);
