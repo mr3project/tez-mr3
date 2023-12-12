@@ -310,10 +310,9 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput {
     RawComparator rawComparator = ConfigUtils.getIntermediateInputKeyComparator(conf);
     Class<?> keyClass = ConfigUtils.getIntermediateInputKeyClass(conf);
     Class<?> valClass = ConfigUtils.getIntermediateInputValueClass(conf);
-    LOG.info(getContext().getSourceVertexName() + ": " + "creating ValuesIterator with "
-        + "comparator=" + rawComparator.getClass().getName()
-        + ", keyClass=" + keyClass.getName()
-        + ", valClass=" + valClass.getName());
+    LOG.info("{}: creating ValuesIterator with comparator={}, keyClass={}, valClass={}",
+        getContext().getSourceVertexName(), rawComparator.getClass().getName(),
+        keyClass.getName(), valClass.getName());
 
     vIter = new ValuesIterator(rawIter, rawComparator, keyClass, valClass,
         conf, inputKeyCounter, inputValueCounter);

@@ -204,7 +204,7 @@ public abstract class ExternalSorter {
     this.serializationContext = new SerializationContext(this.conf);
     keySerializer = serializationContext.getKeySerializer();
     valSerializer = serializationContext.getValueSerializer();
-    LOG.info(outputContext.getDestinationVertexName() + ", memoryMb=" + assignedMb);
+    LOG.info("{}, memoryMb={}", outputContext.getDestinationVertexName(), assignedMb);
     if (LOG.isDebugEnabled()) {
       LOG.debug("keySerializerClass=" + serializationContext.getKeyClass()
           + ", valueSerializerClass=" + valSerializer

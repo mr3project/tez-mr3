@@ -397,7 +397,8 @@ public class ShuffleManager implements FetcherCallback {
         }
       }
       shufflePhaseTime.setValue(System.currentTimeMillis() - startTime);
-      LOG.info(srcNameTrimmed + ": Shutting down FetchScheduler, Was Interrupted: " + Thread.currentThread().isInterrupted());
+      LOG.info("{}: Shutting down FetchScheduler, Was Interrupted: {}",
+          srcNameTrimmed, Thread.currentThread().isInterrupted());
       if (!fetcherExecutor.isShutdown()) {
         fetcherExecutor.shutdownNow();
       }

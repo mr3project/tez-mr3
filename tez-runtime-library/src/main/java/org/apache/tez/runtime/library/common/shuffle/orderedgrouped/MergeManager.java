@@ -147,11 +147,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   private final int ifileReadAheadLength;
   private final int ifileBufferSize;
 
-  // Variables for stats and logging
-  private long lastInMemSegmentLogTime = -1L;
+  // Variables for stats
   private final SegmentStatsTracker statsInMemTotal = new SegmentStatsTracker();
-  private final SegmentStatsTracker statsInMemLastLog = new SegmentStatsTracker();
-
 
   private AtomicInteger mergeFileSequenceId = new AtomicInteger(0);
 
@@ -524,32 +521,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
           + ", commitMemory -> " + commitMemory + ", usedMemory ->" +
           usedMemory + ", mapOutput=" +
           mapOutput);
-    } else {
-      statsInMemLastLog.updateStats(mapOutput.getSize());
-      long now = Time.monotonicNow();
-      if (now > lastInMemSegmentLogTime + 30 * 1000L) {
-        LOG.info(
-            "CloseInMemoryFile. Current state: inMemoryMapOutputs.size={}," +
-                " commitMemory={}," +
-                " usedMemory={}. Since last log:" +
-                " count={}," +
-                " min={}," +
-                " max={}," +
-                " total={}," +
-                " avg={}",
-            inMemoryMapOutputs.size(),
-            commitMemory,
-            usedMemory,
-            statsInMemLastLog.count,
-            statsInMemLastLog.minSize,
-            statsInMemLastLog.maxSize,
-            statsInMemLastLog.size,
-            (statsInMemLastLog.count == 0 ? "nan" :
-                (statsInMemLastLog.size / (double) statsInMemLastLog.count))
-        );
-        statsInMemLastLog.reset();
-        lastInMemSegmentLogTime = now;
-      }
     }
   }
 
@@ -612,20 +583,11 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     }
   }
 
-  private long lastOnDiskSegmentLogTime = -1L;
   private void logCloseOnDiskFile(FileChunk file) {
     if (LOG.isDebugEnabled()) {
       LOG.debug(
           "close onDiskFile=" + file.getPath() + ", len=" + file.getLength() +
               ", onDisMapOutputs=" + onDiskMapOutputs.size());
-    } else {
-      long now = Time.monotonicNow();
-      if (now > lastOnDiskSegmentLogTime + 30 * 1000L) {
-        LOG.info(
-            "close onDiskFile. State: NumOnDiskFiles={}. Current: path={}, len={}",
-            onDiskMapOutputs.size(), file.getPath(), file.getLength());
-        lastOnDiskSegmentLogTime = now;
-      }
     }
   }
 

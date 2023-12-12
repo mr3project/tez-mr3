@@ -161,7 +161,7 @@ public class PipelinedSorter extends ExternalSorter {
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_USE_SOFT_REFERENCE_DEFAULT);
 
     StringBuilder initialSetupLogLine = new StringBuilder("Setting up PipelinedSorter for ")
-        .append(outputContext.getDestinationVertexName()).append(": ");
+        .append(outputContext.getDestinationVertexName());
     partitionBits = bitcount(partitions)+1;
 
     boolean confPipelinedShuffle = this.conf.getBoolean(TezRuntimeConfiguration
@@ -211,19 +211,20 @@ public class PipelinedSorter extends ExternalSorter {
       while(allocateSpace() != null);
     }
 
-    initialSetupLogLine.append("#blocks=").append(maxNumberOfBlocks);
-    initialSetupLogLine.append(", maxMemUsage=").append(maxMemLimit);
-    initialSetupLogLine.append(", lazyAllocateMem=").append(lazyAllocateMem);
-    initialSetupLogLine.append(", useSoftReference=").append(useSoftReference);
-    initialSetupLogLine.append(", minBlockSize=").append(MIN_BLOCK_SIZE);
-    initialSetupLogLine.append(", initial BLOCK_SIZE=").append(buffers.get(0).capacity());
-    initialSetupLogLine.append(", finalMergeEnabled=").append(isFinalMergeEnabled());
-    initialSetupLogLine.append(", pipelinedShuffle=").append(pipelinedShuffle);
-    initialSetupLogLine.append(", sendEmptyPartitions=").append(sendEmptyPartitionDetails);
-    initialSetupLogLine.append(", ").append(TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB).append("=").append(sortmb);
-
     Preconditions.checkState(buffers.size() > 0, "At least one buffer needs to be present");
-    LOG.info(initialSetupLogLine.toString());
+    if (LOG.isDebugEnabled()) {
+      initialSetupLogLine.append("#blocks=").append(maxNumberOfBlocks);
+      initialSetupLogLine.append(", maxMemUsage=").append(maxMemLimit);
+      initialSetupLogLine.append(", lazyAllocateMem=").append(lazyAllocateMem);
+      initialSetupLogLine.append(", useSoftReference=").append(useSoftReference);
+      initialSetupLogLine.append(", minBlockSize=").append(MIN_BLOCK_SIZE);
+      initialSetupLogLine.append(", initial BLOCK_SIZE=").append(buffers.get(0).capacity());
+      initialSetupLogLine.append(", finalMergeEnabled=").append(isFinalMergeEnabled());
+      initialSetupLogLine.append(", pipelinedShuffle=").append(pipelinedShuffle);
+      initialSetupLogLine.append(", sendEmptyPartitions=").append(sendEmptyPartitionDetails);
+      initialSetupLogLine.append(", ").append(TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB).append("=").append(sortmb);
+      LOG.debug(initialSetupLogLine.toString());
+    }
 
     span = new SortSpan(buffers.get(bufferIndex), 1024 * 1024, 16, this.comparator);
     merger = new SpanMerger(); // SpanIterators are comparable
@@ -236,7 +237,6 @@ public class PipelinedSorter extends ExternalSorter {
         .setNameFormat("Sorter {" + TezUtilsInternal
             .cleanVertexName(outputContext.getDestinationVertexName()) + "} #%d")
         .build());
-
 
     valSerializer.open(span.out);
     keySerializer.open(span.out);
@@ -1082,7 +1082,8 @@ public class PipelinedSorter extends ExternalSorter {
         return null;
       }
       int perItem = kvbuffer.position()/items;
-      LOG.info(outputContext.getDestinationVertexName() + ": " + String.format("Span%d.length = %d, perItem = %d", index, length(), perItem));
+      LOG.info("{}: {}", outputContext.getDestinationVertexName(),
+          String.format("Span%d.length = %d, perItem = %d", index, length(), perItem));
       if(remaining.remaining() < METASIZE+perItem) {
         //Check if we can get the next Buffer from the main buffer list
         ByteBuffer space = allocateSpace();
@@ -1421,7 +1422,7 @@ public class PipelinedSorter extends ExternalSorter {
             total += sp.span.length();
             eq += sp.span.getEq();
         }
-        LOG.info(outputContext.getDestinationVertexName() + ": Heap = " + sb.toString());
+        LOG.info("{}: Heap = {}", outputContext.getDestinationVertexName(), sb.toString());
         return true;
       } catch(ExecutionException e) {
         LOG.error("Heap size={}, total={}, eq={}, partition={}, gallop={}, totalItr={},"
