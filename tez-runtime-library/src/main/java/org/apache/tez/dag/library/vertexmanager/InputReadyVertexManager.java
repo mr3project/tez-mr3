@@ -81,7 +81,7 @@ public class InputReadyVertexManager extends VertexManagerPlugin {
   }
   
   private void configure() {
-    Preconditions.checkState(!configured.get(), "Vertex: " + getContext().getVertexName());
+    Preconditions.checkState(!configured.get(), "Vertex: {}", getContext().getVertexName());
     int numManagedTasks = getContext().getVertexNumTasks(getContext().getVertexName());
     LOG.info("Managing {} tasks for vertex: {}", numManagedTasks, getContext().getVertexName());
 
@@ -120,8 +120,8 @@ public class InputReadyVertexManager extends VertexManagerPlugin {
     }
     
     if (numOneToOneEdges > 0) {
-      Preconditions
-          .checkState(oneToOneSrcTaskCount >= 0, "Vertex: " + getContext().getVertexName());
+      Preconditions.checkState(oneToOneSrcTaskCount >= 0,
+          "Vertex: {}", getContext().getVertexName());
       if (oneToOneSrcTaskCount != numManagedTasks) {
         int prevNumManagedTasks = numManagedTasks;
         numManagedTasks = oneToOneSrcTaskCount;
@@ -190,7 +190,7 @@ public class InputReadyVertexManager extends VertexManagerPlugin {
       oneToOneLocationHints = new TaskLocationHint[oneToOneSrcTaskCount];
     }
     
-    Preconditions.checkState(numManagedTasks >=0, "Vertex: " + getContext().getVertexName());
+    Preconditions.checkState(numManagedTasks >=0, "Vertex: {}", getContext().getVertexName());
     taskIsStarted = new boolean[numManagedTasks];
 
     // allow scheduling
@@ -231,7 +231,7 @@ public class InputReadyVertexManager extends VertexManagerPlugin {
     int target = getContext().getInputVertexEdgeProperties().size();
     LOG.info("For vertex: {} Received configured signal from: {} numConfiguredSources: {} needed: {}",
         getContext().getVertexName(), stateUpdate.getVertexName(), numConfiguredSources, target);
-    Preconditions.checkState(numConfiguredSources <= target, "Vertex: " + getContext().getVertexName());
+    Preconditions.checkState(numConfiguredSources <= target, "Vertex: {}", getContext().getVertexName());
     if (numConfiguredSources == target) {
       configure();
     }

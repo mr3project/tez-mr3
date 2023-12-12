@@ -34,7 +34,6 @@ import org.apache.tez.common.Preconditions;
 import com.google.common.collect.Lists;
 
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
 import org.slf4j.Logger;
@@ -150,9 +149,8 @@ public class PipelinedSorter extends ExternalSorter {
               .TEZ_RUNTIME_PIPELINED_SORTER_MIN_BLOCK_SIZE_IN_MB_DEFAULT);
       Preconditions.checkArgument(
           (minBlockSize > 0 && minBlockSize < 2047),
-          TezRuntimeConfiguration
-              .TEZ_RUNTIME_PIPELINED_SORTER_MIN_BLOCK_SIZE_IN_MB
-              + "=" + minBlockSize + " should be a positive value between 0 and 2047");
+          "{}={} should be a positive value between 0 and 2047",
+          TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_MIN_BLOCK_SIZE_IN_MB, minBlockSize);
       MIN_BLOCK_SIZE = minBlockSize << 20;
     }
 
@@ -275,7 +273,7 @@ public class PipelinedSorter extends ExternalSorter {
     bufferUsage.add(0);
 
     Preconditions.checkState(buffers.size() <= maxNumberOfBlocks,
-        buffers.size() + " exceeds " + maxNumberOfBlocks);
+        "{} exceeds {}", buffers.size(), maxNumberOfBlocks);
 
     StringBuilder allocLog = new StringBuilder("Newly allocated block size=" + size);
     allocLog.append(", index=").append(bufferIndex);

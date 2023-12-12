@@ -393,7 +393,7 @@ public abstract class TezSplitGrouper {
         for (SplitContainer groupedSplitContainer : group) {
           groupedSplit.addSplit(groupedSplitContainer);
           Preconditions.checkState(groupedSplitContainer.isProcessed() == false,
-              "Duplicates in grouping at location: " + location);
+              "Duplicates in grouping at location: {}", location);
           groupedSplitContainer.setIsProcessed(true);
           splitsProcessed++;
         }

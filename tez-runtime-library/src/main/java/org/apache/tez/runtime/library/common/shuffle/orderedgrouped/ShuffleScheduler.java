@@ -293,8 +293,8 @@ class ShuffleScheduler {
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MIN_FAILURES_PER_HOST,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MIN_FAILURES_PER_HOST_DEFAULT);
     Preconditions.checkArgument(minFailurePerHost >= 0,
-        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MIN_FAILURES_PER_HOST
-            + "=" + minFailurePerHost + " should not be negative");
+        "{}={} should not be negative",
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MIN_FAILURES_PER_HOST, minFailurePerHost);
 
     this.hostFailureFraction = conf.getFloat(TezRuntimeConfiguration
         .TEZ_RUNTIME_SHUFFLE_ACCEPTABLE_HOST_FETCH_FAILURE_FRACTION,
@@ -305,23 +305,26 @@ class ShuffleScheduler {
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MAX_STALL_TIME_FRACTION,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MAX_STALL_TIME_FRACTION_DEFAULT);
     Preconditions.checkArgument(maxStallTimeFraction >= 0,
-        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MAX_STALL_TIME_FRACTION
-            + "=" + maxStallTimeFraction + " should not be negative");
+        "{}={} should not be negative",
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MAX_STALL_TIME_FRACTION,
+        maxStallTimeFraction);
 
     this.minReqProgressFraction = conf.getFloat(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MIN_REQUIRED_PROGRESS_FRACTION,
         TezRuntimeConfiguration
             .TEZ_RUNTIME_SHUFFLE_MIN_REQUIRED_PROGRESS_FRACTION_DEFAULT);
     Preconditions.checkArgument(minReqProgressFraction >= 0,
-        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MIN_REQUIRED_PROGRESS_FRACTION
-            + "=" + minReqProgressFraction + " should not be negative");
+        "{}={} should not be negative",
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MIN_REQUIRED_PROGRESS_FRACTION,
+        minReqProgressFraction);
 
     this.maxAllowedFailedFetchFraction = conf.getFloat(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MAX_ALLOWED_FAILED_FETCH_ATTEMPT_FRACTION,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MAX_ALLOWED_FAILED_FETCH_ATTEMPT_FRACTION_DEFAULT);
     Preconditions.checkArgument(maxAllowedFailedFetchFraction >= 0,
-        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MAX_ALLOWED_FAILED_FETCH_ATTEMPT_FRACTION
-            + "=" + maxAllowedFailedFetchFraction + " should not be negative");
+        "{}={} should not be negative",
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MAX_ALLOWED_FAILED_FETCH_ATTEMPT_FRACTION,
+        maxAllowedFailedFetchFraction);
 
     this.checkFailedFetchSinceLastCompletion = conf.getBoolean
         (TezRuntimeConfiguration
@@ -536,8 +539,8 @@ class ShuffleScheduler {
     void spillProcessed(int spillId) {
       if (finalEventId != -1) {
         Preconditions.checkState(eventsProcessed.cardinality() <= (finalEventId + 1),
-            "Wrong state. eventsProcessed cardinality=" + eventsProcessed.cardinality() + " "
-                + "finalEventId=" + finalEventId + ", spillId=" + spillId + ", " + toString());
+            "Wrong state. eventsProcessed cardinality={} finalEventId={}, spillId={}, {}",
+        eventsProcessed.cardinality(), finalEventId, spillId, toString());
       }
       eventsProcessed.set(spillId);
     }

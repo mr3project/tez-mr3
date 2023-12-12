@@ -675,8 +675,8 @@ public class ShuffleManager implements FetcherCallback {
     void spillProcessed(int spillId) {
       if (finalEventId != -1) {
         Preconditions.checkState(eventsProcessed.cardinality() <= (finalEventId + 1),
-            "Wrong state. eventsProcessed cardinality=" + eventsProcessed.cardinality() + " "
-                + "finalEventId=" + finalEventId + ", spillId=" + spillId + ", " + toString());
+            "Wrong state. eventsProcessed cardinality={} finalEventId={}, spillId={}, {}",
+        eventsProcessed.cardinality(), finalEventId, spillId, toString());
       }
       eventsProcessed.set(spillId);
     }

@@ -209,8 +209,8 @@ public class RootInputVertexManager extends VertexManagerPlugin {
     SourceVertexInfo srcInfo = srcVertexInfo.get(srcVertexName);
     if (srcInfo.vertexIsConfigured) {
       Preconditions.checkState(srcTaskId < srcInfo.numTasks,
-          "Received completion for srcTaskId " + srcTaskId + " but Vertex: "
-          + srcVertexName + " has only " + srcInfo.numTasks + " tasks");
+          "Received completion for srcTaskId {} but Vertex: {} has only {} tasks",
+          srcTaskId, srcVertexName, srcInfo.numTasks);
     }
     // handle duplicate events and count task completions from
     // all source vertices
@@ -282,12 +282,11 @@ public class RootInputVertexManager extends VertexManagerPlugin {
         // No tasks should have been started yet. Checked by initial state check.
         Preconditions.checkState(dataInformationEventSeen == false);
         Preconditions.checkState(getContext().getVertexNumTasks(getContext().getVertexName()) == -1,
-            "Parallelism for the vertex should be set to -1 if the InputInitializer is setting parallelism"
-                + ", VertexName: " + getContext().getVertexName());
+            "Parallelism for the vertex should be set to -1 if the InputInitializer is setting parallelism, VertexName: {}",
+            getContext().getVertexName());
         Preconditions.checkState(configuredInputName == null,
-            "RootInputVertexManager cannot configure multiple inputs. Use a custom VertexManager"
-                + ", VertexName: " + getContext().getVertexName() + ", ConfiguredInput: "
-                + configuredInputName + ", CurrentInput: " + inputName);
+            "RootInputVertexManager cannot configure multiple inputs. Use a custom VertexManager, VertexName: {}, ConfiguredInput: {}, CurrentInput: {}",
+            getContext().getVertexName(), configuredInputName, inputName);
         configuredInputName = inputName;
         InputConfigureVertexTasksEvent cEvent = (InputConfigureVertexTasksEvent) event;
         Map<String, InputSpecUpdate> rootInputSpecUpdate = new HashMap<String, InputSpecUpdate>();
@@ -309,9 +308,8 @@ public class RootInputVertexManager extends VertexManagerPlugin {
         Preconditions.checkState(getContext().getVertexNumTasks(getContext().getVertexName()) != 0);
         Preconditions.checkState(
             configuredInputName == null || configuredInputName.equals(inputName),
-            "RootInputVertexManager cannot configure multiple inputs. Use a custom VertexManager"
-                + ", VertexName:" + getContext().getVertexName() + ", ConfiguredInput: "
-                + configuredInputName + ", CurrentInput: " + inputName);
+            "RootInputVertexManager cannot configure multiple inputs. Use a custom VertexManager, VertexName: {}, ConfiguredInput: {}, CurrentInput: {}",
+            getContext().getVertexName(), configuredInputName, inputName);
         configuredInputName = inputName;
         
         InputDataInformationEvent rEvent = (InputDataInformationEvent)event;
@@ -391,8 +389,7 @@ public class RootInputVertexManager extends VertexManagerPlugin {
         SourceVertexInfo srcInfo = vInfo.getValue();
         // canScheduleTasks check has already verified all
         // sources are configured
-        Preconditions.checkState(srcInfo.vertexIsConfigured,
-            "Vertex: " + vInfo.getKey());
+        Preconditions.checkState(srcInfo.vertexIsConfigured, "Vertex: {}", vInfo.getKey());
         if (srcInfo.numTasks > 0) {
           int numCompletedTasks = srcInfo.getNumCompletedTasks();
           float completedFraction =
