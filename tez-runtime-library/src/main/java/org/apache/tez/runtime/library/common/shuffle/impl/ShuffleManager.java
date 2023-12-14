@@ -397,7 +397,8 @@ public class ShuffleManager implements FetcherCallback {
         }
       }
       shufflePhaseTime.setValue(System.currentTimeMillis() - startTime);
-      LOG.info(srcNameTrimmed + ": Shutting down FetchScheduler, Was Interrupted: " + Thread.currentThread().isInterrupted());
+      LOG.info("{}: Shutting down FetchScheduler, Was Interrupted: {}",
+          srcNameTrimmed, Thread.currentThread().isInterrupted());
       if (!fetcherExecutor.isShutdown()) {
         fetcherExecutor.shutdownNow();
       }
@@ -674,8 +675,8 @@ public class ShuffleManager implements FetcherCallback {
     void spillProcessed(int spillId) {
       if (finalEventId != -1) {
         Preconditions.checkState(eventsProcessed.cardinality() <= (finalEventId + 1),
-            "Wrong state. eventsProcessed cardinality=" + eventsProcessed.cardinality() + " "
-                + "finalEventId=" + finalEventId + ", spillId=" + spillId + ", " + toString());
+            "Wrong state. eventsProcessed cardinality={} finalEventId={}, spillId={}, {}",
+        eventsProcessed.cardinality(), finalEventId, spillId, toString());
       }
       eventsProcessed.set(spillId);
     }
@@ -1022,13 +1023,9 @@ public class ShuffleManager implements FetcherCallback {
     }
   }
 
-  private final AtomicInteger nextProgressLineEventCount = new AtomicInteger(0);
-
   private void logProgress() {
     int inputsDone = numCompletedInputs.get();
-
-    if (inputsDone > nextProgressLineEventCount.get() || inputsDone == numInputs) {
-      nextProgressLineEventCount.addAndGet(1000);
+    if (inputsDone == numInputs) {
       double mbs = (double) totalBytesShuffledTillNow / (1024 * 1024);
       long secsSinceStart = (System.currentTimeMillis() - startTime) / 1000 + 1;
 

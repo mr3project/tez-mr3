@@ -108,10 +108,8 @@ public class MRInputAMSplitGenerator extends InputInitializer {
 
     boolean groupSplits = userPayloadProto.getGroupingEnabled();
     boolean sortSplits = userPayloadProto.getSortSplitsEnabled();
-    LOG.info("Input " + getContext().getInputName() + " asking for " + numTasks
-        + " tasks. Headroom: " + totalResource + ". Task Resource: "
-        + taskResource + ". waves: " + waves + ". groupingEnabled: "
-        + groupSplits + ". SortSplitsEnabled: " + sortSplits);
+    LOG.info("Input {} asking for {} tasks. Headroom: {}. Task Resource: {}. waves: {}. groupingEnabled: {}. SortSplitsEnabled: {}",
+        getContext().getInputName(), numTasks, totalResource, taskResource, waves, groupSplits, sortSplits);
 
     // Read all credentials into the credentials instance stored in JobConf.
     JobConf jobConf = new JobConf(conf);

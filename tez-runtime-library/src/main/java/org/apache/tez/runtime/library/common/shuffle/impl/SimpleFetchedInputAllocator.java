@@ -65,6 +65,8 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
   
   private volatile long usedMemory = 0;
 
+  private final boolean useFreeMemoryFetchedInput;
+
   public SimpleFetchedInputAllocator(String srcNameTrimmed,
                                      String uniqueIdentifier, int dagID,
                                      Configuration conf,
@@ -90,8 +92,7 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
           + maxInMemCopyUse);
     }
     
-    long memReq = (long) (conf.getLong(Constants.TEZ_RUNTIME_TASK_MEMORY,
-        Math.min(maxAvailableTaskMemory, Integer.MAX_VALUE)) * maxInMemCopyUse);
+    long memReq = (long)(Math.min(maxAvailableTaskMemory, Integer.MAX_VALUE) * maxInMemCopyUse);
     
     if (memReq <= this.initialMemoryAvailable) {
       this.memoryLimit = memReq;
@@ -113,12 +114,12 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
     this.maxSingleShuffleLimit = (long) Math.min((memoryLimit * singleShuffleMemoryLimitPercent),
         Integer.MAX_VALUE);
 
-    LOG.info(srcNameTrimmed + ": "
-        + "RequestedMemory=" + memReq
-        + ", AssignedMemory=" + this.memoryLimit
-        + ", maxSingleShuffleLimit=" + this.maxSingleShuffleLimit
-    );
+    this.useFreeMemoryFetchedInput = conf.getBoolean(
+        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT,
+        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT_DEFAULT);
 
+    LOG.info("{}: RequestedMemory={}, AssignedMemory={}, maxSingleShuffleLimit={}",
+        srcNameTrimmed, memReq, this.memoryLimit, this.maxSingleShuffleLimit);
   }
 
   @Private
@@ -131,27 +132,41 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
           + TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT + ": "
           + maxInMemCopyUse);
     }
-    long memReq = (long) (conf.getLong(Constants.TEZ_RUNTIME_TASK_MEMORY,
-        Math.min(maxAvailableTaskMemory, Integer.MAX_VALUE)) * maxInMemCopyUse);
+    long memReq = (long)(Math.min(maxAvailableTaskMemory, Integer.MAX_VALUE) * maxInMemCopyUse);
     return memReq;
   }
 
   @Override
   public synchronized FetchedInput allocate(long actualSize, long compressedSize,
       InputAttemptIdentifier inputAttemptIdentifier) throws IOException {
-    if (actualSize > maxSingleShuffleLimit
-        || this.usedMemory + actualSize > this.memoryLimit) {
+    if (actualSize > maxSingleShuffleLimit) {
       return new DiskFetchedInput(compressedSize,
           inputAttemptIdentifier, this, conf, localDirAllocator,
           fileNameAllocator);
-    } else {
-      this.usedMemory += actualSize;
-      if (LOG.isDebugEnabled()) {
-        LOG.info(srcNameTrimmed + ": " + "Used memory after allocating " + actualSize + " : " +
-            usedMemory);
-      }
-      return new MemoryFetchedInput(actualSize, inputAttemptIdentifier, this);
     }
+    if (this.usedMemory + actualSize > this.memoryLimit) {
+      // This Task has used up all its memory (memoryLimit).
+      if (!useFreeMemoryFetchedInput) {
+        return new DiskFetchedInput(compressedSize,
+            inputAttemptIdentifier, this, conf, localDirAllocator,
+            fileNameAllocator);
+      }
+      // Check if we can find free memory in the current ContainerWorker.
+      long currentFreeMemory = Runtime.getRuntime().freeMemory();
+      if (currentFreeMemory < maxAvailableTaskMemory){
+        // this ContainerWorker is busy serving Tasks, so do not borrow
+        return new DiskFetchedInput(compressedSize,
+            inputAttemptIdentifier, this, conf, localDirAllocator,
+            fileNameAllocator);
+      }
+      LOG.info("Creating MemoryFetchedInput {} with free memory: {}", this.usedMemory, currentFreeMemory);
+    }
+    this.usedMemory += actualSize;
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(srcNameTrimmed + ": " + "Used memory after allocating " + actualSize + " : " +
+          usedMemory);
+    }
+    return new MemoryFetchedInput(actualSize, inputAttemptIdentifier, this);
   }
 
   @Override

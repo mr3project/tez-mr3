@@ -355,9 +355,7 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
   }
 
   public void done() throws IOException, InterruptedException {
-
-    LOG.info("Task:" + taskAttemptId + " is done."
-        + " And is in the process of committing");
+    LOG.info("Task: {} is done. And is in the process of committing", taskAttemptId );
     // TODO change this to use the new context
     // TODO TEZ Interaciton between Commit and OutputReady. Merge ?
     if (output instanceof MROutputLegacy) {
@@ -413,7 +411,7 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
 
     // task can Commit now
     try {
-      LOG.info("Task " + taskAttemptId + " is allowed to commit now");
+      LOG.info("Task {} is allowed to commit now", taskAttemptId );
       output.flush();
       if (output.isCommitRequired()) {
         output.commit();

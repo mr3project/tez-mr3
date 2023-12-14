@@ -339,8 +339,8 @@ public class MRInputHelpers {
       splitInfoMem = new InputSplitInfoMem(splits, createTaskLocationHintsFromSplits(splits),
           splits.length, jobConf.getCredentials(), jobConf);
     }
-    LOG.info("NumSplits: " + splitInfoMem.getNumTasks() + ", SerializedSize: "
-        + splitInfoMem.getSplitsProto().getSerializedSize());
+    LOG.info("NumSplits: {}, SerializedSize: {}",
+        splitInfoMem.getNumTasks(), splitInfoMem.getSplitsProto().getSerializedSize());
     return splitInfoMem;
   }
 

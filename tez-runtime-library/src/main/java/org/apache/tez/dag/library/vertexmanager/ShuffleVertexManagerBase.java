@@ -256,9 +256,8 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
     }
     pendingVMEvents.clear();
 
-    LOG.info("OnVertexStarted vertex: {} with {} source tasks and {} pending" +
-        " tasks", getContext().getVertexName(), totalNumBipartiteSourceTasks,
-        totalTasksToSchedule);
+    LOG.info("OnVertexStarted vertex: {} with {} source tasks and {} pending tasks",
+        getContext().getVertexName(), totalNumBipartiteSourceTasks, totalTasksToSchedule);
 
     if (completions != null) {
       for (TaskAttemptIdentifier attempt : completions) {
@@ -790,8 +789,7 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
     if (vInfo.edgeProperty.getDataMovementType() == DataMovementType.SCATTER_GATHER) {
       totalNumBipartiteSourceTasks += vInfo.numTasks;
     }
-    LOG.info("Received configured notification : {}" + " for vertex: {} in" +
-        " vertex: {}" + " numBipartiteSourceTasks: {}",
+    LOG.info("Received configured notification : {} for vertex: {} in vertex: {} numBipartiteSourceTasks: {}",
         stateUpdate.getVertexState(), stateUpdate.getVertexName(),
         getContext().getVertexName(), totalNumBipartiteSourceTasks);
     processPendingTasks(null);

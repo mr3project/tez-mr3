@@ -27,7 +27,6 @@ import org.apache.tez.common.TezUtils;
 import org.apache.tez.dag.api.EdgeManagerPluginContext;
 import org.apache.tez.dag.api.EdgeManagerPluginDescriptor;
 import org.apache.tez.dag.api.EdgeManagerPluginOnDemand;
-import org.apache.tez.dag.api.EdgeProperty;
 import org.apache.tez.dag.api.EdgeProperty.DataMovementType;
 import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.dag.api.UserPayload;
@@ -776,7 +775,7 @@ public class ShuffleVertexManager extends ShuffleVertexManagerBase {
       int index = taskInfo.getIndex();
       if (targetIndexes != null) { //parallelism has changed.
         Preconditions.checkState(index < targetIndexes.length,
-            "index=" + index +", targetIndexes length=" + targetIndexes.length);
+            "index={}, targetIndexes length={}", index, targetIndexes.length);
         int[] mapping = targetIndexes[index];
         int partitionStats = 0;
         for (int i : mapping) {

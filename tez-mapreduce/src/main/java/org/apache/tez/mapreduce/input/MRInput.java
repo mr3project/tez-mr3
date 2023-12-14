@@ -68,7 +68,6 @@ import org.apache.tez.runtime.api.Input;
 import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.api.events.InputDataInformationEvent;
 import org.apache.tez.runtime.library.api.KeyValueReader;
-import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 
 import org.apache.tez.common.Preconditions;
 import com.google.common.collect.Lists;
@@ -569,9 +568,8 @@ public class MRInput extends MRInputBase {
     }
     Event event = inputEvents.iterator().next();
     Preconditions.checkArgument(event instanceof InputDataInformationEvent,
-        getClass().getSimpleName()
-            + " can only handle a single event of type: "
-            + InputDataInformationEvent.class.getSimpleName());
+        "{} can only handle a single event of type: {}",
+        getClass().getSimpleName(), InputDataInformationEvent.class.getSimpleName());
 
     processSplitEvent((InputDataInformationEvent) event);
   }

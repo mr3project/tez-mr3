@@ -204,7 +204,7 @@ public abstract class ExternalSorter {
     this.serializationContext = new SerializationContext(this.conf);
     keySerializer = serializationContext.getKeySerializer();
     valSerializer = serializationContext.getValueSerializer();
-    LOG.info(outputContext.getDestinationVertexName() + ", memoryMb=" + assignedMb);
+    LOG.info("{}, memoryMb={}", outputContext.getDestinationVertexName(), assignedMb);
     if (LOG.isDebugEnabled()) {
       LOG.debug("keySerializerClass=" + serializationContext.getKeyClass()
           + ", valueSerializerClass=" + valSerializer
@@ -340,9 +340,8 @@ public abstract class ExternalSorter {
     long reqBytes = ((long) initialMemRequestMb) << 20;
     //Higher bound checks are done in individual sorter implementations
     Preconditions.checkArgument(initialMemRequestMb > 0 && reqBytes < maxAvailableTaskMemory,
-        TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB + " " + initialMemRequestMb + " should be "
-            + "larger than 0 and should be less than the available task memory (MB):" +
-            (maxAvailableTaskMemory >> 20));
+        "{} {} should be larger than 0 and should be less than the available task memory (MB): {}",
+    TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB, initialMemRequestMb, maxAvailableTaskMemory >> 20);
     if (LOG.isDebugEnabled()) {
       LOG.debug("Requested SortBufferSize ("
           + TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB + "): "

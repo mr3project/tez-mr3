@@ -319,10 +319,11 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       skipBuffers = false;
       writer = null;
     }
-    LOG.info("{}: numBuffers={}, sizePerBuffer={}, skipBuffers={}, numPartitions={}",
-        destNameTrimmed, numBuffers, sizePerBuffer, skipBuffers, numPartitions);
+    LOG.info("{}: numBuffers={}, sizePerBuffer={}, numPartitions={}",
+        destNameTrimmed, numBuffers, sizePerBuffer, numPartitions);
     if (LOG.isDebugEnabled()) {
-      LOG.debug("availableMemory=" + availableMemory
+      LOG.debug("skippBuffers=" + skipBuffers
+          + ", availableMemory=" + availableMemory
           + ", maxSingleBufferSizeBytes=" + maxSingleBufferSizeBytes
           + ", pipelinedShuffle=" + pipelinedShuffle
           + ", isFinalMergeEnabled=" + isFinalMergeEnabled
@@ -754,7 +755,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     isShutdown.set(true);
     spillLock.lock();
     try {
-      LOG.info("{}: Waiting for all spills to complete : Pending : {}", destNameTrimmed, pendingSpillCount.get());
+      if (pendingSpillCount.get() != 0) {
+        LOG.info("{}: Waiting for all spills to complete : Pending : {}", destNameTrimmed, pendingSpillCount.get());
+      }
       while (pendingSpillCount.get() != 0 && spillException == null) {
         spillInProgress.await();
       }

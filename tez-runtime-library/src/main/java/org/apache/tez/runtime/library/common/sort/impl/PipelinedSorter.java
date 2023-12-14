@@ -34,7 +34,6 @@ import org.apache.tez.common.Preconditions;
 import com.google.common.collect.Lists;
 
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
 import org.slf4j.Logger;
@@ -150,9 +149,8 @@ public class PipelinedSorter extends ExternalSorter {
               .TEZ_RUNTIME_PIPELINED_SORTER_MIN_BLOCK_SIZE_IN_MB_DEFAULT);
       Preconditions.checkArgument(
           (minBlockSize > 0 && minBlockSize < 2047),
-          TezRuntimeConfiguration
-              .TEZ_RUNTIME_PIPELINED_SORTER_MIN_BLOCK_SIZE_IN_MB
-              + "=" + minBlockSize + " should be a positive value between 0 and 2047");
+          "{}={} should be a positive value between 0 and 2047",
+          TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_MIN_BLOCK_SIZE_IN_MB, minBlockSize);
       MIN_BLOCK_SIZE = minBlockSize << 20;
     }
 
@@ -161,7 +159,7 @@ public class PipelinedSorter extends ExternalSorter {
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_USE_SOFT_REFERENCE_DEFAULT);
 
     StringBuilder initialSetupLogLine = new StringBuilder("Setting up PipelinedSorter for ")
-        .append(outputContext.getDestinationVertexName()).append(": ");
+        .append(outputContext.getDestinationVertexName());
     partitionBits = bitcount(partitions)+1;
 
     boolean confPipelinedShuffle = this.conf.getBoolean(TezRuntimeConfiguration
@@ -211,19 +209,20 @@ public class PipelinedSorter extends ExternalSorter {
       while(allocateSpace() != null);
     }
 
-    initialSetupLogLine.append("#blocks=").append(maxNumberOfBlocks);
-    initialSetupLogLine.append(", maxMemUsage=").append(maxMemLimit);
-    initialSetupLogLine.append(", lazyAllocateMem=").append(lazyAllocateMem);
-    initialSetupLogLine.append(", useSoftReference=").append(useSoftReference);
-    initialSetupLogLine.append(", minBlockSize=").append(MIN_BLOCK_SIZE);
-    initialSetupLogLine.append(", initial BLOCK_SIZE=").append(buffers.get(0).capacity());
-    initialSetupLogLine.append(", finalMergeEnabled=").append(isFinalMergeEnabled());
-    initialSetupLogLine.append(", pipelinedShuffle=").append(pipelinedShuffle);
-    initialSetupLogLine.append(", sendEmptyPartitions=").append(sendEmptyPartitionDetails);
-    initialSetupLogLine.append(", ").append(TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB).append("=").append(sortmb);
-
     Preconditions.checkState(buffers.size() > 0, "At least one buffer needs to be present");
-    LOG.info(initialSetupLogLine.toString());
+    if (LOG.isDebugEnabled()) {
+      initialSetupLogLine.append("#blocks=").append(maxNumberOfBlocks);
+      initialSetupLogLine.append(", maxMemUsage=").append(maxMemLimit);
+      initialSetupLogLine.append(", lazyAllocateMem=").append(lazyAllocateMem);
+      initialSetupLogLine.append(", useSoftReference=").append(useSoftReference);
+      initialSetupLogLine.append(", minBlockSize=").append(MIN_BLOCK_SIZE);
+      initialSetupLogLine.append(", initial BLOCK_SIZE=").append(buffers.get(0).capacity());
+      initialSetupLogLine.append(", finalMergeEnabled=").append(isFinalMergeEnabled());
+      initialSetupLogLine.append(", pipelinedShuffle=").append(pipelinedShuffle);
+      initialSetupLogLine.append(", sendEmptyPartitions=").append(sendEmptyPartitionDetails);
+      initialSetupLogLine.append(", ").append(TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB).append("=").append(sortmb);
+      LOG.debug(initialSetupLogLine.toString());
+    }
 
     span = new SortSpan(buffers.get(bufferIndex), 1024 * 1024, 16, this.comparator);
     merger = new SpanMerger(); // SpanIterators are comparable
@@ -236,7 +235,6 @@ public class PipelinedSorter extends ExternalSorter {
         .setNameFormat("Sorter {" + TezUtilsInternal
             .cleanVertexName(outputContext.getDestinationVertexName()) + "} #%d")
         .build());
-
 
     valSerializer.open(span.out);
     keySerializer.open(span.out);
@@ -275,7 +273,7 @@ public class PipelinedSorter extends ExternalSorter {
     bufferUsage.add(0);
 
     Preconditions.checkState(buffers.size() <= maxNumberOfBlocks,
-        buffers.size() + " exceeds " + maxNumberOfBlocks);
+        "{} exceeds {}", buffers.size(), maxNumberOfBlocks);
 
     StringBuilder allocLog = new StringBuilder("Newly allocated block size=" + size);
     allocLog.append(", index=").append(bufferIndex);
@@ -961,8 +959,10 @@ public class PipelinedSorter extends ExternalSorter {
       }
       ByteBuffer reserved = source.duplicate();
       reserved.mark();
-      LOG.info("{}: reserved.remaining()={}, reserved.metasize={}",
-          outputContext.getDestinationVertexName(), reserved.remaining(), metasize);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("{}: reserved.remaining()={}, reserved.metasize={}",
+            outputContext.getDestinationVertexName(), reserved.remaining(), metasize);
+      }
       reserved.position(metasize);
       kvbuffer = reserved.slice();
       reserved.flip();
@@ -1059,9 +1059,11 @@ public class PipelinedSorter extends ExternalSorter {
         }
         newSpan = new SortSpan(remaining, items, perItem, newComparator);
         newSpan.index = index+1;
-        LOG.info("{}, counter:{}",
-            String.format(outputContext.getDestinationVertexName() + ": New Span%d.length = %d, perItem = %d", newSpan.index, newSpan.length(), perItem),
-            mapOutputRecordCounter.getValue());
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("{}, counter:{}",
+              String.format(outputContext.getDestinationVertexName() + ": New Span%d.length = %d, perItem = %d", newSpan.index, newSpan.length(), perItem),
+              mapOutputRecordCounter.getValue());
+        }
         return newSpan;
       }
       return null;
@@ -1082,7 +1084,10 @@ public class PipelinedSorter extends ExternalSorter {
         return null;
       }
       int perItem = kvbuffer.position()/items;
-      LOG.info(outputContext.getDestinationVertexName() + ": " + String.format("Span%d.length = %d, perItem = %d", index, length(), perItem));
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("{}: {}", outputContext.getDestinationVertexName(),
+            String.format("Span%d.length = %d, perItem = %d", index, length(), perItem));
+      }
       if(remaining.remaining() < METASIZE+perItem) {
         //Check if we can get the next Buffer from the main buffer list
         ByteBuffer space = allocateSpace();
@@ -1411,17 +1416,21 @@ public class PipelinedSorter extends ExternalSorter {
           this.add(iter);
         }
 
-        StringBuilder sb = new StringBuilder();
         if (heap.size() == 0) {
           return false;
         }
         for(SpanIterator sp: heap) {
-            sb.append(sp.toString());
-            sb.append(",");
-            total += sp.span.length();
-            eq += sp.span.getEq();
+          total += sp.span.length();
+          eq += sp.span.getEq();
         }
-        LOG.info(outputContext.getDestinationVertexName() + ": Heap = " + sb.toString());
+        if (LOG.isDebugEnabled()) {
+          StringBuilder sb = new StringBuilder();
+          for(SpanIterator sp: heap) {
+              sb.append(sp.toString());
+              sb.append(",");
+          }
+          LOG.debug("{}: Heap = {}", outputContext.getDestinationVertexName(), sb.toString());
+        }
         return true;
       } catch(ExecutionException e) {
         LOG.error("Heap size={}, total={}, eq={}, partition={}, gallop={}, totalItr={},"

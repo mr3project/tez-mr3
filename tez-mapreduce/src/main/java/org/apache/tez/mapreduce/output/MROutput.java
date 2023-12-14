@@ -69,7 +69,6 @@ import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.Output;
 import org.apache.tez.runtime.api.OutputContext;
 import org.apache.tez.runtime.library.api.KeyValueWriter;
-import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 
 /**
  * {@link MROutput} is an {@link Output} which allows key/values pairs
@@ -144,18 +143,16 @@ public class MROutput extends AbstractLogicalOutput {
               throw new TezUncheckedException("no outputFormat setting on Configuration, useNewAPI:" + useNewApi);
             }
             this.outputFormat = conf.getClassByName(outputClass);
-            Preconditions.checkState(org.apache.hadoop.mapreduce.OutputFormat.class
-                .isAssignableFrom(this.outputFormat), "outputFormat must be assignable from "
-                    + "org.apache.hadoop.mapreduce.OutputFormat");
+            Preconditions.checkState(org.apache.hadoop.mapreduce.OutputFormat.class.isAssignableFrom(this.outputFormat),
+                "outputFormat must be assignable from org.apache.hadoop.mapreduce.OutputFormat");
           } else {
             String outputClass = conf.get("mapred.output.format.class");
             if (StringUtils.isEmpty(outputClass)) {
               throw new TezUncheckedException("no outputFormat setting on Configuration, useNewAPI:" + useNewApi);
             }
             this.outputFormat = conf.getClassByName(outputClass);
-            Preconditions.checkState(org.apache.hadoop.mapred.OutputFormat.class
-                .isAssignableFrom(this.outputFormat), "outputFormat must be assignable from "
-                    + "org.apache.hadoop.mapred.OutputFormat");
+            Preconditions.checkState(org.apache.hadoop.mapred.OutputFormat.class.isAssignableFrom(this.outputFormat),
+                "outputFormat must be assignable from org.apache.hadoop.mapred.OutputFormat");
           }
         } catch (ClassNotFoundException e) {
           throw new TezUncheckedException(e);
@@ -452,9 +449,8 @@ public class MROutput extends AbstractLogicalOutput {
       initCommitter(jobConf, useNewApi);
     }
 
-    LOG.info(getContext().getDestinationVertexName() + ": "
-        + "outputFormat=" + outputFormatClassName
-        + ", using newmapreduce API=" + useNewApi);
+    LOG.info("{}: outputFormat={}, using newmapreduce API={}",
+        getContext().getDestinationVertexName(), outputFormatClassName, useNewApi);
     return null;
   }
 

@@ -64,12 +64,12 @@ public class ImmediateStartVertexManager extends VertexManagerPlugin {
       String srcVertex = entry.getKey();
       //track vertices with task count > 0
       if (getContext().getVertexNumTasks(srcVertex) > 0) {
-        LOG.info("Task count in " + srcVertex + ": " + getContext().getVertexNumTasks(srcVertex));
+        LOG.info("Task count in {}: {}", srcVertex, getContext().getVertexNumTasks(srcVertex));
         srcVertexConfigured.put(srcVertex, false);
         getContext().registerForVertexStateUpdates(srcVertex, EnumSet.of(VertexState.CONFIGURED));
       } else {
-        LOG.info("Vertex: " + getContext().getVertexName() + "; Ignoring " + srcVertex
-            + " as it has got 0 tasks");
+        LOG.info("Vertex: {}; Ignoring {} as it has got 0 tasks",
+            getContext().getVertexName(), srcVertex);
       }
     }
     onVertexStartedDone.set(true);
@@ -97,7 +97,7 @@ public class ImmediateStartVertexManager extends VertexManagerPlugin {
     }
 
     if (!tasksToStart.isEmpty()) {
-      LOG.info("Starting " + tasksToStart.size() + " in " + getContext().getVertexName());
+      LOG.info("Starting {} in {}", tasksToStart.size(), getContext().getVertexName());
       getContext().scheduleTasks(tasksToStart);
     }
     // all tasks scheduled. Can call vertexManagerDone().
@@ -129,8 +129,8 @@ public class ImmediateStartVertexManager extends VertexManagerPlugin {
             + stateUpdate.getVertexName() + " in vertex: " + getContext().getVertexName());
     Preconditions.checkState(srcVertexConfigured.put(stateUpdate.getVertexName(), true)
         .booleanValue() == false);
-    LOG.info("Received configured notification: " + stateUpdate.getVertexState() + " for vertex: "
-        + stateUpdate.getVertexName() + " in vertex: " + getContext().getVertexName());
+    LOG.info("Received configured notification: {} for vertex: {} in vertex: {}",
+        stateUpdate.getVertexState(), stateUpdate.getVertexName(), getContext().getVertexName());
     scheduleTasks();
   }
 

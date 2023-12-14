@@ -194,14 +194,14 @@ public class MemoryDistributor {
     case INPUT:
       numInputsSeen.incrementAndGet();
       Preconditions.checkState(numInputsSeen.get() <= numTotalInputs,
-          "Num Requesting Inputs higher than total # of inputs: " + numInputsSeen + ", "
-              + numTotalInputs);
+          "Num Requesting Inputs higher than total # of inputs: {}, {}",
+          numInputsSeen, numTotalInputs);
       break;
     case OUTPUT:
       numOutputsSeen.incrementAndGet();
       Preconditions.checkState(numOutputsSeen.get() <= numTotalOutputs,
-          "Num Requesting Inputs higher than total # of outputs: " + numOutputsSeen + ", "
-              + numTotalOutputs);
+          "Num Requesting Inputs higher than total # of outputs: {}, {}",
+          numOutputsSeen, numTotalOutputs);
       break;
     case PROCESSOR:
       break;
@@ -221,15 +221,14 @@ public class MemoryDistributor {
       numAllocations++;
     }
     Preconditions.checkState(numAllocations == numRequestors,
-        "Number of allocations must match number of requestors. Allocated=" + numAllocations
-            + ", Requests: " + numRequestors);
+        "Number of allocations must match number of requestors. Allocated={}, Requests: {}",
+    numAllocations, numRequestors);
     if (isInputOutputConcurrent) {
       Preconditions.checkState(totalAllocated <= totalJvmMemory,
-          "Total allocation should be <= availableMem. TotalAllocated: " + totalAllocated
-              + ", totalJvmMemory: " + totalJvmMemory);
+          "Total allocation should be <= availableMem. TotalAllocated: {}, totalJvmMemory: {}",
+      totalAllocated, totalJvmMemory);
     }
   }
-
 
   private static class RequestorInfo {
 

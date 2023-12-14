@@ -84,11 +84,10 @@ public class OneToOneEdgeManager extends EdgeManagerPlugin {
       return;
     }
     // by the time routing is initiated all task counts must be determined and stable
-    Preconditions.checkState(getContext().getSourceVertexNumTasks() == getContext()
-        .getDestinationVertexNumTasks(), "1-1 source and destination task counts must match."
-        + " Destination: " + getContext().getDestinationVertexName() + " tasks: "
-        + getContext().getDestinationVertexNumTasks() + " Source: "
-        + getContext().getSourceVertexName() + " tasks: " + getContext().getSourceVertexNumTasks());
+    Preconditions.checkState(getContext().getSourceVertexNumTasks() == getContext().getDestinationVertexNumTasks(),
+        "1-1 source and destination task counts must match. Destination: {} tasks: {} Source: {} tasks: {}",
+        getContext().getDestinationVertexName(), getContext().getDestinationVertexNumTasks(),
+        getContext().getSourceVertexName(), getContext().getSourceVertexNumTasks());
     stateChecked.set(true);
   }
 }
