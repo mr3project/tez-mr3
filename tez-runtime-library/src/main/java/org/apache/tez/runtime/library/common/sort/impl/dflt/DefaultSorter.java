@@ -216,9 +216,8 @@ public final class DefaultSorter extends ExternalSorter implements IndexedSortab
     }
 
     if (availableMemoryMB > MAX_IO_SORT_MB) {
-      LOG.warn(logContext + ": Scaling down " + TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB +
-          "=" + availableMemoryMB + " to " + MAX_IO_SORT_MB
-          + " (max sort buffer size supported forDefaultSorter)");
+      LOG.warn("{}: Scaling down {}={} to {} (max sort buffer size supported forDefaultSorter)",
+          logContext, TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB, availableMemoryMB, MAX_IO_SORT_MB);
     }
 
     // cap sort buffer to MAX_IO_SORT_MB for DefaultSorter.

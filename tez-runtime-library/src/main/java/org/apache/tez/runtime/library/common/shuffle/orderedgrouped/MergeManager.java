@@ -86,7 +86,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   private final FileSystem rfs;
   private final LocalDirAllocator localDirAllocator;
   
-  private final  TezTaskOutputFiles mapOutputFile;
+  private final TezTaskOutputFiles mapOutputFile;
   private final Progressable progressable = new Progressable() {
     @Override
     public void progress() {
@@ -155,6 +155,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   private final boolean cleanup;
 
   private SerializationContext serializationContext;
+
+  private final boolean useFreeMemoryFetchedInput;
 
   /**
    * Construct the MergeManager. Must call start before it becomes usable.
@@ -292,7 +294,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     }
     
     if (this.maxSingleShuffleLimit >= this.mergeThreshold) {
-      throw new RuntimeException("Invlaid configuration: "
+      throw new RuntimeException("Invalid configuration: "
           + "maxSingleShuffleLimit should be less than mergeThreshold"
           + "maxSingleShuffleLimit: " + this.maxSingleShuffleLimit
           + ", mergeThreshold: " + this.mergeThreshold);
@@ -313,6 +315,10 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     this.onDiskMerger = new OnDiskMerger(this);
 
     this.serializationContext = new SerializationContext(conf);
+
+    this.useFreeMemoryFetchedInput = conf.getBoolean(
+        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT,
+        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT_DEFAULT);
   }
 
   void setupParentThread(Thread shuffleSchedulerThread) {
@@ -443,12 +449,21 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     // all the stalled threads
     
     if (usedMemory > memoryLimit) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug(srcAttemptIdentifier + ": Stalling shuffle since usedMemory (" + usedMemory
-            + ") is greater than memoryLimit (" + memoryLimit + ")." +
-            " CommitMemory is (" + commitMemory + ")");
+      if (!useFreeMemoryFetchedInput) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug(srcAttemptIdentifier + ": Stalling shuffle since usedMemory (" + usedMemory
+              + ") is greater than memoryLimit (" + memoryLimit + ")." +
+              " CommitMemory is (" + commitMemory + ")");
+        }
+        return stallShuffle;
       }
-      return stallShuffle;
+      // Check if we can find free memory in the current ContainerWorker
+      long currentFreeMemory = Runtime.getRuntime().freeMemory();
+      if (currentFreeMemory < inputContext.getTotalMemoryAvailableToTask()){
+        // this ContainerWorker is busy serving Tasks, so do not borrow
+        return stallShuffle;
+      }
+      LOG.info("Creating MemoryMapOutput {} with free memory: {}", this.usedMemory, currentFreeMemory);
     }
     
     // Allow the in-memory shuffle to progress

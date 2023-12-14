@@ -560,6 +560,11 @@ public class TezRuntimeConfiguration {
       "merge.progress.records";
   public static final long TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT = 10000;
 
+  @ConfigurationProperty(type = "boolean")
+  public static final String TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT = TEZ_RUNTIME_PREFIX +
+      "use.free.memory.fetched.input";
+  public static final boolean TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT_DEFAULT = true;
+
   static {
     tezRuntimeKeys.add(TEZ_RUNTIME_IFILE_READAHEAD);
     tezRuntimeKeys.add(TEZ_RUNTIME_IFILE_READAHEAD_BYTES);
@@ -570,8 +575,7 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_INDEX_CACHE_MEMORY_LIMIT_BYTES);
     tezRuntimeKeys.add(TEZ_RUNTIME_COMBINE_MIN_SPILLS);
     tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SORTER_SORT_THREADS);
-    tezRuntimeKeys.add(
-        TEZ_RUNTIME_PIPELINED_SORTER_MIN_BLOCK_SIZE_IN_MB);
+    tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SORTER_MIN_BLOCK_SIZE_IN_MB);
     tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SORTER_USE_SOFT_REFERENCE);
     tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SORTER_LAZY_ALLOCATE_MEMORY);
     tezRuntimeKeys.add(TEZ_RUNTIME_UNORDERED_OUTPUT_BUFFER_SIZE_MB);
@@ -593,8 +597,7 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_MERGE_PERCENT);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_MEMTOMEM_SEGMENTS);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_ENABLE_MEMTOMEM);
-    tezRuntimeKeys.add
-        (TEZ_RUNTIME_SHUFFLE_ACCEPTABLE_HOST_FETCH_FAILURE_FRACTION);
+    tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_ACCEPTABLE_HOST_FETCH_FAILURE_FRACTION);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_MIN_FAILURES_PER_HOST);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_MAX_STALL_TIME_FRACTION);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_SOURCE_ATTEMPT_ABORT_LIMIT);
@@ -626,6 +629,7 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_UNORDERED_PARTITIONED_KVWRITER_BUFFER_MERGE_PERCENT);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_FETCHER_USE_SHARED_POOL);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_HOST_PENALTY_TIME_LIMIT_MS);
+    tezRuntimeKeys.add(TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT);
 
     // Do not keep defaultConf as a static member because it holds a reference to ClassLoader
     // of the Thread that is active at the time of loading this class. The active Thread usually
