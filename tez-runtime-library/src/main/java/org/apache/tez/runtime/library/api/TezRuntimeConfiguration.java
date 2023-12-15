@@ -563,7 +563,7 @@ public class TezRuntimeConfiguration {
   @ConfigurationProperty(type = "boolean")
   public static final String TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT = TEZ_RUNTIME_PREFIX +
       "use.free.memory.fetched.input";
-  public static final boolean TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT_DEFAULT = true;
+  public static final boolean TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT_DEFAULT = false;
 
   static {
     tezRuntimeKeys.add(TEZ_RUNTIME_IFILE_READAHEAD);
