@@ -484,7 +484,7 @@ public class TezRuntimeConfiguration {
   public static final String TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_MAX_SIZE =
           TEZ_RUNTIME_PREFIX + "transfer.data-via-events.max-size";
   @Private
-  public static final int TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_MAX_SIZE_DEFAULT = 512;
+  public static final int TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_MAX_SIZE_DEFAULT = 2048;
 
   @Private
   public static final String TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_SUPPORT_IN_MEM_FILE =
@@ -563,7 +563,7 @@ public class TezRuntimeConfiguration {
   @ConfigurationProperty(type = "boolean")
   public static final String TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT = TEZ_RUNTIME_PREFIX +
       "use.free.memory.fetched.input";
-  public static final boolean TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT_DEFAULT = true;
+  public static final boolean TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT_DEFAULT = false;
 
   static {
     tezRuntimeKeys.add(TEZ_RUNTIME_IFILE_READAHEAD);
