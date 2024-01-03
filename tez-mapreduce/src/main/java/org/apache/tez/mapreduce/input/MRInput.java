@@ -578,8 +578,7 @@ public class MRInput extends MRInputBase {
   public List<Event> close() throws IOException {
     if (mrReader != null) {
       mrReader.close();
-      // TODO: TEZ-4238 sets null to mrReader
-      // mrReader = null;
+      mrReader = null;
     }
     long inputRecords = getContext().getCounters()
         .findCounter(TaskCounter.INPUT_RECORDS_PROCESSED).getValue();
