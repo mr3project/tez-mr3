@@ -39,9 +39,10 @@ public interface LogicalIOProcessorFrameworkInterface extends ProcessorFramework
    * @param outputs
    *          a map of the destination vertex name to {@link LogicalOutput} -
    *          one per outgoing edge
+   * @return true if it is safe to soft-kill sibling Tasks because limit is reached
    * @throws Exception TODO
    */
-  public void run(Map<String, LogicalInput> inputs,
+  public boolean run(Map<String, LogicalInput> inputs,
       Map<String, LogicalOutput> outputs) throws Exception;
 
 }
