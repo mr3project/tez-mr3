@@ -73,7 +73,7 @@ public class SleepProcessor extends AbstractLogicalIOProcessor {
   }
 
   @Override
-  public void run(Map<String, LogicalInput> _inputs,
+  public boolean run(Map<String, LogicalInput> _inputs,
                   Map<String, LogicalOutput> _outputs) throws Exception {
     inputs = _inputs;
     outputs = _outputs;
@@ -92,6 +92,7 @@ public class SleepProcessor extends AbstractLogicalIOProcessor {
     } catch (InterruptedException ie) {
       // ignore
     }
+    return false;
   }
 
   @Override

@@ -29,8 +29,6 @@ import org.apache.tez.runtime.api.LogicalInput;
 import org.apache.tez.runtime.api.LogicalOutput;
 import org.apache.tez.runtime.api.Processor;
 import org.apache.tez.runtime.api.ProcessorContext;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Implements an {@link AbstractLogicalIOProcessor} and provides empty
@@ -41,8 +39,6 @@ import org.slf4j.LoggerFactory;
 @Public
 @Evolving
 public abstract class SimpleProcessor extends AbstractLogicalIOProcessor {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(AbstractLogicalIOProcessor.class);
   protected Map<String, LogicalInput> inputs;
   protected Map<String, LogicalOutput> outputs;
 
@@ -52,7 +48,7 @@ public abstract class SimpleProcessor extends AbstractLogicalIOProcessor {
     super(context);
   }
 
-  public void run(Map<String, LogicalInput> _inputs, Map<String, LogicalOutput> _outputs)
+  public boolean run(Map<String, LogicalInput> _inputs, Map<String, LogicalOutput> _outputs)
       throws Exception {
     this.inputs = _inputs;
     this.outputs = _outputs;
@@ -60,11 +56,13 @@ public abstract class SimpleProcessor extends AbstractLogicalIOProcessor {
     preOp();
     run();
     postOp();
+    return false;
   }
 
   /**
    * Users must implement this method to provide the main
    * application logic code
+   * @return true if it is safe to soft-kill sibling Tasks because limit is reached
    * @throws Exception
    */
   public abstract void run() throws Exception;
