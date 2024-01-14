@@ -58,8 +58,6 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
 
   private static final Logger LOG = LoggerFactory.getLogger(ShuffleInputEventHandlerImpl.class);
 
-  private static AtomicInteger shufflePortIndex = new AtomicInteger(0);
-
   private final ShuffleManager shuffleManager;
   //TODO: unused. Consider removing later?
   private final FetchedInputAllocator inputAllocator;
@@ -76,6 +74,8 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
   private final AtomicInteger numObsoletionEvents = new AtomicInteger(0);
   private final AtomicInteger numDmeEventsNoData = new AtomicInteger(0);
 
+  private final int portIndex;
+
   public ShuffleInputEventHandlerImpl(InputContext inputContext,
                                       ShuffleManager shuffleManager,
                                       FetchedInputAllocator inputAllocator, CompressionCodec codec,
@@ -91,6 +91,10 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
     this.useSharedInputs = (inputContext.getTaskAttemptNumber() == 0);
     this.compositeFetch = compositeFetch;
     this.inflater = TezCommonUtils.newInflater();
+
+    int taskIndex = inputContext.getTaskIndex();
+    int vertexIndex = inputContext.getTaskVertexIndex();
+    this.portIndex = vertexIndex * 7 + taskIndex;
   }
 
   @Override
@@ -296,10 +300,10 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
   private int getShufflePort(DataMovementEventPayloadProto shufflePayload) {
     if (inputContext.useShuffleHandlerProcessOnK8s()) {
       int numPorts = shuffleManager.localShufflePorts.length;
-      return shuffleManager.localShufflePorts[Math.abs(shufflePortIndex.incrementAndGet()) % numPorts];
+      return shuffleManager.localShufflePorts[portIndex % numPorts];
     } else {
       int numPorts = shufflePayload.getNumPorts();
-      return shufflePayload.getPorts(Math.abs(shufflePortIndex.incrementAndGet()) % numPorts);
+      return shufflePayload.getPorts(portIndex % numPorts);
     }
   }
 
