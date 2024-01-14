@@ -30,7 +30,6 @@ import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleEventHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.tez.common.TezCommonUtils;
 import org.apache.tez.common.TezUtilsInternal;
 import org.apache.tez.dag.api.TezUncheckedException;
@@ -49,8 +48,6 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
   
   private static final Logger LOG = LoggerFactory.getLogger(ShuffleInputEventHandlerOrderedGrouped.class);
 
-  private static AtomicInteger shufflePortIndex = new AtomicInteger(0);
-
   private final ShuffleScheduler scheduler;
   private final InputContext inputContext;
   private final boolean compositeFetch;
@@ -61,6 +58,8 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
   private final AtomicInteger numObsoletionEvents = new AtomicInteger(0);
   private final AtomicInteger numDmeEventsNoData = new AtomicInteger(0);
 
+  private final int portIndex;
+
   public ShuffleInputEventHandlerOrderedGrouped(InputContext inputContext,
                                                 ShuffleScheduler scheduler,
                                                 boolean compositeFetch) {
@@ -68,6 +67,10 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
     this.scheduler = scheduler;
     this.compositeFetch = compositeFetch;
     this.inflater = TezCommonUtils.newInflater();
+
+    int taskIndex = inputContext.getTaskIndex();
+    int vertexIndex = inputContext.getTaskVertexIndex();
+    this.portIndex = vertexIndex * 7 + taskIndex;
   }
 
   @Override
@@ -221,10 +224,10 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
   private int getShufflePort(DataMovementEventPayloadProto shufflePayload) {
     if (inputContext.useShuffleHandlerProcessOnK8s()) {
       int numPorts = scheduler.localShufflePorts.length;
-      return scheduler.localShufflePorts[Math.abs(shufflePortIndex.incrementAndGet()) % numPorts];
+      return scheduler.localShufflePorts[portIndex % numPorts];
     } else {
       int numPorts = shufflePayload.getNumPorts();
-      return shufflePayload.getPorts(Math.abs(shufflePortIndex.incrementAndGet()) % numPorts);
+      return shufflePayload.getPorts(portIndex % numPorts);
     }
   }
 
