@@ -139,9 +139,6 @@ class ShuffleScheduler {
   private static final Logger LOG_FETCH = LoggerFactory.getLogger(LOG.getName() + ".fetch");
   private static final FetchStatsLogger fetchStatsLogger = new FetchStatsLogger(LOG_FETCH, LOG);
 
-  static final long INITIAL_PENALTY = 2000L; // 2 seconds
-  private static final float PENALTY_GROWTH_RATE = 1.3f;
-
   private final BitSet finishedMaps;
   private final int numInputs;
   private int numFetchedSpills;
@@ -163,8 +160,7 @@ class ShuffleScheduler {
 
   private final AtomicBoolean isShutdown = new AtomicBoolean(false);
   private final Random random = new Random(System.currentTimeMillis());
-  private final DelayQueue<Penalty> penalties = new DelayQueue<Penalty>();
-  private final Referee referee;
+
   @VisibleForTesting
   final Map<InputAttemptIdentifier, IntWritable> failureCounts = new HashMap<InputAttemptIdentifier,IntWritable>();
   private final InputContext inputContext;
@@ -186,8 +182,6 @@ class ShuffleScheduler {
   private final long startTime;
   @VisibleForTesting
   long lastProgressTime;
-  @VisibleForTesting
-  long failedShufflesSinceLastCompletion;
 
   private final int numFetchers;
   private final Set<FetcherOrderedGrouped> runningFetchers =
@@ -221,27 +215,14 @@ class ShuffleScheduler {
   private final TezCounter wrongReduceErrsCounter;
 
   private final int maxTaskOutputAtOnce;
-  private final int maxFailedUniqueFetches;
-  private final int abortFailureLimit;
 
-  private final int minFailurePerHost;
-  private final float hostFailureFraction;
-  private final float maxStallTimeFraction;
-  private final float minReqProgressFraction;
-  private final float maxAllowedFailedFetchFraction;
-  private final boolean checkFailedFetchSinceLastCompletion;
   private final boolean verifyDiskChecksum;
   private final boolean compositeFetch;
 
   private volatile Thread shuffleSchedulerThread = null;
-  private final int maxPenaltyTime;
 
   private long totalBytesShuffledTillNow = 0;
   private final DecimalFormat  mbpsFormat = new DecimalFormat("0.00");
-
-  // TODO: revise
-  private final int MIN_FAILED_UNIQUE_FETCHES_SHUFFLE_UNHEALTHY = 10;
-  private final int MAX_FAILED_UNIQUE_FETCHES_SHUFFLE_UNHEALTHY = 250;
 
   public ShuffleScheduler(InputContext inputContext,
                           Configuration conf,
@@ -261,15 +242,6 @@ class ShuffleScheduler {
     this.allocator = allocator;
     this.mergeManager = mergeManager;
     this.numInputs = numberOfInputs;
-    int abortFailureLimitConf = conf.getInt(TezRuntimeConfiguration
-        .TEZ_RUNTIME_SHUFFLE_SOURCE_ATTEMPT_ABORT_LIMIT, TezRuntimeConfiguration
-        .TEZ_RUNTIME_SHUFFLE_SOURCE_ATTEMPT_ABORT_LIMIT_DEFAULT);
-    if (abortFailureLimitConf <= -1) {
-      abortFailureLimit = Math.max(15, numberOfInputs / 10);
-    } else {
-      //No upper cap, as user is setting this intentionally
-      abortFailureLimit = abortFailureLimitConf;
-    }
     remainingMaps = new AtomicInteger(numberOfInputs);
     finishedMaps = new BitSet(numberOfInputs);
     this.ifileReadAhead = ifileReadAhead;
@@ -289,49 +261,6 @@ class ShuffleScheduler {
         TezRuntimeConfiguration.TEZ_RUNTIME_LOCAL_FETCH_COMPARE_PORT,
         TezRuntimeConfiguration.TEZ_RUNTIME_LOCAL_FETCH_COMPARE_PORT_DEFAULT);
 
-    this.minFailurePerHost = conf.getInt(
-        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MIN_FAILURES_PER_HOST,
-        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MIN_FAILURES_PER_HOST_DEFAULT);
-    Preconditions.checkArgument(minFailurePerHost >= 0,
-        "{}={} should not be negative",
-        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MIN_FAILURES_PER_HOST, minFailurePerHost);
-
-    this.hostFailureFraction = conf.getFloat(TezRuntimeConfiguration
-        .TEZ_RUNTIME_SHUFFLE_ACCEPTABLE_HOST_FETCH_FAILURE_FRACTION,
-        TezRuntimeConfiguration
-            .TEZ_RUNTIME_SHUFFLE_ACCEPTABLE_HOST_FETCH_FAILURE_FRACTION_DEFAULT);
-
-    this.maxStallTimeFraction = conf.getFloat(
-        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MAX_STALL_TIME_FRACTION,
-        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MAX_STALL_TIME_FRACTION_DEFAULT);
-    Preconditions.checkArgument(maxStallTimeFraction >= 0,
-        "{}={} should not be negative",
-        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MAX_STALL_TIME_FRACTION,
-        maxStallTimeFraction);
-
-    this.minReqProgressFraction = conf.getFloat(
-        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MIN_REQUIRED_PROGRESS_FRACTION,
-        TezRuntimeConfiguration
-            .TEZ_RUNTIME_SHUFFLE_MIN_REQUIRED_PROGRESS_FRACTION_DEFAULT);
-    Preconditions.checkArgument(minReqProgressFraction >= 0,
-        "{}={} should not be negative",
-        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MIN_REQUIRED_PROGRESS_FRACTION,
-        minReqProgressFraction);
-
-    this.maxAllowedFailedFetchFraction = conf.getFloat(
-        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MAX_ALLOWED_FAILED_FETCH_ATTEMPT_FRACTION,
-        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MAX_ALLOWED_FAILED_FETCH_ATTEMPT_FRACTION_DEFAULT);
-    Preconditions.checkArgument(maxAllowedFailedFetchFraction >= 0,
-        "{}={} should not be negative",
-        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MAX_ALLOWED_FAILED_FETCH_ATTEMPT_FRACTION,
-        maxAllowedFailedFetchFraction);
-
-    this.checkFailedFetchSinceLastCompletion = conf.getBoolean
-        (TezRuntimeConfiguration
-            .TEZ_RUNTIME_SHUFFLE_FAILED_CHECK_SINCE_LAST_COMPLETION,
-            TezRuntimeConfiguration
-                .TEZ_RUNTIME_SHUFFLE_FAILED_CHECK_SINCE_LAST_COMPLETION_DEFAULT);
-
     this.applicationId = inputContext.getApplicationId().toString();
     this.dagId = inputContext.getDagIdentifier();
     this.localHostname = inputContext.getExecutionContext().getHostName();
@@ -341,7 +270,6 @@ class ShuffleScheduler {
         inputContext.getServiceProviderMetaData(auxiliaryService);
     this.localShufflePorts = ShuffleUtils.deserializeShuffleProviderMetaData(shuffleMetadata);
 
-    this.referee = new Referee();
     // Counters used by the ShuffleScheduler
     this.shuffledInputsCounter = inputContext.getCounters().findCounter(
         TaskCounter.NUM_SHUFFLED_INPUTS);
@@ -391,10 +319,6 @@ class ShuffleScheduler {
     }
     this.fetcherExecutor = MoreExecutors.listeningDecorator(fetcherRawExecutor);
 
-    this.maxFailedUniqueFetches = Math.min(
-        Math.max(numberOfInputs / 2, MIN_FAILED_UNIQUE_FETCHES_SHUFFLE_UNHEALTHY),
-        MAX_FAILED_UNIQUE_FETCHES_SHUFFLE_UNHEALTHY);
-    referee.start();
     this.verifyDiskChecksum = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_VERIFY_DISK_CHECKSUM,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_VERIFY_DISK_CHECKSUM_DEFAULT);
@@ -411,23 +335,12 @@ class ShuffleScheduler {
     this.firstEventReceived = inputContext.getCounters().findCounter(TaskCounter.FIRST_EVENT_RECEIVED);
     this.lastEventReceived = inputContext.getCounters().findCounter(TaskCounter.LAST_EVENT_RECEIVED);
     this.compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
-    this.maxPenaltyTime = conf.getInt(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_HOST_PENALTY_TIME_LIMIT_MS,
-        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_HOST_PENALTY_TIME_LIMIT_MS_DEFAULT);
 
     pipelinedShuffleInfoEventsMap = Maps.newConcurrentMap();
     LOG.info("ShuffleScheduler running for sourceVertex: {}, numFetchers={}",
         inputContext.getSourceVertexName(), numFetchers);
     if (LOG.isDebugEnabled()) {
-      LOG.debug("maxFailedUniqueFetches=" + maxFailedUniqueFetches
-          + ", abortFailureLimit=" + abortFailureLimit
-          + ", maxTaskOutputAtOnce=" + maxTaskOutputAtOnce
-          + ", hostFailureFraction=" + hostFailureFraction
-          + ", minFailurePerHost=" + minFailurePerHost
-          + ", maxAllowedFailedFetchFraction=" + maxAllowedFailedFetchFraction
-          + ", maxStallTimeFraction=" + maxStallTimeFraction
-          + ", minReqProgressFraction=" + minReqProgressFraction
-          + ", checkFailedFetchSinceLastCompletion=" + checkFailedFetchSinceLastCompletion
-      );
+      LOG.debug("maxTaskOutputAtOnce=" + maxTaskOutputAtOnce);
     }
   }
 
@@ -471,19 +384,6 @@ class ShuffleScheduler {
                 "Error while shutting down fetcher. Ignoring and continuing shutdown. Message={}",
                 e.getMessage());
           }
-        }
-
-        // Kill the Referee thread.
-        try {
-          referee.interrupt();
-          referee.join();
-        } catch (InterruptedException e) {
-          LOG.warn("Interrupted while shutting down referee. Ignoring and continuing shutdown");
-          Thread.currentThread().interrupt();
-        } catch (Exception e) {
-          LOG.warn(
-              "Error while shutting down referee. Ignoring and continuing shutdown. Message={}",
-              e.getMessage());
         }
       }
     } finally {
@@ -570,12 +470,6 @@ class ShuffleScheduler {
                                          ) throws IOException {
 
     if (!isInputFinished(srcAttemptIdentifier.getInputIdentifier())) {
-      if (!isLocalFetch) {
-        /**
-         * Reset it only when it is a non-local-disk copy.
-         */
-        failedShufflesSinceLastCompletion = 0;
-      }
       if (output != null) {
 
         failureCounts.remove(srcAttemptIdentifier);
@@ -743,97 +637,7 @@ class ShuffleScheduler {
                                       boolean connectError,
                                       boolean isLocalFetch) {
     failedShuffleCounter.increment(1);
-    int failures;
-
-    synchronized (this) {
-      failures = incrementAndGetFailureAttempt(srcAttempt);
-
-      if (!isLocalFetch) {
-        /**
-         * Track the number of failures that has happened since last completion.
-         * This gets reset on a successful copy.
-         */
-        failedShufflesSinceLastCompletion++;
-      }
-    }
-
-    /**
-     * Inform AM:
-     *    - In case of read/connect error
-     * Bail-out if needed (in isShuffleHealthy()):
-     *    - Check whether individual attempt crossed failure threshold limits
-     *    - Check overall shuffle health. Bail out if needed.*
-     */
-    // If readError == false and connectError == false, we do not call informAM() right away.
-    // If FetcherOrderedGrouped repeatedly fails to read srcAttempt, however, isAbortLimitExceedFor()
-    // in isShuffleHealthy() eventually fails the current RuntimeTask, blaming the consumer.
-    // In such a case, we also report to AM by sending InputReadError so that the next TaskAttempt
-    // can read newly generated output.
-
-    boolean shouldInformAM = readError || connectError;
-    // Even if isObsoleteInputAttemptIdentifier(srcAttempt) returns true, we should call informAM.
-    // Inform AM. In case producer needs to be restarted, it is handled at AM.
-    if (shouldInformAM) {
-      // informAM() does not need synchronized(this)
-      informAM(srcAttempt);
-    }
-    if (!isShuffleHealthy(srcAttempt)) {
-      return;
-    }
-
-    penalizeHost(host, failures);
-  }
-
-  // not inside synchronized(this)
-  private boolean isAbortLimitExceedFor(InputAttemptIdentifier srcAttempt) {
-    int attemptFailures = getFailureCount(srcAttempt);
-    if (attemptFailures >= abortFailureLimit) {
-      // This task has seen too many fetch failures - report it as failed.
-      // In addition, we send InputReadError to the AM.
-      // Ex.
-      //   1. ShuffleHandler.sendMapOutput() fails to read file.out.
-      //   2. ShuffleHandler.sendMap() sends NOT_FOUND.
-      //   3. IFile.verifyHeaderMagic() fails with 'Not a valid ifile header'.
-      //   4. FetcherOrderedGrouped repeatedly fails on srcAttempt.
-      informAM(srcAttempt);
-
-      String errorMsg = "Failed " + attemptFailures + " times trying to "
-          + "download from " + TezRuntimeUtils.getTaskAttemptIdentifier(
-          inputContext.getSourceVertexName(),
-          srcAttempt.getInputIdentifier(),
-          srcAttempt.getAttemptNumber()) + ". threshold=" + abortFailureLimit;
-      IOException ioe = new IOException(errorMsg);
-      // Shuffle knows how to deal with failures post shutdown via the onFailure hook
-      exceptionReporter.reportException(ioe);
-      return true;
-    }
-    return false;
-  }
-
-  private synchronized void penalizeHost(MapHost host, int failures) {
-    host.penalize();
-
-    long delay = (long) (INITIAL_PENALTY *
-        Math.pow(PENALTY_GROWTH_RATE, failures));
-    long penaltyDelay = Math.min(delay, maxPenaltyTime);
-    penalties.add(new Penalty(host, penaltyDelay));
-  }
-
-  private synchronized int getFailureCount(InputAttemptIdentifier srcAttempt) {
-    IntWritable failureCount = failureCounts.get(srcAttempt);
-    return (failureCount == null) ? 0 : failureCount.get();
-  }
-
-  private int incrementAndGetFailureAttempt(InputAttemptIdentifier srcAttempt) {
-    int failures = 1;
-    if (failureCounts.containsKey(srcAttempt)) {
-      IntWritable x = failureCounts.get(srcAttempt);
-      x.set(x.get() + 1);
-      failures = x.get();
-    } else {
-      failureCounts.put(srcAttempt, new IntWritable(1));
-    }
-    return failures;
+    informAM(srcAttempt);
   }
 
   public void reportLocalError(IOException ioe) {
@@ -859,144 +663,6 @@ class ShuffleScheduler {
         srcAttempt.getAttemptNumber()));
 
     inputContext.sendEvents(failedEvents);
-  }
-
-  private boolean allEventsReceived() {
-    if (!pipelinedShuffleInfoEventsMap.isEmpty()) {
-      return (pipelinedShuffleInfoEventsMap.size() == numInputs);
-    } else {
-      //no pipelining
-      return ((pathToIdentifierMap.size() + skippedInputCounter.getValue())
-          == numInputs);
-    }
-  }
-
-  /**
-   * Check if consumer needs to be restarted based on total failures w.r.t
-   * completed outputs and based on number of errors that have happened since
-   * last successful completion. Consider into account whether failures have
-   * been seen across different nodes.
-   *
-   * @return true to indicate fetchers are healthy
-   */
-  private boolean isFetcherHealthy(String logContext) {
-
-    long totalFailures = failedShuffleCounter.getValue();
-    int doneMaps = numInputs - remainingMaps.get();
-
-    boolean fetcherHealthy = true;
-    if (doneMaps > 0) {
-      fetcherHealthy = (((float) totalFailures / (totalFailures + doneMaps))
-          < maxAllowedFailedFetchFraction);
-    }
-
-    if (fetcherHealthy) {
-      //Compute this logic only when all events are received
-      if (allEventsReceived()) {
-        // We do not check whether failures happened across nodes or not (as in Tez).
-        // That is, we assume that nodes are healthy collectively.
-
-        if (checkFailedFetchSinceLastCompletion) {
-          /**
-           * remainingMaps works better instead of pendingHosts in the
-           * following condition because of the way the fetcher reports failures
-           */
-          if (failedShufflesSinceLastCompletion >=
-              remainingMaps.get() * minFailurePerHost) {
-            /**
-             * Check if lots of errors are seen after last progress time.
-             *
-             * E.g totalFailures = 20. doneMaps = 320 - 300;
-             * fetcherHealthy = (20/(20+300)) < 0.5.  So reducer would be marked as healthy.
-             * Assume 20 errors happen when downloading the last 20 attempts. Host failure & individual
-             * attempt failures would keep increasing; but at very slow rate 15 * 180 seconds per
-             * attempt to find out the issue.
-             *
-             * Instead consider the new errors with the pending items to be fetched.
-             * Assume 21 new errors happened after last progress; remainingMaps = (320-300) = 20;
-             * (21 / (21 + 20)) > 0.5
-             * So we reset the reducer to unhealthy here (special case)
-             *
-             * In normal conditions (i.e happy path), this wouldn't even cause any issue as
-             * failedShufflesSinceLastCompletion is reset as soon as we see successful download.
-             */
-
-            fetcherHealthy =
-                (((float) failedShufflesSinceLastCompletion / (
-                    failedShufflesSinceLastCompletion + remainingMaps.get()))
-                    < maxAllowedFailedFetchFraction);
-
-            LOG.info("{}, fetcherHealthy={}, failedShufflesSinceLastCompletion={}, remainingMaps={}",
-                logContext, fetcherHealthy, failedShufflesSinceLastCompletion, remainingMaps.get());
-          }
-        }
-      }
-    }
-    return fetcherHealthy;
-  }
-
-  // not inside synchronized(this)
-  boolean isShuffleHealthy(InputAttemptIdentifier srcAttempt) {
-
-    if (isAbortLimitExceedFor(srcAttempt)) {
-      return false;
-    }
-
-    String errorMsg = null;
-    boolean result;
-
-    synchronized (this) {
-      final float MIN_REQUIRED_PROGRESS_PERCENT = minReqProgressFraction;
-      final float MAX_ALLOWED_STALL_TIME_PERCENT = maxStallTimeFraction;
-
-      int doneMaps = numInputs - remainingMaps.get();
-
-      String logContext = "srcAttempt=" + srcAttempt.toString();
-      boolean fetcherHealthy = isFetcherHealthy(logContext);
-
-      // check if the reducer has progressed enough
-      boolean reducerProgressedEnough =
-        (((float)doneMaps / numInputs)
-            >= MIN_REQUIRED_PROGRESS_PERCENT);
-
-      // check if the reducer is stalled for a long time
-      // duration for which the reducer is stalled
-      int stallDuration =
-        (int)(System.currentTimeMillis() - lastProgressTime);
-
-      // duration for which the reducer ran with progress
-      int shuffleProgressDuration =
-        (int)(lastProgressTime - startTime);
-
-      boolean reducerStalled = (shuffleProgressDuration > 0) &&
-        (((float)stallDuration / shuffleProgressDuration)
-            >= MAX_ALLOWED_STALL_TIME_PERCENT);
-
-      // kill if not healthy and has insufficient progress
-      if ((failureCounts.size() >= maxFailedUniqueFetches ||
-          failureCounts.size() == (numInputs - doneMaps))
-          && !fetcherHealthy
-          && (!reducerProgressedEnough || reducerStalled)) {
-        errorMsg = (new StringBuilder(srcNameTrimmed))
-            .append(": Shuffle failed with too many fetch failures and insufficient progress!")
-            .append(" failureCounts=").append(failureCounts.size())
-            .append(", pendingInputs=").append(numInputs - doneMaps)
-            .append(", fetcherHealthy=").append(fetcherHealthy)
-            .append(", reducerProgressedEnough=").append(reducerProgressedEnough)
-            .append(", reducerStalled=").append(reducerStalled).toString();
-        LOG.error(errorMsg);
-        result = false;
-      } else {
-        result = true;
-      }
-    }
-
-    if (!result) {
-      // Shuffle knows how to deal with failures post shutdown via the onFailure hook
-      // reportException() should be called outside synchronized(this)
-      exceptionReporter.reportException(new IOException(errorMsg));
-    }
-    return result;
   }
 
   public synchronized void addKnownMapOutput(String inputHostName,
@@ -1096,11 +762,6 @@ class ShuffleScheduler {
   public InputAttemptIdentifier getIdentifierForFetchedOutput(
       String path, int reduceId) {
     return pathToIdentifierMap.get(new PathPartition(path, reduceId));
-  }
-
-  @VisibleForTesting
-  DelayQueue<Penalty> getPenalties() {
-    return penalties;
   }
 
   private synchronized boolean inputShouldBeConsumed(InputAttemptIdentifier id) {
@@ -1240,63 +901,6 @@ class ShuffleScheduler {
   public synchronized boolean isDone() {
     return remainingMaps.get() == 0;
   }
-
-  /**
-   * A structure that records the penalty for a host.
-   */
-  static class Penalty implements Delayed {
-    MapHost host;
-    private long endTime;
-    
-    Penalty(MapHost host, long delay) {
-      this.host = host;
-      this.endTime = System.currentTimeMillis() + delay;
-    }
-
-    public long getDelay(TimeUnit unit) {
-      long remainingTime = endTime - System.currentTimeMillis();
-      return unit.convert(remainingTime, TimeUnit.MILLISECONDS);
-    }
-
-    public int compareTo(Delayed o) {
-      long other = ((Penalty) o).endTime;
-      return endTime == other ? 0 : (endTime < other ? -1 : 1);
-    }
-    
-  }
-
-  /**
-   * A thread that takes hosts off of the penalty list when the timer expires.
-   */
-  private class Referee extends Thread {
-    public Referee() {
-      setName("ShufflePenaltyReferee {"
-          + TezUtilsInternal.cleanVertexName(inputContext.getSourceVertexName()) + "}");
-      setDaemon(true);
-    }
-
-    public void run() {
-      try {
-        while (!isShutdown.get()) {
-          // take the first host that has an expired penalty
-          MapHost host = penalties.take().host;
-          synchronized (ShuffleScheduler.this) {
-            if (host.markAvailable() == MapHost.State.PENDING) {
-              pendingHosts.add(host);
-              ShuffleScheduler.this.notifyAll();
-            }
-          }
-        }
-      } catch (InterruptedException ie) {
-        Thread.currentThread().interrupt();
-        // This handles shutdown of the entire fetch / merge process.
-      } catch (Throwable t) {
-        // Shuffle knows how to deal with failures post shutdown via the onFailure hook
-        exceptionReporter.reportException(t);
-      }
-    }
-  }
-  
 
   void setInputFinished(int inputIndex) {
     synchronized(finishedMaps) {
