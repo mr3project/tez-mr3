@@ -260,14 +260,14 @@ public class TezConfiguration extends Configuration {
       + "resource.cpu.vcores";
   public static final int TEZ_AM_RESOURCE_CPU_VCORES_DEFAULT = 1;
 
+  // used in UtilsForConfTez.scala, MR3 
   /** Int value. The amount of memory in MB to be used by tasks. This applies to all tasks across
-   * all vertices. Setting it to the same value for all tasks is helpful for container reuse and
+   * all vertices. Setting it to the same value for all tasks is helpful for container reuse and 
    * thus good for performance typically. */
-  // do not remove because MR3 test code (UtilsForConfTez) uses it
-  @ConfigurationScope(Scope.DAG)
+  @ConfigurationScope(Scope.DAG)  // TODO vertex level
   @ConfigurationProperty(type="integer")
   public static final String TEZ_TASK_RESOURCE_MEMORY_MB = TEZ_TASK_PREFIX
-    + "resource.memory.mb";
+      + "resource.memory.mb";
   public static final int TEZ_TASK_RESOURCE_MEMORY_MB_DEFAULT = 1024;
 
   /**
