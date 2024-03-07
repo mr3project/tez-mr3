@@ -222,12 +222,13 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
               ifileReadAheadLength, true);
       break;
     case MEMORY:
+      // set useThreadLocalDecompressor = false because we are inside an EventHandler thread, not a Fetcher thread
       ShuffleUtils
           .shuffleToMemory(((MemoryFetchedInput) fetchedInput).getBytes(),
               dataProto.getData().newInput(), dataProto.getRawLength(),
               dataProto.getCompressedLength(),
               codec, ifileReadAhead, ifileReadAheadLength, LOG,
-              fetchedInput.getInputAttemptIdentifier(), inputContext);
+              fetchedInput.getInputAttemptIdentifier(), inputContext, false);
       break;
     case WAIT:
     default:
@@ -278,7 +279,7 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
   }
 
   private void processShufflePayload(DataMovementEventPayloadProto shufflePayload,
-                                     CompositeInputAttemptIdentifier srcAttemptIdentifier, int srcIndex) throws IOException {
+                                     CompositeInputAttemptIdentifier srcAttemptIdentifier, int partitionId) throws IOException {
     int port = getShufflePort(shufflePayload);
     if (shufflePayload.hasData()) {
       DataProto dataProto = shufflePayload.getData();
@@ -293,14 +294,15 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
       LOG.debug("Payload via DME : " + srcAttemptIdentifier);
     } else {
       shuffleManager.addKnownInput(shufflePayload.getHost(), port,
-          srcAttemptIdentifier, srcIndex);
+          srcAttemptIdentifier, partitionId);
     }
   }
 
   private int getShufflePort(DataMovementEventPayloadProto shufflePayload) {
     if (inputContext.useShuffleHandlerProcessOnK8s()) {
-      int numPorts = shuffleManager.localShufflePorts.length;
-      return shuffleManager.localShufflePorts[portIndex % numPorts];
+      int[] localShufflePorts = shuffleManager.getLocalShufflePorts();
+      int numPorts = localShufflePorts.length;
+      return localShufflePorts[portIndex % numPorts];
     } else {
       int numPorts = shufflePayload.getNumPorts();
       return shufflePayload.getPorts(portIndex % numPorts);

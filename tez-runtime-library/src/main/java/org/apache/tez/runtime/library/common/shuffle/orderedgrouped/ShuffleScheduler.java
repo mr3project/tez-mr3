@@ -59,7 +59,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.io.IntWritable;
-import org.apache.tez.common.TezUtilsInternal;
 import org.apache.tez.common.counters.TaskCounter;
 import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.runtime.api.Event;
@@ -215,6 +214,7 @@ class ShuffleScheduler {
   private final TezCounter wrongReduceErrsCounter;
 
   private final int maxTaskOutputAtOnce;
+  private final int abortFailureLimit;
 
   private final boolean verifyDiskChecksum;
   private final boolean compositeFetch;
@@ -242,6 +242,15 @@ class ShuffleScheduler {
     this.allocator = allocator;
     this.mergeManager = mergeManager;
     this.numInputs = numberOfInputs;
+    int abortFailureLimitConf = conf.getInt(TezRuntimeConfiguration
+        .TEZ_RUNTIME_SHUFFLE_SOURCE_ATTEMPT_ABORT_LIMIT, TezRuntimeConfiguration
+        .TEZ_RUNTIME_SHUFFLE_SOURCE_ATTEMPT_ABORT_LIMIT_DEFAULT);
+    if (abortFailureLimitConf <= -1) {
+      abortFailureLimit = Math.max(15, numberOfInputs / 10);
+    } else {
+      //No upper cap, as user is setting this intentionally
+      abortFailureLimit = abortFailureLimitConf;
+    }
     remainingMaps = new AtomicInteger(numberOfInputs);
     finishedMaps = new BitSet(numberOfInputs);
     this.ifileReadAhead = ifileReadAhead;
@@ -337,11 +346,8 @@ class ShuffleScheduler {
     this.compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
 
     pipelinedShuffleInfoEventsMap = Maps.newConcurrentMap();
-    LOG.info("ShuffleScheduler running for sourceVertex: {}, numFetchers={}",
-        inputContext.getSourceVertexName(), numFetchers);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("maxTaskOutputAtOnce=" + maxTaskOutputAtOnce);
-    }
+    LOG.info("ShuffleScheduler running for sourceVertex: {}, numFetchers={}, abortFailureLimit={}, maxTaskOutputAtOnce={}",
+        inputContext.getSourceVertexName(), numFetchers, abortFailureLimit, maxTaskOutputAtOnce);
   }
 
   public void start() throws Exception {
@@ -385,6 +391,7 @@ class ShuffleScheduler {
                 e.getMessage());
           }
         }
+
       }
     } finally {
       long startTime = System.currentTimeMillis();
@@ -428,7 +435,6 @@ class ShuffleScheduler {
     int attemptNum;
     String id;
     boolean scheduledForDownload; // whether chunks got scheduled for download (getMapHost)
-
 
     ShuffleEventInfo(InputAttemptIdentifier input) {
       this.id = input.getInputIdentifier() + "_" + input.getAttemptNumber();
@@ -637,7 +643,67 @@ class ShuffleScheduler {
                                       boolean connectError,
                                       boolean isLocalFetch) {
     failedShuffleCounter.increment(1);
-    informAM(srcAttempt);
+    incrementFailureAttempt(srcAttempt);
+
+    /**
+     * Inform AM:
+     *    - In case of read/connect error
+     * Bail-out if needed (in isAbortLimitExceedFor()):
+     *    - Check whether individual attempt crossed failure threshold limits
+     */
+    // If readError == false and connectError == false, we do not call informAM() right away.
+    // If FetcherOrderedGrouped repeatedly fails to read srcAttempt, however, isAbortLimitExceedFor()
+    // eventually fails the current RuntimeTask, blaming the consumer.
+    // In such a case, we also report to AM by sending InputReadError so that the next TaskAttempt
+    // can read newly generated output.
+
+    boolean shouldInformAM = readError || connectError;
+    // Even if isObsoleteInputAttemptIdentifier(srcAttempt) returns true, we should call informAM.
+    // Inform AM. In case producer needs to be restarted, it is handled at AM.
+    if (shouldInformAM) {
+      // informAM() does not need synchronized(this)
+      informAM(srcAttempt);
+    }
+
+    isAbortLimitExceedFor(srcAttempt);
+  }
+
+  // not inside synchronized(this)
+  private void isAbortLimitExceedFor(InputAttemptIdentifier srcAttempt) {
+    int attemptFailures = getFailureCount(srcAttempt);
+    if (attemptFailures >= abortFailureLimit) {
+      // This task has seen too many fetch failures - report it as failed.
+      // In addition, we send InputReadError to the AM.
+      // Ex.
+      //   1. ShuffleHandler.sendMapOutput() fails to read file.out.
+      //   2. ShuffleHandler.sendMap() sends NOT_FOUND.
+      //   3. IFile.verifyHeaderMagic() fails with 'Not a valid ifile header'.
+      //   4. FetcherOrderedGrouped repeatedly fails on srcAttempt.
+      informAM(srcAttempt);
+
+      String errorMsg = "Failed " + attemptFailures + " times trying to "
+          + "download from " + TezRuntimeUtils.getTaskAttemptIdentifier(
+          inputContext.getSourceVertexName(),
+          srcAttempt.getInputIdentifier(),
+          srcAttempt.getAttemptNumber()) + ". threshold=" + abortFailureLimit;
+      IOException ioe = new IOException(errorMsg);
+      // Shuffle knows how to deal with failures post shutdown via the onFailure hook
+      exceptionReporter.reportException(ioe);
+    }
+  }
+
+  private synchronized int getFailureCount(InputAttemptIdentifier srcAttempt) {
+    IntWritable failureCount = failureCounts.get(srcAttempt);
+    return (failureCount == null) ? 0 : failureCount.get();
+  }
+
+  private synchronized void incrementFailureAttempt(InputAttemptIdentifier srcAttempt) {
+    if (failureCounts.containsKey(srcAttempt)) {
+      IntWritable x = failureCounts.get(srcAttempt);
+      x.set(x.get() + 1);
+    } else {
+      failureCounts.put(srcAttempt, new IntWritable(1));
+    }
   }
 
   public void reportLocalError(IOException ioe) {
@@ -922,7 +988,6 @@ class ShuffleScheduler {
 
   private class ShuffleSchedulerCallable implements Callable<Void> {
 
-
     @Override
     public Void call() throws InterruptedException {
       while (!isShutdown.get() && remainingMaps.get() > 0) {
@@ -1038,8 +1103,6 @@ class ShuffleScheduler {
         ShuffleScheduler.this.notifyAll();
       }
     }
-
-
 
     @Override
     public void onSuccess(Void result) {

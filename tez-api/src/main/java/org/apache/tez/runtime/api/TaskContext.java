@@ -37,7 +37,7 @@ import org.apache.tez.dag.api.UserPayload;
  * This interface is not supposed to be implemented by users
  */
 @Public
-public interface TaskContext {
+public interface TaskContext extends DecompressorPool {
   /**
    * Get the {@link ApplicationId} for the running app
    * @return the {@link ApplicationId}

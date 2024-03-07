@@ -259,24 +259,6 @@ public class TezConfiguration extends Configuration {
       + "resource.cpu.vcores";
   public static final int TEZ_AM_RESOURCE_CPU_VCORES_DEFAULT = 1;
 
-  /** Int value. The amount of memory in MB to be used by tasks. This applies to all tasks across
-   * all vertices. Setting it to the same value for all tasks is helpful for container reuse and 
-   * thus good for performance typically. */
-  @ConfigurationScope(Scope.DAG)  // TODO vertex level
-  @ConfigurationProperty(type="integer")
-  public static final String TEZ_TASK_RESOURCE_MEMORY_MB = TEZ_TASK_PREFIX
-      + "resource.memory.mb";
-  public static final int TEZ_TASK_RESOURCE_MEMORY_MB_DEFAULT = 1024;
-
-  /**
-   * Int value. The number of virtual cores to be used by tasks.
-   */
-  @ConfigurationScope(Scope.DAG)  // TODO vertex level
-  @ConfigurationProperty(type="integer")
-  public static final String TEZ_TASK_RESOURCE_CPU_VCORES = TEZ_TASK_PREFIX
-      + "resource.cpu.vcores";
-  public static final int TEZ_TASK_RESOURCE_CPU_VCORES_DEFAULT = 1; 
-
   /**
    * Int value. The maximum heartbeat interval, in milliseconds, between the app master and tasks.
    * Increasing this can help improve app master scalability for a large number of concurrent tasks.
@@ -494,24 +476,6 @@ public class TezConfiguration extends Configuration {
   @ConfigurationProperty(type="boolean")
   public static final String TEZ_USE_CLUSTER_HADOOP_LIBS = TEZ_PREFIX + "use.cluster.hadoop-libs";
   public static final boolean TEZ_USE_CLUSTER_HADOOP_LIBS_DEFAULT = false;
-
-  /**
-   * Boolean value.
-   * Specify whether the user classpath takes precedence over the Tez framework
-   * classpath.
-   */
-  @ConfigurationScope(Scope.CLIENT)
-  @ConfigurationProperty(type="boolean")
-  public static final String TEZ_USER_CLASSPATH_FIRST = TEZ_PREFIX + "user.classpath.first";
-  public static final boolean TEZ_USER_CLASSPATH_FIRST_DEFAULT = true;
-
-  /**
-   * Session-related properties
-   */
-  @Private
-  @ConfigurationProperty
-  public static final String TEZ_SESSION_PREFIX =
-      TEZ_PREFIX + "session.";
 
   /**
    * String value. The queue name for all jobs being submitted from a given client.

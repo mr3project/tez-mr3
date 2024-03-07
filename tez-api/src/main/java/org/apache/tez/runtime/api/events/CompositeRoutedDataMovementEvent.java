@@ -51,7 +51,7 @@ public final class CompositeRoutedDataMovementEvent extends Event
    * Index(i) of the i-th (physical) Input or Output that generated an Event.
    * For a Processor-generated event, this is ignored.
    */
-  private final int sourceIndex;
+  private final int sourceIndex;  // partitionId
 
   /**
    * Index(i) of the i-th (physical) Input or Output that is meant to receive

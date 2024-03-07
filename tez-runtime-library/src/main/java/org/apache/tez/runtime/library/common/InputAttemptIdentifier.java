@@ -80,11 +80,11 @@ public class InputAttemptIdentifier {
   }
 
   public int getAttemptNumber() {
-    return attemptNumber;
+    return this.attemptNumber;
   }
   
   public String getPathComponent() {
-    return pathComponent;
+    return this.pathComponent;
   }
 
   public boolean isShared() {

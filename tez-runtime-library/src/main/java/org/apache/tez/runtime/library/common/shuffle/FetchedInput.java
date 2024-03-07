@@ -42,7 +42,7 @@ public abstract class FetchedInput {
 
   private static AtomicInteger ID_GEN = new AtomicInteger(0);
 
-  private InputAttemptIdentifier inputAttemptIdentifier;
+  private final InputAttemptIdentifier inputAttemptIdentifier;
   private final FetchedInputCallback callback;
   private final int id;
   private byte state;

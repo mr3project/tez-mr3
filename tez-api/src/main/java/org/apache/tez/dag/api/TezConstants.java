@@ -26,17 +26,6 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 @Private
 public class TezConstants {
 
-
-  public static final String TEZ_APPLICATION_MASTER_CLASS =
-      "org.apache.tez.dag.app.DAGAppMaster";
-  
-  /**
-   * Command-line argument to be set when running the Tez AM in session mode.
-   */
-  public static final String TEZ_SESSION_MODE_CLI_OPTION = "session";
-
-  public static final String TEZ_TAR_LR_NAME = "tezlib";
-  
   /*
    * Tez AM Service Authorization
    * These are the same as MR which allows Tez to run in secure
@@ -49,26 +38,13 @@ public class TezConstants {
   TEZ_AM_SECURITY_SERVICE_AUTHORIZATION_CLIENT =
       "security.job.client.protocol.acl";
 
-  public static final String TEZ_PB_BINARY_CONF_NAME = "tez-conf.pb";
-  public static final String TEZ_PB_PLAN_BINARY_NAME = "tez-dag.pb";
-  public static final String TEZ_PB_PLAN_TEXT_NAME = "tez-dag.pb.txt";
-
   /*
    * Logger properties
    */
   public static final String TEZ_CONTAINER_LOG4J_PROPERTIES_FILE = "tez-container-log4j.properties";
   public static final String TEZ_CONTAINER_LOGGER_NAME = "CLA";
   public static final String TEZ_ROOT_LOGGER_NAME = "tez.root.logger";
-  public static final String TEZ_CONTAINER_LOG_FILE_NAME = "syslog";
-  public static final String TEZ_CONTAINER_ERR_FILE_NAME = "stderr";
-  public static final String TEZ_CONTAINER_OUT_FILE_NAME = "stdout";
-  public static final String TEZ_CONTAINER_LOG_PARAMS = "TEZ_CONTAINER_LOG_PARAMS";
-  public static final String TEZ_CONTAINER_LOG_PARAMS_SEPARATOR = ";";
 
-  public static final String TEZ_AM_LOCAL_RESOURCES_PB_FILE_NAME =
-    TezConfiguration.TEZ_SESSION_PREFIX + "local-resources.pb";
-  
-  public static final String TEZ_APPLICATION_TYPE = "TEZ";
   /**
    * The service id for the NodeManager plugin used to share intermediate data
    * between vertices.

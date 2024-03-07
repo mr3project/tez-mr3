@@ -575,7 +575,7 @@ class FetcherOrderedGrouped implements Callable<Void> {
         if (mapOutput.getType() == Type.MEMORY) {
           ShuffleUtils.shuffleToMemory(mapOutput.getMemory(), input,
               (int) decompressedLength, (int) compressedLength, codec, ifileReadAhead,
-              ifileReadAheadLength, LOG, mapOutput.getAttemptIdentifier(), inputContext);
+              ifileReadAheadLength, LOG, mapOutput.getAttemptIdentifier(), inputContext, false);
         } else if (mapOutput.getType() == Type.DISK) {
           ShuffleUtils.shuffleToDisk(mapOutput.getDisk(), host.getHostIdentifier(),
               input, compressedLength, decompressedLength, LOG,

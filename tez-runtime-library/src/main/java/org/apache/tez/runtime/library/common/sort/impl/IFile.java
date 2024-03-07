@@ -31,13 +31,12 @@ import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.hadoop.io.BoundedByteArrayOutputStream;
 import org.apache.tez.runtime.api.DecompressorPool;
-import org.apache.tez.runtime.api.InputContext;
+import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.library.common.task.local.output.TezTaskOutput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -76,6 +75,14 @@ public class IFile {
 
   private static final String INCOMPLETE_READ = "Requested to read %d got %d";
   private static final String REQ_BUFFER_SIZE_TOO_LARGE = "Size of data %d is greater than the max allowed of %d";
+
+  private static final ThreadLocal<Decompressor> decompressorHolder = new ThreadLocal<>();
+
+  public static Decompressor returnThreadLocalDecompressor() {
+    Decompressor decompressor = decompressorHolder.get();
+    decompressorHolder.remove();
+    return decompressor;
+  }
 
   /**
    * IFileWriter which stores data in memory for specified limit, beyond
@@ -716,7 +723,7 @@ public class IFile {
     long startPos;
 
     private CompressionCodec codec;
-    private DecompressorPool inputOutputContext;
+    private DecompressorPool taskContext;
 
     /**
      * Construct an IFile Reader.
@@ -751,10 +758,10 @@ public class IFile {
         CompressionCodec codec,
         TezCounter readsCounter, TezCounter bytesReadCounter,
         boolean readAhead, int readAheadLength,
-        int bufferSize, DecompressorPool inputOutputContext) throws IOException {
+        int bufferSize, DecompressorPool taskContext) throws IOException {
       this(in, ((in != null) ? (length - HEADER.length) : length), codec,
           readsCounter, bytesReadCounter, readAhead, readAheadLength,
-          bufferSize, inputOutputContext, ((in != null) ? isCompressedFlagEnabled(in) : false));
+          bufferSize, taskContext, ((in != null) ? isCompressedFlagEnabled(in) : false));
       if (in != null && bytesReadCounter != null) {
         bytesReadCounter.increment(IFile.HEADER.length);
       }
@@ -774,15 +781,15 @@ public class IFile {
                   CompressionCodec codec,
                   TezCounter readsCounter, TezCounter bytesReadCounter,
                   boolean readAhead, int readAheadLength,
-                  int bufferSize, DecompressorPool inputOutputContext, boolean isCompressed) throws IOException {
+                  int bufferSize, DecompressorPool taskContext, boolean isCompressed) throws IOException {
       if (in != null) {
         checksumIn = new IFileInputStream(in, length, readAhead,
             readAheadLength/* , isCompressed */);
         if (isCompressed && codec != null) {
-          assert inputOutputContext != null;
+          assert taskContext != null;
           this.codec = codec;
-          this.inputOutputContext = inputOutputContext;
-          decompressor = inputOutputContext.getDecompressor(codec);
+          this.taskContext = taskContext;
+          decompressor = taskContext.getDecompressor(codec);
           if (decompressor != null) {
             this.in = CodecUtils.createInputStream(codec, checksumIn, decompressor);
           } else {
@@ -818,7 +825,8 @@ public class IFile {
      * @throws IOException
      */
     public static void readToMemory(byte[] buffer, InputStream in, int compressedLength,
-        CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLength, InputContext inputContext)
+        CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLength,
+        TaskContext taskContext, boolean useThreadLocalDecompressor)
         throws IOException {
       boolean isCompressed = IFile.Reader.isCompressedFlagEnabled(in);
       IFileInputStream checksumIn = new IFileInputStream(in,
@@ -827,8 +835,17 @@ public class IFile {
       in = checksumIn;
       Decompressor decompressor = null;
       if (isCompressed && codec != null) {
-        assert inputContext != null;
-        decompressor = inputContext.getDecompressor(codec);
+        if (useThreadLocalDecompressor) {
+          decompressor = decompressorHolder.get();
+          if (decompressor == null) {
+            assert taskContext != null;
+            decompressor = taskContext.getDecompressor(codec);
+            decompressorHolder.set(decompressor);
+          }
+        } else {
+          assert taskContext != null;
+          decompressor = taskContext.getDecompressor(codec);
+        }
         if (decompressor != null) {
           decompressor.reset();
           in = CodecUtils.getDecompressedInputStreamWithBufferSize(codec, checksumIn, decompressor,
@@ -863,10 +880,13 @@ public class IFile {
       } finally {
         if (decompressor != null) {
           decompressor.reset();
-          if (inputContext != null) {
-            inputContext.returnDecompressor(codec.getCompressorType(), decompressor);
-          } else {
-            CodecPool.returnDecompressor(decompressor);
+          // if useThreadLocalDecompressor == false, never return decompressor which will be garbage-collected
+          if (!useThreadLocalDecompressor) {
+            if (taskContext != null) {
+              taskContext.returnDecompressor(codec.getCompressorType(), decompressor);
+            } else {
+              CodecPool.returnDecompressor(decompressor);
+            }
           }
         }
       }
@@ -1098,8 +1118,8 @@ public class IFile {
       // Return the decompressor
       if (decompressor != null) {
         decompressor.reset();
-        if (inputOutputContext != null) {
-          inputOutputContext.returnDecompressor(codec.getCompressorType(), decompressor);
+        if (taskContext != null) {
+          taskContext.returnDecompressor(codec.getCompressorType(), decompressor);
         } else {
           CodecPool.returnDecompressor(decompressor);
         }

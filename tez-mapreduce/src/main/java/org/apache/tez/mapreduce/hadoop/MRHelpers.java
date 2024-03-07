@@ -256,35 +256,6 @@ public class MRHelpers {
   }
 
   /**
-   * Generate JVM options based on MapReduce reducer java options. </p>
-   *
-   * This is only meant to be used if frameworks are not setting up their own java options,
-   * and would like to fallback to using java options which may already be configured for
-   * Hadoop MapReduce reducers.
-   *
-   * Uses mapreduce.admin.reduce.child.java.opts, mapreduce.reduce.java.opts
-   * and mapreduce.reduce.log.level from config to generate the opts.
-   *
-   * @param conf Configuration to be used to extract JVM opts specific info
-   * @return JAVA_OPTS string to be used in launching the JVM
-   */
-  @SuppressWarnings("deprecation")
-  public static String getJavaOptsForMRReducer(Configuration conf) {
-    String adminOpts = conf.get(
-        MRJobConfig.MAPRED_REDUCE_ADMIN_JAVA_OPTS,
-        MRJobConfig.DEFAULT_MAPRED_ADMIN_JAVA_OPTS);
-
-    String userOpts = conf.get(
-        MRJobConfig.REDUCE_JAVA_OPTS,
-        conf.get(
-            JobConf.MAPRED_TASK_JAVA_OPTS,
-            JobConf.DEFAULT_MAPRED_TASK_JAVA_OPTS));
-
-    return adminOpts.trim() + " " + userOpts.trim() + " "
-        + getLog4jCmdLineProperties(conf, false);
-  }
-
-  /**
    * Extract the container resource requirements from the provided configuration, which would
    * otherwise have been used when running a Hadoop MapReduce mapper. </p>
    * <p/>

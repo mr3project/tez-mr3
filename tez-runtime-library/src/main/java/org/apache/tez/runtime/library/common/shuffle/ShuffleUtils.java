@@ -46,7 +46,7 @@ import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.http.BaseHttpConnection;
 import org.apache.tez.http.HttpConnectionParams;
-import org.apache.tez.runtime.api.InputContext;
+import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.api.events.DataMovementEvent;
 import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.TezRuntimeUtils;
@@ -80,14 +80,14 @@ public class ShuffleUtils {
   private static final Logger LOG = LoggerFactory.getLogger(ShuffleUtils.class);
   private static final long MB = 1024l * 1024l;
 
-  static final ThreadLocal<DecimalFormat> MBPS_FORMAT =
+  public static final ThreadLocal<DecimalFormat> MBPS_FORMAT =
       new ThreadLocal<DecimalFormat>() {
         @Override
         protected DecimalFormat initialValue() {
           return new DecimalFormat("0.00");
         }
       };
-  static final ThreadLocal<FastNumberFormat> MBPS_FAST_FORMAT =
+  public static final ThreadLocal<FastNumberFormat> MBPS_FAST_FORMAT =
       new ThreadLocal<FastNumberFormat>() {
         @Override
         protected FastNumberFormat initialValue() {
@@ -129,10 +129,11 @@ public class ShuffleUtils {
   public static void shuffleToMemory(byte[] shuffleData,
       InputStream input, int decompressedLength, int compressedLength,
       CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLength,
-      Logger LOG, InputAttemptIdentifier identifier, InputContext inputContext) throws IOException {
+      Logger LOG, InputAttemptIdentifier identifier,
+      TaskContext taskContext, boolean useThreadLocalDecompressor) throws IOException {
     try {
       IFile.Reader.readToMemory(shuffleData, input, compressedLength, codec,
-          ifileReadAhead, ifileReadAheadLength, inputContext);
+          ifileReadAhead, ifileReadAheadLength, taskContext, useThreadLocalDecompressor);
       // metrics.inputBytes(shuffleData.length);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Read " + shuffleData.length + " bytes from input for "
@@ -556,7 +557,6 @@ public class ShuffleUtils {
       this.aggregateLogger = aggregateLogger;
     }
 
-
     private static StringBuilder toShortString(InputAttemptIdentifier inputAttemptIdentifier, StringBuilder sb) {
       sb.append("{");
       sb.append(inputAttemptIdentifier.getInputIdentifier());
@@ -617,16 +617,15 @@ public class ShuffleUtils {
         activeLogger.debug(sb.toString());
       } else {
         long currentCount, currentCompressedSize, currentDecompressedSize, currentTotalTime;
-        synchronized (this) {
-          currentCount = logCount.incrementAndGet();
-          currentCompressedSize = compressedSize.addAndGet(bytesCompressed);
-          currentDecompressedSize = decompressedSize.addAndGet(bytesDecompressed);
-          currentTotalTime = totalTime.addAndGet(millis);
-          if (currentCount % 1000 == 0) {
-            compressedSize.set(0);
-            decompressedSize.set(0);
-            totalTime.set(0);
-          }
+        currentCount = logCount.incrementAndGet();
+        currentCompressedSize = compressedSize.addAndGet(bytesCompressed);
+        currentDecompressedSize = decompressedSize.addAndGet(bytesDecompressed);
+        currentTotalTime = totalTime.addAndGet(millis);
+        if (currentCount == 1000) {
+          logCount.set(0);
+          compressedSize.set(0);
+          decompressedSize.set(0);
+          totalTime.set(0);
         }
         if (currentCount % 1000 == 0) {
           double avgRate = currentTotalTime == 0 ? 0

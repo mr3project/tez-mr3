@@ -21,11 +21,15 @@ package org.apache.tez.runtime.library.utils;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Map;
 
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.LocalDirAllocator;
+import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.io.compress.CodecPool;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.io.compress.CompressionInputStream;
@@ -34,21 +38,98 @@ import org.apache.hadoop.io.compress.Compressor;
 import org.apache.hadoop.io.compress.Decompressor;
 import org.apache.hadoop.io.compress.DefaultCodec;
 import org.apache.hadoop.util.ReflectionUtils;
+import org.apache.tez.common.TezRuntimeFrameworkConfigs;
+import org.apache.tez.common.security.JobTokenSecretManager;
+import org.apache.tez.dag.api.TezConfiguration;
+import org.apache.tez.http.HttpConnectionParams;
+import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.ConfigUtils;
+import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
+import org.apache.tez.runtime.library.common.shuffle.impl.ShuffleManagerServer;
 import org.apache.tez.runtime.library.common.sort.impl.IFileInputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.annotations.VisibleForTesting;
+import javax.crypto.SecretKey;
 
 public final class CodecUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(CodecUtils.class);
-  @VisibleForTesting
   static final int DEFAULT_BUFFER_SIZE = 256 * 1024;
 
   private CodecUtils() {
+  }
+
+  public static ShuffleManagerServer.FetcherConfig constructFetcherConfig(
+      Configuration conf, TaskContext taskContext) throws IOException {
+    boolean ifileReadAhead = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD,
+        TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_DEFAULT);
+    int ifileReadAheadLength =
+        ifileReadAhead ? conf.getInt(TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_BYTES,
+            TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_BYTES_DEFAULT) : 0;
+    int ifileBufferSize = conf.getInt("io.file.buffer.size",
+        TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_BUFFER_SIZE_DEFAULT);
+
+    String auxiliaryService = conf.get(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
+        TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT);
+    SecretKey shuffleSecret = ShuffleUtils
+        .getJobTokenSecretFromTokenBytes(taskContext
+            .getServiceConsumerMetaData(auxiliaryService));
+    JobTokenSecretManager jobTokenSecretMgr = new JobTokenSecretManager(shuffleSecret);
+
+    Configuration codecConf = CodecUtils.reduceConfForCodec(conf);
+
+    HttpConnectionParams httpConnectionParams = ShuffleUtils.getHttpConnectionParams(conf);
+    RawLocalFileSystem localFs = (RawLocalFileSystem) FileSystem.getLocal(conf).getRaw();
+    LocalDirAllocator localDirAllocator = new LocalDirAllocator(TezRuntimeFrameworkConfigs.LOCAL_DIRS);
+    String localHostName = taskContext.getExecutionContext().getHostName();
+
+    boolean localDiskFetchEnabled = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH,
+        TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_DEFAULT);
+    boolean sharedFetchEnabled = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_SHARED_FETCH,
+        TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_SHARED_FETCH_DEFAULT);
+    boolean verifyDiskChecksum = conf.getBoolean(
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_VERIFY_DISK_CHECKSUM,
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_VERIFY_DISK_CHECKSUM_DEFAULT);
+    boolean compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
+    boolean localFetchComparePort = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_LOCAL_FETCH_COMPARE_PORT,
+        TezRuntimeConfiguration.TEZ_RUNTIME_LOCAL_FETCH_COMPARE_PORT_DEFAULT);
+
+    return new ShuffleManagerServer.FetcherConfig(
+        codecConf,
+        ifileReadAhead,
+        ifileReadAheadLength,
+        ifileBufferSize,
+        jobTokenSecretMgr,
+        httpConnectionParams,
+        localFs,
+        localDirAllocator,
+        localHostName,
+        localDiskFetchEnabled,
+        sharedFetchEnabled,
+        verifyDiskChecksum,
+        compositeFetch,
+        localFetchComparePort);
+  }
+
+  private static Configuration reduceConfForCodec(Configuration conf) {
+    Configuration newConf = new Configuration(false);
+
+    newConf.set(
+        TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS,
+        conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS));
+    newConf.set(
+        TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS_CODEC,
+        conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS_CODEC));
+
+    for (Map.Entry<String, String> entry: conf) {
+      if (entry.getKey().startsWith("io.")) {
+        newConf.set(entry.getKey(), entry.getValue());
+      }
+    }
+
+    return newConf;
   }
 
   public static CompressionCodec getCodec(Configuration conf) throws IOException {

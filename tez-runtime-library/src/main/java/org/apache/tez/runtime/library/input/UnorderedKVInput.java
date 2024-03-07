@@ -26,7 +26,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.tez.common.TezUtilsInternal;
 import org.apache.tez.runtime.api.ProgressFailedException;
-import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -113,6 +112,9 @@ public class UnorderedKVInput extends AbstractLogicalInput {
     if (!isClosed && !isStarted.get()) {
       ////// Initial configuration
       memoryUpdateCallbackHandler.validateUpdateReceived();
+
+      // no need to call CodecUtils.reduceConfForCodec(conf)
+      // because this codec is shared by ShuffleInputEventHandlerImpl and kvReader anyway
       CompressionCodec codec = CodecUtils.getCodec(conf);
 
       boolean compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
@@ -137,8 +139,7 @@ public class UnorderedKVInput extends AbstractLogicalInput {
           getContext().getExecutionContext().getContainerId(),
           getContext().getTaskVertexIndex());
 
-      this.shuffleManager = new ShuffleManager(getContext(), conf, getNumPhysicalInputs(), ifileBufferSize,
-          ifileReadAhead, ifileReadAheadLength, codec, inputManager);
+      this.shuffleManager = new ShuffleManager(getContext(), conf, getNumPhysicalInputs(), inputManager);
 
       this.inputEventHandler = new ShuffleInputEventHandlerImpl(getContext(), shuffleManager,
           inputManager, codec, ifileReadAhead, ifileReadAheadLength, compositeFetch);
@@ -253,7 +254,7 @@ public class UnorderedKVInput extends AbstractLogicalInput {
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_IO_FILE_BUFFER_SIZE);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_FACTOR);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_PARALLEL_COPIES);
-    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_FAILURES_LIMIT);
+    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_UNORDERED_PARALLEL_COPIES);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_MAX_TASK_OUTPUT_AT_ONCE);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_CONNECT_TIMEOUT);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_KEEP_ALIVE_ENABLED);
