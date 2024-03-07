@@ -46,7 +46,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
@@ -66,6 +65,7 @@ import java.util.concurrent.locks.ReentrantLock;
 public class ShuffleServer implements FetcherCallback {
 
   private static final Logger LOG = LoggerFactory.getLogger(ShuffleServer.class);
+  private final boolean isDebugEnabled = LOG.isDebugEnabled();
 
   private static volatile ShuffleServer INSTANCE;
 
@@ -191,6 +191,11 @@ public class ShuffleServer implements FetcherCallback {
     }
   }
 
+  public static enum RangesScheme {
+    SCHEME_FIRST,
+    SCHEME_MAX
+  }
+
   private final TaskContext taskContext;
   private final Configuration conf;
   private final int numFetchers;
@@ -207,14 +212,18 @@ public class ShuffleServer implements FetcherCallback {
   public final int[] localShufflePorts;
 
   private final int maxTaskOutputAtOnce;
+  private final RangesScheme rangesScheme;
 
-  // TODO: knownSrcHosts[] is never removed from, so check for memory-leak in public clouds
+  // to prevent memory-leak in knownSrcHosts[] in public clouds
+  private final int maxNumInputHosts;
+
   // Invariant: pendingHosts[] \subset knownSrcHosts.InputHost[]
   private final ConcurrentMap<HostPort, InputHost> knownSrcHosts;
   private final Set<Fetcher> runningFetchers;   // thread-safe because we use ConcurrentHashMap
 
   private final AtomicLong shuffleClientCount = new AtomicLong(0L);
   protected final ConcurrentMap<Long, ShuffleClient<?>> shuffleClients;
+  private final Object registerLock = new Object();
 
   private final BlockingQueue<InputHost> pendingHosts;
   // required to be held when manipulating pendingHosts[]
@@ -236,7 +245,7 @@ public class ShuffleServer implements FetcherCallback {
     final ExecutorService fetcherRawExecutor;
     fetcherRawExecutor = Executors.newFixedThreadPool(numFetchers, new ThreadFactoryBuilder()
         .setDaemon(true)
-        .setNameFormat(taskContext.getUniqueIdentifier() + " Fetcher" + " #%d")
+        .setNameFormat("Fetcher" + " #%d")
         .build());
     this.fetcherExecutor = MoreExecutors.listeningDecorator(fetcherRawExecutor);
     this.fetcherConfig = CodecUtils.constructFetcherConfig(conf, taskContext);
@@ -258,13 +267,22 @@ public class ShuffleServer implements FetcherCallback {
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_MAX_TASK_OUTPUT_AT_ONCE,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_MAX_TASK_OUTPUT_AT_ONCE_DEFAULT)));
 
+    String scheme = conf.get(
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_RANGES_SCHEME,
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_RANGES_SCHEME_DEFAULT);
+    this.rangesScheme = scheme.equalsIgnoreCase("max") ? RangesScheme.SCHEME_MAX : RangesScheme.SCHEME_FIRST;
+
     knownSrcHosts = new ConcurrentHashMap<HostPort, InputHost>();
     runningFetchers = Collections.newSetFromMap(new ConcurrentHashMap<Fetcher, Boolean>());
     shuffleClients = new ConcurrentHashMap<Long, ShuffleClient<?>>();
     pendingHosts = new LinkedBlockingQueue<InputHost>();
 
-    LOG.info("{} Configuration: numFetchers={}, maxTaskOutputAtOnce={}, FetcherConfig={}",
-        serverName, numFetchers, maxTaskOutputAtOnce, fetcherConfig);
+    this.maxNumInputHosts = conf.getInt(
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MAX_INPUT_HOSTPORTS,
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MAX_INPUT_HOSTPORTS_DEFAULT);
+
+    LOG.info("{} Configuration: numFetchers={}, maxTaskOutputAtOnce={}, FetcherConfig={}, rangesScheme={}, maxNumInputHosts={}",
+        serverName, numFetchers, maxTaskOutputAtOnce, fetcherConfig, rangesScheme, maxNumInputHosts);
   }
 
   public int[] getLocalShufflePorts() {
@@ -273,10 +291,6 @@ public class ShuffleServer implements FetcherCallback {
 
   public int getMaxTaskOutputAtOnce() {
     return maxTaskOutputAtOnce;
-  }
-
-  public BlockingQueue<InputHost> getPendingHosts() {
-    return pendingHosts;
   }
 
   public void run() {
@@ -340,7 +354,7 @@ public class ShuffleServer implements FetcherCallback {
             throw e;
           }
         }
-        if (LOG.isDebugEnabled()) {
+        if (isDebugEnabled) {
           LOG.debug("Processing InputHost: " + inputHost.toDetailedString());
         }
 
@@ -371,7 +385,7 @@ public class ShuffleServer implements FetcherCallback {
 
   private Fetcher constructFetcherForHost(InputHost inputHost, Configuration conf) {
     InputHost.PartitionToInputs pendingInputs = inputHost.clearAndGetOnePartitionRange(
-        shuffleClients, maxTaskOutputAtOnce);
+        shuffleClients, maxTaskOutputAtOnce, rangesScheme);
     if (pendingInputs == null) {
       // assert { inputHost.partitionToInputs.keys.forall { s => !shuffleClients[s].shouldScanPendingInputs() } }
       // is not valid because some Fetcher may have returned
@@ -389,37 +403,20 @@ public class ShuffleServer implements FetcherCallback {
 
     boolean removedAnyInput = shuffleClient.cleanInputHostForConstructFetcher(pendingInputs);
     if (pendingInputs.getInputs().isEmpty()) {
+      assert removedAnyInput;
       return null;
     }
 
-    InputHost.PartitionToInputs[] pendingInputsSeq;
-    if (removedAnyInput || (shuffleClient instanceof ShuffleScheduler)) {
-      pendingInputsSeq = new InputHost.PartitionToInputs[1];
-      pendingInputsSeq[0] = pendingInputs;
-    } else {
-      pendingInputsSeq = inputHost.getPendingInputsSeq(shuffleClient, pendingInputs);
-    }
-    assert pendingInputsSeq.length > 0;
-    assert !pendingInputsSeq[0].getInputs().isEmpty();
-    assert Arrays.stream(pendingInputsSeq).allMatch(p ->
-        p.getInputs().size() == pendingInputsSeq[0].getInputs().size());
-    assert java.util.stream.IntStream.range(0, pendingInputsSeq[0].getInputs().size()).allMatch(index ->
-      Arrays.stream(pendingInputsSeq).allMatch(p ->
-          p.getInputs().get(index).getPathComponent().equals(
-              pendingInputsSeq[0].getInputs().get(index).getPathComponent()))
-    );
-
     if (shuffleClient instanceof ShuffleManager) {
       FetcherUnordered fetcher = constructFetcherUnordered(
-          conf, fetcherConfig, taskContext, inputHost, pendingInputsSeq);
+          conf, fetcherConfig, taskContext, inputHost, pendingInputs, (ShuffleManager)shuffleClient);
       // do not merge assignShuffleClient() to constructFetcher() because
       // type variable T should not appear both in argument types and in return type
       fetcher.assignShuffleClient((ShuffleManager)shuffleClient);
       return fetcher;
     } else {
-      assert pendingInputsSeq.length == 1;
       FetcherOrderedGrouped fetcher = constructFetcherOrdered(
-        conf, fetcherConfig, taskContext, inputHost, pendingInputsSeq[0]);
+          conf, fetcherConfig, taskContext, inputHost, pendingInputs, (ShuffleScheduler)shuffleClient);
       fetcher.assignShuffleClient((ShuffleScheduler)shuffleClient);
       return fetcher;
     }
@@ -427,7 +424,9 @@ public class ShuffleServer implements FetcherCallback {
 
   public long register(ShuffleClient<?> shuffleClient) {
     long shuffleClientId = shuffleClientCount.getAndIncrement();
-    shuffleClients.put(shuffleClientId, shuffleClient);
+    synchronized (registerLock) {
+      shuffleClients.put(shuffleClientId, shuffleClient);
+    }
     LOG.info("Registered ShuffleClient: {}, total={}", shuffleClientId, shuffleClients.size());
     return shuffleClientId;
   }
@@ -435,10 +434,7 @@ public class ShuffleServer implements FetcherCallback {
   public void unregister(long shuffleClientId) {
     // clear InputHost with shuffleClientId
     for (InputHost inputHost: knownSrcHosts.values()) {
-      boolean removed = inputHost.clearShuffleClientId(shuffleClientId);
-      if (removed) {
-        LOG.warn("Cleared InputHost for {}: {}", serverName, shuffleClientId);
-      }
+      inputHost.clearShuffleClientId(shuffleClientId);
     }
 
     for (Fetcher fetcher: runningFetchers) {
@@ -449,8 +445,19 @@ public class ShuffleServer implements FetcherCallback {
       }
     }
 
-    ShuffleClient<?> old = shuffleClients.remove(shuffleClientId);
-    assert old != null;
+    synchronized (registerLock) {
+      ShuffleClient<?> old = shuffleClients.remove(shuffleClientId);
+      assert old != null;
+      if (shuffleClients.isEmpty()) {
+        // no new ShuffleClient can be registered, so addKnownInput() is not called
+        // as a result, knownSrcHosts[] can be safely cleaned inside this block
+        if (knownSrcHosts.size() > maxNumInputHosts) {
+          LOG.warn("Clearing known InputHosts: current size = {}", knownSrcHosts.size());
+          knownSrcHosts.clear();
+        }
+      }
+    }
+
     LOG.info("Unregistered ShuffleClient: " + shuffleClientId);
   }
 
@@ -545,16 +552,10 @@ public class ShuffleServer implements FetcherCallback {
       FetcherConfig fetcherConfig,
       TaskContext taskContext,
       InputHost inputHost,
-      InputHost.PartitionToInputs[] pendingInputsSeq) {
-    FetcherUnordered.FetcherBuilder fetcherBuilder = new FetcherUnordered.FetcherBuilder(this,
-      conf, taskContext.getApplicationId(), fetcherConfig, taskContext);
-    fetcherBuilder.assignWork(inputHost, pendingInputsSeq);
-
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Created FetcherUnordered for host: " + inputHost.getHost()
-        + ", with inputs: " + pendingInputsSeq);
-    }
-    return fetcherBuilder.build();
+      InputHost.PartitionToInputs pendingInputsSeq,
+      ShuffleManager shuffleManager) {
+    return new FetcherUnordered(this,
+        conf, taskContext.getApplicationId(), inputHost, pendingInputsSeq, fetcherConfig, taskContext, shuffleManager);
   }
 
   private FetcherOrderedGrouped constructFetcherOrdered(
@@ -562,9 +563,10 @@ public class ShuffleServer implements FetcherCallback {
       FetcherConfig fetcherConfig,
       TaskContext taskContext,
       InputHost inputHost,
-      InputHost.PartitionToInputs pendingInputs) {
+      InputHost.PartitionToInputs pendingInputsSeq,
+      ShuffleScheduler shuffleScheduler) {
     return new FetcherOrderedGrouped(this,
-      conf, inputHost, pendingInputs, fetcherConfig, taskContext);
+        conf, inputHost, pendingInputsSeq, fetcherConfig, taskContext, shuffleScheduler);
   }
 
   public void informAM(long shuffleSchedulerId, InputAttemptIdentifier srcAttempt) {
@@ -609,7 +611,7 @@ public class ShuffleServer implements FetcherCallback {
     public void onSuccess(FetchResult result) {
       fetcher.shutdown();
       if (isShutdown.get()) {
-        if (LOG.isDebugEnabled()) {
+        if (isDebugEnabled) {
           LOG.debug("Already shutdown. Ignoring event from fetcher");
         }
       } else {
@@ -621,12 +623,12 @@ public class ShuffleServer implements FetcherCallback {
           if (pendingInputs != null) {
             HostPort identifier = new HostPort(result.getHost(), result.getPort());
             InputHost inputHost = knownSrcHosts.get(identifier);
-            assert inputHost != null;
-
-            for (Map.Entry<InputAttemptIdentifier, InputHost.PartitionRange > input : pendingInputs.entrySet()) {
-              InputHost.PartitionRange range = input.getValue();
-              inputHost.addKnownInput(fetcher.getShuffleClient(),
-                  range.getPartition(), range.getPartitionCount(), input.getKey(), pendingHosts);
+            if (inputHost != null) {  // can be null (in rare cases) if unregister() has been called
+              for (Map.Entry<InputAttemptIdentifier, InputHost.PartitionRange > input : pendingInputs.entrySet()) {
+                InputHost.PartitionRange range = input.getValue();
+                inputHost.addKnownInput(fetcher.getShuffleClient(),
+                    range.getPartition(), range.getPartitionCount(), input.getKey(), pendingHosts);
+              }
             }
           }
         }
@@ -639,7 +641,7 @@ public class ShuffleServer implements FetcherCallback {
       // Unsuccessful - the fetcher may not have shutdown correctly. Try shutting it down.
       fetcher.shutdown();
       if (isShutdown.get()) {
-        if (LOG.isDebugEnabled()) {
+        if (isDebugEnabled) {
           LOG.debug("Already shutdown. Ignoring error from fetcher: " + t);
         }
       } else {

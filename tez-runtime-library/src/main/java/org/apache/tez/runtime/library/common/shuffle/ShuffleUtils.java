@@ -135,10 +135,7 @@ public class ShuffleUtils {
       IFile.Reader.readToMemory(shuffleData, input, compressedLength, codec,
           ifileReadAhead, ifileReadAheadLength, taskContext, useThreadLocalDecompressor);
       // metrics.inputBytes(shuffleData.length);
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Read " + shuffleData.length + " bytes from input for "
-            + identifier);
-      }
+      // finished reading shuffleData.length bytes from identifier
     } catch (InternalError | Exception e) {
       // Close the streams
       LOG.info("Failed to read data to memory for {}. len={}, decomp={}. ExceptionMessage={}",
@@ -181,11 +178,7 @@ public class ShuffleUtils {
           // metrics.inputBytes(n);
         }
       }
-
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Read " + (compressedLength - bytesLeft)
-            + " bytes from input for " + identifier);
-      }
+      // finished reading (compressedLength - bytesLeft) bytes
 
       output.close();
     } catch (IOException ioe) {
@@ -221,7 +214,7 @@ public class ShuffleUtils {
   }
 
   public static StringBuilder constructBaseURIForShuffleHandler(String host,
-      int port, List<InputHost.PartitionRange> ranges, String appId, int dagIdentifier, boolean sslShuffle) {
+      int port, InputHost.PartitionRange range, String appId, int dagIdentifier, boolean sslShuffle) {
     final String http_protocol = (sslShuffle) ? "https://" : "http://";
     StringBuilder sb = new StringBuilder(http_protocol);
     sb.append(host);
@@ -231,9 +224,9 @@ public class ShuffleUtils {
     sb.append("mapOutput?job=");
     sb.append(appId.replace("application", "job"));
     sb.append("&dag=");
-    sb.append(String.valueOf(dagIdentifier));
+    sb.append(dagIdentifier);
     sb.append("&reduce=");
-    sb.append(ranges.stream().map(x -> x.toString()).collect(Collectors.joining(",")));
+    sb.append(range.toString());
     sb.append("&map=");
     return sb;
   }

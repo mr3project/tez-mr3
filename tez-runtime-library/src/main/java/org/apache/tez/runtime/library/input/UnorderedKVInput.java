@@ -130,18 +130,20 @@ public class UnorderedKVInput extends AbstractLogicalInput {
       ifileBufferSize = conf.getInt("io.file.buffer.size",
           TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_BUFFER_SIZE_DEFAULT);
 
+      InputContext inputContext = getContext();
       this.inputManager = new SimpleFetchedInputAllocator(
           TezUtilsInternal.cleanVertexName(getContext().getSourceVertexName()),
-          getContext().getUniqueIdentifier(),
-          getContext().getDagIdentifier(), conf,
-          getContext().getTotalMemoryAvailableToTask(),
+          inputContext.getUniqueIdentifier(),
+          inputContext.getDagIdentifier(), conf,
+          inputContext.getTotalMemoryAvailableToTask(),
           memoryUpdateCallbackHandler.getMemoryAssigned(),
-          getContext().getExecutionContext().getContainerId(),
-          getContext().getTaskVertexIndex());
+          inputContext.getExecutionContext().getContainerId(),
+          inputContext.getTaskVertexIndex());
 
-      this.shuffleManager = new ShuffleManager(getContext(), conf, getNumPhysicalInputs(), inputManager);
+      String srcNameTrimmed = TezUtilsInternal.cleanVertexName(inputContext.getSourceVertexName());
+      this.shuffleManager = new ShuffleManager(inputContext, conf, getNumPhysicalInputs(), inputManager, srcNameTrimmed);
 
-      this.inputEventHandler = new ShuffleInputEventHandlerImpl(getContext(), shuffleManager,
+      this.inputEventHandler = new ShuffleInputEventHandlerImpl(inputContext, shuffleManager,
           inputManager, codec, ifileReadAhead, ifileReadAheadLength, compositeFetch);
 
       ////// End of Initial configuration
@@ -153,7 +155,7 @@ public class UnorderedKVInput extends AbstractLogicalInput {
       pendingEvents.drainTo(pending);
       if (pending.size() > 0) {
         if (LOG.isDebugEnabled()) {
-          LOG.debug(getContext().getSourceVertexName() + ": " + "NoAutoStart delay in processing first event: "
+          LOG.debug(inputContext.getSourceVertexName() + ": " + "NoAutoStart delay in processing first event: "
               + (System.currentTimeMillis() - firstEventReceivedTime));
         }
         inputEventHandler.handleEvents(pending);

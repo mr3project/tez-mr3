@@ -25,7 +25,6 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.tez.common.security.JobTokenSecretManager;
 import org.apache.tez.runtime.library.common.security.SecureShuffleUtils;
 import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.ShuffleHeader;
-import org.apache.tez.util.StopWatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,7 +40,6 @@ import java.util.concurrent.atomic.AtomicLong;
 public class HttpConnection extends BaseHttpConnection {
 
   private static final Logger LOG = LoggerFactory.getLogger(HttpConnection.class);
-  private static final Logger URL_LOG = LoggerFactory.getLogger(LOG.getName() + ".url");
 
   private URL url;
   private final String logIdentifier;
@@ -57,7 +55,6 @@ public class HttpConnection extends BaseHttpConnection {
   private String msgToEncode;
 
   private final HttpConnectionParams httpConnParams;
-  private final StopWatch stopWatch;
   private final AtomicLong urlLogCount;
 
   /**
@@ -75,10 +72,9 @@ public class HttpConnection extends BaseHttpConnection {
     this.jobTokenSecretMgr = jobTokenSecretManager;
     this.httpConnParams = connParams;
     this.url = url;
-    this.stopWatch = new StopWatch();
     this.urlLogCount = new AtomicLong();
     if (LOG.isDebugEnabled()) {
-      LOG.debug("MapOutput URL :" + url.toString());
+      LOG.debug("MapOutput URL: " + url.toString());
     }
   }
 
@@ -132,7 +128,6 @@ public class HttpConnection extends BaseHttpConnection {
    * @throws IOException upon connection failure
    */
   private boolean connect(int connectionTimeout) throws IOException {
-    stopWatch.reset().start();
     if (connection == null) {
       setupConnection();
     }
@@ -193,17 +188,11 @@ public class HttpConnection extends BaseHttpConnection {
 
       }
     }
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Time taken to connect to " + url.toString() +
-          " " + stopWatch.now(TimeUnit.MILLISECONDS) + " ms; connectionFailures="
-          + connectionFailures);
-    }
     return true;
   }
 
   @Override
   public void validate() throws IOException {
-    stopWatch.reset().start();
     int rc = connection.getResponseCode();
     if (rc != HttpURLConnection.HTTP_OK) {
       throw new IOException("Got invalid response code " + rc + " from " + url
@@ -227,22 +216,14 @@ public class HttpConnection extends BaseHttpConnection {
     }
 
     if (LOG.isDebugEnabled()) {
-      LOG.debug("url=" + msgToEncode + ";encHash=" + encHash + ";replyHash="
-          + replyHash);
+      LOG.debug("url=" + msgToEncode + "; encHash=" + encHash + "; replyHash=" + replyHash);
     }
 
     // verify that replyHash is HMac of encHash
     SecureShuffleUtils.verifyReply(replyHash, encHash, jobTokenSecretMgr);
-    if (URL_LOG.isDebugEnabled()) {
-      // Following log statement will be used by tez-tool perf-analyzer for mapping attempt to NM
-      // host
-      URL_LOG.debug("for url=" + url + " sent hash and receievd reply " +
-          stopWatch.now(TimeUnit.MILLISECONDS) + " ms");
-    } else {
-      // Log summary.
-      if (urlLogCount.incrementAndGet() % 1000 == 0) {
-        LOG.info("Sent hash and recieved reply for {} urls", urlLogCount);
-      }
+    // Log summary
+    if (urlLogCount.incrementAndGet() % 1000 == 0) {
+      LOG.info("Sent hash and received reply for {} urls", urlLogCount);
     }
   }
 
@@ -254,14 +235,9 @@ public class HttpConnection extends BaseHttpConnection {
    */
   @Override
   public DataInputStream getInputStream() throws IOException {
-    stopWatch.reset().start();
     if (connectionSucceeed) {
       input = new DataInputStream(new BufferedInputStream(
               connection.getInputStream(), httpConnParams.getBufferSize()));
-    }
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Time taken to getInputStream (connect) " + url +
-          " " + stopWatch.now(TimeUnit.MILLISECONDS) + " ms");
     }
     return input;
   }
@@ -275,7 +251,6 @@ public class HttpConnection extends BaseHttpConnection {
   @Override
   public void cleanup(boolean disconnect) throws IOException {
     cleanup = true;
-    stopWatch.reset().start();
     try {
       if (input != null) {
         if (LOG.isDebugEnabled()) {
@@ -300,13 +275,8 @@ public class HttpConnection extends BaseHttpConnection {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Exception while shutting down fetcher " + logIdentifier, e);
       } else {
-        LOG.info("Exception while shutting down fetcher " + logIdentifier
-            + ": " + e.getMessage());
+        LOG.info("Exception while shutting down fetcher " + logIdentifier + ": " + e.getMessage());
       }
-    }
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Time taken to cleanup connection to " + url +
-          " " + stopWatch.now(TimeUnit.MILLISECONDS) + " ms");
     }
   }
 

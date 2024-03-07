@@ -232,7 +232,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
 
   private void processTaskFailedEvent(InputFailedEvent ifEvent) {
     InputAttemptIdentifier taIdentifier = new InputAttemptIdentifier(ifEvent.getTargetIndex(), ifEvent.getVersion());
-    scheduler.obsoleteInput(taIdentifier);
+    scheduler.obsoleteKnownInput(taIdentifier);
     if (LOG.isDebugEnabled()) {
       LOG.debug("Obsoleting output of src-task: " + taIdentifier);
     }

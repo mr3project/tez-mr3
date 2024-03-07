@@ -42,7 +42,6 @@ import org.apache.tez.runtime.api.InputInitializerContext;
 import org.apache.tez.runtime.api.events.InputDataInformationEvent;
 import org.apache.tez.runtime.api.events.InputInitializerEvent;
 import org.apache.tez.runtime.api.events.InputUpdatePayloadEvent;
-import org.apache.tez.util.StopWatch;
 
 import com.google.common.collect.Lists;
 
@@ -70,14 +69,8 @@ public class MRInputSplitDistributor extends InputInitializer {
 
   @Override
   public List<Event> initialize() throws IOException {
-    StopWatch sw = new StopWatch().start();
     MRInputUserPayloadProto userPayloadProto = MRInputHelpers
         .parseMRInputPayload(getContext().getInputUserPayload());
-    sw.stop();
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Time to parse MRInput payload into prot: "
-          + sw.now(TimeUnit.MILLISECONDS));
-    }
     Configuration conf = TezUtils.createConfFromByteString(userPayloadProto
         .getConfigurationBytes());
     JobConf jobConf = new JobConf(conf);

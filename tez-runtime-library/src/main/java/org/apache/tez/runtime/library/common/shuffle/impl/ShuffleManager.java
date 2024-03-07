@@ -21,15 +21,8 @@ package org.apache.tez.runtime.library.common.shuffle.impl;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.BitSet;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -37,13 +30,10 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.tez.runtime.api.TaskFailureType;
-import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
-import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.tez.common.TezUtilsInternal;
 import org.apache.tez.common.counters.TaskCounter;
 import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.runtime.api.Event;
@@ -55,7 +45,6 @@ import org.apache.tez.runtime.library.common.shuffle.FetchedInput;
 import org.apache.tez.runtime.library.common.shuffle.FetchedInput.Type;
 import org.apache.tez.runtime.library.common.shuffle.FetchedInputAllocator;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleClient;
-import org.apache.tez.runtime.library.common.shuffle.InputHost;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils.FetchStatsLogger;
 
@@ -65,18 +54,13 @@ import com.google.common.collect.Lists;
 // This only knows how to deal with a single srcIndex for a given targetIndex.
 // In case the src task generates multiple outputs for the same target Index
 // (multiple src-indices), modifications will be required.
-public class ShuffleManager implements ShuffleClient<FetchedInput> {
+public class ShuffleManager extends ShuffleClient<FetchedInput> {
 
   private static final Logger LOG = LoggerFactory.getLogger(ShuffleManager.class);
   private static final Logger LOG_FETCH = LoggerFactory.getLogger(LOG.getName() + ".fetch");
   private static final FetchStatsLogger fetchStatsLogger = new FetchStatsLogger(LOG_FETCH, LOG);
 
-  private final ShuffleServer shuffleManagerServer;
-  private final long shuffleManagerId;
-  private final InputContext inputContext;
-  private final int numInputs;
   private final FetchedInputAllocator inputManager;
-  private final String srcNameTrimmed;
 
   private final TezCounter approximateInputRecords;
   private final TezCounter shuffledInputsCounter;
@@ -87,9 +71,6 @@ public class ShuffleManager implements ShuffleClient<FetchedInput> {
   private final TezCounter bytesShuffledToMemCounter;
   private final TezCounter bytesShuffledDirectDiskCounter;
   private final TezCounter shufflePhaseTime;
-
-  // TODO: keep in ShuffleServer???
-  private final int maxNumFetchers;
 
   private final long startTime;
 
@@ -116,32 +97,11 @@ public class ShuffleManager implements ShuffleClient<FetchedInput> {
   private final BlockingQueue<FetchedInput> completedInputs;
   private static final FetchedInput endOfInputMarker = new NullFetchedInput(null);
 
-  // thread-safe for reading and updating
-  // InputAttemptIdentifier is immutable
-  private final Set<InputAttemptIdentifier> obsoletedInputs;
-
-  // to track shuffleInfo events when finalMerge is disabled OR pipelined shuffle is enabled in source
-  // guard with: synchronized (shuffleInfoEventsMap)
-  private final Map<Integer, ShuffleEventInfo> shuffleInfoEventsMap;
-
-  // not thread-safe - accessed from:
-  //   1. ShuffleServer.call() thread
-  //   2. ShuffleInputEventHandler thread
-  //   3. Fetcher thread via fetchSucceeded()
-  private final BitSet completedInputSet;
-
-  private int numFetchers = 0;
-  private int numPartitionRanges = 0;
-  private final Object lock = new Object();
-
   public ShuffleManager(InputContext inputContext, Configuration conf, int numInputs,
-      FetchedInputAllocator inputAllocator) throws IOException {
-    this.shuffleManagerServer = ShuffleServer.getInstance();
-    this.shuffleManagerId = shuffleManagerServer.register(this);
-    this.inputContext = inputContext;
-    this.numInputs = numInputs;
+      FetchedInputAllocator inputAllocator, String srcNameTrimmed) throws IOException {
+    super(inputContext, conf, numInputs, srcNameTrimmed);
+
     this.inputManager = inputAllocator;
-    this.srcNameTrimmed = TezUtilsInternal.cleanVertexName(inputContext.getSourceVertexName());
 
     this.approximateInputRecords = inputContext.getCounters().findCounter(TaskCounter.APPROXIMATE_INPUT_RECORDS);
     this.shuffledInputsCounter = inputContext.getCounters().findCounter(TaskCounter.NUM_SHUFFLED_INPUTS);
@@ -153,29 +113,13 @@ public class ShuffleManager implements ShuffleClient<FetchedInput> {
     this.bytesShuffledDirectDiskCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_DISK_DIRECT);
     this.shufflePhaseTime = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_PHASE_TIME);
 
-    this.maxNumFetchers = conf.getInt(
-        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_PARALLEL_COPIES,
-        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_PARALLEL_COPIES_DEFAULT);
-
     this.startTime = System.currentTimeMillis();
 
     // In case of pipelined shuffle, it is possible to get multiple FetchedInput per attempt.
     // We do not know upfront the number of spills from source.
     completedInputs = new LinkedBlockingDeque<FetchedInput>();
-    obsoletedInputs = Collections.newSetFromMap(new ConcurrentHashMap<InputAttemptIdentifier, Boolean>());
-
-    shuffleInfoEventsMap = new HashMap<Integer, ShuffleEventInfo>();
-    completedInputSet = new BitSet(numInputs);
 
     LOG.info("ShuffleManager for {}: numInputs={}", srcNameTrimmed, numInputs);
-  }
-
-  public long getShuffleClientId() {
-    return shuffleManagerId;
-  }
-
-  public int getDagIdentifier() {
-    return inputContext.getDagIdentifier();
   }
 
   public FetchedInputAllocator getInputManager() {
@@ -184,7 +128,7 @@ public class ShuffleManager implements ShuffleClient<FetchedInput> {
 
   // called only when inputContext.useShuffleHandlerProcessOnK8s()
   public int[] getLocalShufflePorts() {
-    return shuffleManagerServer.getLocalShufflePorts();
+    return shuffleServer.getLocalShufflePorts();
   }
 
   // called from ShuffleInputEventHandler thread
@@ -201,99 +145,8 @@ public class ShuffleManager implements ShuffleClient<FetchedInput> {
     // ShuffleManager does not run any thread
   }
 
-  public void fetcherStarted() {
-    synchronized (lock) {
-      numFetchers += 1;
-    }
-  }
-
-  public void fetcherFinished() {
-    synchronized (lock) {
-      numFetchers -= 1;
-      assert numFetchers >= 0;
-    }
-  }
-
-  // partitionRangeAdded/Removed() are called only from the inside of synchronized(InputHost),
-  // so numPartitionRanges is up-to-date and accurate.
-
-  public void partitionRangeAdded() {
-    synchronized (lock) {
-      numPartitionRanges += 1;
-    }
-  }
-
-  public void partitionRangeRemoved() {
-    synchronized (lock) {
-      numPartitionRanges -= 1;
-      assert numPartitionRanges >= 0;
-    }
-  }
-
-  // if true, we should scan pending InputHosts in ShuffleServer
-  // if false, no need to consider this ShuffleManager for now
-  public boolean shouldScanPendingInputs() {
-    synchronized (lock) {
-      return numPartitionRanges > 0 && numFetchers < maxNumFetchers;
-    }
-  }
-
-  // inside ShuffleServer.call() thread
-  public boolean cleanInputHostForConstructFetcher(InputHost.PartitionToInputs pendingInputs) {
-    // safe to update pendingInputs because we are running in ShuffleServer.call() thread
-    assert pendingInputs.getShuffleClientId() == shuffleManagerId;
-    assert pendingInputs.getInputs().size() <= shuffleManagerServer.getMaxTaskOutputAtOnce();
-
-    boolean removedAnyInput = false;
-
-    // avoid adding attempts which have already been completed
-    // guard with synchronized because completedInputSet should not be updated while traversing
-    synchronized (completedInputSet) {
-      for (Iterator<InputAttemptIdentifier> inputIter = pendingInputs.getInputs().iterator();
-           inputIter.hasNext();) {
-        InputAttemptIdentifier input = inputIter.next();
-
-        boolean alreadyCompleted;
-        if (input instanceof CompositeInputAttemptIdentifier) {
-          CompositeInputAttemptIdentifier compositeInput = (CompositeInputAttemptIdentifier) input;
-          int nextClearBit = completedInputSet.nextClearBit(compositeInput.getInputIdentifier());
-          int maxClearBit = compositeInput.getInputIdentifier() + compositeInput.getInputIdentifierCount();
-          alreadyCompleted = nextClearBit > maxClearBit;
-        } else {
-          alreadyCompleted = completedInputSet.get(input.getInputIdentifier());
-        }
-
-        if (alreadyCompleted) {
-          LOG.info("Skipping completed input: " + input);
-          inputIter.remove();
-          removedAnyInput = true;
-        }
-      }
-    }
-
-    for (Iterator<InputAttemptIdentifier> inputIter = pendingInputs.getInputs().iterator();
-         inputIter.hasNext();) {
-      InputAttemptIdentifier input = inputIter.next();
-
-      // avoid adding attempts which have been marked as OBSOLETE
-      if (isObsoleteInputAttemptIdentifier(input)) {
-        LOG.info("Skipping obsolete input: " + input);
-        inputIter.remove();
-        removedAnyInput = true;
-        continue;
-      }
-
-      if (!validateInputAttemptForPipelinedShuffle(input, false)) {
-        inputIter.remove();   // no need to fetch for input, so remove
-        removedAnyInput = true;
-      }
-    }
-
-    return removedAnyInput;
-  }
-
   // can run in ShuffleServer.call() thread, ShuffleInputEventHandler thread, Fetcher thread
-  private boolean validateInputAttemptForPipelinedShuffle(
+  protected boolean validateInputAttemptForPipelinedShuffle(
       InputAttemptIdentifier input, boolean registerShuffleInfoEvent) {
     // for pipelined shuffle
     // TODO: TEZ-2132 for error handling. As of now, fail fast if there is a different attempt
@@ -309,7 +162,7 @@ public class ShuffleManager implements ShuffleClient<FetchedInput> {
                   input + ". Previous attempt's data could have been already merged "
                   + "to memory/disk outputs.  Killing (self) this task early."
                   + " currentAttemptNum=" + eventInfo.attemptNum
-                  + ", eventsProcessed=" + eventInfo.eventsProcessed
+                  + ", eventsProcessed=" + eventInfo.getEventsProcessed()
                   + ", newAttemptNum=" + input.getAttemptNumber());
           String message = "Killing self as previous attempt data could have been consumed";
           killSelf(exception, message);
@@ -341,7 +194,7 @@ public class ShuffleManager implements ShuffleClient<FetchedInput> {
       return;
     }
 
-    shuffleManagerServer.addKnownInput(this, hostName, port, srcAttemptIdentifier, partitionId);
+    shuffleServer.addKnownInput(this, hostName, port, srcAttemptIdentifier, partitionId);
   }
 
   public void addCompletedInputWithNoData(
@@ -391,56 +244,8 @@ public class ShuffleManager implements ShuffleClient<FetchedInput> {
     }
   }
 
-  public void obsoleteKnownInput(InputAttemptIdentifier srcAttemptIdentifier) {
-    obsoletedInputs.add(srcAttemptIdentifier);
-  }
-
   /////////////////// End of Methods for ShuffleInputEventHandler
   /////////////////// fetchSucceeded/fetchFailed() from Fetcher
-
-  /**
-   * Placeholder for tracking shuffle events in case we get multiple spills info for the same
-   * attempt.
-   */
-  static class ShuffleEventInfo {
-    final int attemptNum;
-    final String id;
-
-    // not thread-safe, so guard with: synchronized (shuffleInfoEventsMap)
-    BitSet eventsProcessed;
-    int finalEventId = -1;        // 0 indexed
-
-    ShuffleEventInfo(InputAttemptIdentifier input) {
-      this.id = input.getInputIdentifier() + "_" + input.getAttemptNumber();
-      this.attemptNum = input.getAttemptNumber();
-      this.eventsProcessed = new BitSet();
-    }
-
-    // invariant: inside synchronized (shuffleInfoEventsMap)
-    void spillProcessed(int spillId) {
-      if (finalEventId != -1) {
-        Preconditions.checkState(eventsProcessed.cardinality() <= (finalEventId + 1),
-            "Wrong state. eventsProcessed cardinality={} finalEventId={}, spillId={}, {}",
-        eventsProcessed.cardinality(), finalEventId, spillId, toString());
-      }
-      eventsProcessed.set(spillId);
-    }
-
-    // invariant: inside synchronized (shuffleInfoEventsMap)
-    boolean isDone() {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("finalEventId=" + finalEventId + ", eventsProcessed cardinality=" +
-            eventsProcessed.cardinality());
-      }
-      return ((finalEventId != -1) && (finalEventId + 1) == eventsProcessed.cardinality());
-    }
-
-    // called from registerCompletedInputForPipelinedShuffle() and no need guard there
-    public String toString() {
-      return "[eventsProcessed=" + eventsProcessed + ", finalEventId=" + finalEventId
-          +  ", id=" + id + ", attemptNum=" + attemptNum + "]";
-    }
-  }
 
   // called from (multiple) Fetcher threads, via ShuffleServer
   public void fetchSucceeded(
@@ -523,7 +328,7 @@ public class ShuffleManager implements ShuffleClient<FetchedInput> {
       eventInfo.spillProcessed(srcAttemptIdentifier.getSpillEventId());
       numFetchedSpills.getAndIncrement();
       if (srcAttemptIdentifier.getFetchTypeInfo() == InputAttemptIdentifier.SPILL_INFO.FINAL_UPDATE) {
-        eventInfo.finalEventId = srcAttemptIdentifier.getSpillEventId();
+        eventInfo.setFinalEventId(srcAttemptIdentifier.getSpillEventId());
       }
 
       eventInfoIsDone = eventInfo.isDone();
@@ -620,21 +425,6 @@ public class ShuffleManager implements ShuffleClient<FetchedInput> {
     inputContext.reportFailure(TaskFailureType.NON_FATAL, exception, message);
   }
 
-  // thread-safe because InputAttemptIdentifier is immutable
-  private boolean isObsoleteInputAttemptIdentifier(InputAttemptIdentifier input) {
-    if (input == null || obsoletedInputs.isEmpty()) {
-      return false;
-    }
-    Iterator<InputAttemptIdentifier> obsoleteInputsIter = obsoletedInputs.iterator();
-    while (obsoleteInputsIter.hasNext()) {
-      InputAttemptIdentifier obsoleteInput = obsoleteInputsIter.next();
-      if (input.include(obsoleteInput.getInputIdentifier(), obsoleteInput.getAttemptNumber())) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   /////////////////// End of fetchSucceeded/fetchFailed() from Fetcher
 
   public void shutdown() {
@@ -645,7 +435,7 @@ public class ShuffleManager implements ShuffleClient<FetchedInput> {
 
     if (!isShutdown.getAndSet(true)) {
       LOG.info("Shutting down pending fetchers on source {}", srcNameTrimmed);
-      shuffleManagerServer.unregister(shuffleManagerId);
+      shuffleServer.unregister(shuffleClientId);
     }
   }
 

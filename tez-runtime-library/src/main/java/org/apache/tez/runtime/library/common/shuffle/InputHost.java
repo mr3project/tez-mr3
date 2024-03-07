@@ -32,6 +32,8 @@ import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.tez.runtime.library.common.shuffle.ShuffleServer.RangesScheme;
+
 /**
  * Represents a Host with respect to the MapReduce ShuffleHandler.
  * 
@@ -153,7 +155,8 @@ public class InputHost extends HostPort {
 
   public synchronized PartitionToInputs clearAndGetOnePartitionRange(
       ConcurrentMap<Long, ShuffleClient<?>> shuffleClients,
-      int maxTaskOutputAtOnce) {
+      int maxTaskOutputAtOnce,
+      ShuffleServer.RangesScheme rangesScheme) {
     if (partitionToInputs.isEmpty()) {
       // this can happen if:
       //   1. ShuffleServer takes InputHost from pendingHosts[]
@@ -164,7 +167,12 @@ public class InputHost extends HostPort {
       return null;
     }
 
-    ShuffleClient<?> shuffleClient = getMaxSizeShuffleClient(shuffleClients);
+    ShuffleClient<?> shuffleClient = null;
+    if (rangesScheme == RangesScheme.SCHEME_FIRST) {
+      shuffleClient = getFirstShuffleClient(shuffleClients);
+    } else {
+      shuffleClient = getMaxSizeShuffleClient(shuffleClients);
+    }
     if (shuffleClient == null) {
       return null;
     }
@@ -194,8 +202,35 @@ public class InputHost extends HostPort {
       partitionToInputs.remove(shuffleClientId);
     }
 
-    LOG.info("InputHost returns for the next fetcher: {}", ret);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("InputHost returns for the next fetcher: {}", ret);
+    }
     return ret;
+  }
+
+  private ShuffleClient getFirstShuffleClient(
+      ConcurrentMap<Long, ShuffleClient<?>> shuffleClients) {
+    Iterator<Map.Entry<Long, Map<PartitionRange, List<InputAttemptIdentifier>>>> iterator =
+      partitionToInputs.entrySet().iterator();
+    while (iterator.hasNext()) {
+      Map.Entry<Long, Map<PartitionRange, List<InputAttemptIdentifier>>> entry = iterator.next();
+      long shuffleClientId = entry.getKey();
+      Map<PartitionRange, List<InputAttemptIdentifier>> partitionMap = entry.getValue();
+      assert !partitionMap.isEmpty();   // invariant on partitionToInputs[]
+
+      ShuffleClient<?> shuffleClient = shuffleClients.get(shuffleClientId);
+      if (shuffleClient == null) {
+        iterator.remove();
+        continue;
+      }
+      if (!shuffleClient.shouldScanPendingInputs()) {
+        continue;
+      }
+
+      return shuffleClient;
+    }
+
+    return null;
   }
 
   private ShuffleClient getMaxSizeShuffleClient(
@@ -249,89 +284,8 @@ public class InputHost extends HostPort {
     return maxEntry;
   }
 
-  public synchronized PartitionToInputs[] getPendingInputsSeq(
-      ShuffleClient shuffleClient, PartitionToInputs srcPendingInputs) {
-    long shuffleClientId = srcPendingInputs.shuffleClientId;
-    assert shuffleClientId == shuffleClient.getShuffleClientId();
-    Map<PartitionRange, List<InputAttemptIdentifier>> partitionMap = partitionToInputs.get(shuffleClientId);
-
-    if (partitionMap == null) {
-      PartitionToInputs[] pendingInputsSeq = { srcPendingInputs };
-      return pendingInputsSeq;
-    }
-    assert !partitionMap.isEmpty();
-
-    PartitionRange srcRange = srcPendingInputs.getPartitionRange();
-    List<InputAttemptIdentifier> srcInputs = srcPendingInputs.inputs;
-    int numSrcInputs = srcPendingInputs.inputs.size();
-    LOG.info("Checking for additional PartitionRanges: {}, srcRange={}, numSrcInputs={}", this, srcRange, numSrcInputs);
-
-    ArrayList<PartitionToInputs> pendingInputsSeq = new ArrayList<>();
-    pendingInputsSeq.add(srcPendingInputs);   // srcPendingInputs is included in the final result
-
-    Iterator<Map.Entry<PartitionRange, List<InputAttemptIdentifier>>> iterator =
-        partitionMap.entrySet().iterator();
-    while (iterator.hasNext()) {
-      Map.Entry<PartitionRange, List<InputAttemptIdentifier>> entry = iterator.next();
-      PartitionRange queueRange = entry.getKey();
-      List<InputAttemptIdentifier> queueInputs = entry.getValue();
-      assert !queueInputs.isEmpty();
-
-      if (queueInputs.size() < numSrcInputs) {
-        continue;
-      }
-
-      boolean isQueueCompatibleWithSrcInputs = srcInputs.stream().allMatch(srcInput ->
-          queueInputs.stream().anyMatch(queueInput ->
-              srcInput.getPathComponent().equals(queueInput.getPathComponent())));
-
-      if (isQueueCompatibleWithSrcInputs) {
-        LOG.info("Found additional PartitionRange for {}, srcRange={}: queueRange={}", this, srcRange, queueRange);
-        ArrayList<InputAttemptIdentifier> newInputs = new ArrayList<>();
-
-        moveQueueInputsToNewInputs(srcInputs, queueInputs, newInputs);
-        assert newInputs.size() == numSrcInputs;
-
-        PartitionToInputs newPendingInputs = new PartitionToInputs(shuffleClientId, queueRange, newInputs);
-        pendingInputsSeq.add(newPendingInputs);
-
-        if (queueInputs.isEmpty()) {
-          iterator.remove();
-          shuffleClient.partitionRangeRemoved();
-        }
-      }
-    }
-
-    if (partitionMap.isEmpty()) {
-      partitionToInputs.remove(shuffleClientId);
-    }
-
-    pendingInputsSeq.sort((a, b) -> Integer.compare(a.getPartition(), b.getPartition()));
-
-    return pendingInputsSeq.toArray(new PartitionToInputs[0]);
-  }
-
-  private void moveQueueInputsToNewInputs(
-      List<InputAttemptIdentifier> srcInputs,
-      List<InputAttemptIdentifier> queueInputs,
-      ArrayList<InputAttemptIdentifier> newInputs) {
-    for (InputAttemptIdentifier input : srcInputs) {
-      Iterator<InputAttemptIdentifier> iteratorQueue = queueInputs.iterator();
-      while (iteratorQueue.hasNext()) {
-        InputAttemptIdentifier queueInput = iteratorQueue.next();
-        if (input.getPathComponent().equals(queueInput.getPathComponent())) {
-          iteratorQueue.remove();
-          newInputs.add(queueInput);
-          break;
-        }
-      }
-    }
-  }
-
-  // return true if some entries have been removed
-  public synchronized boolean clearShuffleClientId(long shuffleManagerId) {
-    Map<PartitionRange, List<InputAttemptIdentifier>> current = partitionToInputs.remove(shuffleManagerId);
-    return current != null;
+  public synchronized void clearShuffleClientId(long shuffleManagerId) {
+    partitionToInputs.remove(shuffleManagerId);
   }
 
   public synchronized String toDetailedString() {

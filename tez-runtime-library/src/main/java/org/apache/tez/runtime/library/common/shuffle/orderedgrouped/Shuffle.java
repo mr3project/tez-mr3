@@ -99,7 +99,6 @@ public class Shuffle implements ExceptionReporter {
   public Shuffle(InputContext inputContext, Configuration conf, int numInputs,
       long initialMemoryAvailable) throws IOException {
     this.inputContext = inputContext;
-
     this.srcNameTrimmed = TezUtilsInternal.cleanVertexName(inputContext.getSourceVertexName());
 
     CompressionCodec codec = CodecUtils.getCodec(conf);
