@@ -29,8 +29,8 @@ import java.text.DecimalFormat;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 import java.util.zip.Deflater;
 
 import javax.annotation.Nullable;
@@ -46,7 +46,7 @@ import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.http.BaseHttpConnection;
 import org.apache.tez.http.HttpConnectionParams;
-import org.apache.tez.runtime.api.InputContext;
+import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.api.events.DataMovementEvent;
 import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.TezRuntimeUtils;
@@ -80,14 +80,14 @@ public class ShuffleUtils {
   private static final Logger LOG = LoggerFactory.getLogger(ShuffleUtils.class);
   private static final long MB = 1024l * 1024l;
 
-  static final ThreadLocal<DecimalFormat> MBPS_FORMAT =
+  public static final ThreadLocal<DecimalFormat> MBPS_FORMAT =
       new ThreadLocal<DecimalFormat>() {
         @Override
         protected DecimalFormat initialValue() {
           return new DecimalFormat("0.00");
         }
       };
-  static final ThreadLocal<FastNumberFormat> MBPS_FAST_FORMAT =
+  public static final ThreadLocal<FastNumberFormat> MBPS_FAST_FORMAT =
       new ThreadLocal<FastNumberFormat>() {
         @Override
         protected FastNumberFormat initialValue() {
@@ -129,15 +129,13 @@ public class ShuffleUtils {
   public static void shuffleToMemory(byte[] shuffleData,
       InputStream input, int decompressedLength, int compressedLength,
       CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLength,
-      Logger LOG, InputAttemptIdentifier identifier, InputContext inputContext) throws IOException {
+      Logger LOG, InputAttemptIdentifier identifier,
+      TaskContext taskContext, boolean useThreadLocalDecompressor) throws IOException {
     try {
       IFile.Reader.readToMemory(shuffleData, input, compressedLength, codec,
-          ifileReadAhead, ifileReadAheadLength, inputContext);
+          ifileReadAhead, ifileReadAheadLength, taskContext, useThreadLocalDecompressor);
       // metrics.inputBytes(shuffleData.length);
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Read " + shuffleData.length + " bytes from input for "
-            + identifier);
-      }
+      // finished reading shuffleData.length bytes from identifier
     } catch (InternalError | Exception e) {
       // Close the streams
       LOG.info("Failed to read data to memory for {}. len={}, decomp={}. ExceptionMessage={}",
@@ -180,11 +178,7 @@ public class ShuffleUtils {
           // metrics.inputBytes(n);
         }
       }
-
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Read " + (compressedLength - bytesLeft)
-            + " bytes from input for " + identifier);
-      }
+      // finished reading (compressedLength - bytesLeft) bytes
 
       output.close();
     } catch (IOException ioe) {
@@ -220,7 +214,7 @@ public class ShuffleUtils {
   }
 
   public static StringBuilder constructBaseURIForShuffleHandler(String host,
-      int port, int partition, int partitionCount, String appId, int dagIdentifier, boolean sslShuffle) {
+      int port, InputHost.PartitionRange range, String appId, int dagIdentifier, boolean sslShuffle) {
     final String http_protocol = (sslShuffle) ? "https://" : "http://";
     StringBuilder sb = new StringBuilder(http_protocol);
     sb.append(host);
@@ -230,13 +224,9 @@ public class ShuffleUtils {
     sb.append("mapOutput?job=");
     sb.append(appId.replace("application", "job"));
     sb.append("&dag=");
-    sb.append(String.valueOf(dagIdentifier));
+    sb.append(dagIdentifier);
     sb.append("&reduce=");
-    sb.append(String.valueOf(partition));
-    if (partitionCount > 1) {
-      sb.append("-");
-      sb.append(String.valueOf(partition + partitionCount - 1));
-    }
+    sb.append(range.toString());
     sb.append("&map=");
     return sb;
   }
@@ -556,7 +546,6 @@ public class ShuffleUtils {
       this.aggregateLogger = aggregateLogger;
     }
 
-
     private static StringBuilder toShortString(InputAttemptIdentifier inputAttemptIdentifier, StringBuilder sb) {
       sb.append("{");
       sb.append(inputAttemptIdentifier.getInputIdentifier());
@@ -617,16 +606,15 @@ public class ShuffleUtils {
         activeLogger.debug(sb.toString());
       } else {
         long currentCount, currentCompressedSize, currentDecompressedSize, currentTotalTime;
-        synchronized (this) {
-          currentCount = logCount.incrementAndGet();
-          currentCompressedSize = compressedSize.addAndGet(bytesCompressed);
-          currentDecompressedSize = decompressedSize.addAndGet(bytesDecompressed);
-          currentTotalTime = totalTime.addAndGet(millis);
-          if (currentCount % 1000 == 0) {
-            compressedSize.set(0);
-            decompressedSize.set(0);
-            totalTime.set(0);
-          }
+        currentCount = logCount.incrementAndGet();
+        currentCompressedSize = compressedSize.addAndGet(bytesCompressed);
+        currentDecompressedSize = decompressedSize.addAndGet(bytesDecompressed);
+        currentTotalTime = totalTime.addAndGet(millis);
+        if (currentCount == 1000) {
+          logCount.set(0);
+          compressedSize.set(0);
+          decompressedSize.set(0);
+          totalTime.set(0);
         }
         if (currentCount % 1000 == 0) {
           double avgRate = currentTotalTime == 0 ? 0

@@ -27,7 +27,7 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 
 @Private
-public abstract class FetchedInput {
+public abstract class FetchedInput implements ShuffleInput {
   
   public static enum Type {
     WAIT, // TODO NEWTEZ Implement this, only if required.
@@ -42,7 +42,7 @@ public abstract class FetchedInput {
 
   private static AtomicInteger ID_GEN = new AtomicInteger(0);
 
-  private InputAttemptIdentifier inputAttemptIdentifier;
+  private final InputAttemptIdentifier inputAttemptIdentifier;
   private final FetchedInputCallback callback;
   private final int id;
   private byte state;

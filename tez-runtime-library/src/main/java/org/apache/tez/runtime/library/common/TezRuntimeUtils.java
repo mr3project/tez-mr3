@@ -240,8 +240,8 @@ public class TezRuntimeUtils {
     return httpConnParams;
   }
 
-  public static BaseHttpConnection getHttpConnection(URL url,
-                                                     HttpConnectionParams params, String logIdentifier, JobTokenSecretManager jobTokenSecretManager)
+  public static BaseHttpConnection getHttpConnection(
+      URL url, HttpConnectionParams params, String logIdentifier, JobTokenSecretManager jobTokenSecretManager)
       throws IOException {
     return new HttpConnection(url, params, logIdentifier, jobTokenSecretManager);
   }

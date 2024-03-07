@@ -77,7 +77,6 @@ public class UnorderedKVReader<K, V> extends KeyValueReader {
   private final AtomicLong totalBytesRead = new AtomicLong(0);
   private final AtomicLong totalFileBytes = new AtomicLong(0);
 
-
   public UnorderedKVReader(ShuffleManager shuffleManager, Configuration conf,
       CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLength, int ifileBufferSize,
       TezCounter inputRecordCounter, InputContext context)

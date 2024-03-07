@@ -20,28 +20,26 @@ package org.apache.tez.runtime.library.common.shuffle;
 
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 
+import java.util.Map;
+
 public class FetchResult {
 
+  private final long shuffleManagerId;
   private final String host;
   private final int port;
-  private final int partition;
-  private final int partitionCount;
-  private final Iterable<InputAttemptIdentifier> pendingInputs;
-  private final String additionalInfo;
 
-  public FetchResult(String host, int port, int partition, int partitionCount,
-      Iterable<InputAttemptIdentifier> pendingInputs) {
-    this(host, port, partition, partitionCount, pendingInputs, null);
-  }
+  private Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs;
 
-  public FetchResult(String host, int port, int partition, int partitionCount,
-      Iterable<InputAttemptIdentifier> pendingInputs, String additionalInfo) {
+  public FetchResult(long shuffleManagerId, String host, int port,
+                     Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs) {
+    this.shuffleManagerId = shuffleManagerId;
     this.host = host;
     this.port = port;
-    this.partition = partition;
-    this.partitionCount = partitionCount;
     this.pendingInputs = pendingInputs;
-    this.additionalInfo = additionalInfo;
+  }
+
+  public long getShuffleManagerId() {
+    return shuffleManagerId;
   }
 
   public String getHost() {
@@ -52,19 +50,7 @@ public class FetchResult {
     return port;
   }
 
-  public int getPartition() {
-    return partition;
-  }
-
-  public int getPartitionCount() {
-    return partitionCount;
-  }
-
-  public Iterable<InputAttemptIdentifier> getPendingInputs() {
+  public Map<InputAttemptIdentifier, InputHost.PartitionRange> getPendingInputs() {
     return pendingInputs;
-  }
-
-  public String getAdditionalInfo() {
-    return additionalInfo;
   }
 }

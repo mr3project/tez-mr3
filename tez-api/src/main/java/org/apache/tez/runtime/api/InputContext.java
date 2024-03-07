@@ -25,7 +25,7 @@ import org.apache.hadoop.classification.InterfaceAudience.Public;
  * This interface is not supposed to be implemented by users
  */
 @Public
-public interface InputContext extends TaskContext, DecompressorPool {
+public interface InputContext extends TaskContext {
 
   /**
    * Get the Vertex Name of the Source that generated data for this Input

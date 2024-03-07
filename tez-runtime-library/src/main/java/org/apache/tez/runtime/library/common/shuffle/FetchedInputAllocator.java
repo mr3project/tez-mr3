@@ -25,10 +25,10 @@ import org.apache.tez.runtime.library.common.shuffle.FetchedInput.Type;
 
 public interface FetchedInputAllocator {
 
-  public FetchedInput allocate(long actualSize, long compresedSize,
+  FetchedInput allocate(long actualSize, long compresedSize,
       InputAttemptIdentifier inputAttemptIdentifier) throws IOException;
   
-  public FetchedInput allocateType(Type type, long actualSize, long compresedSize,
+ FetchedInput allocateType(Type type, long actualSize, long compresedSize,
       InputAttemptIdentifier inputAttemptIdentifier) throws IOException;
-  
+
 }

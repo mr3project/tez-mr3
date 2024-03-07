@@ -22,18 +22,17 @@ import java.io.OutputStream;
 import java.util.Comparator;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.tez.runtime.library.common.shuffle.ShuffleInput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.BoundedByteArrayOutputStream;
 import org.apache.hadoop.io.FileChunk;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.task.local.output.TezTaskOutputFiles;
 
-
-abstract class MapOutput {
+public abstract class MapOutput implements ShuffleInput {
   private static final Logger LOG = LoggerFactory.getLogger(MapOutput.class);
   private static AtomicInteger ID = new AtomicInteger(0);
   

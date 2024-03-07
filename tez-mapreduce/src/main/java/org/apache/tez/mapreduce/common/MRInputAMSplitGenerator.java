@@ -47,7 +47,6 @@ import org.apache.tez.runtime.api.InputInitializerContext;
 import org.apache.tez.runtime.api.events.InputConfigureVertexTasksEvent;
 import org.apache.tez.runtime.api.events.InputDataInformationEvent;
 import org.apache.tez.runtime.api.events.InputInitializerEvent;
-import org.apache.tez.util.StopWatch;
 
 /**
  * Implements an {@link InputInitializer} that generates Map Reduce 
@@ -71,15 +70,8 @@ public class MRInputAMSplitGenerator extends InputInitializer {
 
   @Override
   public List<Event> initialize() throws Exception {
-    StopWatch sw = new StopWatch().start();
     MRInputUserPayloadProto userPayloadProto = MRInputHelpers
         .parseMRInputPayload(getContext().getInputUserPayload());
-    sw.stop();
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Time to parse MRInput payload into prot: "
-          + sw.now(TimeUnit.MILLISECONDS));
-    }
-    sw.reset().start();
     Configuration conf = TezUtils.createConfFromByteString(userPayloadProto
         .getConfigurationBytes());
     
@@ -87,14 +79,10 @@ public class MRInputAMSplitGenerator extends InputInitializer {
         MRJobConfig.MR_TEZ_INPUT_INITIALIZER_SERIALIZE_EVENT_PAYLOAD,
         MRJobConfig.MR_TEZ_INPUT_INITIALIZER_SERIALIZE_EVENT_PAYLOAD_DEFAULT);
 
-    sw.stop();
     if (LOG.isDebugEnabled()) {
       LOG.debug("Emitting serialized splits: " + sendSerializedEvents + " for input " +
           getContext().getInputName());
-      LOG.debug("Time converting ByteString to configuration: " + sw.now(TimeUnit.MILLISECONDS));
     }
-
-    sw.reset().start();
 
     int totalResource = getContext().getTotalAvailableResource().getMemory();
     int taskResource = getContext().getVertexTaskResource().getMemory();
@@ -119,10 +107,6 @@ public class MRInputAMSplitGenerator extends InputInitializer {
 
     inputSplitInfo = MRInputHelpers.generateInputSplitsToMem(jobConf,
         groupSplits, sortSplits, groupSplits ? numTasks : 0);
-    sw.stop();
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Time to create splits to mem: " + sw.now(TimeUnit.MILLISECONDS));
-    }
 
     List<Event> events = Lists.newArrayListWithCapacity(inputSplitInfo
         .getNumTasks() + 1);

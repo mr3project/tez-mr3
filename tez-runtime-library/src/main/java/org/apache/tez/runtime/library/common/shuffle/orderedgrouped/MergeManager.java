@@ -418,11 +418,11 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   final private MapOutput stallShuffle = MapOutput.createWaitMapOutput(null);
 
   @Override
-  public synchronized MapOutput reserve(InputAttemptIdentifier srcAttemptIdentifier, 
-                                             long requestedSize,
-                                             long compressedLength,
-                                             int fetcher
-                                             ) throws IOException {
+  public MapOutput reserve(
+      InputAttemptIdentifier srcAttemptIdentifier,
+      long requestedSize,
+      long compressedLength,
+      int fetcher) throws IOException {
     if (!canShuffleToMemory(requestedSize)) {
       if (LOG.isDebugEnabled()) {
         LOG.debug(srcAttemptIdentifier + ": Shuffling to disk since " + requestedSize +
@@ -447,43 +447,45 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     // (usedMemory + requestedSize > memoryLimit). When this thread is done
     // fetching, this will automatically trigger a merge thereby unlocking
     // all the stalled threads
-    
-    if (usedMemory > memoryLimit) {
-      if (!useFreeMemoryFetchedInput) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug(srcAttemptIdentifier + ": Stalling shuffle since usedMemory (" + usedMemory
-              + ") is greater than memoryLimit (" + memoryLimit + ")." +
-              " CommitMemory is (" + commitMemory + ")");
+
+    synchronized (this) {
+      if (usedMemory > memoryLimit) {
+        if (!useFreeMemoryFetchedInput) {
+          if (LOG.isDebugEnabled()) {
+            LOG.debug(srcAttemptIdentifier + ": Stalling shuffle since usedMemory (" + usedMemory
+                + ") is greater than memoryLimit (" + memoryLimit + ")." +
+                " CommitMemory is (" + commitMemory + ")");
+          }
+          return stallShuffle;
         }
-        return stallShuffle;
+        // Check if we can find free memory in the current ContainerWorker
+        long currentFreeMemory = Runtime.getRuntime().freeMemory();
+        if (currentFreeMemory < inputContext.getTotalMemoryAvailableToTask()){
+          // this ContainerWorker is busy serving Tasks, so do not borrow
+          return stallShuffle;
+        }
+        LOG.info("Creating MemoryMapOutput {} with free memory: {}", usedMemory, currentFreeMemory);
       }
-      // Check if we can find free memory in the current ContainerWorker
-      long currentFreeMemory = Runtime.getRuntime().freeMemory();
-      if (currentFreeMemory < inputContext.getTotalMemoryAvailableToTask()){
-        // this ContainerWorker is busy serving Tasks, so do not borrow
-        return stallShuffle;
+
+      // Allow the in-memory shuffle to progress
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(srcAttemptIdentifier + ": Proceeding with shuffle since usedMemory ("
+            + usedMemory + ") is lesser than memoryLimit (" + memoryLimit + ")."
+            + "CommitMemory is (" + commitMemory + ")");
       }
-      LOG.info("Creating MemoryMapOutput {} with free memory: {}", this.usedMemory, currentFreeMemory);
+      return unconditionalReserve(srcAttemptIdentifier, requestedSize, true);
     }
-    
-    // Allow the in-memory shuffle to progress
-    if (LOG.isDebugEnabled()) {
-      LOG.debug(srcAttemptIdentifier + ": Proceeding with shuffle since usedMemory ("
-          + usedMemory + ") is lesser than memoryLimit (" + memoryLimit + ")."
-          + "CommitMemory is (" + commitMemory + ")");
-    }
-    return unconditionalReserve(srcAttemptIdentifier, requestedSize, true);
   }
-  
+
   /**
    * Unconditional Reserve is used by the Memory-to-Memory thread
    */
   private synchronized MapOutput unconditionalReserve(
-      InputAttemptIdentifier srcAttemptIdentifier, long requestedSize, boolean primaryMapOutput) throws
-      IOException {
+      InputAttemptIdentifier srcAttemptIdentifier,
+      long requestedSize,
+      boolean primaryMapOutput) throws IOException {
     usedMemory += requestedSize;
-    return MapOutput.createMemoryMapOutput(srcAttemptIdentifier, this, (int)requestedSize,
-        primaryMapOutput);
+    return MapOutput.createMemoryMapOutput(srcAttemptIdentifier, this, (int) requestedSize, primaryMapOutput);
   }
 
   @Override
@@ -517,8 +519,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     // This should likely run a Combiner.
     if (memToMemMerger != null) {
       synchronized (memToMemMerger) {
-        if (!memToMemMerger.isInProgress() && 
-            inMemoryMapOutputs.size() >= memToMemMergeOutputsThreshold) {
+        if (!memToMemMerger.isInProgress() && inMemoryMapOutputs.size() >= memToMemMergeOutputsThreshold) {
           memToMemMerger.startMerge(inMemoryMapOutputs);
         }
       }
@@ -1319,8 +1320,9 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     return commitMemory;
   }
 
+  // always called inside synchronized (MergeManager) {}
   @VisibleForTesting
-  synchronized long getUsedMemory() {
+  long getUsedMemory() {
     return usedMemory;
   }
 

@@ -18,7 +18,6 @@
 
 package org.apache.tez.runtime.common.resources;
 
-import java.text.DecimalFormat;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -60,8 +59,8 @@ public class ScalingAllocator implements InitialMemoryAllocator {
 
     long totalJvmMem = Runtime.getRuntime().maxMemory();
     double ratio = totalRequested / (double) totalJvmMem;
-    LOG.info("Scaling Requests. TotalRequested: {}, TotalJVMHeap: {}, TotalAvailable: {}, TotalRequested/TotalJVMHeap:{}",
-        totalRequested, totalJvmMem, availableForAllocation, new DecimalFormat("0.00").format(ratio));
+    LOG.info("Scaling Requests. TotalRequested: {}, TotalJVMHeap: {}, TotalAvailable: {}, TotalRequested/TotalJVMHeap: {}",
+        totalRequested, totalJvmMem, availableForAllocation, ratio);
 
     if (totalRequested < availableForAllocation || totalRequested == 0) {
       // Not scaling up requests. Assuming things were setup correctly by

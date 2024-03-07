@@ -19,14 +19,20 @@
 package org.apache.tez.runtime.library.common.shuffle;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ConcurrentMap;
+import java.util.stream.Collectors;
 
+import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import static org.apache.tez.runtime.library.common.shuffle.ShuffleServer.RangesScheme;
 
 /**
  * Represents a Host with respect to the MapReduce ShuffleHandler.
@@ -34,13 +40,15 @@ import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
  */
 public class InputHost extends HostPort {
 
-  private static class PartitionRange {
+  private static final Logger LOG = LoggerFactory.getLogger(InputHost.class);
 
-    private final int partition;
+  public static class PartitionRange {
+
+    private final int partitionId;
     private final int partitionCount;
 
-    PartitionRange(int partition, int partitionCount) {
-      this.partition = partition;
+    public PartitionRange(int partitionId, int partitionCount) {
+      this.partitionId = partitionId;
       this.partitionCount = partitionCount;
     }
 
@@ -51,83 +59,244 @@ public class InputHost extends HostPort {
 
       PartitionRange that = (PartitionRange) o;
 
-      if (partition != that.partition) return false;
+      if (partitionId != that.partitionId) return false;
       return partitionCount == that.partitionCount;
     }
 
     @Override
     public int hashCode() {
-      int result = partition;
+      int result = partitionId;
       result = 31 * result + partitionCount;
       return result;
     }
 
     public int getPartition() {
-      return partition;
+      return partitionId;
     }
 
     public int getPartitionCount() {
       return partitionCount;
     }
+
+    @Override
+    public String toString() {
+      if (partitionCount == 1) {
+        return String.valueOf(partitionId);
+      } else {
+        return partitionId + "-" + (partitionId + partitionCount - 1);
+      }
+    }
   }
 
-  private String additionalInfo;
+  // Long = shuffleManagerId
+  // Invariant:
+  //   1. partitionToInputs[shuffleClientId] is never empty
+  //   2. partitionToInputs[shuffleClientId][partitionRange] is never empty
+  // no need to use concurrent Map/Queue because we guard all access with synchronized{}
+  private final Map<Long, Map<PartitionRange, List<InputAttemptIdentifier>>>
+      partitionToInputs = new HashMap<>();
 
-  // Each input host can support more than one partition.
-  // Each partition has a list of inputs for pipelined shuffle.
-  private final Map<PartitionRange, BlockingQueue<InputAttemptIdentifier>>
-      partitionToInputs = new ConcurrentHashMap<>();
+  private boolean hasPendingInput;
 
   public InputHost(HostPort hostPort) {
     super(hostPort.getHost(), hostPort.getPort());
+    this.hasPendingInput = false;
   }
 
-  public void setAdditionalInfo(String additionalInfo) {
-    this.additionalInfo = additionalInfo;
+  public synchronized InputHost takeFromPendingHosts(
+      BlockingQueue<InputHost> pendingHosts) throws InterruptedException {
+    assert hasPendingInput;
+    InputHost inputHost = pendingHosts.take();
+    assert inputHost == this;
+    hasPendingInput = false;
+    return inputHost;
   }
 
-  public String getAdditionalInfo() {
-    return (additionalInfo == null) ? "" : additionalInfo;
+  public synchronized void addToPendingHostsIfNecessary(BlockingQueue<InputHost> pendingHosts) {
+    // 'assert !hasPendingInput' is invalid because addKnownInput() may have been called
+    if (!hasPendingInput && !partitionToInputs.isEmpty()) {
+      pendingHosts.add(this);
+      hasPendingInput = true;
+    }
   }
 
-  public int getNumPendingPartitions() {
-    return partitionToInputs.size();
-  }
+  // partitionId == output partition in DME (DataMovementEvent.sourceIndex)
+  // partitionId != srcAttempt.inputIdentifier
+  public synchronized void addKnownInput(
+      ShuffleClient<?> shuffleClient,
+      int partitionId, int partitionCount, InputAttemptIdentifier srcAttempt,
+      BlockingQueue<InputHost> pendingHosts) {
+    long shuffleManagerId = shuffleClient.getShuffleClientId();
+    Map<PartitionRange, List<InputAttemptIdentifier>> partitionMap = partitionToInputs.get(shuffleManagerId);
+    if (partitionMap == null) {
+      partitionMap = new HashMap<PartitionRange, List<InputAttemptIdentifier>>();
+      partitionToInputs.put(shuffleManagerId, partitionMap);
+    }
 
-  public synchronized void addKnownInput(int partition, int partitionCount,
-      InputAttemptIdentifier srcAttempt) {
-    PartitionRange partitionRange = new PartitionRange(partition, partitionCount);
-    BlockingQueue<InputAttemptIdentifier> inputs =
-        partitionToInputs.get(partitionRange);
+    PartitionRange partitionRange = new PartitionRange(partitionId, partitionCount);
+    List<InputAttemptIdentifier> inputs = partitionMap.get(partitionRange);
     if (inputs == null) {
-      inputs = new LinkedBlockingQueue<InputAttemptIdentifier>();
-      partitionToInputs.put(partitionRange, inputs);
+      inputs = new ArrayList<InputAttemptIdentifier>();
+      partitionMap.put(partitionRange, inputs);
+      shuffleClient.partitionRangeAdded();
     }
+
     inputs.add(srcAttempt);
+
+    if (!hasPendingInput) {
+      boolean added = pendingHosts.offer(this);
+      if (!added) {
+        String errorMessage = "Unable to add host " + super.toString() + " to pending queue";
+        throw new TezUncheckedException(errorMessage);
+      }
+      hasPendingInput = true;
+    }
   }
 
-  public synchronized PartitionToInputs clearAndGetOnePartitionRange() {
-    for (Map.Entry<PartitionRange, BlockingQueue<InputAttemptIdentifier>> entry :
-        partitionToInputs.entrySet()) {
-      List<InputAttemptIdentifier> inputs =
-          new ArrayList<InputAttemptIdentifier>(entry.getValue().size());
-      entry.getValue().drainTo(inputs);
-      PartitionToInputs ret = new PartitionToInputs(entry.getKey().getPartition(), entry.getKey().getPartitionCount(), inputs);
-      partitionToInputs.remove(entry.getKey());
-      return ret;
+  public synchronized PartitionToInputs clearAndGetOnePartitionRange(
+      ConcurrentMap<Long, ShuffleClient<?>> shuffleClients,
+      int maxTaskOutputAtOnce,
+      ShuffleServer.RangesScheme rangesScheme) {
+    if (partitionToInputs.isEmpty()) {
+      // this can happen if:
+      //   1. ShuffleServer takes InputHost from pendingHosts[]
+      //   2. pendingHosts[] does not contain InputHost
+      //   3. addKnownInput() is called before constructFetcherForHost() is called,
+      //      and add InputHost to pendingHosts[]
+      //   4. InputHost.partitionToInputs[] is all consumed and becomes empty
+      return null;
     }
+
+    ShuffleClient<?> shuffleClient = null;
+    if (rangesScheme == RangesScheme.SCHEME_FIRST) {
+      shuffleClient = getFirstShuffleClient(shuffleClients);
+    } else {
+      shuffleClient = getMaxSizeShuffleClient(shuffleClients);
+    }
+    if (shuffleClient == null) {
+      return null;
+    }
+    long shuffleClientId = shuffleClient.getShuffleClientId();
+
+    Map<PartitionRange, List<InputAttemptIdentifier>> partitionMap = partitionToInputs.get(shuffleClientId);
+    assert !partitionMap.isEmpty();   // invariant on partitionToInputs[]
+
+    Map.Entry<PartitionRange, List<InputAttemptIdentifier>> maxSizeEntry = getMaxSizeEntry(partitionMap);
+    assert maxSizeEntry != null;
+
+    // extract PartitionToInputs from maxSizeEntry, updating partitionMap[] and notifying shuffleClient
+    PartitionRange range = maxSizeEntry.getKey();
+    List<InputAttemptIdentifier> queue = maxSizeEntry.getValue();
+    PartitionToInputs ret;
+    if (queue.size() <= maxTaskOutputAtOnce) {
+      ret = new PartitionToInputs(shuffleClientId, range, queue);
+      partitionMap.remove(range);
+      shuffleClient.partitionRangeRemoved();
+    } else {
+      List<InputAttemptIdentifier> inputToConsume = new ArrayList<>(queue.subList(0, maxTaskOutputAtOnce));
+      queue.subList(0, maxTaskOutputAtOnce).clear();
+      ret = new PartitionToInputs(shuffleClientId, range, inputToConsume);
+    }
+
+    if (partitionMap.isEmpty()) {
+      partitionToInputs.remove(shuffleClientId);
+    }
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("InputHost returns for the next fetcher: {}", ret);
+    }
+    return ret;
+  }
+
+  private ShuffleClient getFirstShuffleClient(
+      ConcurrentMap<Long, ShuffleClient<?>> shuffleClients) {
+    Iterator<Map.Entry<Long, Map<PartitionRange, List<InputAttemptIdentifier>>>> iterator =
+      partitionToInputs.entrySet().iterator();
+    while (iterator.hasNext()) {
+      Map.Entry<Long, Map<PartitionRange, List<InputAttemptIdentifier>>> entry = iterator.next();
+      long shuffleClientId = entry.getKey();
+      Map<PartitionRange, List<InputAttemptIdentifier>> partitionMap = entry.getValue();
+      assert !partitionMap.isEmpty();   // invariant on partitionToInputs[]
+
+      ShuffleClient<?> shuffleClient = shuffleClients.get(shuffleClientId);
+      if (shuffleClient == null) {
+        iterator.remove();
+        continue;
+      }
+      if (!shuffleClient.shouldScanPendingInputs()) {
+        continue;
+      }
+
+      return shuffleClient;
+    }
+
     return null;
   }
 
-  public String toDetailedString() {
-    return "HostPort=" + super.toString() + ", InputDetails=" +
-        partitionToInputs;
+  private ShuffleClient getMaxSizeShuffleClient(
+      ConcurrentMap<Long, ShuffleClient<?>> shuffleClients) {
+    int maxCount = Integer.MIN_VALUE;
+    ShuffleClient maxShuffleClient = null;
+
+    Iterator<Map.Entry<Long, Map<PartitionRange, List<InputAttemptIdentifier>>>> iterator =
+      partitionToInputs.entrySet().iterator();
+    while (iterator.hasNext()) {
+      Map.Entry<Long, Map<PartitionRange, List<InputAttemptIdentifier>>> entry = iterator.next();
+      long shuffleClientId = entry.getKey();
+      Map<PartitionRange, List<InputAttemptIdentifier>> partitionMap = entry.getValue();
+      assert !partitionMap.isEmpty();   // invariant on partitionToInputs[]
+
+      ShuffleClient<?> shuffleClient = shuffleClients.get(shuffleClientId);
+      if (shuffleClient == null) {
+        iterator.remove();
+        continue;
+      }
+      if (!shuffleClient.shouldScanPendingInputs()) {
+        continue;
+      }
+
+      int currentSize = partitionMap.values().stream()
+          .mapToInt(x -> x.size())
+          .sum();
+      if (currentSize > maxCount) {
+        maxCount = currentSize;
+        maxShuffleClient = shuffleClient;
+      }
+    }
+
+    return maxShuffleClient;
+  }
+
+  private Map.Entry<PartitionRange, List<InputAttemptIdentifier>> getMaxSizeEntry(
+      Map<PartitionRange, List<InputAttemptIdentifier>> partitionMap) {
+    Map.Entry<PartitionRange, List<InputAttemptIdentifier>> maxEntry = null;
+
+    int maxIdentifierCount = Integer.MIN_VALUE;
+    for (Map.Entry<PartitionRange, List<InputAttemptIdentifier>> e : partitionMap.entrySet()) {
+      int currentSize = e.getValue().size();
+      assert currentSize > 0;
+      if (currentSize > maxIdentifierCount) {
+        maxIdentifierCount = currentSize;
+        maxEntry = e;
+      }
+    }
+
+    return maxEntry;
+  }
+
+  public synchronized void clearShuffleClientId(long shuffleManagerId) {
+    partitionToInputs.remove(shuffleManagerId);
+  }
+
+  public synchronized String toDetailedString() {
+    return "HostPort=" + super.toString() + ", partitionToInputs=" +
+        partitionToInputs.keySet().stream().map(x -> x.toString())
+            .collect(Collectors.joining(", "));
   }
   
   @Override
   public String toString() {
-    return "HostPort=" + super.toString() + ", PartitionIds=" +
-        partitionToInputs.keySet();
+    return "InputHost " + super.toString();
   }
 
   @Override
@@ -141,22 +310,30 @@ public class InputHost extends HostPort {
   }
 
   public static class PartitionToInputs {
-    private final int partition;
-    private final int partitionCount;
-    private List<InputAttemptIdentifier> inputs;
+    private final long shuffleClientId;
+    private final PartitionRange partitionRange;
+    private List<InputAttemptIdentifier> inputs;  // can be removed from after initializing
 
-    public PartitionToInputs(int partition, int partitionCount, List<InputAttemptIdentifier> input) {
-      this.partition = partition;
-      this.partitionCount = partitionCount;
-      this.inputs = input;
+    public PartitionToInputs(long shuffleClientId, PartitionRange partitionRange, List<InputAttemptIdentifier> inputs) {
+      this.shuffleClientId = shuffleClientId;
+      this.partitionRange = partitionRange;
+      this.inputs = inputs;
+    }
+
+    public long getShuffleClientId() {
+      return shuffleClientId;
+    }
+
+    public PartitionRange getPartitionRange() {
+      return partitionRange;
     }
 
     public int getPartition() {
-      return partition;
+      return partitionRange.partitionId;
     }
 
     public int getPartitionCount() {
-      return partitionCount;
+      return partitionRange.partitionCount;
     }
 
     public List<InputAttemptIdentifier> getInputs() {
@@ -165,7 +342,16 @@ public class InputHost extends HostPort {
 
     @Override
     public String toString() {
-      return "partition=" + partition + ", partitionCount=" + partitionCount + ", inputs=" + inputs;
+      StringBuilder sb = new StringBuilder();
+      sb.append("shuffleClientId=");
+      sb.append(shuffleClientId);
+      sb.append(", partitionId=");
+      sb.append(partitionRange.partitionId);
+      sb.append(", partitionCount=");
+      sb.append(partitionRange.partitionCount);
+      sb.append(", input[]=");
+      sb.append(inputs.size());
+      return sb.toString();
     }
   }
 }
