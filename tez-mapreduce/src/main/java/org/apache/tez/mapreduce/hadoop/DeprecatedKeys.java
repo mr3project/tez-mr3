@@ -22,8 +22,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.tez.dag.api.TezConfiguration;
-import org.apache.tez.dag.library.vertexmanager.ShuffleVertexManager;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 
 public class DeprecatedKeys {

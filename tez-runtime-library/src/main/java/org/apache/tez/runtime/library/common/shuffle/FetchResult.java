@@ -20,23 +20,21 @@ package org.apache.tez.runtime.library.common.shuffle;
 
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 
+import java.util.Map;
+
 public class FetchResult {
 
   private final long shuffleManagerId;
   private final String host;
   private final int port;
-  private final int partition;
-  private final int partitionCount;
-  private final Iterable<InputAttemptIdentifier> pendingInputs;
+
+  private Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs;
 
   public FetchResult(long shuffleManagerId, String host, int port,
-                     int partition, int partitionCount,
-                     Iterable<InputAttemptIdentifier> pendingInputs) {
+                     Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs) {
     this.shuffleManagerId = shuffleManagerId;
     this.host = host;
     this.port = port;
-    this.partition = partition;
-    this.partitionCount = partitionCount;
     this.pendingInputs = pendingInputs;
   }
 
@@ -52,15 +50,7 @@ public class FetchResult {
     return port;
   }
 
-  public int getPartition() {
-    return partition;
-  }
-
-  public int getPartitionCount() {
-    return partitionCount;
-  }
-
-  public Iterable<InputAttemptIdentifier> getPendingInputs() {
+  public Map<InputAttemptIdentifier, InputHost.PartitionRange> getPendingInputs() {
     return pendingInputs;
   }
 }

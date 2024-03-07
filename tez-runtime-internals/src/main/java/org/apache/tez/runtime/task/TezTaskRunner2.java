@@ -16,7 +16,6 @@ package org.apache.tez.runtime.task;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 
@@ -24,14 +23,9 @@ import com.google.common.collect.Multimap;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.tez.common.TezExecutors;
-import org.apache.tez.dag.records.TezTaskAttemptID;
 import org.apache.tez.runtime.api.ExecutionContext;
 import org.apache.tez.runtime.api.ObjectRegistry;
-import org.apache.tez.runtime.api.TaskFailureType;
-import org.apache.tez.runtime.api.impl.EventMetaData;
 import org.apache.tez.runtime.api.impl.TaskSpec;
-import org.apache.tez.runtime.api.impl.TezEvent;
-import org.apache.tez.runtime.api.impl.TezUmbilical;
 import org.apache.tez.runtime.internals.api.TaskReporterInterface;
 
 public class TezTaskRunner2 {

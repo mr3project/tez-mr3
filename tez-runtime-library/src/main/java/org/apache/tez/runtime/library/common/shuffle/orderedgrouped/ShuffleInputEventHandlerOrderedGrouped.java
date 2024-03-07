@@ -45,7 +45,7 @@ import org.apache.tez.util.StringInterner;
 import com.google.protobuf.InvalidProtocolBufferException;
 
 public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandler {
-  
+
   private static final Logger LOG = LoggerFactory.getLogger(ShuffleInputEventHandlerOrderedGrouped.class);
 
   private final ShuffleScheduler scheduler;
@@ -61,8 +61,8 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
   private final int portIndex;
 
   public ShuffleInputEventHandlerOrderedGrouped(InputContext inputContext,
-                                                ShuffleScheduler scheduler,
-                                                boolean compositeFetch) {
+      ShuffleScheduler scheduler,
+      boolean compositeFetch) {
     this.inputContext = inputContext;
     this.scheduler = scheduler;
     this.compositeFetch = compositeFetch;
@@ -111,7 +111,6 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
         }
       }
       processDataMovementEvent(dmEvent, shufflePayload, emptyPartitionsBitSet);
-      scheduler.updateEventReceivedTime();
     } else if (event instanceof CompositeRoutedDataMovementEvent) {
       CompositeRoutedDataMovementEvent crdme = (CompositeRoutedDataMovementEvent)event;
       DataMovementEventPayloadProto shufflePayload;
@@ -138,7 +137,6 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
           processDataMovementEvent(crdme.expand(offset), shufflePayload, emptyPartitionsBitSet);
         }
       }
-      scheduler.updateEventReceivedTime();
     } else if (event instanceof InputFailedEvent) {
       numObsoletionEvents.incrementAndGet();
       processTaskFailedEvent((InputFailedEvent) event);
@@ -169,7 +167,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
                     + srcAttemptIdentifier + "]. Not fetching.");
           }
           numDmeEventsNoData.getAndIncrement();
-          scheduler.copySucceeded(srcAttemptIdentifier.expand(0), null, 0, 0, 0, null, true);
+          scheduler.fetchSucceeded(srcAttemptIdentifier.expand(0), null, 0, 0, 0);
           return;
         }
       } catch (IOException e) {
@@ -207,7 +205,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
                 + srcInputAttemptIdentifier + "]. Not fetching.");
           }
           numDmeEventsNoData.getAndIncrement();
-          scheduler.copySucceeded(srcInputAttemptIdentifier, null, 0, 0, 0, null, true);
+          scheduler.fetchSucceeded(srcInputAttemptIdentifier, null, 0, 0, 0);
         }
       }
 
@@ -223,8 +221,9 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
 
   private int getShufflePort(DataMovementEventPayloadProto shufflePayload) {
     if (inputContext.useShuffleHandlerProcessOnK8s()) {
-      int numPorts = scheduler.localShufflePorts.length;
-      return scheduler.localShufflePorts[portIndex % numPorts];
+      int[] localShufflePorts = scheduler.getLocalShufflePorts();
+      int numPorts = localShufflePorts.length;
+      return localShufflePorts[portIndex % numPorts];
     } else {
       int numPorts = shufflePayload.getNumPorts();
       return shufflePayload.getPorts(portIndex % numPorts);
@@ -249,7 +248,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
    * @return CompositeInputAttemptIdentifier
    */
   private CompositeInputAttemptIdentifier constructInputAttemptIdentifier(int targetIndex, int targetIndexCount, int version,
-                                                                          DataMovementEventPayloadProto shufflePayload) {
+      DataMovementEventPayloadProto shufflePayload) {
     String pathComponent = (shufflePayload.hasPathComponent()) ? StringInterner.intern(shufflePayload.getPathComponent()) : null;
     int spillEventId = shufflePayload.getSpillId();
     CompositeInputAttemptIdentifier srcAttemptIdentifier = null;
@@ -258,7 +257,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
       InputAttemptIdentifier.SPILL_INFO info = (lastEvent) ? InputAttemptIdentifier.SPILL_INFO
           .FINAL_UPDATE : InputAttemptIdentifier.SPILL_INFO.INCREMENTAL_UPDATE;
       srcAttemptIdentifier =
-          new CompositeInputAttemptIdentifier(targetIndex, version, pathComponent, false, info, spillEventId, targetIndexCount);
+          new CompositeInputAttemptIdentifier(targetIndex, version, pathComponent, info, spillEventId, targetIndexCount);
     } else {
       srcAttemptIdentifier =
           new CompositeInputAttemptIdentifier(targetIndex, version, pathComponent, targetIndexCount);

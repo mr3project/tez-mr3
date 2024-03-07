@@ -66,7 +66,8 @@ abstract class MergeThread<T> extends Thread {
     this.shuffleSchedulerThread = shuffleSchedulerThread;
   }
 
-  public synchronized boolean isInProgress() {
+  // always called inside synchronized (Merger) {}
+  public boolean isInProgress() {
     return inProgress;
   }
   
@@ -87,8 +88,7 @@ abstract class MergeThread<T> extends Thread {
 
   public synchronized void waitForMerge() throws InterruptedException {
     while (inProgress) {
-      if (shuffleSchedulerThread != null
-          && !shuffleSchedulerThread.isAlive()) {
+      if (shuffleSchedulerThread != null && !shuffleSchedulerThread.isAlive()) {
         return;
       }
       wait(5000);
@@ -101,8 +101,7 @@ abstract class MergeThread<T> extends Thread {
         // Wait for notification to start the merge...
         synchronized (this) {
           while (!inProgress) {
-            if (shuffleSchedulerThread != null
-                && !shuffleSchedulerThread.isAlive()) {
+            if (shuffleSchedulerThread != null&& !shuffleSchedulerThread.isAlive()) {
               return;
             }
             wait(5000);

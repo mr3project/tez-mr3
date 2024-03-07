@@ -229,28 +229,9 @@ public class TezRuntimeConfiguration {
   public static final int TEZ_RUNTIME_SHUFFLE_PARALLEL_COPIES_DEFAULT = 20;
 
   @ConfigurationProperty(type = "integer")
-  public static final String TEZ_RUNTIME_SHUFFLE_UNORDERED_PARALLEL_COPIES = TEZ_RUNTIME_PREFIX +
-      "shuffle.unordered.parallel.copies";
-  public static final int TEZ_RUNTIME_SHUFFLE_UNORDERED_PARALLEL_COPIES_DEFAULT = 20;
-
-  @ConfigurationProperty(type = "integer")
-  public static final String TEZ_RUNTIME_SHUFFLE_ORDERED_PARALLEL_COPIES = TEZ_RUNTIME_PREFIX +
-      "shuffle.ordered.parallel.copies";
-  public static final int TEZ_RUNTIME_SHUFFLE_ORDERED_PARALLEL_COPIES_DEFAULT = 20;
-
-  @Private
-  @Unstable
-  @ConfigurationProperty(type = "integer")
-  /**
-   * Expert setting made available only for debugging. Do not change it. Sets
-   * the number of retries before giving up on downloading from source
-   * attempt by consumer. Code internally handles the threshold if set to -1.
-   */
-  public static final String
-      TEZ_RUNTIME_SHUFFLE_SOURCE_ATTEMPT_ABORT_LIMIT =
-      TEZ_RUNTIME_PREFIX + "shuffle.src-attempt.abort.limit";
-  public static final int
-      TEZ_RUNTIME_SHUFFLE_SOURCE_ATTEMPT_ABORT_LIMIT_DEFAULT = -1;
+  public static final String TEZ_RUNTIME_SHUFFLE_TOTAL_PARALLEL_COPIES = TEZ_RUNTIME_PREFIX +
+      "shuffle.total.parallel.copies";
+  public static final int TEZ_RUNTIME_SHUFFLE_TOTAL_PARALLEL_COPIES_DEFAULT = 40;
 
   @ConfigurationProperty(type = "integer")
   public static final String TEZ_RUNTIME_SHUFFLE_FETCH_MAX_TASK_OUTPUT_AT_ONCE =
@@ -330,13 +311,6 @@ public class TezRuntimeConfiguration {
       "shuffle.memory-to-memory.enable";
   public static final boolean TEZ_RUNTIME_SHUFFLE_ENABLE_MEMTOMEM_DEFAULT =
       false;
-
-  @Private
-  @Unstable
-  @ConfigurationProperty(type = "boolean")
-  public static final String TEZ_RUNTIME_SHUFFLE_FETCHER_USE_SHARED_POOL = TEZ_RUNTIME_PREFIX +
-      "shuffle.fetcher.use-shared-pool";
-  public static final boolean TEZ_RUNTIME_SHUFFLE_FETCHER_USE_SHARED_POOL_DEFAULT = false;
 
   @ConfigurationProperty(type = "float")
   public static final String TEZ_RUNTIME_INPUT_POST_MERGE_BUFFER_PERCENT = TEZ_RUNTIME_PREFIX +
@@ -431,18 +405,6 @@ public class TezRuntimeConfiguration {
   public static final boolean TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT_DEFAULT = true;
 
   /**
-   * Share data fetched between tasks running on the same host if applicable
-   */
-  @ConfigurationProperty(type = "boolean")
-  public static final String TEZ_RUNTIME_OPTIMIZE_SHARED_FETCH = TEZ_RUNTIME_PREFIX
-      + "optimize.shared.fetch";
-
-  /**
-   * shared mode bypassing the http fetch is not enabled by default till we have unit tests in.
-   */
-  public static final boolean TEZ_RUNTIME_OPTIMIZE_SHARED_FETCH_DEFAULT = false;
-
-  /**
    * Used only for internal testing. Strictly not recommended to be used elsewhere. This
    * parameter could be changed/dropped later.
    */
@@ -486,8 +448,7 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_PARTITIONER_CLASS);
     tezRuntimeKeys.add(TEZ_RUNTIME_COMBINER_CLASS);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_PARALLEL_COPIES);
-    tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_UNORDERED_PARALLEL_COPIES);
-    tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_ORDERED_PARALLEL_COPIES);
+    tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_TOTAL_PARALLEL_COPIES);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_FETCH_MAX_TASK_OUTPUT_AT_ONCE);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_CONNECT_TIMEOUT);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_KEEP_ALIVE_ENABLED);
@@ -501,7 +462,6 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_MERGE_PERCENT);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_MEMTOMEM_SEGMENTS);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_ENABLE_MEMTOMEM);
-    tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_SOURCE_ATTEMPT_ABORT_LIMIT);
     tezRuntimeKeys.add(TEZ_RUNTIME_REPORT_PARTITION_STATS);
     tezRuntimeKeys.add(TEZ_RUNTIME_INPUT_POST_MERGE_BUFFER_PERCENT);
     tezRuntimeKeys.add(TEZ_RUNTIME_GROUP_COMPARATOR_CLASS);
@@ -521,11 +481,9 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS);
     tezRuntimeKeys.add(TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH);
     tezRuntimeKeys.add(TEZ_RUNTIME_LOCAL_FETCH_COMPARE_PORT);
-    tezRuntimeKeys.add(TEZ_RUNTIME_OPTIMIZE_SHARED_FETCH);
     tezRuntimeKeys.add(TEZ_RUNTIME_SORTER_CLASS);
     tezRuntimeKeys.add(TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT);
     tezRuntimeKeys.add(TEZ_RUNTIME_UNORDERED_PARTITIONED_KVWRITER_BUFFER_MERGE_PERCENT);
-    tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_FETCHER_USE_SHARED_POOL);
     tezRuntimeKeys.add(TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT);
 
     // Do not keep defaultConf as a static member because it holds a reference to ClassLoader

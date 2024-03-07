@@ -880,7 +880,7 @@ public class IFile {
       } finally {
         if (decompressor != null) {
           decompressor.reset();
-          // if useThreadLocalDecompressor == false, never return decompressor which will be garbage-collected
+          // if useThreadLocalDecompressor == true, never return decompressor which will be garbage-collected
           if (!useThreadLocalDecompressor) {
             if (taskContext != null) {
               taskContext.returnDecompressor(codec.getCompressorType(), decompressor);

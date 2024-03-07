@@ -18,13 +18,29 @@
 
 package org.apache.tez.runtime.library.common.shuffle;
 
-import java.util.concurrent.Callable;
+import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 
-// T = FetcherInput
-public interface Fetcher<T extends ShuffleInput> extends Callable<FetchResult> {
-  void assignShuffleClient(ShuffleClient<T> shuffleClient);
-  ShuffleClient<T> getShuffleClient();
-  boolean useSingleShuffleClientId(long shuffleClientId);
-  String getFetcherIdentifier();
-  void shutdown();
+import java.io.IOException;
+
+public interface ShuffleClient<T extends ShuffleInput> {
+
+  long getShuffleClientId();
+  int getDagIdentifier();
+
+  void fetcherStarted();
+  void fetcherFinished();
+
+  void partitionRangeAdded();
+  void partitionRangeRemoved();
+  boolean shouldScanPendingInputs();
+
+  boolean cleanInputHostForConstructFetcher(InputHost.PartitionToInputs pendingInputsOfOnePartitionRange);
+
+  void fetchSucceeded(
+      InputAttemptIdentifier srcAttemptIdentifier,
+      T fetchedInput,
+      long fetchedBytes, long decompressedLength, long copyDuration) throws IOException;
+  void fetchFailed(
+      InputAttemptIdentifier srcAttemptIdentifier,
+      boolean readFailed, boolean connectFailed);
 }

@@ -45,8 +45,8 @@ import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.ConfigUtils;
+import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
-import org.apache.tez.runtime.library.common.shuffle.impl.ShuffleManagerServer;
 import org.apache.tez.runtime.library.common.sort.impl.IFileInputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,7 +61,7 @@ public final class CodecUtils {
   private CodecUtils() {
   }
 
-  public static ShuffleManagerServer.FetcherConfig constructFetcherConfig(
+  public static ShuffleServer.FetcherConfig constructFetcherConfig(
       Configuration conf, TaskContext taskContext) throws IOException {
     boolean ifileReadAhead = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD,
         TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_DEFAULT);
@@ -87,8 +87,6 @@ public final class CodecUtils {
 
     boolean localDiskFetchEnabled = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH,
         TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_DEFAULT);
-    boolean sharedFetchEnabled = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_SHARED_FETCH,
-        TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_SHARED_FETCH_DEFAULT);
     boolean verifyDiskChecksum = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_VERIFY_DISK_CHECKSUM,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_VERIFY_DISK_CHECKSUM_DEFAULT);
@@ -96,7 +94,7 @@ public final class CodecUtils {
     boolean localFetchComparePort = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_LOCAL_FETCH_COMPARE_PORT,
         TezRuntimeConfiguration.TEZ_RUNTIME_LOCAL_FETCH_COMPARE_PORT_DEFAULT);
 
-    return new ShuffleManagerServer.FetcherConfig(
+    return new ShuffleServer.FetcherConfig(
         codecConf,
         ifileReadAhead,
         ifileReadAheadLength,
@@ -107,7 +105,6 @@ public final class CodecUtils {
         localDirAllocator,
         localHostName,
         localDiskFetchEnabled,
-        sharedFetchEnabled,
         verifyDiskChecksum,
         compositeFetch,
         localFetchComparePort);

@@ -284,7 +284,7 @@ public class HttpConnection extends BaseHttpConnection {
         input.close();
         input = null;
       }
-      if (httpConnParams.isKeepAlive() && connectionSucceeed) {
+      if (connection != null && httpConnParams.isKeepAlive() && connectionSucceeed) {
         // Refer:
         // http://docs.oracle.com/javase/6/docs/technotes/guides/net/http-keepalive.html
         readErrorStream(connection.getErrorStream());

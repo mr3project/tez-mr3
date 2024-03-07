@@ -21,6 +21,8 @@ package org.apache.tez.runtime.library.common;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.tez.dag.api.TezUncheckedException;
 
+import java.util.concurrent.atomic.AtomicLong;
+
 /**
  * Container for a task number and an attempt number for the task.
  */
@@ -30,10 +32,12 @@ public class InputAttemptIdentifier {
   private final int inputIdentifier;
   private final int attemptNumber;
   private final String pathComponent;
-  private final boolean shared;
 
   public static final String PATH_PREFIX = "attempt";
   public static final String PATH_PREFIX_MR3 = com.datamonad.mr3.container.ContainerID$.MODULE$.prefixInContainerWorkerEnv();
+
+  private static final AtomicLong counter = new AtomicLong(0L);
+  private final long uniqueId;
 
   public enum SPILL_INFO {
     FINAL_MERGE_ENABLED, //Final merge is enabled at source
@@ -54,21 +58,18 @@ public class InputAttemptIdentifier {
   }
 
   public InputAttemptIdentifier(int inputIdentifier, int attemptNumber, String pathComponent) {
-    this(inputIdentifier, attemptNumber, pathComponent, false);
-  }
-
-  public InputAttemptIdentifier(int inputIdentifier, int attemptNumber, String pathComponent, boolean shared) {
-    this(inputIdentifier, attemptNumber, pathComponent, shared, SPILL_INFO.FINAL_MERGE_ENABLED, -1);
+    this(inputIdentifier, attemptNumber, pathComponent, SPILL_INFO.FINAL_MERGE_ENABLED, -1);
   }
 
   public InputAttemptIdentifier(int inputIdentifier, int attemptNumber, String pathComponent,
-      boolean shared, SPILL_INFO fetchTypeInfo, int spillEventId) {
+      SPILL_INFO fetchTypeInfo, int spillEventId) {
     this.inputIdentifier = inputIdentifier;
     this.attemptNumber = attemptNumber;
     this.pathComponent = pathComponent;
-    this.shared = shared;
     this.fetchTypeInfo = (byte)fetchTypeInfo.ordinal();
     this.spillEventId = spillEventId;
+    this.uniqueId = counter.incrementAndGet();
+
     if (pathComponent != null && !pathComponent.startsWith(PATH_PREFIX_MR3) && !pathComponent.startsWith(PATH_PREFIX)) {
       throw new TezUncheckedException(
           "Path component must start with: " + PATH_PREFIX_MR3 + "/" + PATH_PREFIX + ", " + this);
@@ -85,10 +86,6 @@ public class InputAttemptIdentifier {
   
   public String getPathComponent() {
     return this.pathComponent;
-  }
-
-  public boolean isShared() {
-    return this.shared;
   }
 
   public SPILL_INFO getFetchTypeInfo() {
@@ -113,7 +110,7 @@ public class InputAttemptIdentifier {
     return this.inputIdentifier == thatInputIdentifier && this.attemptNumber == thatAttemptNumber;
   }
 
-  // PathComponent & shared does not need to be part of the hashCode and equals computation.
+  // PathComponent does not need to be part of the hashCode and equals computation.
   @Override
   public int hashCode() {
     final int prime = 31;
@@ -138,6 +135,10 @@ public class InputAttemptIdentifier {
       return false;
     // do not compare pathComponent as they may not always be present
     return true;
+  }
+
+  public long getUniqueId() {
+    return uniqueId;
   }
 
   @Override

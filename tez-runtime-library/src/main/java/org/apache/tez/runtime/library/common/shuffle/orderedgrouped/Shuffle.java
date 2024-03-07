@@ -40,8 +40,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.hadoop.io.compress.DefaultCodec;
-import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.TezUtilsInternal;
 import org.apache.tez.common.counters.TaskCounter;
@@ -70,36 +68,29 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class Shuffle implements ExceptionReporter {
-  
+
   private static final Logger LOG = LoggerFactory.getLogger(Shuffle.class);
-  private static final int PROGRESS_FREQUENCY = 2000;
-  
-  private final Configuration conf;
+
   private final InputContext inputContext;
-  
+
   private final ShuffleInputEventHandlerOrderedGrouped eventHandler;
   @VisibleForTesting
   final ShuffleScheduler scheduler;
   @VisibleForTesting
   final MergeManager merger;
 
-  private final CompressionCodec codec;
-  private final boolean ifileReadAhead;
-  private final int ifileReadAheadLength;
-
-  private AtomicReference<Throwable> throwable = new AtomicReference<Throwable>();
+  private final AtomicReference<Throwable> throwable = new AtomicReference<Throwable>();
   private String throwingThreadName = null;
 
   private final RunShuffleCallable runShuffleCallable;
   private volatile ListenableFuture<TezRawKeyValueIterator> runShuffleFuture;
   private final ListeningExecutorService executor;
-  
+
   private final String srcNameTrimmed;
-  
-  private AtomicBoolean isShutDown = new AtomicBoolean(false);
-  private AtomicBoolean fetchersClosed = new AtomicBoolean(false);
-  private AtomicBoolean schedulerClosed = new AtomicBoolean(false);
-  private AtomicBoolean mergerClosed = new AtomicBoolean(false);
+
+  private final AtomicBoolean isShutDown = new AtomicBoolean(false);
+  private final AtomicBoolean schedulerClosed = new AtomicBoolean(false);
+  private final AtomicBoolean mergerClosed = new AtomicBoolean(false);
 
   private final long startTime;
   private final TezCounter mergePhaseTime;
@@ -108,27 +99,25 @@ public class Shuffle implements ExceptionReporter {
   public Shuffle(InputContext inputContext, Configuration conf, int numInputs,
       long initialMemoryAvailable) throws IOException {
     this.inputContext = inputContext;
-    this.conf = conf;
 
     this.srcNameTrimmed = TezUtilsInternal.cleanVertexName(inputContext.getSourceVertexName());
-    
-    this.codec = CodecUtils.getCodec(conf);
 
-    this.ifileReadAhead = conf.getBoolean(
+    CompressionCodec codec = CodecUtils.getCodec(conf);
+
+    boolean ifileReadAhead = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD,
         TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_DEFAULT);
-    if (this.ifileReadAhead) {
-      this.ifileReadAheadLength = conf.getInt(
+    int ifileReadAheadLength = 0;
+    if (ifileReadAhead) {
+      ifileReadAheadLength = conf.getInt(
           TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_BYTES,
           TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_BYTES_DEFAULT);
-    } else {
-      this.ifileReadAheadLength = 0;
     }
-    
+
     Combiner combiner = TezRuntimeUtils.instantiateCombiner(conf, inputContext);
-    
-    FileSystem localFS = FileSystem.getLocal(this.conf);
-    LocalDirAllocator localDirAllocator = 
+
+    FileSystem localFS = FileSystem.getLocal(conf);
+    LocalDirAllocator localDirAllocator =
         new LocalDirAllocator(TezRuntimeFrameworkConfigs.LOCAL_DIRS);
 
     // TODO TEZ Get rid of Map / Reduce references.
@@ -144,7 +133,7 @@ public class Shuffle implements ExceptionReporter {
 
     startTime = System.currentTimeMillis();
     merger = new MergeManager(
-        this.conf,
+        conf,
         localFS,
         localDirAllocator,
         inputContext,
@@ -159,31 +148,25 @@ public class Shuffle implements ExceptionReporter {
         ifileReadAheadLength);
 
     scheduler = new ShuffleScheduler(
-          this.inputContext,
-          this.conf,
-          numInputs,
-          this,
-          merger,
-          merger,
-          startTime,
-          codec,
-          ifileReadAhead,
-          ifileReadAheadLength,
-          srcNameTrimmed);
+        this.inputContext,
+        conf,
+        numInputs,
+        this,
+        merger,
+        merger,
+        startTime,
+        srcNameTrimmed);
 
     this.mergePhaseTime = inputContext.getCounters().findCounter(TaskCounter.MERGE_PHASE_TIME);
     this.shufflePhaseTime = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_PHASE_TIME);
-
-
 
     eventHandler= new ShuffleInputEventHandlerOrderedGrouped(
         inputContext,
         scheduler,
         ShuffleUtils.isTezShuffleHandler(conf));
-    
+
     ExecutorService rawExecutor = Executors.newFixedThreadPool(1, new ThreadFactoryBuilder()
         .setDaemon(true).setNameFormat("ShuffleAndMergeRunner {" + srcNameTrimmed + "}").build());
-
 
     executor = MoreExecutors.listeningDecorator(rawExecutor);
     runShuffleCallable = new RunShuffleCallable();
@@ -197,13 +180,13 @@ public class Shuffle implements ExceptionReporter {
           srcNameTrimmed, events.size());
     }
   }
-  
+
   /**
    * Indicates whether the Shuffle and Merge processing is complete.
    * @return false if not complete, true if complete or if an error occurred.
-   * @throws InterruptedException 
-   * @throws IOException 
-   * @throws InputAlreadyClosedException 
+   * @throws InterruptedException
+   * @throws IOException
+   * @throws InputAlreadyClosedException
    */
   public boolean isInputReady() throws IOException, InterruptedException, TezException {
     if (isShutDown.get()) {
@@ -311,12 +294,12 @@ public class Shuffle implements ExceptionReporter {
         throw new ShuffleError("Error while doing final merge ", e);
       }
       mergePhaseTime.setValue(System.currentTimeMillis() - startTime);
-      
+
       // Sanity check
       synchronized (Shuffle.this) {
         if (throwable.get() != null) {
           throw new ShuffleError("error in shuffle in " + throwingThreadName,
-                                 throwable.get());
+              throwable.get());
         }
       }
 
@@ -400,13 +383,19 @@ public class Shuffle implements ExceptionReporter {
 
   @Private
   @Override
-  public synchronized void killSelf(Exception exception, String message) {
-    if (!isShutDown.get() && throwable.get() == null) {
-      shutdown();
-      inputContext.killSelf(exception, message);
+  public void killSelf(Exception exception, String message) {
+    synchronized (this) {
+      if (!isShutDown.get() && throwable.get() == null) {
+        shutdown();
+      } else {
+        return;
+      }
     }
+
+    // It is safe to call killSelf() outside synchronized {} because shutdown() sets isShutDown to true.
+    inputContext.killSelf(exception, message);
   }
-  
+
   public static class ShuffleError extends IOException {
     private static final long serialVersionUID = 5753909320586607881L;
 
@@ -419,7 +408,7 @@ public class Shuffle implements ExceptionReporter {
   public static long getInitialMemoryRequirement(Configuration conf, long maxAvailableTaskMemory) {
     return MergeManager.getInitialMemoryRequirement(conf, maxAvailableTaskMemory);
   }
-  
+
   private class ShuffleRunnerFutureCallback implements FutureCallback<TezRawKeyValueIterator> {
     @Override
     public void onSuccess(TezRawKeyValueIterator result) {

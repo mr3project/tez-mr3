@@ -248,6 +248,7 @@ public class TezConfiguration extends Configuration {
   /** Int value. The amount of memory in MB to be used by the AppMaster */
   @ConfigurationScope(Scope.AM)
   @ConfigurationProperty(type="integer")
+  // do not remove because MR3 test code (UtilsForConfTez) uses it
   public static final String TEZ_AM_RESOURCE_MEMORY_MB = TEZ_AM_PREFIX
       + "resource.memory.mb";
   public static final int TEZ_AM_RESOURCE_MEMORY_MB_DEFAULT = 1024;
@@ -258,6 +259,16 @@ public class TezConfiguration extends Configuration {
   public static final String TEZ_AM_RESOURCE_CPU_VCORES = TEZ_AM_PREFIX
       + "resource.cpu.vcores";
   public static final int TEZ_AM_RESOURCE_CPU_VCORES_DEFAULT = 1;
+
+  /** Int value. The amount of memory in MB to be used by tasks. This applies to all tasks across
+   * all vertices. Setting it to the same value for all tasks is helpful for container reuse and
+   * thus good for performance typically. */
+  // do not remove because MR3 test code (UtilsForConfTez) uses it
+  @ConfigurationScope(Scope.DAG)
+  @ConfigurationProperty(type="integer")
+  public static final String TEZ_TASK_RESOURCE_MEMORY_MB = TEZ_TASK_PREFIX
+    + "resource.memory.mb";
+  public static final int TEZ_TASK_RESOURCE_MEMORY_MB_DEFAULT = 1024;
 
   /**
    * Int value. The maximum heartbeat interval, in milliseconds, between the app master and tasks.
@@ -581,24 +592,6 @@ public class TezConfiguration extends Configuration {
   public static final String TEZ_TEST_MINI_CLUSTER_APP_WAIT_ON_SHUTDOWN_SECS =
       TEZ_PREFIX + "test.minicluster.app.wait.on.shutdown.secs";
   public static final long TEZ_TEST_MINI_CLUSTER_APP_WAIT_ON_SHUTDOWN_SECS_DEFAULT = 30;
-
-  /**
-   * Int value. Minimum number of threads to be allocated by TezSharedExecutor.
-   */
-  @Private
-  @ConfigurationScope(Scope.AM)
-  public static final String TEZ_SHARED_EXECUTOR_MIN_THREADS = "tez.shared-executor.min-threads";
-  public static final int TEZ_SHARED_EXECUTOR_MIN_THREADS_DEFAULT = 0;
-
-  /**
-   * Int value. Maximum number of threads to be allocated by TezSharedExecutor. If value is negative
-   * then Integer.MAX_VALUE is used as the limit.
-   * Default: Integer.MAX_VALUE.
-   */
-  @Private
-  @ConfigurationScope(Scope.AM)
-  public static final String TEZ_SHARED_EXECUTOR_MAX_THREADS = "tez.shared-executor.max-threads";
-  public static final int TEZ_SHARED_EXECUTOR_MAX_THREADS_DEFAULT = -1;
 
   /**
    *  Comma-separated list of properties that MRReaderMapred should return (if present) when calling for config updates.

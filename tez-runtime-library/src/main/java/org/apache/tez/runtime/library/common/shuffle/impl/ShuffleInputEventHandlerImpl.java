@@ -64,7 +64,6 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
   private final CompressionCodec codec;
   private final boolean ifileReadAhead;
   private final int ifileReadAheadLength;
-  private final boolean useSharedInputs;
   private final InputContext inputContext;
   private final boolean compositeFetch;
   private final Inflater inflater;
@@ -86,9 +85,6 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
     this.codec = codec;
     this.ifileReadAhead = ifileReadAhead;
     this.ifileReadAheadLength = ifileReadAheadLength;
-    // this currently relies on a user to enable the flag
-    // expand on idea based on vertex parallelism and num inputs
-    this.useSharedInputs = (inputContext.getTaskAttemptNumber() == 0);
     this.compositeFetch = compositeFetch;
     this.inflater = TezCommonUtils.newInflater();
 
@@ -124,7 +120,6 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
         }
       }
       processDataMovementEvent(dmEvent, shufflePayload, emptyPartitionsBitSet);
-      shuffleManager.updateEventReceivedTime();
     } else if (event instanceof CompositeRoutedDataMovementEvent) {
       CompositeRoutedDataMovementEvent crdme = (CompositeRoutedDataMovementEvent)event;
       DataMovementEventPayloadProto shufflePayload;
@@ -151,7 +146,6 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
           processDataMovementEvent(crdme.expand(offset), shufflePayload, emptyPartitionsBitSet);
         }
       }
-      shuffleManager.updateEventReceivedTime();
     } else if (event instanceof InputFailedEvent) {
       numObsoletionEvents.incrementAndGet();
       processInputFailedEvent((InputFailedEvent) event);
@@ -188,7 +182,7 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
     if (shufflePayload.hasEmptyPartitions()) {
       if (emptyPartitionsBitSet.get(srcIndex)) {
         CompositeInputAttemptIdentifier srcAttemptIdentifier =
-            constructInputAttemptIdentifier(dme.getTargetIndex(), 1, dme.getVersion(), shufflePayload, false);
+            constructInputAttemptIdentifier(dme.getTargetIndex(), 1, dme.getVersion(), shufflePayload);
         if (LOG.isDebugEnabled()) {
           LOG.debug("Source partition: " + srcIndex + " did not generate any data. SrcAttempt: ["
               + srcAttemptIdentifier + "]. Not fetching.");
@@ -204,7 +198,7 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
     }
 
     CompositeInputAttemptIdentifier srcAttemptIdentifier = constructInputAttemptIdentifier(dme.getTargetIndex(), 1, dme.getVersion(),
-        shufflePayload, (useSharedInputs && srcIndex == 0));
+        shufflePayload);
 
     processShufflePayload(shufflePayload, srcAttemptIdentifier, srcIndex);
   }
@@ -250,7 +244,7 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
 
     if (shufflePayload.hasEmptyPartitions()) {
       CompositeInputAttemptIdentifier compositeInputAttemptIdentifier =
-          constructInputAttemptIdentifier(crdme.getTargetIndex(), crdme.getCount(), crdme.getVersion(), shufflePayload, false);
+          constructInputAttemptIdentifier(crdme.getTargetIndex(), crdme.getCount(), crdme.getVersion(), shufflePayload);
 
       boolean allPartitionsEmpty = true;
       for (int i = 0; i < crdme.getCount(); i++) {
@@ -273,7 +267,7 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
     }
 
     CompositeInputAttemptIdentifier srcAttemptIdentifier = constructInputAttemptIdentifier(crdme.getTargetIndex(), crdme.getCount(), crdme.getVersion(),
-        shufflePayload, (useSharedInputs && partitionId == 0));
+        shufflePayload);
 
     processShufflePayload(shufflePayload, srcAttemptIdentifier, partitionId);
   }
@@ -322,11 +316,10 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
    * @param targetIndexCount
    * @param version
    * @param shufflePayload
-   * @param isShared
    * @return CompositeInputAttemptIdentifier
    */
   private CompositeInputAttemptIdentifier constructInputAttemptIdentifier(int targetIndex, int targetIndexCount, int version,
-      DataMovementEventPayloadProto shufflePayload, boolean isShared) {
+      DataMovementEventPayloadProto shufflePayload) {
     String pathComponent = (shufflePayload.hasPathComponent()) ? shufflePayload.getPathComponent() : null;
     CompositeInputAttemptIdentifier srcAttemptIdentifier = null;
     if (shufflePayload.hasSpillId()) {
@@ -335,10 +328,10 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
       InputAttemptIdentifier.SPILL_INFO spillInfo = (lastEvent) ? InputAttemptIdentifier.SPILL_INFO
           .FINAL_UPDATE : InputAttemptIdentifier.SPILL_INFO.INCREMENTAL_UPDATE;
       srcAttemptIdentifier =
-          new CompositeInputAttemptIdentifier(targetIndex, version, pathComponent, isShared, spillInfo, spillEventId, targetIndexCount);
+          new CompositeInputAttemptIdentifier(targetIndex, version, pathComponent, spillInfo, spillEventId, targetIndexCount);
     } else {
       srcAttemptIdentifier =
-          new CompositeInputAttemptIdentifier(targetIndex, version, pathComponent, isShared, targetIndexCount);
+          new CompositeInputAttemptIdentifier(targetIndex, version, pathComponent, targetIndexCount);
     }
     return srcAttemptIdentifier;
   }

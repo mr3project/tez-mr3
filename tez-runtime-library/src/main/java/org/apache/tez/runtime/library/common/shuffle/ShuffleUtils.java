@@ -29,8 +29,8 @@ import java.text.DecimalFormat;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 import java.util.zip.Deflater;
 
 import javax.annotation.Nullable;
@@ -221,7 +221,7 @@ public class ShuffleUtils {
   }
 
   public static StringBuilder constructBaseURIForShuffleHandler(String host,
-      int port, int partition, int partitionCount, String appId, int dagIdentifier, boolean sslShuffle) {
+      int port, List<InputHost.PartitionRange> ranges, String appId, int dagIdentifier, boolean sslShuffle) {
     final String http_protocol = (sslShuffle) ? "https://" : "http://";
     StringBuilder sb = new StringBuilder(http_protocol);
     sb.append(host);
@@ -233,11 +233,7 @@ public class ShuffleUtils {
     sb.append("&dag=");
     sb.append(String.valueOf(dagIdentifier));
     sb.append("&reduce=");
-    sb.append(String.valueOf(partition));
-    if (partitionCount > 1) {
-      sb.append("-");
-      sb.append(String.valueOf(partition + partitionCount - 1));
-    }
+    sb.append(ranges.stream().map(x -> x.toString()).collect(Collectors.joining(",")));
     sb.append("&map=");
     return sb;
   }

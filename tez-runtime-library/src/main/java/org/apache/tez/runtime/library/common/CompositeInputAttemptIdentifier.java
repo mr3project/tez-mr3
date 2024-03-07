@@ -28,16 +28,12 @@ public class CompositeInputAttemptIdentifier extends InputAttemptIdentifier {
   private final int inputIdentifierCount;
 
   public CompositeInputAttemptIdentifier(int inputIdentifier, int attemptNumber, String pathComponent, int inputIdentifierCount) {
-    this(inputIdentifier, attemptNumber, pathComponent, false, SPILL_INFO.FINAL_MERGE_ENABLED, -1, inputIdentifierCount);
-  }
-
-  public CompositeInputAttemptIdentifier(int inputIdentifier, int attemptNumber, String pathComponent, boolean isShared, int inputIdentifierCount) {
-    this(inputIdentifier, attemptNumber, pathComponent, isShared, SPILL_INFO.FINAL_MERGE_ENABLED, -1, inputIdentifierCount);
+    this(inputIdentifier, attemptNumber, pathComponent, SPILL_INFO.FINAL_MERGE_ENABLED, -1, inputIdentifierCount);
   }
 
   public CompositeInputAttemptIdentifier(int inputIdentifier, int attemptNumber, String pathComponent,
-      boolean shared, SPILL_INFO fetchTypeInfo, int spillEventId, int inputIdentifierCount) {
-    super(inputIdentifier, attemptNumber, pathComponent, shared, fetchTypeInfo, spillEventId);
+      SPILL_INFO fetchTypeInfo, int spillEventId, int inputIdentifierCount) {
+    super(inputIdentifier, attemptNumber, pathComponent, fetchTypeInfo, spillEventId);
     this.inputIdentifierCount = inputIdentifierCount;
   }
 
@@ -47,7 +43,7 @@ public class CompositeInputAttemptIdentifier extends InputAttemptIdentifier {
   }
 
   public InputAttemptIdentifier expand(int inputIdentifierOffset) {
-    return new InputAttemptIdentifier(getInputIdentifier() + inputIdentifierOffset, getAttemptNumber(), getPathComponent(), isShared(), getFetchTypeInfo(), getSpillEventId());
+    return new InputAttemptIdentifier(getInputIdentifier() + inputIdentifierOffset, getAttemptNumber(), getPathComponent(), getFetchTypeInfo(), getSpillEventId());
   }
 
   public boolean include(int thatInputIdentifier, int thatAttemptNumber) {
