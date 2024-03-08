@@ -274,13 +274,15 @@ public class PipelinedSorter extends ExternalSorter {
     Preconditions.checkState(buffers.size() <= maxNumberOfBlocks,
         "{} exceeds {}", buffers.size(), maxNumberOfBlocks);
 
-    StringBuilder allocLog = new StringBuilder("Newly allocated block size=" + size);
-    allocLog.append(", index=").append(bufferIndex);
-    allocLog.append(", Number of buffers=").append(buffers.size());
-    allocLog.append(", currentAllocatableMemory=").append(currentAllocatableMemory);
-    allocLog.append(", currentBufferSize=").append(space.capacity());
-    allocLog.append(", total=").append(availableMemoryMb << 20);
-    LOG.info(allocLog.toString());
+    if (LOG.isDebugEnabled()) {
+      StringBuilder allocLog = new StringBuilder("Newly allocated block size=" + size);
+      allocLog.append(", index=").append(bufferIndex);
+      allocLog.append(", Number of buffers=").append(buffers.size());
+      allocLog.append(", currentAllocatableMemory=").append(currentAllocatableMemory);
+      allocLog.append(", currentBufferSize=").append(space.capacity());
+      allocLog.append(", total=").append(availableMemoryMb << 20);
+      LOG.debug(allocLog.toString());
+    }
     return space;
   }
 
@@ -674,7 +676,7 @@ public class PipelinedSorter extends ExternalSorter {
     }
 
     try {
-      LOG.info(outputContext.getDestinationVertexName() + ": Starting flush of map output");
+      if (LOG.isDebugEnabled()) { LOG.debug(outputContext.getDestinationVertexName() + ": Starting flush of map output"); }
       span.end();
       merger.add(span.sort(sorter));
       // force a spill in flush()
@@ -973,11 +975,11 @@ public class PipelinedSorter extends ExternalSorter {
 
     public SpanIterator sort(IndexedSorter sorter) {
       long start = System.currentTimeMillis();
-      if(length() > 1) {
+      if (length() > 1) {
         sorter.sort(this, 0, length(), progressable);
       }
-      LOG.info("{}: done sorting span={}, length={}, time={}",
-          outputContext.getDestinationVertexName(), index, length(), System.currentTimeMillis() - start);
+      if (LOG.isDebugEnabled()) { LOG.debug("{}: done sorting span={}, length={}, time={}",
+          outputContext.getDestinationVertexName(), index, length(), System.currentTimeMillis() - start); }
       return new SpanIterator((SortSpan)this);
     }
 

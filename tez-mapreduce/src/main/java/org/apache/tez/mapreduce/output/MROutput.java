@@ -449,8 +449,8 @@ public class MROutput extends AbstractLogicalOutput {
       initCommitter(jobConf, useNewApi);
     }
 
-    LOG.info("{}: outputFormat={}, using newmapreduce API={}",
-        getContext().getDestinationVertexName(), outputFormatClassName, useNewApi);
+    if (LOG.isDebugEnabled()) { LOG.debug("{}: outputFormat={}, using newmapreduce API={}",
+        getContext().getDestinationVertexName(), outputFormatClassName, useNewApi); }
     return null;
   }
 

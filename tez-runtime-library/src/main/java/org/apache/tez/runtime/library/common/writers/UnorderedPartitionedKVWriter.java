@@ -709,7 +709,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     Preconditions.checkArgument(initialMemRequestMb != 0,
         TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_OUTPUT_BUFFER_SIZE_MB + " should be larger than 0");
     long reqBytes = initialMemRequestMb << 20;
-    LOG.info("Requested BufferSize ({}): {}", TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_OUTPUT_BUFFER_SIZE_MB, initialMemRequestMb);
+    if (LOG.isDebugEnabled()) { LOG.debug("Requested BufferSize ({}): {}", TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_OUTPUT_BUFFER_SIZE_MB, initialMemRequestMb); }
     return reqBytes;
   }
 

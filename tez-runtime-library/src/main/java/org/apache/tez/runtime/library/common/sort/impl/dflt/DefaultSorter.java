@@ -659,7 +659,7 @@ public final class DefaultSorter extends ExternalSorter implements IndexedSortab
 
   @Override
   public void flush() throws IOException {
-    LOG.info(outputContext.getDestinationVertexName() + ": Starting flush of map output");
+    if (LOG.isDebugEnabled()) { LOG.debug(outputContext.getDestinationVertexName() + ": Starting flush of map output"); }
     if (Thread.currentThread().isInterrupted()) {
       /**
        * Possible that the thread got interrupted when flush was happening or when the flush was
