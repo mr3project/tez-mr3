@@ -160,8 +160,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     HostFetchResult hostFetchResult;
     // ignore ShuffleServer.localShufflePorts[] which is not initialized
     if (fetcherConfig.localDiskFetchEnabled &&
-        host.equals(fetcherConfig.localHostName) &&
-        !fetcherConfig.localFetchComparePort) {
+        host.equals(fetcherConfig.localHostName)) {
       hostFetchResult = doLocalDiskFetch();
     } else{
       hostFetchResult = doHttpFetch();

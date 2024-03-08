@@ -388,7 +388,7 @@ public class TezRuntimeConfiguration {
 
   @ConfigurationProperty(type = "boolean")
   public static final String TEZ_RUNTIME_LOCAL_FETCH_COMPARE_PORT = TEZ_RUNTIME_PREFIX + "local.fetch.compare.port";
-  public static final boolean TEZ_RUNTIME_LOCAL_FETCH_COMPARE_PORT_DEFAULT = true;
+  public static final boolean TEZ_RUNTIME_LOCAL_FETCH_COMPARE_PORT_DEFAULT = false;
 
   /**
    * Expert level setting. Enable pipelined shuffle in ordered outputs and in unordered

@@ -91,8 +91,6 @@ public final class CodecUtils {
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_VERIFY_DISK_CHECKSUM,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_VERIFY_DISK_CHECKSUM_DEFAULT);
     boolean compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
-    boolean localFetchComparePort = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_LOCAL_FETCH_COMPARE_PORT,
-        TezRuntimeConfiguration.TEZ_RUNTIME_LOCAL_FETCH_COMPARE_PORT_DEFAULT);
 
     return new ShuffleServer.FetcherConfig(
         codecConf,
@@ -106,19 +104,19 @@ public final class CodecUtils {
         localHostName,
         localDiskFetchEnabled,
         verifyDiskChecksum,
-        compositeFetch,
-        localFetchComparePort);
+        compositeFetch);
   }
 
   private static Configuration reduceConfForCodec(Configuration conf) {
     Configuration newConf = new Configuration(false);
 
-    newConf.set(
-        TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS,
-        conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS));
-    newConf.set(
-        TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS_CODEC,
-        conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS_CODEC));
+    boolean enabled = ConfigUtils.shouldCompressIntermediateOutput(conf);
+    newConf.setBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS, enabled);
+
+    String compressionCodec = conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS_CODEC);
+    if (enabled && compressionCodec != null) {
+      newConf.set(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS_CODEC, compressionCodec);
+    }
 
     for (Map.Entry<String, String> entry: conf) {
       if (entry.getKey().startsWith("io.")) {

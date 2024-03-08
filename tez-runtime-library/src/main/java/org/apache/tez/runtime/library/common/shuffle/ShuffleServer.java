@@ -67,15 +67,29 @@ public class ShuffleServer implements FetcherCallback {
   private static final Logger LOG = LoggerFactory.getLogger(ShuffleServer.class);
   private final boolean isDebugEnabled = LOG.isDebugEnabled();
 
+  private static final Object INSTANCELock = new Object();
   private static volatile ShuffleServer INSTANCE;
 
   public static ShuffleServer createInstance(
       TaskContext context, Configuration conf) throws IOException {
-    int numFetchers = conf.getInt(
-        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_TOTAL_PARALLEL_COPIES,
-        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_TOTAL_PARALLEL_COPIES_DEFAULT);
-    INSTANCE = new ShuffleServer(context, conf, numFetchers, "ShuffleServer");
-    return INSTANCE;
+    synchronized (INSTANCELock) {
+      if (INSTANCE != null) {
+        return null;  // because we should not create another ShuffleServer (e.g., in local mode)
+      }
+
+      int numFetchers = conf.getInt(
+          TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_TOTAL_PARALLEL_COPIES,
+          TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_TOTAL_PARALLEL_COPIES_DEFAULT);
+      INSTANCE = new ShuffleServer(context, conf, numFetchers, "ShuffleServer");
+      return INSTANCE;
+    }
+  }
+
+  // called only at the beginning of each local test in MR3
+  public static void resetInstance() {
+    synchronized (INSTANCELock) {
+      INSTANCE = null;
+    }
   }
 
   public static ShuffleServer getInstance() throws IOException {
@@ -99,22 +113,20 @@ public class ShuffleServer implements FetcherCallback {
     public final boolean localDiskFetchEnabled;
     public final boolean verifyDiskChecksum;
     public final boolean compositeFetch;
-    public final boolean localFetchComparePort;
 
     public FetcherConfig(
-      Configuration codecConf,
-      boolean ifileReadAhead,
-      int ifileReadAheadLength,
-      int ifileBufferSize,
-      JobTokenSecretManager jobTokenSecretMgr,
-      HttpConnectionParams httpConnectionParams,
-      RawLocalFileSystem localFs,
-      LocalDirAllocator localDirAllocator,
-      String localHostName,
-      boolean localDiskFetchEnabled,
-      boolean verifyDiskChecksum,
-      boolean compositeFetch,
-      boolean localFetchComparePort) {
+        Configuration codecConf,
+        boolean ifileReadAhead,
+        int ifileReadAheadLength,
+        int ifileBufferSize,
+        JobTokenSecretManager jobTokenSecretMgr,
+        HttpConnectionParams httpConnectionParams,
+        RawLocalFileSystem localFs,
+        LocalDirAllocator localDirAllocator,
+        String localHostName,
+        boolean localDiskFetchEnabled,
+        boolean verifyDiskChecksum,
+        boolean compositeFetch) {
       this.codecConf = codecConf;
       this.ifileReadAhead = ifileReadAhead;
       this.ifileReadAheadLength = ifileReadAheadLength;
@@ -127,7 +139,6 @@ public class ShuffleServer implements FetcherCallback {
       this.localDiskFetchEnabled = localDiskFetchEnabled;
       this.verifyDiskChecksum = verifyDiskChecksum;
       this.compositeFetch = compositeFetch;
-      this.localFetchComparePort = localFetchComparePort;
     }
 
     public String toString() {
