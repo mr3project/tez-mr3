@@ -216,8 +216,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       shuffleSchedulerServer.waitForMergeManager(shuffleSchedulerId);
 
       if (fetcherConfig.localDiskFetchEnabled
-          && host.equals(fetcherConfig.localHostName)
-          && !fetcherConfig.localFetchComparePort) {
+          && host.equals(fetcherConfig.localHostName)) {
         failedFetches = setupLocalDiskFetch();
       } else {
         pendingInputs = copyFromHost();
