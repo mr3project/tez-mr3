@@ -67,36 +67,12 @@ public class ShuffleServer implements FetcherCallback {
   private static final Logger LOG = LoggerFactory.getLogger(ShuffleServer.class);
   private final boolean isDebugEnabled = LOG.isDebugEnabled();
 
-  private static final Object INSTANCELock = new Object();
-  private static volatile ShuffleServer INSTANCE;
-
   public static ShuffleServer createInstance(
       TaskContext context, Configuration conf) throws IOException {
-    synchronized (INSTANCELock) {
-      if (INSTANCE != null) {
-        return null;  // because we should not create another ShuffleServer (e.g., in local mode)
-      }
-
-      int numFetchers = conf.getInt(
-          TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_TOTAL_PARALLEL_COPIES,
-          TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_TOTAL_PARALLEL_COPIES_DEFAULT);
-      INSTANCE = new ShuffleServer(context, conf, numFetchers, "ShuffleServer");
-      return INSTANCE;
-    }
-  }
-
-  // called only at the beginning of each local test in MR3
-  public static void resetInstance() {
-    synchronized (INSTANCELock) {
-      INSTANCE = null;
-    }
-  }
-
-  public static ShuffleServer getInstance() throws IOException {
-    if (INSTANCE == null) {
-      throw new IOException("ShuffleServer not found");
-    }
-    return INSTANCE;
+    int numFetchers = conf.getInt(
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_TOTAL_PARALLEL_COPIES,
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_TOTAL_PARALLEL_COPIES_DEFAULT);
+    return new ShuffleServer(context, conf, numFetchers, context.getUniqueIdentifier());
   }
 
   // parameters required by Fetchers
