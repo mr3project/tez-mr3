@@ -267,4 +267,8 @@ public interface TaskContext extends DecompressorPool {
   public String getJobUserName();
 
   public ExecutorServiceUserGroupInformation getExecutorServiceUgi();
+
+  // we use Object (instead of ShuffleServe) because of dependency issues
+  public void setShuffleServer(Object shuffleServer);
+  public Object getShuffleServer();
 }
