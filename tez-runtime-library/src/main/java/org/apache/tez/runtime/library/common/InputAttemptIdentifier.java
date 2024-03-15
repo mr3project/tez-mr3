@@ -36,9 +36,6 @@ public class InputAttemptIdentifier {
   public static final String PATH_PREFIX = "attempt";
   public static final String PATH_PREFIX_MR3 = com.datamonad.mr3.container.ContainerID$.MODULE$.prefixInContainerWorkerEnv();
 
-  private static final AtomicLong counter = new AtomicLong(0L);
-  private final long uniqueId;
-
   public enum SPILL_INFO {
     FINAL_MERGE_ENABLED, //Final merge is enabled at source
     INCREMENTAL_UPDATE, //Final merge is disabled and qualifies for incremental spill updates.(i.e spill 0, 1 etc)
@@ -68,7 +65,6 @@ public class InputAttemptIdentifier {
     this.pathComponent = pathComponent;
     this.fetchTypeInfo = (byte)fetchTypeInfo.ordinal();
     this.spillEventId = spillEventId;
-    this.uniqueId = counter.incrementAndGet();
 
     if (pathComponent != null && !pathComponent.startsWith(PATH_PREFIX_MR3) && !pathComponent.startsWith(PATH_PREFIX)) {
       throw new TezUncheckedException(
@@ -135,10 +131,6 @@ public class InputAttemptIdentifier {
       return false;
     // do not compare pathComponent as they may not always be present
     return true;
-  }
-
-  public long getUniqueId() {
-    return uniqueId;
   }
 
   @Override
