@@ -1,8 +1,126 @@
+commit 34bb628e3a25edf5e36e3ca1bf73f06752a43118
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Tue Feb 27 14:14:44 2024 +0100
+
+    TEZ-4543: Throw a special exception to DagClient when there is no current DAG (#338). (Laszlo Bodor, reviewed by Ayush Saxena)
+
+commit f8c2e11d0b469748ea95381e7021266e25e5ac89
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Wed Feb 7 06:53:08 2024 +0100
+
+    TEZ-4529: Apache Tez Release 0.10.3: Update SNAPSHOT versions, DOAP file (#335). (Laszlo Bodor, reviewed by Ayush Saxena)
+
+commit 8b408587b39b2e84cb180effdf6b3a7e63ad5051
+Author: Ayush Saxena <ayushsaxena@apache.org>
+Date:   Tue Feb 6 14:19:22 2024 +0530
+
+    TEZ-4451: ThreadLevel IO Stats Support for TEZ. (#331) (Ayush Saxena reviewed by Laszlo Bodor, Steve Loughran)
+
+commit 5e1cdee759caa1f99e18e1c468a5bad781b24793
+Author: Stamatis Zampetakis <zabetak@gmail.com>
+Date:   Mon Jan 29 11:08:50 2024 +0100
+
+    TEZ-4532: Remove KEYS file from git repo and source distribution (#329). (Stamatis Zampetakis, reviewed by Ayush Saxena)
+
+commit 8c0884d00e2a95510418b3fa8fafb232c32688ff
+Author: AnmolSun <124231245+AnmolSun@users.noreply.github.com>
+Date:   Mon Jan 29 14:42:01 2024 +0530
+
+    TEZ-4538: Upgrade netty to 4.1.100 due to CVE-2023-44487 (#333) (Anmol Sundaram reviewed by Laszlo Bodor)
+
+commit 5b4e827bc5da596400f9493bd44dc9e2fefca053
+Author: Stamatis Zampetakis <zabetak@gmail.com>
+Date:   Thu Jan 25 12:04:52 2024 +0100
+
+    TEZ-4536: Drop .txt suffix from LICENSE.txt and NOTICE.txt files (#330) (Stamatis Zampetakis reviewed by Laszlo Bodor)
+    
+    The .txt suffix is not forbidden however the preferred/suggested naming
+    (https://www.apache.org/legal/apply-license.html#license-file-name)
+    excludes suffix from LICENSE and NOTICE files.
+
+commit 5a2df5490bea37fc68224dc8130a7cf7c954febf
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Thu Jan 25 09:07:16 2024 +0100
+
+    TEZ-4501: Fix TestLocalMode timeouts (#300). (Laszlo Bodor, reviewed by Ayush Saxena)
+
+commit cafa4b37d0c7fa42e7af58dfd270ee38da9ed051
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Thu Jan 25 03:59:45 2024 +0100
+
+    TEZ-4357: Report url to logs in case of fetcher connection failure (#169). (Laszlo Bodor, reviewed by Ayush Saxena)
+
+commit d8dda5c2b3adba3547ef014c56877cbea42a7032
+Author: Stamatis Zampetakis <zabetak@gmail.com>
+Date:   Fri Jan 19 16:32:47 2024 +0100
+
+    TEZ-4530: Distribution years in NOTICE files are incorrect (#327) (Stamatis Zampetakis reviewed by Laszlo Bodor)
+    
+    According to the ASF policy the NOTICE file must reflect the distribution years of the product.
+
+commit 21611246b1dc4cdc61d3c1970c646fb9a6943351
+Author: Sourabh Badhya <iamsbadhya@gmail.com>
+Date:   Tue Jan 9 21:16:05 2024 +0530
+
+    TEZ-4526: Avoid calling LocationProvider#getPreferredLocations multiple times while generating grouped splits (#323)
+    --> apply (TODO)
+
+commit 174d0d13f7809e881986364511fe129861165a61
+Author: Ayush Saxena <ayushsaxena@apache.org>
+Date:   Mon Jan 8 16:38:29 2024 +0530
+
+    TEZ-4039: Addendum: Tez should inject dag id, query id into MDC. (#325) (Ayush Saxena reviewed by Laszlo Bodor)
+
+commit 2dcdeba63d69145d89a7cfed39e75c13931fb3df
+Author: jialiang <2510095164@qq.com>
+Date:   Thu Jan 4 23:26:23 2024 +0800
+
+    TEZ-4520: Enable Parallel Compilation for TEZ (#315) (JiaLiangC reviewed by Laszlo Bodor)
+
+commit 4cba79e5690c0b6fb19ddee66b5009d646b886a4
+Author: Sercan Tekin <73108963+sercanCyberVision@users.noreply.github.com>
+Date:   Thu Jan 4 10:14:22 2024 -0500
+
+    TEZ-4494: Addressing CVE-2022-41881 - Netty vulnerability (#287) ( Sercan Tekin reviewed by Laszlo Bodor)
+
+commit a9655eeaf321061f61ee41a3f03f5d33b4860ed2
+Author: Akshat Mathur <akshatatstps@gmail.com>
+Date:   Thu Jan 4 20:17:06 2024 +0530
+
+    TEZ-4525: Remove broken links from site (#322)
+
+commit 3bc73f3c937b15c46a7b2b13f1d64023c3472a7e
+Author: BilwaST <stbilwa@gmail.com>
+Date:   Thu Jan 4 20:11:13 2024 +0530
+
+    TEZ-4524 - Upgrade commons-codec to 1.15 (#321) (Bilwa S T reviewed by Laszlo Bodor)
+
+commit 0c5cf688690bacc662a015b1bff0ecb556314b90
+Author: Ayush Saxena <ayushsaxena@apache.org>
+Date:   Mon Dec 4 20:29:55 2023 +0530
+
+    TEZ-4522: Use OpenFile where FileStatus is available. (#318) (Ayush Saxena reviewed by Laszlo Bodor)
+    --> apply (TODO)
+
+commit 0ed5e3296c55dda66c691a9c60d1db38f0c80ce5
+Author: Ayush Saxena <ayushsaxena@apache.org>
+Date:   Mon Dec 4 18:37:30 2023 +0530
+
+    TEZ-4523: Findbugs build is broken tez-tfile-parser. (#319) (Ayush Saxena reviewed by Laszlo Bodor)
+
+commit 43562adc38117ae191650fe54f8344e635dcc890
+Author: okumin <git@okumin.com>
+Date:   Wed Nov 29 00:33:09 2023 +0900
+
+    TEZ-4521: Partition stats should be always uncompressed size (#317) (okumin reviewed by Laszlo Bodor)
+    --> apply (TODO)
+
 commit 51d6f53967110e2b91b6d90b46f8e16bdc062091
 Author: Ayush Saxena <ayushsaxena@apache.org>
 Date:   Fri Oct 27 13:35:16 2023 +0530
 
     TEZ-3821: Ability to fail fast tasks that write too much to local disk. (#314) (Ayush Saxena reviewed by Rajesh Balamohan)
+    --> apply (TODO)
 
 commit 4bc87e25069795f15da28f08b206b24d7eeea11d
 Author: Ayush Saxena <ayushsaxena@apache.org>
@@ -99,6 +217,7 @@ Author: Ayush Saxena <ayushsaxena@apache.org>
 Date:   Fri Jun 23 15:05:16 2023 +0530
 
     TEZ-4473: Remove pointless MDC_LOGGING message from logs if there is no custom MDC key. (#294) (Ayush Saxena reviewed by Laszlo Bodor)
+    --> not related
 
 commit 9aeb17b4b3a2ae227d33fb0b913b3d5952531329
 Author: Ayush Saxena <ayushsaxena@apache.org>
@@ -196,6 +315,7 @@ Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
 Date:   Tue Feb 28 09:35:34 2023 +0100
 
     TEZ-4394: Netty4 ShuffleHandler: should use 1 boss thread (#256) (Laszlo Bodor reviewed by Rajesh Balamohan)
+    --> merged to ShuffleHandler
 
 commit b73cfcd30aa21f7bec031f0d64b4320f5cfd986d
 Author: BilwaST <Bilwa@apache.org>
@@ -228,7 +348,7 @@ Author: Aman Raj <104416558+amanraj2520@users.noreply.github.com>
 Date:   Fri Feb 24 13:08:44 2023 +0530
 
     TEZ-4420 : Upgrade Hadoop to 3.3.4 (#272) (Aman Raj reviewed by Laszlo Bodor)
-    --> TODO in MR3 1.9+
+    --> to use Hadoop 3.3.6
 
 commit be994890dadc3f118671439a717290cf03b471cc
 Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
