@@ -225,7 +225,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       // FIXME
       if (failedFetches != null && !failedFetches.isEmpty()) {
         failedFetches.stream().forEach(input ->
-          shuffleSchedulerServer.fetchFailed(shuffleSchedulerId, host, input, true, false));
+          shuffleSchedulerServer.fetchFailed(shuffleSchedulerId, input, true, false));
       }
       cleanupCurrentConnection(false);
     }
@@ -323,7 +323,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
           // readError == false and connectError == false, so we only report fetch failure
 
           // Use (true, false) to stop the corresponding ShuffleScheduler.
-          shuffleSchedulerServer.fetchFailed(shuffleSchedulerId, host, left, true, false);
+          shuffleSchedulerServer.fetchFailed(shuffleSchedulerId, left, true, false);
         }
       }
     }
@@ -402,8 +402,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       for (InputAttemptIdentifier left : failedFetches) {
         // Need to be handling temporary glitches ..
         // Report read error to the AM to trigger source failure heuristics
-        shuffleSchedulerServer.fetchFailed(shuffleSchedulerId, host, left,
-            connectSucceeded, !connectSucceeded);
+        shuffleSchedulerServer.fetchFailed(shuffleSchedulerId, left, connectSucceeded, !connectSucceeded);
       }
       return false;
     }
@@ -650,7 +649,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
           if (!stopped) {
             hasFailures = true;
             shuffleErrorCounterGroup.ioErrs.increment(1);
-            shuffleSchedulerServer.fetchFailed(shuffleSchedulerId, host, srcAttemptId, true, false);
+            shuffleSchedulerServer.fetchFailed(shuffleSchedulerId, srcAttemptId, true, false);
             LOG.warn("{}: Failed to read local disk output of {} from {}", logIdentifier, srcAttemptId, host, e);
           } else {
             if (isDebugEnabled) {

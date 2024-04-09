@@ -371,7 +371,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
     }
   }
 
-  // called from Fetcher threads, via ShuffleServer
+  // called from Fetcher threads, via ShuffleServer (except calls from FetchFutureCallback.onSuccess())
   // readFailed is not used in ShuffleManager
   public void fetchFailed(
       InputAttemptIdentifier srcAttemptIdentifier, boolean readFailed, boolean connectFailed) {
