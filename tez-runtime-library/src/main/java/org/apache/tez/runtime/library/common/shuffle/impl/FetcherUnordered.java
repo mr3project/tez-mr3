@@ -175,7 +175,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs =
           hostFetchResult.fetchResult.getPendingInputs();
         for (InputAttemptIdentifier failed : hostFetchResult.failedInputs) {
-          fetcherCallback.fetchFailed(shuffleManagerId, host, failed, false, hostFetchResult.connectFailed);
+          fetcherCallback.fetchFailed(shuffleManagerId, failed, false, hostFetchResult.connectFailed);
           if (pendingInputs != null) {
             pendingInputs.remove(failed);
           }
@@ -262,8 +262,6 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       httpConnection.validate();
       // validateConnectionResponse(msgToEncode, encHash);
     } catch (IOException e) {
-      // If we got a read error at this stage, it implies there was a problem
-      // with the first map, typically lost map. So, penalize only that map and add the rest.
       if (isShutDown.get()) {
         if (isDebugEnabled) {
           LOG.debug("Not reporting fetch failure during connection establishment, since an Exception was caught after shutdown." +
@@ -271,14 +269,19 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         }
         return getResultWithNoPendingInputsNoFailedInputBecauseAlreadyShutdown();
       } else {
-        LOG.warn(
-            "{}: Fetch Failure while connecting from {} to: {}:{}, Informing ShuffleManager",
+        LOG.warn("{}: Fetch Failure while connecting from {} to: {}:{}, Informing ShuffleManager",
             logIdentifier, fetcherConfig.localHostName, host, port, e);
+        // If we got a read error at this stage, it implies there was a problem with the first map,
+        // typically lost map. So, penalize only that map and add the rest.
+        // In this way, we can rerun one source Task at a time and avoid rerunning many source Tasks at once.
+        // Cf. gla2024.4.8.pptx: What if a ContainerWorker becomes unreachable temporarily?
         // no need to apply TEZ-4174 because we send InputReadError regardless of connectFailed (see ShuffleManager.fetchFailed())
-        InputAttemptIdentifier[] failedFetches = buildInputSeqFromIndex(currentIndex);
-        // exception and we fail all inputs, so no pending inputs && only failed inputs
+        InputAttemptIdentifier[] failedFetches = new InputAttemptIdentifier[1];
+        failedFetches[0] = pendingInputsSeq.getInputs().get(currentIndex);
+        // It is okay to set pendingInputs[] to include all remaining IAIs, including failedFetches[0],
+        // because call() removes failedInputs[0] from pendingInputs[].
         return new HostFetchResult(new FetchResult(
-            shuffleManagerId, host, port, null),
+            shuffleManagerId, host, port, buildInputMapFromIndex(currentIndex)),
             failedFetches, false);
       }
     } catch (InterruptedException e) {

@@ -492,7 +492,7 @@ public class ShuffleServer implements FetcherCallback {
     }
   }
 
-  public void fetchFailed(long shuffleClientId, String host,
+  public void fetchFailed(long shuffleClientId,
                           InputAttemptIdentifier srcAttemptIdentifier,
                           boolean readFailed, boolean connectFailed) {
     ShuffleClient<?> shuffleClient = shuffleClients.get(shuffleClientId);
@@ -603,8 +603,7 @@ public class ShuffleServer implements FetcherCallback {
         }
       } else {
         if (result != null) {
-          // TODO: originally only for unordered
-          assert result.getShuffleManagerId() == fetcher.getShuffleClient().getShuffleClientId();
+          assert result.getShuffleClientId() == fetcher.getShuffleClient().getShuffleClientId();
 
           Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs = result.getPendingInputs();
           if (pendingInputs != null) {
@@ -615,6 +614,13 @@ public class ShuffleServer implements FetcherCallback {
                 InputHost.PartitionRange range = input.getValue();
                 inputHost.addKnownInput(fetcher.getShuffleClient(),
                     range.getPartition(), range.getPartitionCount(), input.getKey(), pendingHosts);
+              }
+            } else {
+              long shuffleClientId = result.getShuffleClientId();
+              LOG.warn("Reporting fetch failure for all pending inputs because {} for ShuffleClient {} is gone",
+                  identifier, shuffleClientId);
+              for (Map.Entry<InputAttemptIdentifier, InputHost.PartitionRange > input : pendingInputs.entrySet()) {
+                fetchFailed(shuffleClientId, input.getKey(), false, true);
               }
             }
           }

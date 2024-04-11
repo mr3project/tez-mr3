@@ -24,22 +24,22 @@ import java.util.Map;
 
 public class FetchResult {
 
-  private final long shuffleManagerId;
+  private final long shuffleClientId;
   private final String host;
   private final int port;
 
   private Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs;
 
-  public FetchResult(long shuffleManagerId, String host, int port,
+  public FetchResult(long shuffleClientId, String host, int port,
                      Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs) {
-    this.shuffleManagerId = shuffleManagerId;
+    this.shuffleClientId = shuffleClientId;
     this.host = host;
     this.port = port;
     this.pendingInputs = pendingInputs;
   }
 
-  public long getShuffleManagerId() {
-    return shuffleManagerId;
+  public long getShuffleClientId() {
+    return shuffleClientId;
   }
 
   public String getHost() {
