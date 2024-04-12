@@ -257,7 +257,6 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     // after putting back the remaining maps to the
     // yet_to_be_fetched list and marking the failed tasks.
     int index = 0;  // points to the next input to be consumed
-    boolean putBackRemainingInputsFromIndex = true;   // true if remaining inputs should be put back in queue
     InputAttemptIdentifier[] failedInputs = null;
 
     while (index < numInputs) {
@@ -267,9 +266,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       // skip for this error in the input stream. So we cannot move on to the
       // remaining outputs. YARN-1773. Will get to them in the next retry.
       try {
-        failedInputs = copyMapOutput(input, inputAttemptIdentifier, index);
-        // Cf. failedInputs[] can be buildInputSeqFromIndex(index)
-        // TODO: remove the above comment
+        failedInputs = copyMapOutput(input, inputAttemptIdentifier);
         if (failedInputs != null) {
           break;
         }
@@ -299,42 +296,39 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       }
     }
 
-    // Q. When do we have failedInputs == null?
-    //   1. success --> set putBackRemainingInputsFromIndex to false
-    //   2. index % pendingInputsSeq.length != 0 after FetcherReadTimeoutException --> already set to true
-    // From 2, we may have:
-    //   failedInputs == null && index < numInputs
-
+    Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputsFinal;
     if (index == numInputs) {   // success
       assert failedInputs == null;
-      putBackRemainingInputsFromIndex = false;
-    }
+      // no need to return pendingInputs[] because this is success
+      pendingInputsFinal = null;
+    } else {
+      assert failedInputs != null;
+      pendingInputsFinal = buildInputMapFromIndex(index);
 
-    // TODO: calculate buildInputMapFromIndex(index) for putBackRemainingInputsFromIndex here
-
-    if (failedInputs != null && failedInputs.length > 0) {
-      if (stopped) {
-        if (isDebugEnabled) {
-          LOG.debug("Ignoring copyMapOutput failures for tasks: " + Arrays.toString(failedInputs) +
+      if (failedInputs.length > 0) {
+        if (stopped) {
+          if (isDebugEnabled) {
+            LOG.debug("Ignoring copyMapOutput failures for tasks: " + Arrays.toString(failedInputs) +
               " since Fetcher has been stopped");
-        }
-      } else {
-        LOG.warn("copyMapOutput failed for tasks " + Arrays.toString(failedInputs));
-        for (InputAttemptIdentifier left : failedInputs) {
-          // readError == false and connectError == false, so we only report fetch failure
-          shuffleSchedulerServer.fetchFailed(shuffleSchedulerId, left, true, false);
+          }
+          cleanupCurrentConnection(false);  // TODO: why disconnect == false???
+          return null;
+        } else {
+          LOG.warn("copyMapOutput failed for tasks: " + Arrays.toString(failedInputs));
+          for (InputAttemptIdentifier failedInput : failedInputs) {
+            // readError == false and connectError == false, so we only report fetch failure
+            shuffleSchedulerServer.fetchFailed(shuffleSchedulerId, failedInput, true, false);
+            // remove failedInput from pendingInputsFinal[] because it reports fetch failure to AM
+            if (pendingInputsFinal != null) {
+              pendingInputsFinal.remove(failedInput);
+            }
+          }
         }
       }
     }
 
     cleanupCurrentConnection(false);
-
-    if (putBackRemainingInputsFromIndex) {
-      // TODO: Why not remove failedInputs[]??? Note: I.A.I vs CompositeI.A.I.
-      return buildInputMapFromIndex(index);
-    } else {
-      return null;
-    }
+    return pendingInputsFinal;
   }
 
   // return null if success
@@ -436,8 +430,10 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     return null;
   }
 
-  private InputAttemptIdentifier[] copyMapOutput(DataInputStream input,
-      InputAttemptIdentifier inputAttemptIdentifier, int currentIndex) throws FetcherReadTimeoutException {
+  // return failedInputs[]
+  private InputAttemptIdentifier[] copyMapOutput(
+      DataInputStream input,
+      InputAttemptIdentifier inputAttemptIdentifier) throws FetcherReadTimeoutException {
     MapOutput mapOutput = null;
     InputAttemptIdentifier srcAttemptId = null;
     long decompressedLength = 0;
