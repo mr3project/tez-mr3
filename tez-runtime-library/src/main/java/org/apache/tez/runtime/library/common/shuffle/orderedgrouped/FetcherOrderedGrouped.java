@@ -25,6 +25,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -165,7 +166,6 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     return logIdentifier;
   }
 
-  // always results null
   public FetchResult call() {
     assert !pendingInputsSeq.getInputs().isEmpty();
 
@@ -233,6 +233,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     return pendingInputs;
   }
 
+  // return pendingInputs[]
   private Map<InputAttemptIdentifier, InputHost.PartitionRange> copyFromHost() {
     // reset retryStartTime for a new host
     retryStartTime = 0;
@@ -242,12 +243,13 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
           + ", partition range: " + minPartition + "-" + maxPartition);
     }
 
-    if (!setupConnection(0)) {
-      // do not put back remaining inputs because connection failed
+    Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs = setupConnection(0);
+    if (pendingInputs != null) {  // stopped or failure
       if (stopped) {
         cleanupCurrentConnection(true);
+        return null;
       }
-      return null;
+      return pendingInputs;
     }
 
     // Loop through available map-outputs and fetch them
@@ -267,6 +269,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       try {
         failedInputs = copyMapOutput(input, inputAttemptIdentifier, index);
         // Cf. failedInputs[] can be buildInputSeqFromIndex(index)
+        // TODO: remove the above comment
         if (failedInputs != null) {
           break;
         }
@@ -282,7 +285,8 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
           return null;
         }
         // Connect with retry
-        if (!setupConnection(index)) {
+        Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputsNew = setupConnection(index);
+        if (pendingInputsNew != null) {   // stopped or failure
           if (stopped) {
             cleanupCurrentConnection(true);
             if (isDebugEnabled) {
@@ -290,12 +294,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
             }
             return null;
           }
-          // do not put back remaining inputs because connection failed
-          putBackRemainingInputsFromIndex = false;
-          // Q. Why return failedInputs[] when setupConnection() calls shuffleSchedulerServer.fetchFailed()???
-          // TODO: (this seems unnecessary)
-          failedInputs = new InputAttemptIdentifier[] { inputAttemptIdentifier };
-          break;
+          return pendingInputsNew;
         }
       }
     }
@@ -311,6 +310,8 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       putBackRemainingInputsFromIndex = false;
     }
 
+    // TODO: calculate buildInputMapFromIndex(index) for putBackRemainingInputsFromIndex here
+
     if (failedInputs != null && failedInputs.length > 0) {
       if (stopped) {
         if (isDebugEnabled) {
@@ -321,8 +322,6 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         LOG.warn("copyMapOutput failed for tasks " + Arrays.toString(failedInputs));
         for (InputAttemptIdentifier left : failedInputs) {
           // readError == false and connectError == false, so we only report fetch failure
-
-          // Use (true, false) to stop the corresponding ShuffleScheduler.
           shuffleSchedulerServer.fetchFailed(shuffleSchedulerId, left, true, false);
         }
       }
@@ -331,14 +330,21 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     cleanupCurrentConnection(false);
 
     if (putBackRemainingInputsFromIndex) {
+      // TODO: Why not remove failedInputs[]??? Note: I.A.I vs CompositeI.A.I.
       return buildInputMapFromIndex(index);
     } else {
       return null;
     }
   }
 
-  // setupConnection() calls shuffleSchedulerServer.fetchFailed() as necessary if it returns false
-  private boolean setupConnection(int currentIndex) {
+  // return null if success
+  // return non-null pendingInputs[] if stopped or failure
+  //   - should check 'stopped' after returning
+  //   - 'interrupted' is treated as 'failure', as in the original Tez implementation
+  //   - pendingInputs[] should be put back in the queue
+  //   - pendingInputs[] can be empty
+  //   - shuffleSchedulerServer.fetchFailed() has been called for failedInputs[]
+  private Map<InputAttemptIdentifier, InputHost.PartitionRange> setupConnection(int currentIndex) {
     assert currentIndex < pendingInputsSeq.getInputs().size();
 
     boolean connectSucceeded = false;
@@ -365,16 +371,6 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       httpConnection = ShuffleUtils.getHttpConnection(url, fetcherConfig.httpConnectionParams,
           logIdentifier, fetcherConfig.jobTokenSecretMgr);
       connectSucceeded = httpConnection.connect();
-
-      if (stopped) {
-        if (isDebugEnabled) {
-          LOG.debug("Detected fetcher has been shutdown after connection establishment. Returning");
-        }
-        return false;
-      }
-      input = httpConnection.getInputStream();
-      httpConnection.validate();
-      return true;
     } catch (IOException | InterruptedException ie) {
       if (ie instanceof InterruptedException) {
         Thread.currentThread().interrupt();   // reset status
@@ -383,7 +379,40 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         if (isDebugEnabled) {
           LOG.debug("Not reporting fetch failure, since an Exception was caught after shutdown");
         }
-        return false;
+        return new HashMap<>();
+      }
+      shuffleErrorCounterGroup.ioErrs.increment(1);
+      LOG.warn("{}: Failed to connect from {} to {} with index = {}", logIdentifier, fetcherConfig.localHostName,
+        host, currentIndex, ie);
+      shuffleErrorCounterGroup.connectionErrs.increment(1);
+
+      // exception, so no pending inputs && only failed inputs
+      InputAttemptIdentifier[] failedFetches = buildInputSeqFromIndex(currentIndex);
+      for (InputAttemptIdentifier failedFetch : failedFetches) {
+        shuffleSchedulerServer.fetchFailed(shuffleSchedulerId, failedFetch, false, true);
+      }
+      return new HashMap<>();   // non-null, so failure; empty, so no pendingInputs[]
+    }
+
+    if (stopped) {
+      if (isDebugEnabled) {
+        LOG.debug("Detected fetcher has been shutdown after connection establishment. Returning");
+      }
+      return new HashMap<>();
+    }
+
+    try {
+      input = httpConnection.getInputStream();
+      httpConnection.validate();
+    } catch (IOException | InterruptedException ie) {
+      if (ie instanceof InterruptedException) {
+        Thread.currentThread().interrupt();   // reset status
+      }
+      if (stopped) {
+        if (isDebugEnabled) {
+          LOG.debug("Not reporting fetch failure, since an Exception was caught after shutdown");
+        }
+        return new HashMap<>();
       }
       shuffleErrorCounterGroup.ioErrs.increment(1);
       if (!connectSucceeded) {
@@ -395,17 +424,16 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
             fetcherConfig.localHostName, host, currentIndex, ie);
       }
 
-      // At this point, either the connection failed, or the initial header verification failed.
-      // The error does not relate to any specific Input. Report all of them as failed.
-      // This ends up indirectly penalizing the host (multiple failures reported on the single host)
-      InputAttemptIdentifier[] failedFetches = buildInputSeqFromIndex(currentIndex);
-      for (InputAttemptIdentifier left : failedFetches) {
-        // Need to be handling temporary glitches ..
-        // Report read error to the AM to trigger source failure heuristics
-        shuffleSchedulerServer.fetchFailed(shuffleSchedulerId, left, connectSucceeded, !connectSucceeded);
-      }
-      return false;
+      // similarly to FetcherUnordered, penalize only the first map and add the rest
+      InputAttemptIdentifier failedFetch = pendingInputsSeq.getInputs().get(currentIndex);
+      shuffleSchedulerServer.fetchFailed(shuffleSchedulerId, failedFetch, connectSucceeded, !connectSucceeded);
+
+      Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs = buildInputMapFromIndex(currentIndex);
+      pendingInputs.remove(failedFetch);
+      return pendingInputs;
     }
+
+    return null;
   }
 
   private InputAttemptIdentifier[] copyMapOutput(DataInputStream input,
@@ -436,6 +464,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
               if (header.mapId.startsWith(ShuffleHandlerError.DISK_ERROR_EXCEPTION.toString())) {
                 LOG.warn("{}: ShuffleHandler error - {}, while fetching {}",
                     logIdentifier, header.mapId, inputAttemptIdentifier);
+                // TODO: Why is this necessary? We return [inputAttemptIdentifier] anyway.
                 shuffleSchedulerServer.informAM(shuffleSchedulerId, inputAttemptIdentifier);
               } else {
                 LOG.warn("{}: Invalid map id: {}, expected to start with {} / {}, partition: {}",
@@ -588,6 +617,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         LOG.info("{}: Failed to read map header {} decomp: {}, {}",
             logIdentifier, srcAttemptId, decompressedLength, compressedLength, ioe);
         if (srcAttemptId == null) {
+          // TODO: Why fail all inputs starting from currentIndex??? Why not fail only currentIndex?
           InputAttemptIdentifier[] failedFetches = buildInputSeqFromIndex(currentIndex);
           return failedFetches;
         } else {

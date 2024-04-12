@@ -67,7 +67,7 @@ public class HttpConnection extends BaseHttpConnection {
    * @throws IOException
    */
   public HttpConnection(URL url, HttpConnectionParams connParams,
-      String logIdentifier, JobTokenSecretManager jobTokenSecretManager) throws IOException {
+      String logIdentifier, JobTokenSecretManager jobTokenSecretManager) {
     this.logIdentifier = logIdentifier;
     this.jobTokenSecretMgr = jobTokenSecretManager;
     this.httpConnParams = connParams;

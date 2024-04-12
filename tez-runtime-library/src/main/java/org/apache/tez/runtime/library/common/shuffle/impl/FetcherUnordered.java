@@ -196,9 +196,6 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
   }
 
   // currentIndex is only for providing pathComponents to be used in URL.
-  // Reconnecting after a fetch failure is allowed only if:
-  //   currentIndex points to pendingInputsSeq[0] (i.e., the first PartitionRange)
-  // Otherwise, we cannot build a valid connection string.
   // success or interrupted --> return null
   // fail --> return non-null
   private HostFetchResult setupConnection(int currentIndex) {
