@@ -617,9 +617,8 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         LOG.info("{}: Failed to read map header {} decomp: {}, {}",
             logIdentifier, srcAttemptId, decompressedLength, compressedLength, ioe);
         if (srcAttemptId == null) {
-          // TODO: Why fail all inputs starting from currentIndex??? Why not fail only currentIndex?
-          InputAttemptIdentifier[] failedFetches = buildInputSeqFromIndex(currentIndex);
-          return failedFetches;
+          // unlike Tez, do not fail all inputs starting from currentIndex -- fail only inputAttemptIdentifier
+          return new InputAttemptIdentifier[]{ inputAttemptIdentifier };
         } else {
           return new InputAttemptIdentifier[]{ srcAttemptId };
         }
