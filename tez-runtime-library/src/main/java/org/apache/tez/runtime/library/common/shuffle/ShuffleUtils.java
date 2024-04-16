@@ -252,8 +252,7 @@ public class ShuffleUtils {
   }
 
   public static BaseHttpConnection getHttpConnection(URL url,
-      HttpConnectionParams params, String logIdentifier, JobTokenSecretManager jobTokenSecretManager)
-      throws IOException {
+      HttpConnectionParams params, String logIdentifier, JobTokenSecretManager jobTokenSecretManager) {
     return TezRuntimeUtils.getHttpConnection(url, params, logIdentifier, jobTokenSecretManager);
   }
 

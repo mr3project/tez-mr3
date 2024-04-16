@@ -15,6 +15,7 @@ Author: Ayush Saxena <ayushsaxena@apache.org>
 Date:   Tue Feb 6 14:19:22 2024 +0530
 
     TEZ-4451: ThreadLevel IO Stats Support for TEZ. (#331) (Ayush Saxena reviewed by Laszlo Bodor, Steve Loughran)
+    --> apply if logging is necessary for debugging
 
 commit 5e1cdee759caa1f99e18e1c468a5bad781b24793
 Author: Stamatis Zampetakis <zabetak@gmail.com>
@@ -63,7 +64,7 @@ Author: Sourabh Badhya <iamsbadhya@gmail.com>
 Date:   Tue Jan 9 21:16:05 2024 +0530
 
     TEZ-4526: Avoid calling LocationProvider#getPreferredLocations multiple times while generating grouped splits (#323)
-    --> apply (TODO)
+    --> applied
 
 commit 174d0d13f7809e881986364511fe129861165a61
 Author: Ayush Saxena <ayushsaxena@apache.org>
@@ -100,7 +101,7 @@ Author: Ayush Saxena <ayushsaxena@apache.org>
 Date:   Mon Dec 4 20:29:55 2023 +0530
 
     TEZ-4522: Use OpenFile where FileStatus is available. (#318) (Ayush Saxena reviewed by Laszlo Bodor)
-    --> apply (TODO)
+    --> apply (TODO after upgrading to Hadoop 3.3.6 or 3.4.0)
 
 commit 0ed5e3296c55dda66c691a9c60d1db38f0c80ce5
 Author: Ayush Saxena <ayushsaxena@apache.org>
@@ -113,7 +114,7 @@ Author: okumin <git@okumin.com>
 Date:   Wed Nov 29 00:33:09 2023 +0900
 
     TEZ-4521: Partition stats should be always uncompressed size (#317) (okumin reviewed by Laszlo Bodor)
-    --> apply (TODO)
+    --> applied
 
 commit 51d6f53967110e2b91b6d90b46f8e16bdc062091
 Author: Ayush Saxena <ayushsaxena@apache.org>
@@ -183,6 +184,7 @@ Author: Ayush Saxena <ayushsaxena@apache.org>
 Date:   Tue Jul 18 11:39:29 2023 +0530
 
     TEZ-4344: Collect jstack periodically from all containers. (#299) (Ayush Saxena reviewed by Laszlo Bodor)
+    --> revisit if necessary
 
 commit 50380751b7e7e628aeb40a985b94aba98d2a88db
 Author: Ayush Saxena <ayushsaxena@apache.org>

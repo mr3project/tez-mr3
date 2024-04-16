@@ -241,8 +241,7 @@ public class TezRuntimeUtils {
   }
 
   public static BaseHttpConnection getHttpConnection(
-      URL url, HttpConnectionParams params, String logIdentifier, JobTokenSecretManager jobTokenSecretManager)
-      throws IOException {
+      URL url, HttpConnectionParams params, String logIdentifier, JobTokenSecretManager jobTokenSecretManager) {
     return new HttpConnection(url, params, logIdentifier, jobTokenSecretManager);
   }
 

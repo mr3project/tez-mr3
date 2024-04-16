@@ -89,6 +89,7 @@ public class ShuffleServer implements FetcherCallback {
     public final boolean localDiskFetchEnabled;
     public final boolean verifyDiskChecksum;
     public final boolean compositeFetch;
+    public final boolean connectionFailAllInput;
 
     public FetcherConfig(
         Configuration codecConf,
@@ -102,7 +103,8 @@ public class ShuffleServer implements FetcherCallback {
         String localHostName,
         boolean localDiskFetchEnabled,
         boolean verifyDiskChecksum,
-        boolean compositeFetch) {
+        boolean compositeFetch,
+        boolean connectionFailAllInput) {
       this.codecConf = codecConf;
       this.ifileReadAhead = ifileReadAhead;
       this.ifileReadAheadLength = ifileReadAheadLength;
@@ -115,6 +117,7 @@ public class ShuffleServer implements FetcherCallback {
       this.localDiskFetchEnabled = localDiskFetchEnabled;
       this.verifyDiskChecksum = verifyDiskChecksum;
       this.compositeFetch = compositeFetch;
+      this.connectionFailAllInput = connectionFailAllInput;
     }
 
     public String toString() {
