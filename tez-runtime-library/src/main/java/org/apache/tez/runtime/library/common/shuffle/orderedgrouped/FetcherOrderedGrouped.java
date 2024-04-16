@@ -318,7 +318,14 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
           for (InputAttemptIdentifier failedInput : failedInputs) {
             // readError == false and connectError == false, so we only report fetch failure
             shuffleSchedulerServer.fetchFailed(shuffleSchedulerId, failedInput, true, false);
-            // remove failedInput from pendingInputsFinal[] because it reports fetch failure to AM
+
+            // Try to remove failedInput from pendingInputsFinal[] because it reports fetch failure to AM.
+            // If failedInput == srcAttemptId (instead of inputAttemptIdentifier) in copyMapOutput(),
+            // failedInput may not be removed from pendingInputsFinal[], e.g.:
+            //   - inputAttemptIdentifier = CompositeInputAttemptIdentifier[inputAttemptIdentifier=1000, count=5]
+            //   - srcAttemptId = InputAttemptIdentifier[inputAttemptIdentifier=1004]
+            // In this case, the same inputAttemptIdentifier is tried again at the next iteration.
+            // This is safe because eventually the task is re-executed and new DMEs arrive, making existing DMEs obsolete.
             if (pendingInputsFinal != null) {
               pendingInputsFinal.remove(failedInput);
             }
@@ -380,12 +387,22 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         host, currentIndex, ie);
       shuffleErrorCounterGroup.connectionErrs.increment(1);
 
-      // exception, so no pending inputs && only failed inputs
-      InputAttemptIdentifier[] failedFetches = buildInputSeqFromIndex(currentIndex);
-      for (InputAttemptIdentifier failedFetch : failedFetches) {
+      if (fetcherConfig.connectionFailAllInput) {
+        // no pending inputs && only failed inputs
+        InputAttemptIdentifier[] failedFetches = buildInputSeqFromIndex(currentIndex);
+        for (InputAttemptIdentifier failedFetch : failedFetches) {
+          shuffleSchedulerServer.fetchFailed(shuffleSchedulerId, failedFetch, false, true);
+        }
+        return new HashMap<>();   // non-null, so failure; empty, so no pendingInputs[]
+      } else {
+        // pending inputs == all remaining, except failedInput == InputAttemptIdentifier at currentIndex
+        InputAttemptIdentifier failedFetch =  pendingInputsSeq.getInputs().get(currentIndex);
         shuffleSchedulerServer.fetchFailed(shuffleSchedulerId, failedFetch, false, true);
+
+        Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs = buildInputMapFromIndex(currentIndex);
+        pendingInputs.remove(failedFetch);
+        return pendingInputs;   // non-null, so failure; non-empty pendingInputs[]
       }
-      return new HashMap<>();   // non-null, so failure; empty, so no pendingInputs[]
     }
 
     if (stopped) {
