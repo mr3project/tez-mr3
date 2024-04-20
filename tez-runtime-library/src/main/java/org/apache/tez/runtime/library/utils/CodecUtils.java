@@ -91,6 +91,9 @@ public final class CodecUtils {
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_VERIFY_DISK_CHECKSUM,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_VERIFY_DISK_CHECKSUM_DEFAULT);
     boolean compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
+    boolean connectionFailAllInput = conf.getBoolean(
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_CONNECTION_FAIL_ALL_INPUT,
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_CONNECTION_FAIL_ALL_INPUT_DEFAULT);
 
     return new ShuffleServer.FetcherConfig(
         codecConf,
@@ -104,7 +107,8 @@ public final class CodecUtils {
         localHostName,
         localDiskFetchEnabled,
         verifyDiskChecksum,
-        compositeFetch);
+        compositeFetch,
+        connectionFailAllInput);
   }
 
   private static Configuration reduceConfForCodec(Configuration conf) {

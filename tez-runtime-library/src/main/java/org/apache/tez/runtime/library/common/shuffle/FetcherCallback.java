@@ -30,6 +30,6 @@ public interface FetcherCallback {
       long fetchedBytes, long decompressedLength, long copyDuration) throws IOException;
 
   void fetchFailed(
-      long shuffleClientId, String host, InputAttemptIdentifier srcAttemptIdentifier,
+      long shuffleClientId, InputAttemptIdentifier srcAttemptIdentifier,
       boolean readFailed, boolean connectFailed);
 }

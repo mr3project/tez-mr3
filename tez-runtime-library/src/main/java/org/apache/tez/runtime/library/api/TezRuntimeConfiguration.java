@@ -244,8 +244,14 @@ public class TezRuntimeConfiguration {
   public final static int TEZ_RUNTIME_SHUFFLE_MAX_INPUT_HOSTPORTS_DEFAULT = 10000;
 
   // "first", "max" - used in ShuffleServer
-  public static final String TEZ_RUNTIME_SHUFFLE_RANGES_SCHEME = TEZ_RUNTIME_PREFIX + "shuffle.ranges.scheme";
+  public static final String TEZ_RUNTIME_SHUFFLE_RANGES_SCHEME =
+      TEZ_RUNTIME_PREFIX + "shuffle.ranges.scheme";
   public static final String TEZ_RUNTIME_SHUFFLE_RANGES_SCHEME_DEFAULT = "first";
+
+  @ConfigurationProperty(type = "boolean")
+  public static final String TEZ_RUNTIME_SHUFFLE_CONNECTION_FAIL_ALL_INPUT =
+      TEZ_RUNTIME_PREFIX + "shuffle.connection.fail.all.input";
+  public static final boolean TEZ_RUNTIME_SHUFFLE_CONNECTION_FAIL_ALL_INPUT_DEFAULT = false;
 
   @ConfigurationProperty(type = "integer")
   public static final String TEZ_RUNTIME_SHUFFLE_CONNECT_TIMEOUT = TEZ_RUNTIME_PREFIX +
@@ -459,6 +465,7 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_FETCH_MAX_TASK_OUTPUT_AT_ONCE);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_MAX_INPUT_HOSTPORTS);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_RANGES_SCHEME);
+    tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_CONNECTION_FAIL_ALL_INPUT);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_CONNECT_TIMEOUT);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_KEEP_ALIVE_ENABLED);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_KEEP_ALIVE_MAX_CONNECTIONS);

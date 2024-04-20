@@ -173,9 +173,9 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
 
         // never add back those InputAttemptIdentifiers that are sent to AM with InputReadError.
         Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs =
-          hostFetchResult.fetchResult.getPendingInputs();
+            hostFetchResult.fetchResult.getPendingInputs();
         for (InputAttemptIdentifier failed : hostFetchResult.failedInputs) {
-          fetcherCallback.fetchFailed(shuffleManagerId, host, failed, false, hostFetchResult.connectFailed);
+          fetcherCallback.fetchFailed(shuffleManagerId, failed, false, hostFetchResult.connectFailed);
           if (pendingInputs != null) {
             pendingInputs.remove(failed);
           }
@@ -196,9 +196,6 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
   }
 
   // currentIndex is only for providing pathComponents to be used in URL.
-  // Reconnecting after a fetch failure is allowed only if:
-  //   currentIndex points to pendingInputsSeq[0] (i.e., the first PartitionRange)
-  // Otherwise, we cannot build a valid connection string.
   // success or interrupted --> return null
   // fail --> return non-null
   private HostFetchResult setupConnection(int currentIndex) {
@@ -232,19 +229,32 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       }
       // If connect did not succeed, just mark all the maps as failed.
       InputAttemptIdentifier[] failedFetches;
+      Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs;
       if (isShutDown.get()) {
         if (isDebugEnabled) {
           LOG.debug("Not reporting fetch failure during connection establishment, since an Exception was caught after shutdown." +
               e.getClass().getName() + ", Message: " + e.getMessage());
         }
         failedFetches = null;
+        pendingInputs = null;
         // do not call getResultWithNoPendingInputsNoFailedInputBecauseAlreadyShutdown() because connectFailed == true
       } else {
-        failedFetches = buildInputSeqFromIndex(currentIndex);
+        if (fetcherConfig.connectionFailAllInput) {
+          // no pending inputs && only failed inputs
+          failedFetches = buildInputSeqFromIndex(currentIndex);
+          pendingInputs = null;
+        } else {
+          // all pending inputs, except failedInput == InputAttemptIdentifier at currentIndex
+          InputAttemptIdentifier failedFetch =  pendingInputsSeq.getInputs().get(currentIndex);
+          failedFetches = new InputAttemptIdentifier[]{ failedFetch };
+
+          pendingInputs = buildInputMapFromIndex(currentIndex);
+          // pendingInputs.remove() is optional because call() removes failedFetches[] from pendingInputs[]
+          pendingInputs.remove(failedFetch);
+        }
       }
-      // exception, so no pending inputs && only failed inputs
       return new HostFetchResult(new FetchResult(
-          shuffleManagerId, host, port, null),
+          shuffleManagerId, host, port, pendingInputs),
           failedFetches, true);
     }
 
@@ -262,8 +272,6 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       httpConnection.validate();
       // validateConnectionResponse(msgToEncode, encHash);
     } catch (IOException e) {
-      // If we got a read error at this stage, it implies there was a problem
-      // with the first map, typically lost map. So, penalize only that map and add the rest.
       if (isShutDown.get()) {
         if (isDebugEnabled) {
           LOG.debug("Not reporting fetch failure during connection establishment, since an Exception was caught after shutdown." +
@@ -271,14 +279,19 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         }
         return getResultWithNoPendingInputsNoFailedInputBecauseAlreadyShutdown();
       } else {
-        LOG.warn(
-            "{}: Fetch Failure while connecting from {} to: {}:{}, Informing ShuffleManager",
+        LOG.warn("{}: Fetch Failure while connecting from {} to: {}:{}, Informing ShuffleManager",
             logIdentifier, fetcherConfig.localHostName, host, port, e);
+        // If we got a read error at this stage, it implies there was a problem with the first map,
+        // typically lost map. So, penalize only that map and add the rest.
+        // In this way, we can rerun one source Task at a time and avoid rerunning many source Tasks at once.
+        // Cf. gla2024.4.8.pptx: What if a ContainerWorker becomes unreachable temporarily?
         // no need to apply TEZ-4174 because we send InputReadError regardless of connectFailed (see ShuffleManager.fetchFailed())
-        InputAttemptIdentifier[] failedFetches = buildInputSeqFromIndex(currentIndex);
-        // exception and we fail all inputs, so no pending inputs && only failed inputs
+        InputAttemptIdentifier[] failedFetches =
+            new InputAttemptIdentifier[]{ pendingInputsSeq.getInputs().get(currentIndex) };
+        // It is okay to set pendingInputs[] to include all remaining IAIs, including failedFetches[0],
+        // because call() removes failedInputs[0] from pendingInputs[].
         return new HostFetchResult(new FetchResult(
-            shuffleManagerId, host, port, null),
+            shuffleManagerId, host, port, buildInputMapFromIndex(currentIndex)),
             failedFetches, false);
       }
     } catch (InterruptedException e) {
@@ -650,7 +663,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
           if (!isShutDown.get()) {
             LOG.warn("{}: Invalid src id", logIdentifier, e);
             // don't know which one was bad, so consider all of them (starting from currentIndex) as bad
-            return buildInputSeqFromIndex(currentIndex);
+            return buildInputSeqFromIndex(currentIndex);  // okay because it is IllegalArgumentException
           } else {
             if (isDebugEnabled) {
               LOG.debug("Already shutdown. Ignoring badId error with message: " + e.getMessage());

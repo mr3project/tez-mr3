@@ -89,6 +89,7 @@ public class ShuffleServer implements FetcherCallback {
     public final boolean localDiskFetchEnabled;
     public final boolean verifyDiskChecksum;
     public final boolean compositeFetch;
+    public final boolean connectionFailAllInput;
 
     public FetcherConfig(
         Configuration codecConf,
@@ -102,7 +103,8 @@ public class ShuffleServer implements FetcherCallback {
         String localHostName,
         boolean localDiskFetchEnabled,
         boolean verifyDiskChecksum,
-        boolean compositeFetch) {
+        boolean compositeFetch,
+        boolean connectionFailAllInput) {
       this.codecConf = codecConf;
       this.ifileReadAhead = ifileReadAhead;
       this.ifileReadAheadLength = ifileReadAheadLength;
@@ -115,6 +117,7 @@ public class ShuffleServer implements FetcherCallback {
       this.localDiskFetchEnabled = localDiskFetchEnabled;
       this.verifyDiskChecksum = verifyDiskChecksum;
       this.compositeFetch = compositeFetch;
+      this.connectionFailAllInput = connectionFailAllInput;
     }
 
     public String toString() {
@@ -492,7 +495,7 @@ public class ShuffleServer implements FetcherCallback {
     }
   }
 
-  public void fetchFailed(long shuffleClientId, String host,
+  public void fetchFailed(long shuffleClientId,
                           InputAttemptIdentifier srcAttemptIdentifier,
                           boolean readFailed, boolean connectFailed) {
     ShuffleClient<?> shuffleClient = shuffleClients.get(shuffleClientId);
@@ -603,8 +606,7 @@ public class ShuffleServer implements FetcherCallback {
         }
       } else {
         if (result != null) {
-          // TODO: originally only for unordered
-          assert result.getShuffleManagerId() == fetcher.getShuffleClient().getShuffleClientId();
+          assert result.getShuffleClientId() == fetcher.getShuffleClient().getShuffleClientId();
 
           Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs = result.getPendingInputs();
           if (pendingInputs != null) {
@@ -615,6 +617,13 @@ public class ShuffleServer implements FetcherCallback {
                 InputHost.PartitionRange range = input.getValue();
                 inputHost.addKnownInput(fetcher.getShuffleClient(),
                     range.getPartition(), range.getPartitionCount(), input.getKey(), pendingHosts);
+              }
+            } else {
+              long shuffleClientId = result.getShuffleClientId();
+              LOG.warn("Reporting fetch failure for all pending inputs because {} for ShuffleClient {} is gone",
+                  identifier, shuffleClientId);
+              for (Map.Entry<InputAttemptIdentifier, InputHost.PartitionRange > input : pendingInputs.entrySet()) {
+                fetchFailed(shuffleClientId, input.getKey(), false, true);
               }
             }
           }
