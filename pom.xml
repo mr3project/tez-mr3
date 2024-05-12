@@ -47,7 +47,7 @@
     <distMgmtStagingId>apache.staging.https</distMgmtStagingId>
     <distMgmtStagingName>Apache Release Distribution Repository</distMgmtStagingName>
     <distMgmtStagingUrl>https://repository.apache.org/service/local/staging/deploy/maven2</distMgmtStagingUrl>
-    <protoc.jar.version>3.5.1.1</protoc.jar.version>
+    <protoc.jar.version>3.8.0</protoc.jar.version>
     <protobuf.version>3.24.4</protobuf.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <scm.url>scm:git:https://git-wip-us.apache.org/repos/asf/tez.git</scm.url>
