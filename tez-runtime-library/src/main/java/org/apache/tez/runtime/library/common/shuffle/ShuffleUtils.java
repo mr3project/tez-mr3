@@ -414,6 +414,14 @@ public class ShuffleUtils {
     return DataMovementEvent.create(-1, -1, 0, dmePayload);
   }
 
+  public static VertexManagerEvent generateEmptyVertexManagerEvent(String destVertexName) {
+    ShuffleUserPayloads.VertexManagerEventPayloadProto.Builder vmBuilder =
+      ShuffleUserPayloads.VertexManagerEventPayloadProto.newBuilder();
+    vmBuilder.setOutputSize(0);
+    return VertexManagerEvent.create(
+      destVertexName, vmBuilder.build().toByteString().asReadOnlyByteBuffer());
+  }
+
   /**
    * Generate events when spill happens
    *
