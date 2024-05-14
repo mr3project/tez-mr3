@@ -361,11 +361,9 @@ public class ShuffleUtils {
                                                        int numPhysicalOutputs,
                                                        OutputContext context,
                                                        boolean generateVmEvent,
-                                                       boolean isCompositeEvent, Deflater deflater) throws
-      IOException {
+                                                       boolean isCompositeEvent, Deflater deflater) throws IOException {
     DataMovementEventPayloadProto.Builder payloadBuilder = DataMovementEventPayloadProto
         .newBuilder();
-
 
     // Construct the VertexManager event if required.
     if (generateVmEvent) {
@@ -390,7 +388,6 @@ public class ShuffleUtils {
     DataMovementEventPayloadProto payloadProto = payloadBuilder.build();
     ByteBuffer dmePayload = payloadProto.toByteString().asReadOnlyByteBuffer();
 
-
     if (isCompositeEvent) {
       CompositeDataMovementEvent cdme =
           CompositeDataMovementEvent.create(0, numPhysicalOutputs, dmePayload);
@@ -399,6 +396,22 @@ public class ShuffleUtils {
       DataMovementEvent dme = DataMovementEvent.create(0, dmePayload);
       eventList.add(dme);
     }
+  }
+
+  public static DataMovementEvent generateEmptyDataMovementEvent(int numPhysicalOutputs) throws IOException {
+    DataMovementEventPayloadProto.Builder payloadBuilder = DataMovementEventPayloadProto
+      .newBuilder();
+
+    BitSet emptyPartitionDetails = new BitSet(numPhysicalOutputs);
+    emptyPartitionDetails.set(0, numPhysicalOutputs, true);
+    ByteString emptyPartitionsBytesString =
+      TezCommonUtils.compressByteArrayToByteString(
+        TezUtilsInternal.toByteArray(emptyPartitionDetails), TezCommonUtils.newBestCompressionDeflater());
+    payloadBuilder.setEmptyPartitions(emptyPartitionsBytesString);
+    DataMovementEventPayloadProto payloadProto = payloadBuilder.build();
+    ByteBuffer dmePayload = payloadProto.toByteString().asReadOnlyByteBuffer();
+
+    return DataMovementEvent.create(-1, -1, 0, dmePayload);
   }
 
   /**
@@ -517,8 +530,7 @@ public class ShuffleUtils {
    *
    * @param sizes actual partition sizes
    */
-  public static DetailedPartitionStatsProto
-  getDetailedPartitionStatsForPhysicalOutput(long[] sizes) {
+  public static DetailedPartitionStatsProto getDetailedPartitionStatsForPhysicalOutput(long[] sizes) {
     DetailedPartitionStatsProto.Builder builder =
         DetailedPartitionStatsProto.newBuilder();
     for (int i=0; i<sizes.length; i++) {
