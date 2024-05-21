@@ -73,7 +73,7 @@ public class SleepProcessor extends AbstractLogicalIOProcessor {
   }
 
   @Override
-  public boolean run(Map<String, LogicalInput> _inputs,
+  public scala.Tuple2<java.lang.Integer, java.lang.Integer> run(Map<String, LogicalInput> _inputs,
                   Map<String, LogicalOutput> _outputs) throws Exception {
     inputs = _inputs;
     outputs = _outputs;
@@ -92,7 +92,7 @@ public class SleepProcessor extends AbstractLogicalIOProcessor {
     } catch (InterruptedException ie) {
       // ignore
     }
-    return false;
+    return null;
   }
 
   @Override
