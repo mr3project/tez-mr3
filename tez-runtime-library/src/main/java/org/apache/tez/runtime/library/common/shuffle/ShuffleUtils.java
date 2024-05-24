@@ -327,7 +327,7 @@ public class ShuffleUtils {
       if (!context.useShuffleHandlerProcessOnK8s()) {
         ByteBuffer shuffleMetadata = context.getServiceProviderMetaData(auxiliaryService);
         int[] shufflePorts = ShuffleUtils.deserializeShuffleProviderMetaData(shuffleMetadata);
-        payloadBuilder.setNumPorts(shufflePorts.length);
+        payloadBuilder.setNumPorts(shufflePorts.length);  // shufflePorts[] can be empty
         for (int i = 0; i < shufflePorts.length; i++) {
           payloadBuilder.addPorts(shufflePorts[i]);
         }
