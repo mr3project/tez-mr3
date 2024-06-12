@@ -116,7 +116,7 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
       InputContext inputContext,
       Configuration conf,
       int numInputs,
-      String srcNameTrimmed) {
+      String srcNameTrimmed) throws IOException {
     this.shuffleServer = (ShuffleServer)inputContext.getShuffleServer();
     this.shuffleClientId = shuffleServer.register(this);
     this.inputContext = inputContext;
