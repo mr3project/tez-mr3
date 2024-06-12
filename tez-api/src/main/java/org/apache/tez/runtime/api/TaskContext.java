@@ -18,6 +18,7 @@
 
 package org.apache.tez.runtime.api;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -268,7 +269,7 @@ public interface TaskContext extends DecompressorPool {
 
   public ExecutorServiceUserGroupInformation getExecutorServiceUgi();
 
-  // we use Object (instead of ShuffleServe) because of dependency issues
+  // we use Object (instead of ShuffleServer) because of dependency issues
   public void setShuffleServer(Object shuffleServer);
-  public Object getShuffleServer();
+  public Object getShuffleServer() throws IOException;
 }
