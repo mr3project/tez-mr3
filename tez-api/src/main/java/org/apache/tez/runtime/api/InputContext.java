@@ -53,4 +53,6 @@ public interface InputContext extends TaskContext {
    * @return {@link InputStatisticsReporter}
    */
   public InputStatisticsReporter getStatisticsReporter();
+
+  public boolean getScheduledOnHost();
 }
