@@ -100,7 +100,7 @@ public class MRInput extends MRInputBase {
   @Private public static final String TEZ_MAPREDUCE_TASK_ID = "tez.mapreduce.task.id";
   @Private public static final String TEZ_MAPREDUCE_TASK_ATTEMPT_ID = "tez.mapreduce.task.attempt.id";
 
-
+  @Private public static final String TEZ_MR3_SCHEDULED_ON_HOST = "tez.mr3.scheduled.on.host";
 
   /**
    * Helper class to configure {@link MRInput}
