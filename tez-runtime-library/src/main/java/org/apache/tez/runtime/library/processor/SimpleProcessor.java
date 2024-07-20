@@ -48,7 +48,7 @@ public abstract class SimpleProcessor extends AbstractLogicalIOProcessor {
     super(context);
   }
 
-  public boolean run(Map<String, LogicalInput> _inputs, Map<String, LogicalOutput> _outputs)
+  public scala.Tuple2<java.lang.Integer, java.lang.Integer> run(Map<String, LogicalInput> _inputs, Map<String, LogicalOutput> _outputs)
       throws Exception {
     this.inputs = _inputs;
     this.outputs = _outputs;
@@ -56,7 +56,7 @@ public abstract class SimpleProcessor extends AbstractLogicalIOProcessor {
     preOp();
     run();
     postOp();
-    return false;
+    return null;
   }
 
   /**

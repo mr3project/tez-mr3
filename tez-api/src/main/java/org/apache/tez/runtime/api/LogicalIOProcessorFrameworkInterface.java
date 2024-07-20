@@ -39,10 +39,10 @@ public interface LogicalIOProcessorFrameworkInterface extends ProcessorFramework
    * @param outputs
    *          a map of the destination vertex name to {@link LogicalOutput} -
    *          one per outgoing edge
-   * @return true if it is safe to soft-kill sibling Tasks because limit is reached
+   * @return true (limit, # of records), or null if unnecessary
    * @throws Exception TODO
    */
-  public boolean run(Map<String, LogicalInput> inputs,
+  public scala.Tuple2<java.lang.Integer, java.lang.Integer> run(Map<String, LogicalInput> inputs,
       Map<String, LogicalOutput> outputs) throws Exception;
 
 }

@@ -84,23 +84,10 @@ import com.google.common.collect.Lists;
 @Public
 public class MRInput extends MRInputBase {
 
-  @Private public static final String TEZ_MAPREDUCE_DAG_INDEX = "tez.mapreduce.dag.index";
-  @Private public static final String TEZ_MAPREDUCE_DAG_NAME = "tez.mapreduce.dag.name";
-  @Private public static final String TEZ_MAPREDUCE_VERTEX_INDEX = "tez.mapreduce.vertex.index";
-  @Private public static final String TEZ_MAPREDUCE_VERTEX_NAME = "tez.mapreduce.vertex.name";
-  @Private public static final String TEZ_MAPREDUCE_TASK_INDEX = "tez.mapreduce.task.index";
-  @Private public static final String TEZ_MAPREDUCE_TASK_ATTEMPT_INDEX = "tez.mapreduce.task.attempt.index";
-  @Private public static final String TEZ_MAPREDUCE_INPUT_INDEX = "tez.mapreduce.input.index";
-  @Private public static final String TEZ_MAPREDUCE_INPUT_NAME = "tez.mapreduce.input.name";
-  @Private public static final String TEZ_MAPREDUCE_APPLICATION_ID = "tez.mapreduce.application.id";
-  @Private public static final String TEZ_MAPREDUCE_UNIQUE_IDENTIFIER = "tez.mapreduce.unique.identifier";
-  @Private public static final String TEZ_MAPREDUCE_DAG_ATTEMPT_NUMBER = "tez.mapreduce.dag.attempt.number";
   @Private public static final String TEZ_MAPREDUCE_DAG_ID= "tez.mapreduce.dag.id";
-  @Private public static final String TEZ_MAPREDUCE_VERTEX_ID = "tez.mapreduce.vertex.id";
-  @Private public static final String TEZ_MAPREDUCE_TASK_ID = "tez.mapreduce.task.id";
   @Private public static final String TEZ_MAPREDUCE_TASK_ATTEMPT_ID = "tez.mapreduce.task.attempt.id";
 
-
+  @Private public static final String TEZ_MR3_SCHEDULED_ON_HOST = "tez.mr3.scheduled.on.host";
 
   /**
    * Helper class to configure {@link MRInput}
@@ -445,8 +432,8 @@ public class MRInput extends MRInputBase {
     getContext().inputIsReady();
     this.splitInfoViaEvents = jobConf.getBoolean(MRJobConfig.MR_TEZ_SPLITS_VIA_EVENTS,
         MRJobConfig.MR_TEZ_SPLITS_VIA_EVENTS_DEFAULT);
-    if (LOG.isDebugEnabled()) { LOG.debug("{} using newmapreduce API={}, split via event={}, numPhysicalInputs={}",
-        getContext().getSourceVertexName(), useNewApi, splitInfoViaEvents, getNumPhysicalInputs()); }
+    LOG.info("{} using newmapreduce API={}, split via event={}, numPhysicalInputs={}",  // log useNewApi to check if Iceberg is correctly handled
+        getContext().getSourceVertexName(), useNewApi, splitInfoViaEvents, getNumPhysicalInputs());
     initializeInternal();
     return null;
   }

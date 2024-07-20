@@ -226,7 +226,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
       return localShufflePorts[(portIndex + targetIndex) % numPorts];
     } else {
       int numPorts = shufflePayload.getNumPorts();
-      return shufflePayload.getPorts((portIndex + targetIndex) % numPorts);
+      return numPorts > 0 ? shufflePayload.getPorts((portIndex + targetIndex) % numPorts) : 0;
     }
   }
 
