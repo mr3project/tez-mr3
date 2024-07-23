@@ -528,10 +528,6 @@
             <groupId>io.netty</groupId>
             <artifactId>*</artifactId>
           </exclusion>
-          <exclusion>
-            <groupId>org.jboss.netty</groupId>
-            <artifactId>netty</artifactId>
-          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -550,10 +546,6 @@
           <exclusion>
             <groupId>io.netty</groupId>
             <artifactId>*</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.jboss.netty</groupId>
-            <artifactId>netty</artifactId>
           </exclusion>
           <exclusion>
             <groupId>com.google.inject.extensions</groupId>
@@ -649,10 +641,6 @@
           <exclusion>
             <groupId>io.netty</groupId>
             <artifactId>*</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.jboss.netty</groupId>
-            <artifactId>netty</artifactId>
           </exclusion>
         </exclusions>
       </dependency>

@@ -186,6 +186,33 @@
       <dependencies>
         <dependency>
           <groupId>org.apache.hadoop</groupId>
+          <artifactId>hadoop-hdfs</artifactId>
+          <version>${hadoop.version}</version>
+          <exclusions>
+            <exclusion>
+              <groupId>commons-logging</groupId>
+              <artifactId>commons-logging</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>com.fasterxml.jackson.core</groupId>
+              <artifactId>jackson-annotations</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>com.fasterxml.jackson.core</groupId>
+              <artifactId>jackson-core</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>com.fasterxml.jackson.core</groupId>
+              <artifactId>jackson-databind</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.fusesource.leveldbjni</groupId>
+              <artifactId>leveldbjni-all</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+        <dependency>
+          <groupId>org.apache.hadoop</groupId>
           <artifactId>hadoop-hdfs-client</artifactId>
           <version>${hadoop.version}</version>
           <exclusions>
