@@ -48,4 +48,5 @@ public interface OutputContext extends TaskContext {
    */
   public OutputStatisticsReporter getStatisticsReporter();
 
+  public String getDAGID();
 }
