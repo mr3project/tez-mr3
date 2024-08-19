@@ -29,6 +29,7 @@
         <include>org.apache.tez:tez-runtime-library</include>
         <include>org.apache.tez:tez-mapreduce</include>
         <include>org.apache.tez:tez-dag</include>
+        <include>org.apache.tez:tez-protobuf-history-plugin</include>
       </includes>
       <binaries>
         <outputDirectory>/</outputDirectory>

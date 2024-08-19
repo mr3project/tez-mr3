@@ -19,6 +19,7 @@
 package org.apache.tez.mapreduce.hadoop;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -30,11 +31,14 @@ import java.util.Map;
 import java.util.Objects;
 
 import com.google.common.base.Function;
+import com.google.common.base.Strings;
+
 import org.apache.tez.common.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.protobuf.ByteString;
 
+import org.apache.tez.runtime.api.events.InputDataInformationEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -42,6 +46,7 @@ import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -71,6 +76,7 @@ import org.apache.tez.dag.api.VertexLocationHint;
 import org.apache.tez.mapreduce.input.MRInput;
 import org.apache.tez.mapreduce.input.MRInputLegacy;
 import org.apache.tez.mapreduce.protos.MRRuntimeProtos;
+import org.apache.tez.mapreduce.protos.MRRuntimeProtos.MRSplitProto;
 
 @Public
 @Unstable
@@ -778,5 +784,31 @@ public class MRInputHelpers {
 
   private static int getIntProperty(Configuration conf, String propertyName) {
     return Integer.parseInt(getStringProperty(conf, propertyName));
+  }
+
+  public static MRSplitProto getProto(InputDataInformationEvent initEvent, JobConf jobConf) throws IOException {
+    return Strings.isNullOrEmpty(initEvent.getSerializedPath()) ? readProtoFromPayload(initEvent)
+      : readProtoFromFs(initEvent, jobConf);
+  }
+
+  private static MRSplitProto readProtoFromFs(InputDataInformationEvent initEvent, JobConf jobConf) throws IOException {
+    String serializedPath = initEvent.getSerializedPath();
+    Path filePath = new Path(serializedPath);
+    LOG.info("Reading InputDataInformationEvent from path: {}", filePath);
+
+    MRSplitProto splitProto = null;
+    FileSystem fs = filePath.getFileSystem(jobConf);
+
+    try (FSDataInputStream in = fs.open(filePath)) {
+      splitProto = MRSplitProto.parseFrom(in);
+      fs.delete(filePath, false);
+    }
+    return splitProto;
+  }
+
+  private static MRSplitProto readProtoFromPayload(InputDataInformationEvent initEvent) throws IOException {
+    ByteBuffer payload = initEvent.getUserPayload();
+    LOG.info("Reading InputDataInformationEvent from payload: {}", payload);
+    return MRSplitProto.parseFrom(ByteString.copyFrom(payload));
   }
 }
