@@ -1,3 +1,142 @@
+commit a66c90337395fd90de00b772d70a058416328de5
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Sun Aug 18 18:16:09 2024 +0200
+
+    TEZ-3322: Add Apache license to the generated tez-configuration-template files (#230). (Laszlo Bodor, reviewed by Ayush Saxena)
+
+commit cd6ceec3dfdf444470bdd94fa8be31602015a2f3
+Author: slfan1989 <55643692+slfan1989@users.noreply.github.com>
+Date:   Fri Aug 9 19:20:52 2024 +0800
+
+    TEZ-4550: Upgrade commons-cli to 1.6.0. (#343) (Shilun Fan reviewed by Laszlo Bodor)
+
+commit 563b4947b53e9070e2e99cba91102e377f439ebc
+Author: Venkatasubrahmanian Narayanan <10137808+VenkatSNarayanan@users.noreply.github.com>
+Date:   Mon Aug 5 05:06:25 2024 -0700
+
+    TEZ-4547: Add Tez AM JobID to the JobConf (#339) (Venkatasubrahmanian Narayanan reviewed by Laszlo Bodor)
+    --> applied
+
+commit 70d79b27ceea1f5b98e4cdd9c02af126d6c3e25d
+Author: Mayank Kunwar <55212670+mayankkunwar@users.noreply.github.com>
+Date:   Fri Aug 2 21:48:46 2024 +0530
+
+    TEZ-4573: Upgrade momentjs to 2.29.4 due to CVE-2022-24785, CVE-2022-31129 and CVE-2017-18214 (#363)
+
+commit c745edfbbaeaaccd3f07d6cc2fd0d8ee88c7ef6f
+Author: Raghav Aggarwal <raghavaggarwal03.ra@gmail.com>
+Date:   Fri Jun 28 09:32:01 2024 +0530
+
+    TEZ-4557: Revert TEZ-4303, NoClassDefFoundError because of missing httpclient jar (#349) (Raghav Aggarwal reviewed by Laszlo Bodor)
+    --> applied
+
+commit 19b2351a909589500397cc69e12d22da1f74949a
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Tue Jun 25 07:51:05 2024 +0200
+
+    TEZ-4554: Counter for used nodes within a DAG (#362) (Laszlo
+    --> apply if needed
+
+commit 0ac505b09d18b51cbe880e2804bee47b9ea6c329
+Author: Raghav Aggarwal <raghavaggarwal03.ra@gmail.com>
+Date:   Thu Jun 20 19:56:30 2024 +0530
+
+    TEZ-4540: Reading proto data more than 2GB from multiple splits fails (#334) (Raghav Aggarwal reviewed by Laszlo Bodor)
+    --> applied
+
+commit e08d0279c5cf50a41879c6df0faf8f4cd60ddb67
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Thu Jun 6 12:38:19 2024 +0200
+
+    TEZ-4568: ProfileServlet: add html to output formats and prepare for profiler 3.0 (#360) (Laszlo Bodor reviewed by Ayush Saxena)
+
+commit 38c5aaccdf8e4f7db210975021c78b6db556c87f
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Tue May 28 07:45:54 2024 +0200
+
+    TEZ-4564: TezClient to expose Tez AM host:port (#356). (Laszlo Bodor, reviewed by Ayush Saxena)
+
+commit 30e9cdbff7adb75c3553d5cbb8515761a7231e07
+Author: Ayush Saxena <ayushsaxena@apache.org>
+Date:   Wed May 22 12:05:11 2024 +0530
+
+    TEZ-4566: NPE in TezChild while fetching attemptId when container is asked to shut down. (#358). (Ayush Saxena, reviewed by Laszlo Bodor)
+
+commit a1fcddb8bae6f4451751b0f0f82f1ee1eac951b0
+Author: jteagles <jeagles@gmail.com>
+Date:   Tue May 14 02:37:00 2024 -0500
+
+    [TEZ-4019] Modify Tez shuffle handler to use AuxiliaryLocalPathHandler instead of LocalDirAllocator (#355) (Jonathan Eagles reviewed by Laszlo Bodor)
+    --> apply to MR3 if okay
+    Tez: ShuffleHandler is an aux service extending AuxiliaryService
+    MR3: ShuffleHandler does not extend AuxiliaryService
+
+commit 642f4c052c68e2a3e45641150965fa3321563949
+Author: zhengchenyu <zhengchenyu16@163.com>
+Date:   Tue May 14 15:28:52 2024 +0800
+
+    TEZ-4542: Tez application may fail due to int overflow when record size is large and sort memory is low. (#336) (zhengchenyu reviewed by Rajesh Balamohan)
+    --> applied
+
+commit 9a6757b45642f959bf56b18ea891a1db4edbe7c8
+Author: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+Date:   Fri May 10 06:20:02 2024 +0530
+
+    TEZ-4563: Bump org.bouncycastle:bcprov-jdk18on from 1.77 to 1.78 (#352). (dependabot, Reviewed by Ayush Saxena)
+
+commit 7a9211e4da789cddc00a70ce6933962d3c69c13d
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Tue May 7 10:13:30 2024 +0200
+
+    TEZ-4559: Fix Retry logic in case of Recovery (#353). (Laszlo Bodor, reviewed by Ayush Saxena)
+
+commit 66a6ca64b5edde0d30bea0962cb132f3c4982469
+Author: slfan1989 <55643692+slfan1989@users.noreply.github.com>
+Date:   Mon May 6 15:52:32 2024 +0800
+
+    TEZ-4552. Upgrade protobuf to 3.24.4 due to CVE. (#345) (Shilun Fan reviewed by Laszlo Bodor)
+
+commit 071d4479b7903b58bb5249c3220df6360e5f8747
+Author: slfan1989 <55643692+slfan1989@users.noreply.github.com>
+Date:   Mon May 6 15:49:44 2024 +0800
+
+    TEZ-4560. Upgrade bouncycastle to 1.77 due to CVE. (#351) (Shilun Fan reviewed by Laszlo Bodor)
+
+commit 39255443c983fe4e9726eb96c381c8b4f4bed7f4
+Author: slfan1989 <55643692+slfan1989@users.noreply.github.com>
+Date:   Mon May 6 15:48:06 2024 +0800
+
+    TEZ-4551. Upgrade commons-io to 2.16.0. (#344) (Shilun Fan reviewed by Laszlo Bodor)
+
+commit 906059adb1f196c07cade0b3abdac4142f4e819f
+Author: jteagles <jeagles@gmail.com>
+Date:   Fri May 3 13:51:25 2024 -0500
+
+    TEZ-4558. Update build setup maven version and enforcer minimum to correct minimum (#350)
+    
+    Co-authored-by: Jonathan Eagles <jeagles@apache.org>
+
+commit a77f8ef9f8d8753c125c9fb57dc47cdaace09198
+Author: jteagles <jeagles@gmail.com>
+Date:   Wed May 1 10:02:54 2024 -0500
+
+    TEZ-4553. Default task scheduler to DagAwareTaskScheduler to avoid hang in TEZ-3535 (#347)
+    
+    Co-authored-by: Jonathan Eagles <jeagles@apache.org>
+
+commit b5b62261497c25d64fbfb9936cba852520ebd3e4
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Thu Apr 25 12:19:33 2024 +0200
+
+    TEZ-4555: Fail fast in LocalClient if the dirs (log, local) haven't been created (#348). (Laszlo Bodor, reviewed by Ayush Saxena)
+
+commit f080031f5c72bc4bfd8090ccdc670bdc0f7fd090
+Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
+Date:   Tue Apr 2 17:27:53 2024 +0200
+
+    TEZ-4548: InputDataInformationEvent to be read from serialized payload from filesystem (#341) (Laszlo Bodor reviewed by Ayush Saxena)
+    --> applied
+
 commit 34bb628e3a25edf5e36e3ca1bf73f06752a43118
 Author: Bodor Laszlo <bodorlaszlo0202@gmail.com>
 Date:   Tue Feb 27 14:14:44 2024 +0100
@@ -95,13 +234,14 @@ Author: BilwaST <stbilwa@gmail.com>
 Date:   Thu Jan 4 20:11:13 2024 +0530
 
     TEZ-4524 - Upgrade commons-codec to 1.15 (#321) (Bilwa S T reviewed by Laszlo Bodor)
+    --> applied
 
 commit 0c5cf688690bacc662a015b1bff0ecb556314b90
 Author: Ayush Saxena <ayushsaxena@apache.org>
 Date:   Mon Dec 4 20:29:55 2023 +0530
 
     TEZ-4522: Use OpenFile where FileStatus is available. (#318) (Ayush Saxena reviewed by Laszlo Bodor)
-    --> apply (TODO after upgrading to Hadoop 3.3.6 or 3.4.0)
+    --> applied (for Hadoop 3.3.6)
 
 commit 0ed5e3296c55dda66c691a9c60d1db38f0c80ce5
 Author: Ayush Saxena <ayushsaxena@apache.org>

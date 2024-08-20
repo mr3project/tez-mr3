@@ -78,6 +78,7 @@ public class MROutputCommitter extends OutputCommitter {
     jobConf.getCredentials().mergeAll(UserGroupInformation.getCurrentUser().getCredentials());
     jobConf.setInt(MRJobConfig.APPLICATION_ATTEMPT_ID,
         getContext().getDAGAttemptNumber());
+    jobConf.set(MRJobConfig.JOB_COMMITTER_UUID, getContext().getDAGID());   // getDAGID() of MR3 returns a string unique to (DAG, attempt number)
     jobConf.setInt(MRJobConfig.VERTEX_ID, getContext().getVertexIndex());
     committer = getOutputCommitter(getContext());
     jobContext = getJobContextFromVertexContext(getContext());

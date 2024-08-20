@@ -26,8 +26,6 @@ import java.util.List;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
-import com.google.protobuf.ByteString;
-
 import org.apache.tez.runtime.api.ProgressFailedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,6 +68,7 @@ import org.apache.tez.runtime.api.events.InputDataInformationEvent;
 import org.apache.tez.runtime.library.api.KeyValueReader;
 
 import org.apache.tez.common.Preconditions;
+
 import com.google.common.collect.Lists;
 
 /**
@@ -644,7 +643,7 @@ public class MRInput extends MRInputBase {
       LOG.debug(getContext().getSourceVertexName() + " initializing RecordReader from event");
     }
     Preconditions.checkState(initEvent != null, "InitEvent must be specified");
-    MRSplitProto splitProto = MRSplitProto.parseFrom(ByteString.copyFrom(initEvent.getUserPayload()));
+    MRSplitProto splitProto = MRInputHelpers.getProto(initEvent, jobConf);
     Object splitObj = null;
     long splitLength = -1;
     if (useNewApi) {

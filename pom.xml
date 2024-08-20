@@ -161,9 +161,9 @@
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.dropwizard.metrics</groupId>
-        <artifactId>metrics-core</artifactId>
-        <version>3.1.0</version>
+        <groupId>org.apache.tez</groupId>
+        <artifactId>tez-plugins</artifactId>
+        <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>org.roaringbitmap</groupId>
@@ -200,10 +200,6 @@
           <exclusion>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.apache.httpcomponents</groupId>
-            <artifactId>httpclient</artifactId>
           </exclusion>
           <exclusion>
             <groupId>commons-logging</groupId>
@@ -289,10 +285,6 @@
             <groupId>org.apache.zookeeper</groupId>
             <artifactId>zookeeper</artifactId>
           </exclusion>
-          <exclusion>
-            <groupId>org.apache.httpcomponents</groupId>
-            <artifactId>httpclient</artifactId>
-          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -300,10 +292,6 @@
         <artifactId>hadoop-auth</artifactId>
         <version>${hadoop.version}</version>
         <exclusions>
-          <exclusion>
-            <groupId>org.apache.httpcomponents</groupId>
-            <artifactId>httpclient</artifactId>
-          </exclusion>
           <exclusion>
             <groupId>org.apache.curator</groupId>
             <artifactId>curator-client</artifactId>
@@ -739,6 +727,7 @@
     <module>tez-examples</module>
     <module>tez-tests</module>
     <module>tez-dag</module>
+    <module>tez-plugins</module>
     <module>tez-dist</module>
   </modules>
 
@@ -1062,14 +1051,6 @@
               <groupId>com.fasterxml.jackson.core</groupId>
               <artifactId>jackson-core</artifactId>
             </exclusion>
-            <exclusion>
-              <groupId>org.apache.httpcomponents</groupId>
-              <artifactId>httpclient</artifactId>
-            </exclusion>
-            <exclusion>
-              <groupId>org.apache.httpcomponents</groupId>
-              <artifactId>httpcore</artifactId>
-            </exclusion>
           </exclusions>
         </dependency>
         <dependency>
@@ -1107,14 +1088,6 @@
             <exclusion>
               <groupId>com.fasterxml.jackson.core</groupId>
               <artifactId>jackson-core</artifactId>
-            </exclusion>
-            <exclusion>
-              <groupId>org.apache.httpcomponents</groupId>
-              <artifactId>httpclient</artifactId>
-            </exclusion>
-            <exclusion>
-              <groupId>org.apache.httpcomponents</groupId>
-              <artifactId>httpcore</artifactId>
             </exclusion>
           </exclusions>
         </dependency>

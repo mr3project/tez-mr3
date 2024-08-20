@@ -123,6 +123,11 @@ public interface MRJobConfig {
   public static final String CACHE_ARCHIVES_VISIBILITIES = "mapreduce.job.cache.archives.visibilities";
 
   /**
+   * Used by committers to set a job-wide UUID.
+   */
+  public static final String JOB_COMMITTER_UUID = "job.committer.uuid";
+
+  /**
    * @deprecated Symlinks are always on and cannot be disabled.
    */
   @Deprecated
