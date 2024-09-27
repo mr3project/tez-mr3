@@ -71,8 +71,6 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
   protected Configuration conf;
   private RawLocalFileSystem localFs;
   protected MemoryUpdateCallbackHandler memoryUpdateCallbackHandler;
-  private long startTime;
-  private long endTime;
   private final AtomicBoolean isStarted = new AtomicBoolean(false);
   private final Deflater deflater;
 
@@ -91,7 +89,6 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
 
   @Override
   public synchronized List<Event> initialize() throws IOException {
-    this.startTime = System.nanoTime();
     this.conf = TezUtils.createConfFromUserPayload(getContext().getUserPayload());
     this.localFs = (RawLocalFileSystem) FileSystem.getLocal(conf).getRaw();
 
@@ -194,7 +191,6 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
     if (sorter != null) {
       sorter.flush();
       returnEvents.addAll(sorter.close());
-      this.endTime = System.nanoTime();
       returnEvents.addAll(generateEvents());
       sorter = null;
     } else {
