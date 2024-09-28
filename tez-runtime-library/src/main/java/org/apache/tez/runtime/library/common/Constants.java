@@ -50,16 +50,6 @@ public class Constants {
   public static final String TEZ_RUNTIME_TASK_INPUT_FILE_FORMAT_STRING =
       "%s/task_%d.out"; 
 
-  public static final String TEZ_RUNTIME_JOB_CREDENTIALS =
-      "tez.runtime.job.credentials";
-
-  /**
-   * Parameter used to specify the memory available to runtime components, for writing unit tests.
-   */
-  @Private
-  public static final String TEZ_RUNTIME_TASK_MEMORY =
-      "tez.runtime.task.memory";
-  
   public static final String TEZ_RUNTIME_TASK_OUTPUT_DIR = "output";
   
   public static final String TEZ_RUNTIME_TASK_OUTPUT_MANAGER = 
