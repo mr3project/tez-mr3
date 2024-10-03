@@ -349,6 +349,9 @@ public abstract class TezSplitGrouper {
         long groupLength = 0;
         int groupNumSplits = 0;
         do {
+          // Invariant:
+          //   splitContainer != null
+          //   splitContainerSize == -1L || splitContainerSize = estimator.getEstimatedSize(splitContainer)
           group.add(splitContainer);
           if (splitContainerSize == -1L) {  // not computed yet for splitContainer
             splitContainerSize = estimator.getEstimatedSize(splitContainer);
@@ -363,10 +366,8 @@ public abstract class TezSplitGrouper {
             splitContainerSize = -1L;   // do not compute yet for splitContainer
           }
         } while(splitContainer != null
-            && (!groupByLength ||
-            (groupLength + splitContainerSize <= lengthPerGroup))
-            && (!groupByCount ||
-            (groupNumSplits + 1 <= numSplitsInGroup)));
+            && (!groupByLength || (groupLength + splitContainerSize <= lengthPerGroup))
+            && (!groupByCount || (groupNumSplits + 1 <= numSplitsInGroup)));
 
         if (holder.isEmpty()
             && !allowSmallGroups
