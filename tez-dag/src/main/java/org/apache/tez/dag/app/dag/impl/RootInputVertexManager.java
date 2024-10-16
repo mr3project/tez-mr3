@@ -443,8 +443,10 @@ public class RootInputVertexManager extends VertexManagerPlugin {
   int getNumOfTasksToSchedule(float minSourceVertexCompletedTaskFraction) {
     int numPendingTasks = pendingTasks.size();
     if (numSourceTasksCompleted == totalNumSourceTasks) {
-      LOG.info("All source tasks completed. Ramping up {} remaining tasks" +
-          " for vertex: {}", numPendingTasks, getContext().getVertexName());
+      if (numPendingTasks > 0) {
+        LOG.info("All source tasks completed. Ramping up {} remaining tasks" +
+            " for vertex: {}", numPendingTasks, getContext().getVertexName());
+      }
       return numPendingTasks;
     }
 
