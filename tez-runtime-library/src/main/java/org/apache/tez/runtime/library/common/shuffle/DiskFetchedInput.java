@@ -45,7 +45,7 @@ public class DiskFetchedInput extends FetchedInput {
   public DiskFetchedInput(long compressedSize,
       InputAttemptIdentifier inputAttemptIdentifier,
       FetchedInputCallback callbackHandler, Configuration conf,
-      LocalDirAllocator localDirAllocator, TezTaskOutputFiles filenameAllocator)  // TODO: localDirAllocator never used
+      TezTaskOutputFiles filenameAllocator)
       throws IOException {
     super(inputAttemptIdentifier, callbackHandler);
 

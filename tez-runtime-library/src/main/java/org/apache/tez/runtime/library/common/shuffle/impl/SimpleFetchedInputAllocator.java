@@ -24,8 +24,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.LocalDirAllocator;
-import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
@@ -51,7 +49,6 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
   private final Configuration conf;
 
   private final TezTaskOutputFiles fileNameAllocator;
-  private final LocalDirAllocator localDirAllocator;
 
   // Configuration parameters
   private final long memoryLimit;
@@ -79,8 +76,7 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
     
     this.fileNameAllocator = new TezTaskOutputFiles(conf,
         uniqueIdentifier, dagID, containerId, vertexId);
-    this.localDirAllocator = new LocalDirAllocator(TezRuntimeFrameworkConfigs.LOCAL_DIRS);
-    
+
     // Setup configuration
     final float maxInMemCopyUse = conf.getFloat(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT,
@@ -140,14 +136,14 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
       InputAttemptIdentifier inputAttemptIdentifier) throws IOException {
     if (actualSize > maxSingleShuffleLimit) {
       return new DiskFetchedInput(compressedSize,
-          inputAttemptIdentifier, this, conf, localDirAllocator,
+          inputAttemptIdentifier, this, conf,
           fileNameAllocator);
     }
     if (this.usedMemory + actualSize > this.memoryLimit) {
       // This Task has used up all its memory (memoryLimit).
       if (!useFreeMemoryFetchedInput) {
         return new DiskFetchedInput(compressedSize,
-            inputAttemptIdentifier, this, conf, localDirAllocator,
+            inputAttemptIdentifier, this, conf,
             fileNameAllocator);
       }
       // Check if we can find free memory in the current ContainerWorker.
@@ -155,7 +151,7 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
       if (currentFreeMemory < maxAvailableTaskMemory){
         // this ContainerWorker is busy serving Tasks, so do not borrow
         return new DiskFetchedInput(compressedSize,
-            inputAttemptIdentifier, this, conf, localDirAllocator,
+            inputAttemptIdentifier, this, conf,
             fileNameAllocator);
       }
       LOG.info("Creating MemoryFetchedInput {} with free memory: {}", this.usedMemory, currentFreeMemory);
@@ -176,7 +172,7 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
     switch (type) {
     case DISK:
       return new DiskFetchedInput(compressedSize,
-          inputAttemptIdentifier, this, conf, localDirAllocator,
+          inputAttemptIdentifier, this, conf,
           fileNameAllocator);
     default:
       return allocate(actualSize, compressedSize, inputAttemptIdentifier);
