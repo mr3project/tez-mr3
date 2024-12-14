@@ -25,11 +25,11 @@ import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 public interface FetcherCallback {
 
   void fetchSucceeded(
-      long shuffleClientId, String host, InputAttemptIdentifier srcAttemptIdentifier,
+      Long shuffleClientId, String host, InputAttemptIdentifier srcAttemptIdentifier,
       ShuffleInput fetchedInput,
       long fetchedBytes, long decompressedLength, long copyDuration) throws IOException;
 
   void fetchFailed(
-      long shuffleClientId, InputAttemptIdentifier srcAttemptIdentifier,
+      Long shuffleClientId, InputAttemptIdentifier srcAttemptIdentifier,
       boolean readFailed, boolean connectFailed);
 }

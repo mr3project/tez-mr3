@@ -382,7 +382,7 @@ public class ShuffleServer implements FetcherCallback {
       return null;
     }
 
-    long shuffleClientId = pendingInputs.getShuffleClientId();
+    Long shuffleClientId = pendingInputs.getShuffleClientId();
     ShuffleClient<?> shuffleClient = shuffleClients.get(shuffleClientId);
     if (shuffleClient == null) {
       // this can happen if ShuffleServer.unregister() is called after obtaining pendingInputs
@@ -412,8 +412,8 @@ public class ShuffleServer implements FetcherCallback {
     }
   }
 
-  public long register(ShuffleClient<?> shuffleClient) {
-    long shuffleClientId = shuffleClientCount.getAndIncrement();
+  public Long register(ShuffleClient<?> shuffleClient) {
+    Long shuffleClientId = Long.valueOf(shuffleClientCount.getAndIncrement());
     synchronized (registerLock) {
       shuffleClients.put(shuffleClientId, shuffleClient);
     }
@@ -421,7 +421,7 @@ public class ShuffleServer implements FetcherCallback {
     return shuffleClientId;
   }
 
-  public void unregister(long shuffleClientId) {
+  public void unregister(Long shuffleClientId) {
     // clear InputHost with shuffleClientId
     for (InputHost inputHost: knownSrcHosts.values()) {
       inputHost.clearShuffleClientId(shuffleClientId);
@@ -473,7 +473,7 @@ public class ShuffleServer implements FetcherCallback {
     }
   }
 
-  public void fetchSucceeded(long shuffleClientId, String host,
+  public void fetchSucceeded(Long shuffleClientId, String host,
                              InputAttemptIdentifier srcAttemptIdentifier,
                              ShuffleInput fetchedInput,
                              long fetchedBytes, long decompressedLength, long copyDuration)
@@ -495,7 +495,7 @@ public class ShuffleServer implements FetcherCallback {
     }
   }
 
-  public void fetchFailed(long shuffleClientId,
+  public void fetchFailed(Long shuffleClientId,
                           InputAttemptIdentifier srcAttemptIdentifier,
                           boolean readFailed, boolean connectFailed) {
     ShuffleClient<?> shuffleClient = shuffleClients.get(shuffleClientId);
@@ -559,7 +559,7 @@ public class ShuffleServer implements FetcherCallback {
         conf, inputHost, pendingInputsSeq, fetcherConfig, taskContext, shuffleScheduler);
   }
 
-  public void informAM(long shuffleSchedulerId, InputAttemptIdentifier srcAttempt) {
+  public void informAM(Long shuffleSchedulerId, InputAttemptIdentifier srcAttempt) {
     ShuffleScheduler shuffleScheduler = (ShuffleScheduler)shuffleClients.get(shuffleSchedulerId);
     if (shuffleScheduler == null) {
       LOG.warn("ShuffleScheduler {} already unregistered, ignoring informAM(): {}",
@@ -569,7 +569,7 @@ public class ShuffleServer implements FetcherCallback {
     }
   }
 
-  public void waitForMergeManager(long shuffleSchedulerId) throws InterruptedException {
+  public void waitForMergeManager(Long shuffleSchedulerId) throws InterruptedException {
     ShuffleScheduler shuffleScheduler = (ShuffleScheduler)shuffleClients.get(shuffleSchedulerId);
     if (shuffleScheduler == null) {
       throw new TezUncheckedException("Unregistered ShuffleScheduler: " + shuffleSchedulerId);
@@ -577,6 +577,7 @@ public class ShuffleServer implements FetcherCallback {
       shuffleScheduler.waitForMergeManager();
     }
   }
+
   private class FetchFutureCallback implements FutureCallback<FetchResult> {
 
     private final Fetcher fetcher;
@@ -619,7 +620,7 @@ public class ShuffleServer implements FetcherCallback {
                     range.getPartition(), range.getPartitionCount(), input.getKey(), pendingHosts);
               }
             } else {
-              long shuffleClientId = result.getShuffleClientId();
+              Long shuffleClientId = result.getShuffleClientId();
               LOG.warn("Reporting fetch failure for all pending inputs because {} for ShuffleClient {} is gone",
                   identifier, shuffleClientId);
               for (Map.Entry<InputAttemptIdentifier, InputHost.PartitionRange > input : pendingInputs.entrySet()) {

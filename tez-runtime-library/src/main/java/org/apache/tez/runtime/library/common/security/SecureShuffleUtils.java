@@ -32,7 +32,7 @@ import org.apache.tez.common.security.JobTokenSecretManager;
 
 /**
  * 
- * utilities for generating kyes, hashes and verifying them for shuffle
+ * utilities for generating keys, hashes and verifying them for shuffle
  *
  */
 @InterfaceAudience.Private

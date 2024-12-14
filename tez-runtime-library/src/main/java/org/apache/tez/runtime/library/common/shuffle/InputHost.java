@@ -93,8 +93,7 @@ public class InputHost extends HostPort {
   //   1. partitionToInputs[shuffleClientId] is never empty
   //   2. partitionToInputs[shuffleClientId][partitionRange] is never empty
   // no need to use concurrent Map/Queue because we guard all access with synchronized{}
-  private final Map<Long, Map<PartitionRange, List<InputAttemptIdentifier>>>
-      partitionToInputs = new HashMap<>();
+  private final Map<Long, Map<PartitionRange, List<InputAttemptIdentifier>>> partitionToInputs = new HashMap<>();
 
   private boolean hasPendingInput;
 
@@ -126,7 +125,7 @@ public class InputHost extends HostPort {
       ShuffleClient<?> shuffleClient,
       int partitionId, int partitionCount, InputAttemptIdentifier srcAttempt,
       BlockingQueue<InputHost> pendingHosts) {
-    long shuffleManagerId = shuffleClient.getShuffleClientId();
+    Long shuffleManagerId = shuffleClient.getShuffleClientId();
     Map<PartitionRange, List<InputAttemptIdentifier>> partitionMap = partitionToInputs.get(shuffleManagerId);
     if (partitionMap == null) {
       partitionMap = new HashMap<PartitionRange, List<InputAttemptIdentifier>>();
@@ -176,7 +175,7 @@ public class InputHost extends HostPort {
     if (shuffleClient == null) {
       return null;
     }
-    long shuffleClientId = shuffleClient.getShuffleClientId();
+    Long shuffleClientId = shuffleClient.getShuffleClientId();
 
     Map<PartitionRange, List<InputAttemptIdentifier>> partitionMap = partitionToInputs.get(shuffleClientId);
     assert !partitionMap.isEmpty();   // invariant on partitionToInputs[]
@@ -214,7 +213,7 @@ public class InputHost extends HostPort {
       partitionToInputs.entrySet().iterator();
     while (iterator.hasNext()) {
       Map.Entry<Long, Map<PartitionRange, List<InputAttemptIdentifier>>> entry = iterator.next();
-      long shuffleClientId = entry.getKey();
+      Long shuffleClientId = entry.getKey();
       Map<PartitionRange, List<InputAttemptIdentifier>> partitionMap = entry.getValue();
       assert !partitionMap.isEmpty();   // invariant on partitionToInputs[]
 
@@ -242,7 +241,7 @@ public class InputHost extends HostPort {
       partitionToInputs.entrySet().iterator();
     while (iterator.hasNext()) {
       Map.Entry<Long, Map<PartitionRange, List<InputAttemptIdentifier>>> entry = iterator.next();
-      long shuffleClientId = entry.getKey();
+      Long shuffleClientId = entry.getKey();
       Map<PartitionRange, List<InputAttemptIdentifier>> partitionMap = entry.getValue();
       assert !partitionMap.isEmpty();   // invariant on partitionToInputs[]
 
@@ -284,7 +283,7 @@ public class InputHost extends HostPort {
     return maxEntry;
   }
 
-  public synchronized void clearShuffleClientId(long shuffleManagerId) {
+  public synchronized void clearShuffleClientId(Long shuffleManagerId) {
     partitionToInputs.remove(shuffleManagerId);
   }
 
@@ -310,17 +309,17 @@ public class InputHost extends HostPort {
   }
 
   public static class PartitionToInputs {
-    private final long shuffleClientId;
+    private final Long shuffleClientId;
     private final PartitionRange partitionRange;
     private List<InputAttemptIdentifier> inputs;  // can be removed from after initializing
 
-    public PartitionToInputs(long shuffleClientId, PartitionRange partitionRange, List<InputAttemptIdentifier> inputs) {
+    public PartitionToInputs(Long shuffleClientId, PartitionRange partitionRange, List<InputAttemptIdentifier> inputs) {
       this.shuffleClientId = shuffleClientId;
       this.partitionRange = partitionRange;
       this.inputs = inputs;
     }
 
-    public long getShuffleClientId() {
+    public Long getShuffleClientId() {
       return shuffleClientId;
     }
 

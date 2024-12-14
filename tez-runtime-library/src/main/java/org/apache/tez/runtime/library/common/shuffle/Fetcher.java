@@ -47,7 +47,7 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
 
   abstract public void assignShuffleClient(ShuffleClient<T> shuffleClient);
   abstract public ShuffleClient<T> getShuffleClient();
-  abstract public boolean useSingleShuffleClientId(long shuffleClientId);
+  abstract public boolean useSingleShuffleClientId(Long shuffleClientId);
   abstract public String getFetcherIdentifier();
   abstract public void shutdown();
   abstract public FetchResult call() throws Exception;

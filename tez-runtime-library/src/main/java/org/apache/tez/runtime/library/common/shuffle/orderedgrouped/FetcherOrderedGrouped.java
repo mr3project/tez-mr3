@@ -107,7 +107,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
 
   // set in assignShuffleClient()
   private ShuffleScheduler shuffleScheduler;
-  private long shuffleSchedulerId;
+  private Long shuffleSchedulerId;
   private int dagId;
   private FetchedInputAllocatorOrderedGrouped allocator;
   private ExceptionReporter exceptionReporter;
@@ -158,8 +158,8 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     return shuffleScheduler;
   }
 
-  public boolean useSingleShuffleClientId(long shuffleSchedulerId) {
-    return shuffleSchedulerId == this.shuffleSchedulerId;
+  public boolean useSingleShuffleClientId(Long targetShuffleSchedulerId) {
+    return shuffleSchedulerId.equals(targetShuffleSchedulerId);
   }
 
   public String getFetcherIdentifier() {

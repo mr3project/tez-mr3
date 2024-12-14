@@ -95,7 +95,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
   // set in assignShuffleClient()
   // never updated after assignShuffleClient(), so effectively immutable
   private ShuffleManager shuffleManager;
-  private long shuffleManagerId;
+  private Long shuffleManagerId;
 
   private BaseHttpConnection httpConnection;
   private volatile DataInputStream input;
@@ -134,8 +134,8 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     return shuffleManager;
   }
 
-  public boolean useSingleShuffleClientId(long targetShuffleManagerId) {
-    return shuffleManagerId == targetShuffleManagerId;
+  public boolean useSingleShuffleClientId(Long targetShuffleManagerId) {
+    return shuffleManagerId.equals(targetShuffleManagerId);
   }
 
   public String getFetcherIdentifier() {

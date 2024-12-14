@@ -95,7 +95,9 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
   private final String logIdentifier;
 
   protected final ShuffleServer shuffleServer;
-  protected final long shuffleClientId;
+  // use Long instead of long because we need Long when accessing ShuffleServer.shuffleClients[]
+  // In particular, the conversion from long to Long can be expensive in ShuffleServer.fetchSucceeded().
+  protected final Long shuffleClientId;
 
   // thread-safe for reading and updating
   // InputAttemptIdentifier is immutable
@@ -218,7 +220,7 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
     return false;
   }
 
-  public long getShuffleClientId() {
+  public Long getShuffleClientId() {
     return shuffleClientId;
   }
 
