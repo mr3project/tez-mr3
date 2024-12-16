@@ -122,11 +122,9 @@ public class MRReaderMapReduce extends MRReader {
     }
     if (hasNext) {
       inputRecordCounter.increment(1);
-      notifyProgress();
     } else {
       hasCompletedProcessing();
       completedProcessing = true;
-      notifyDone();
     }
     return hasNext;
   }

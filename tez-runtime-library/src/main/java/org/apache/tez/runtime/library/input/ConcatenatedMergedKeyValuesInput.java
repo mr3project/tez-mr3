@@ -57,7 +57,6 @@ public class ConcatenatedMergedKeyValuesInput extends MergedLogicalInput {
         if (currentReaderIndex == getInputs().size()) {
           hasCompletedProcessing();
           completedProcessing = true;
-          getContext().notifyProgress();
           return false;
         }
         try {
@@ -68,7 +67,6 @@ public class ConcatenatedMergedKeyValuesInput extends MergedLogicalInput {
           }
           currentReader = (KeyValuesReader) reader;
           currentReaderIndex++;
-          getContext().notifyProgress();
         } catch (Exception e) {
           // An InterruptedException is not expected here since this works off of
           // underlying readers which take care of throwing IOInterruptedExceptions

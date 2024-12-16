@@ -126,16 +126,6 @@ public interface TaskContext extends DecompressorPool {
   public ObjectRegistry getObjectRegistry();
   
   /**
-   * Notifies the framework that progress is being made by this component. 
-   * This is used to identify hung components that are not making progress.
-   * Must be called periodically until processing has completed for this component.
-   * Care must be taken to call this when real progress has been made. Simply 
-   * calling this continuously from a thread without regard to real work may prevent 
-   * identification of hung components and delay/stall job completion.
-   */
-  public void notifyProgress();
-
-  /**
    * Report an error to the framework. This will cause the taskAttempt to fail, and should not be used
    * to report errors which can be handled locally in the TaskAttempt. A new TaskAttempt will be launched
    * depending upon how many retries are available for the task.

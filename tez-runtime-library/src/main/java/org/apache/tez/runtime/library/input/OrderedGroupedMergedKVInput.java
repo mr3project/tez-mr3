@@ -126,7 +126,6 @@ public class OrderedGroupedMergedKVInput extends MergedLogicalInput {
       finishedReaders.clear();
 
       nextKVReader = pQueue.poll();
-      context.notifyProgress();
       if (nextKVReader != null) {
         currentKey = nextKVReader.getCurrentKey();
         currentValues.moveToNext();

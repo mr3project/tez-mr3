@@ -116,11 +116,9 @@ public class MRReaderMapred extends MRReader {
     boolean hasNext = recordReader.next(key, value);
     if (hasNext) {
       inputRecordCounter.increment(1);
-      notifyProgress();
     } else {
       hasCompletedProcessing();
       completedProcessing = true;
-      notifyDone();
     }
     // The underlying reader does not throw InterruptedExceptions. Cannot convert to an
     // IOInterruptedException without checking the interrupt flag on each request, which is also
