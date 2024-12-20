@@ -64,6 +64,8 @@ public class WeightedScalingMemoryDistributor implements InitialMemoryAllocator 
 
   static final double MAX_ADDITIONAL_RESERVATION_FRACTION_PER_IO = 0.1d;
   static final double RESERVATION_FRACTION_PER_IO = 0.015d;
+
+  // TODO: update populateTypeScaleMap() as well
   static final String[] DEFAULT_TASK_MEMORY_WEIGHTED_RATIOS =
       generateWeightStrings(1, 1, 1, 12, 12, 1, 1);
 
@@ -256,6 +258,18 @@ public class WeightedScalingMemoryDistributor implements InitialMemoryAllocator 
   }
 
   private void populateTypeScaleMap() {
+    if (conf.get(TezConfiguration.TEZ_TASK_SCALE_MEMORY_WEIGHTED_RATIOS) == null) {
+      // set according to DEFAULT_TASK_MEMORY_WEIGHTED_RATIOS
+      typeScaleMap.put(RequestType.PARTITIONED_UNSORTED_OUTPUT, 1);
+      typeScaleMap.put(RequestType.UNSORTED_OUTPUT, 1);
+      typeScaleMap.put(RequestType.UNSORTED_INPUT, 1);
+      typeScaleMap.put(RequestType.SORTED_OUTPUT, 12);
+      typeScaleMap.put(RequestType.SORTED_MERGED_INPUT, 1);
+      typeScaleMap.put(RequestType.PROCESSOR, 1);
+      typeScaleMap.put(RequestType.OTHER, 1);
+      return;
+    }
+
     String[] ratios = conf.getStrings(TezConfiguration.TEZ_TASK_SCALE_MEMORY_WEIGHTED_RATIOS,
         DEFAULT_TASK_MEMORY_WEIGHTED_RATIOS);
     int numExpectedValues = RequestType.values().length;
