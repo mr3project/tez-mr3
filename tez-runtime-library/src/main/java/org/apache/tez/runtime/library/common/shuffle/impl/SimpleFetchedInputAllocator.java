@@ -134,11 +134,15 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
             fileNameAllocator);
       }
       this.usedMemory += actualSize;
-      LOG.info("Creating MemoryFetchedInput in free memory: {}, {}, {}", this.usedMemory, actualSize, currentFreeMemory);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Creating MemoryFetchedInput in free memory: {}, {}, {}", this.usedMemory, actualSize, currentFreeMemory);
+      }
       return new MemoryFetchedInput(actualSize, inputAttemptIdentifier, this);
     } else {
       this.usedMemory += actualSize;
-      LOG.info("Creating MemoryFetchedInput: {}, {}", this.usedMemory, actualSize);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Creating MemoryFetchedInput: {}, {}", this.usedMemory, actualSize);
+      }
       return new MemoryFetchedInput(actualSize, inputAttemptIdentifier, this);
     }
   }
