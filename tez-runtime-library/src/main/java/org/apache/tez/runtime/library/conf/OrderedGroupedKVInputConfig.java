@@ -332,14 +332,15 @@ public class OrderedGroupedKVInputConfig {
 
     @Override
     public Builder setShuffleBufferFraction(float shuffleBufferFraction) {
-      this.conf
-          .setFloat(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT, shuffleBufferFraction);
+      this.conf.setFloat(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT,
+          shuffleBufferFraction);
       return this;
     }
 
     @Override
     public Builder setPostMergeBufferFraction(float postMergeBufferFraction) {
-      this.conf.setFloat(TezRuntimeConfiguration.TEZ_RUNTIME_INPUT_POST_MERGE_BUFFER_PERCENT, postMergeBufferFraction);
+      this.conf.setFloat(TezRuntimeConfiguration.TEZ_RUNTIME_INPUT_POST_MERGE_BUFFER_PERCENT,
+          postMergeBufferFraction);
       return this;
     }
 

@@ -30,11 +30,9 @@ import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.task.local.output.TezTaskOutputFiles;
 import org.apache.tez.runtime.library.common.shuffle.DiskFetchedInput;
 import org.apache.tez.runtime.library.common.shuffle.FetchedInput;
-import org.apache.tez.runtime.library.common.shuffle.FetchedInput.Type;
 import org.apache.tez.runtime.library.common.shuffle.FetchedInputAllocator;
 import org.apache.tez.runtime.library.common.shuffle.FetchedInputCallback;
 import org.apache.tez.runtime.library.common.shuffle.MemoryFetchedInput;
-
 
 /**
  * Usage: Create instance, setInitialMemoryAvailable(long), configureAndStart()
@@ -51,11 +49,9 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
   private final TezTaskOutputFiles fileNameAllocator;
 
   // Configuration parameters
-  private final long memoryLimit;
-  private final long maxSingleShuffleLimit;
-
   private final long maxAvailableTaskMemory;
-  private final long initialMemoryAvailable;
+  private final long memoryLimit;
+  private final long maxSingleMemoryShuffle;
 
   private final String srcNameTrimmed;
   
@@ -67,54 +63,33 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
                                      String uniqueIdentifier, int dagID,
                                      Configuration conf,
                                      long maxTaskAvailableMemory,
-                                     long memoryAvailable,
+                                     long memoryAssigned,
                                      String containerId, int vertexId) {
     this.srcNameTrimmed = srcNameTrimmed;
     this.conf = conf;    
+    this.fileNameAllocator = new TezTaskOutputFiles(conf, uniqueIdentifier, dagID, containerId, vertexId);
+
     this.maxAvailableTaskMemory = maxTaskAvailableMemory;
-    this.initialMemoryAvailable = memoryAvailable;
-    
-    this.fileNameAllocator = new TezTaskOutputFiles(conf,
-        uniqueIdentifier, dagID, containerId, vertexId);
+    this.memoryLimit = memoryAssigned;
 
-    // Setup configuration
-    final float maxInMemCopyUse = conf.getFloat(
-        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT,
-        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT_DEFAULT);
-    if (maxInMemCopyUse > 1.0 || maxInMemCopyUse < 0.0) {
-      throw new IllegalArgumentException("Invalid value for "
-          + TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT + ": "
-          + maxInMemCopyUse);
-    }
-    
-    long memReq = (long)(Math.min(maxAvailableTaskMemory, Integer.MAX_VALUE) * maxInMemCopyUse);
-    
-    if (memReq <= this.initialMemoryAvailable) {
-      this.memoryLimit = memReq;
-    } else {
-      this.memoryLimit = initialMemoryAvailable;
-    }
-
-    final float singleShuffleMemoryLimitPercent = conf.getFloat(
+    final float maxSingleShuffleMemoryPercent = conf.getFloat(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MEMORY_LIMIT_PERCENT,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MEMORY_LIMIT_PERCENT_DEFAULT);
-    if (singleShuffleMemoryLimitPercent <= 0.0f
-        || singleShuffleMemoryLimitPercent > 1.0f) {
+    if (maxSingleShuffleMemoryPercent <= 0.0f) {
       throw new IllegalArgumentException("Invalid value for "
           + TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MEMORY_LIMIT_PERCENT + ": "
-          + singleShuffleMemoryLimitPercent);
+          + maxSingleShuffleMemoryPercent);
     }
-
-    //TODO: cap it to MAX_VALUE until MemoryFetchedInput can handle > 2 GB
-    this.maxSingleShuffleLimit = (long) Math.min((memoryLimit * singleShuffleMemoryLimitPercent),
+    // TODO: currently we must cap to MAX_VALUE because MemoryFetchedInput cannot handle > 2 GB
+    this.maxSingleMemoryShuffle = (long) Math.min((memoryLimit * maxSingleShuffleMemoryPercent),
         Integer.MAX_VALUE);
 
     this.useFreeMemoryFetchedInput = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT,
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT_DEFAULT);
 
-    LOG.info("{}: RequestedMemory={}, AssignedMemory={}, maxSingleShuffleLimit={}",
-        srcNameTrimmed, memReq, this.memoryLimit, this.maxSingleShuffleLimit);
+    LOG.info("{}: memoryLimit={}, maxSingleMemoryShuffle={}",
+        srcNameTrimmed, this.memoryLimit, this.maxSingleMemoryShuffle);
   }
 
   @Private
@@ -134,7 +109,8 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
   @Override
   public synchronized FetchedInput allocate(long actualSize, long compressedSize,
       InputAttemptIdentifier inputAttemptIdentifier) throws IOException {
-    if (actualSize > maxSingleShuffleLimit) {
+    if (actualSize > maxSingleMemoryShuffle) {
+      LOG.info("Creating DiskFetchedInput: {} > maxSingleMemoryShuffle", actualSize);
       return new DiskFetchedInput(compressedSize,
           inputAttemptIdentifier, this, conf,
           fileNameAllocator);
@@ -142,6 +118,7 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
     if (this.usedMemory + actualSize > this.memoryLimit) {
       // This Task has used up all its memory (memoryLimit).
       if (!useFreeMemoryFetchedInput) {
+        LOG.info("Creating DiskFetchedInput: {} + {} > memoryLimit", this.usedMemory, actualSize);
         return new DiskFetchedInput(compressedSize,
             inputAttemptIdentifier, this, conf,
             fileNameAllocator);
@@ -150,32 +127,19 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
       long currentFreeMemory = Runtime.getRuntime().freeMemory();
       if (currentFreeMemory < maxAvailableTaskMemory){
         // this ContainerWorker is busy serving Tasks, so do not borrow
+        // TODO: introduce a factor for maxAvailableTaskMemory (e.g. 0.5)
+        LOG.info("Creating DiskFetchedInput: {}, {} < maxAvailableTaskMemory", actualSize, currentFreeMemory);
         return new DiskFetchedInput(compressedSize,
             inputAttemptIdentifier, this, conf,
             fileNameAllocator);
       }
-      LOG.info("Creating MemoryFetchedInput {} with free memory: {}", this.usedMemory, currentFreeMemory);
-    }
-    this.usedMemory += actualSize;
-    if (LOG.isDebugEnabled()) {
-      LOG.debug(srcNameTrimmed + ": " + "Used memory after allocating " + actualSize + " : " +
-          usedMemory);
-    }
-    return new MemoryFetchedInput(actualSize, inputAttemptIdentifier, this);
-  }
-
-  @Override
-  public synchronized FetchedInput allocateType(Type type, long actualSize,
-      long compressedSize, InputAttemptIdentifier inputAttemptIdentifier)
-      throws IOException {
-
-    switch (type) {
-    case DISK:
-      return new DiskFetchedInput(compressedSize,
-          inputAttemptIdentifier, this, conf,
-          fileNameAllocator);
-    default:
-      return allocate(actualSize, compressedSize, inputAttemptIdentifier);
+      this.usedMemory += actualSize;
+      LOG.info("Creating MemoryFetchedInput in free memory: {}, {}, {}", this.usedMemory, actualSize, currentFreeMemory);
+      return new MemoryFetchedInput(actualSize, inputAttemptIdentifier, this);
+    } else {
+      this.usedMemory += actualSize;
+      LOG.info("Creating MemoryFetchedInput: {}, {}", this.usedMemory, actualSize);
+      return new MemoryFetchedInput(actualSize, inputAttemptIdentifier, this);
     }
   }
 

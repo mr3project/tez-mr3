@@ -241,8 +241,8 @@ public class UnorderedKVInputConfig {
 
     @Override
     public Builder setShuffleBufferFraction(float shuffleBufferFraction) {
-      this.conf
-          .setFloat(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT, shuffleBufferFraction);
+      this.conf.setFloat(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT,
+          shuffleBufferFraction);
       return this;
     }
 

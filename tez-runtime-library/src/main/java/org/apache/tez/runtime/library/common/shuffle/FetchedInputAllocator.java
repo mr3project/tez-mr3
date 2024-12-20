@@ -28,7 +28,4 @@ public interface FetchedInputAllocator {
   FetchedInput allocate(long actualSize, long compresedSize,
       InputAttemptIdentifier inputAttemptIdentifier) throws IOException;
   
- FetchedInput allocateType(Type type, long actualSize, long compresedSize,
-      InputAttemptIdentifier inputAttemptIdentifier) throws IOException;
-
 }
