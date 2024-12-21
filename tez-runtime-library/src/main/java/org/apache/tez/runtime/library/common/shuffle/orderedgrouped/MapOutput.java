@@ -80,8 +80,7 @@ public abstract class MapOutput implements ShuffleInput {
   public static MapOutput createLocalDiskMapOutput(InputAttemptIdentifier attemptIdentifier,
                                                    FetchedInputAllocatorOrderedGrouped callback, Path path,  long offset,
                                                    long size, boolean primaryMapOutput)  {
-    return new DiskDirectMapOutput(attemptIdentifier, callback, size, path, offset,
-        primaryMapOutput);
+    return new DiskDirectMapOutput(attemptIdentifier, callback, size, path, offset, primaryMapOutput);
   }
 
   public static MapOutput createMemoryMapOutput(InputAttemptIdentifier attemptIdentifier,

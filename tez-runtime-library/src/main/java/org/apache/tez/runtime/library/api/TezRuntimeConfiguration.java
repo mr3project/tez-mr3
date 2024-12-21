@@ -306,8 +306,7 @@ public class TezRuntimeConfiguration {
   @ConfigurationProperty(type = "float")
   public static final String TEZ_RUNTIME_SHUFFLE_MEMORY_LIMIT_PERCENT = TEZ_RUNTIME_PREFIX +
       "shuffle.memory.limit.percent";
-  public static final float TEZ_RUNTIME_SHUFFLE_MEMORY_LIMIT_PERCENT_DEFAULT =
-      0.25f;
+  public static final float TEZ_RUNTIME_SHUFFLE_MEMORY_LIMIT_PERCENT_DEFAULT = 0.25f;
 
   // Rename to fraction
   @ConfigurationProperty(type = "float")

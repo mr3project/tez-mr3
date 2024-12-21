@@ -112,16 +112,14 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
     if (actualSize > maxSingleMemoryShuffle) {
       LOG.info("Creating DiskFetchedInput: {} > maxSingleMemoryShuffle", actualSize);
       return new DiskFetchedInput(compressedSize,
-          inputAttemptIdentifier, this, conf,
-          fileNameAllocator);
+          inputAttemptIdentifier, this, conf, fileNameAllocator);
     }
     if (this.usedMemory + actualSize > this.memoryLimit) {
       // This Task has used up all its memory (memoryLimit).
       if (!useFreeMemoryFetchedInput) {
         LOG.info("Creating DiskFetchedInput: {} + {} > memoryLimit", this.usedMemory, actualSize);
         return new DiskFetchedInput(compressedSize,
-            inputAttemptIdentifier, this, conf,
-            fileNameAllocator);
+            inputAttemptIdentifier, this, conf, fileNameAllocator);
       }
       // Check if we can find free memory in the current ContainerWorker.
       long currentFreeMemory = Runtime.getRuntime().freeMemory();
@@ -137,14 +135,13 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
       if (LOG.isDebugEnabled()) {
         LOG.debug("Creating MemoryFetchedInput in free memory: {}, {}, {}", this.usedMemory, actualSize, currentFreeMemory);
       }
-      return new MemoryFetchedInput(actualSize, inputAttemptIdentifier, this);
     } else {
       this.usedMemory += actualSize;
       if (LOG.isDebugEnabled()) {
         LOG.debug("Creating MemoryFetchedInput: {}, {}", this.usedMemory, actualSize);
       }
-      return new MemoryFetchedInput(actualSize, inputAttemptIdentifier, this);
     }
+    return new MemoryFetchedInput(actualSize, inputAttemptIdentifier, this);
   }
 
   @Override

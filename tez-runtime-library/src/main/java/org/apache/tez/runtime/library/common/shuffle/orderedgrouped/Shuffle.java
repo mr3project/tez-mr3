@@ -122,8 +122,6 @@ public class Shuffle implements ExceptionReporter {
     // TODO TEZ Get rid of Map / Reduce references.
     TezCounter spilledRecordsCounter =
         inputContext.getCounters().findCounter(TaskCounter.SPILLED_RECORDS);
-    TezCounter reduceCombineInputCounter =
-        inputContext.getCounters().findCounter(TaskCounter.COMBINE_INPUT_RECORDS);
     TezCounter mergedMapOutputsCounter =
         inputContext.getCounters().findCounter(TaskCounter.MERGED_MAP_OUTPUTS);
 
@@ -138,7 +136,6 @@ public class Shuffle implements ExceptionReporter {
         inputContext,
         combiner,
         spilledRecordsCounter,
-        reduceCombineInputCounter,
         mergedMapOutputsCounter,
         this,
         initialMemoryAvailable,
