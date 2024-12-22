@@ -173,6 +173,7 @@ public final class CodecUtils {
         int defaultBufferSize = getDefaultBufferSize(codec);
         int originalSize = conf.getInt(bufferSizeProp, defaultBufferSize);
         int newBufSize = Math.min(compressedLength, defaultBufferSize);
+        // for Zstd, newBufSize is always 0 because defaultBufferSize == 0
 
         if (LOG.isDebugEnabled()) {
           LOG.debug("buffer size was set according to min({}, {}) => {}={}",
