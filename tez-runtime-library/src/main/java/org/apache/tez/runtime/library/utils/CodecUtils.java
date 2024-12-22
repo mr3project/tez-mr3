@@ -170,14 +170,18 @@ public final class CodecUtils {
       Configuration conf = configurableCodec.getConf();
 
       synchronized (conf) {
-        int defaultBufferSize = getDefaultBufferSize(conf, codec);
+        int defaultBufferSize = getDefaultBufferSize(codec);
         int originalSize = conf.getInt(bufferSizeProp, defaultBufferSize);
-
         int newBufSize = Math.min(compressedLength, defaultBufferSize);
-        LOG.debug("buffer size was set according to min({}, {}) => {}={}", compressedLength,
-            defaultBufferSize, bufferSizeProp, newBufSize);
 
-        conf.setInt(bufferSizeProp, newBufSize);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("buffer size was set according to min({}, {}) => {}={}",
+              compressedLength, defaultBufferSize, bufferSizeProp, newBufSize);
+        }
+
+        if (originalSize != newBufSize) {
+          conf.setInt(bufferSizeProp, newBufSize);
+        }
 
         in = codec.createInputStream(checksumIn, decompressor);
         /*
@@ -204,7 +208,9 @@ public final class CodecUtils {
          * issues above for Compressor instances as well, even when we tried to leverage from
          * smaller buffer size only on decompression paths.
          */
-        conf.setInt(bufferSizeProp, originalSize);
+        if (originalSize != newBufSize) {
+          conf.setInt(bufferSizeProp, originalSize);
+        }
       }
     } else {
       in = codec.createInputStream(checksumIn, decompressor);
@@ -264,11 +270,11 @@ public final class CodecUtils {
     }
   }
 
-  public static int getDefaultBufferSize(Configuration conf, CompressionCodec codec) {
-    return getDefaultBufferSize(conf, codec.getClass().getName());
+  public static int getDefaultBufferSize(CompressionCodec codec) {
+    return getDefaultBufferSize(codec.getClass().getName());
   }
 
-  public static int getDefaultBufferSize(Configuration conf, String codecClassName) {
+  public static int getDefaultBufferSize(String codecClassName) {
     switch (codecClassName) {
     case "org.apache.hadoop.io.compress.DefaultCodec":
     case "org.apache.hadoop.io.compress.BZip2Codec":
