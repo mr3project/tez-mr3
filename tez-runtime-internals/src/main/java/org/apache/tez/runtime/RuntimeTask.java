@@ -32,7 +32,6 @@ import org.apache.tez.runtime.api.impl.TaskSpec;
 import org.apache.tez.runtime.api.impl.TaskStatistics;
 import org.apache.tez.runtime.api.impl.TezEvent;
 import org.apache.tez.runtime.api.impl.TezUmbilical;
-import org.apache.tez.runtime.metrics.TaskCounterUpdater;
 
 import com.google.common.collect.Maps;
 
@@ -50,7 +49,6 @@ public abstract class RuntimeTask {
   protected final AtomicInteger nextFromEventId;
   protected final AtomicInteger nextPreRoutedEventId;
   private final AtomicBoolean taskDone;
-  private final TaskCounterUpdater counterUpdater;
   private final TaskStatistics statistics;
   private final AtomicBoolean progressNotified = new AtomicBoolean(false);
 
@@ -66,11 +64,6 @@ public abstract class RuntimeTask {
     this.progress = 0.0f;
     this.taskDone = new AtomicBoolean(false);
     this.statistics = new TaskStatistics();
-    if (setupSysCounterUpdater) {
-      this.counterUpdater = new TaskCounterUpdater(tezCounters, tezConf, pid);
-    } else {
-      this.counterUpdater = null;
-    }
   }
 
   protected enum State {
@@ -168,9 +161,6 @@ public abstract class RuntimeTask {
   }
   
   public void setFrameworkCounters() {
-    if (counterUpdater != null) {
-      this.counterUpdater.updateCounters();
-    }
   }
 
   protected void setTaskDone() {

@@ -374,17 +374,6 @@ public class TezConfiguration extends Configuration {
   public static final String TEZ_TASK_SCALE_MEMORY_WEIGHTED_RATIOS =
       TEZ_TASK_PREFIX + "scale.memory.ratios";
 
-  @Private
-  @Unstable
-  /**
-   * Defines the ProcessTree implementation which will be used to collect resource utilization.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty
-  public static final String TEZ_TASK_RESOURCE_CALCULATOR_PROCESS_TREE_CLASS =
-      TEZ_TASK_PREFIX + "resource.calculator.process-tree.class";
-
-
   /**
    * Int value. The minimum number of containers that will be held in session mode. Not active in 
    * non-session mode. Enables an idle session (not running any DAG) to hold on to a minimum number
