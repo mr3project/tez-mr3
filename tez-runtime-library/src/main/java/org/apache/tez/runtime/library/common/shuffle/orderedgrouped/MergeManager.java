@@ -68,7 +68,6 @@ import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-
 /**
  * Usage. Create instance. setInitialMemoryAvailable(long), configureAndStart()
  *
@@ -135,8 +134,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   
   private final CompressionCodec codec;
   
-  private volatile boolean finalMergeComplete = false;
-  
   private final boolean ifileReadAhead;
   private final int ifileReadAheadLength;
   private final int ifileBufferSize;
@@ -144,11 +141,11 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   // Variables for stats
   private final SegmentStatsTracker statsInMemTotal = new SegmentStatsTracker();
 
-  private AtomicInteger mergeFileSequenceId = new AtomicInteger(0);
+  private final AtomicInteger mergeFileSequenceId = new AtomicInteger(0);
 
   private final boolean cleanup;
 
-  private SerializationContext serializationContext;
+  private final SerializationContext serializationContext;
 
   private final boolean useFreeMemoryFetchedInput;
 
@@ -394,8 +391,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       wait();
     }
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Waited for " + (System.currentTimeMillis() - startTime) + " for memory to become"
-          + " available");
+      LOG.debug("Waited for " + (System.currentTimeMillis() - startTime) + " for memory to become available");
     }
   }
 
@@ -466,7 +462,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   private synchronized MapOutput unconditionalReserve(
       InputAttemptIdentifier srcAttemptIdentifier,
       long requestedSize,
-      boolean primaryMapOutput) throws IOException {
+      boolean primaryMapOutput) {
     usedMemory += requestedSize;
     return MapOutput.createMemoryMapOutput(srcAttemptIdentifier, this, (int) requestedSize, primaryMapOutput);
   }
@@ -587,18 +583,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     }
   }
 
-  /**
-   * Should <b>only</b> be used after the Shuffle phaze is complete, otherwise can
-   * return an invalid state since a merge may not be in progress dur to
-   * inadequate inputs
-   * 
-   * @return true if the merge process is complete, otherwise false
-   */
-  @Private
-  public boolean isMergeComplete() {
-    return finalMergeComplete;
-  }
-
   public TezRawKeyValueIterator close(boolean tryFinalMerge) throws Throwable {
     if (!isShutdown.getAndSet(true)) {
       // Wait for on-going merges to complete
@@ -629,7 +613,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       if (tryFinalMerge) {
         try {
           TezRawKeyValueIterator kvIter = finalMerge(conf, rfs, memory, disk);
-          this.finalMergeComplete = true;
           return kvIter;
         } catch (InterruptedException e) {
           //Cleanup the disk segments
@@ -671,8 +654,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       LOG.info("Error in deleting " + path);
     }
   }
-
-
 
   void runCombineProcessor(TezRawKeyValueIterator kvIter, Writer writer)
       throws IOException, InterruptedException {
@@ -781,8 +762,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     }
 
     @Override
-    public void cleanup(List<MapOutput> inputs, boolean deleteData) throws IOException,
-        InterruptedException {
+    public void cleanup(List<MapOutput> inputs, boolean deleteData)
+        throws IOException, InterruptedException {
       //No OP
     }
   }
@@ -1118,8 +1099,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     // segments required to vacate memory
     List<Segment> memDiskSegments = new ArrayList<Segment>();
     long inMemToDiskBytes = 0;
-    boolean mergePhaseFinished = false;
-    if (inMemoryMapOutputs.size() > 0) {
+    if (!inMemoryMapOutputs.isEmpty()) {
       int srcTaskId = inMemoryMapOutputs.get(0).getAttemptIdentifier().getInputIdentifier();
       inMemToDiskBytes = createInMemorySegments(inMemoryMapOutputs, memDiskSegments, this.postMergeMemLimit);
       final int numMemDiskSegments = memDiskSegments.size();
@@ -1133,7 +1113,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         // the merge of all these disk segments would be directly fed to the
         // reduce method
         
-        mergePhaseFinished = true;
         // must spill to disk, but can't retain in-mem for intermediate merge
         // Can not use spill id in final merge as it would clobber with other files, hence using
         // Integer.MAX_VALUE
