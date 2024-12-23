@@ -173,44 +173,7 @@ public class WeightedScalingMemoryDistributor implements InitialMemoryAllocator 
       }
     }
 
-    if (!conf.getBoolean(TezConfiguration.TEZ_TASK_SCALE_MEMORY_INPUT_OUTPUT_CONCURRENT,
-        TezConfiguration.TEZ_TASK_SCALE_MEMORY_INPUT_OUTPUT_CONCURRENT_DEFAULT)) {
-      adjustAllocationsForNonConcurrent(allocations, requests,
-          numInputRequestsScaled, totalInputAllocated,
-          numOutputRequestsScaled, totalOutputAllocated);
-    }
-
     return allocations;
-  }
-
-  private void adjustAllocationsForNonConcurrent(List<Long> allocations,
-      List<Request> requests, int numInputsScaled, long totalInputAllocated,
-      int numOutputsScaled, long totalOutputAllocated) {
-    boolean inputsEnabled = conf.getBoolean(
-        TezConfiguration.TEZ_TASK_SCALE_MEMORY_NON_CONCURRENT_INPUTS_ENABLED,
-        TezConfiguration.TEZ_TASK_SCALE_MEMORY_NON_CONCURRENT_INPUTS_ENABLED_DEFAULT);
-    LOG.info("Adjusting scaled allocations for I/O non-concurrent."
-        + " numInputsScaled: {} InputAllocated: {} numOutputsScaled: {} outputAllocated: {} inputsEnabled: {}",
-        numInputsScaled, totalInputAllocated, numOutputsScaled, totalOutputAllocated, inputsEnabled);
-    for (int i = 0; i < requests.size(); i++) {
-      Request request = requests.get(i);
-      long additional = 0;
-      if (request.componentType == ComponentType.INPUT && inputsEnabled) {
-        double share = request.requestWeight / (double)numInputsScaled;
-        additional = (long) (totalOutputAllocated * share);
-      } else if (request.componentType == ComponentType.OUTPUT) {
-        double share = request.requestWeight / (double)numOutputsScaled;
-        additional = (long) (totalInputAllocated * share);
-      }
-      if (additional > 0) {
-        long newTotal = Math.min(allocations.get(i) + additional, request.requestSize);
-        // TODO Later - If requestedSize is used, the difference could be allocated to others.
-        allocations.set(i, newTotal);
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Adding {} to {} total={}", additional, request.componentClassname, newTotal);
-        }
-      }
-    }
   }
 
   private void initialProcessMemoryRequestContext(InitialMemoryRequestContext context) {
