@@ -321,7 +321,6 @@ public class IFile {
     // de-dup keys or not
     protected final boolean rle;
 
-
     public Writer(Serialization keySerialization, Serialization valSerialization, FileSystem fs, Path file,
                   Class keyClass, Class valueClass,
                   CompressionCodec codec,

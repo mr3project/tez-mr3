@@ -360,7 +360,7 @@ public class TezMerger {
     public DiskSegment(FileSystem fs, Path file,
                    CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLenth,
                    int bufferSize, boolean preserve, TezCounter mergedMapOutputsCounter, DecompressorPool inputContext)
-  throws IOException {
+    throws IOException {
       this(fs, file, 0, fs.getFileStatus(file).getLen(), codec,
           ifileReadAhead, ifileReadAheadLenth, bufferSize, preserve,
           mergedMapOutputsCounter, inputContext);

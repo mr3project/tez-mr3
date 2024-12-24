@@ -176,7 +176,8 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       codec = codecHolder.get();
       if (codec == null) {
         // clone codecConf because Decompressor uses locks on the Configuration object
-        CompressionCodec newCodec = CodecUtils.getCodec(new Configuration(fetcherConfig.codecConf));
+        Configuration codecConf = new Configuration(fetcherConfig.codecConf);
+        CompressionCodec newCodec = CodecUtils.getCodec(codecConf);
         codec = newCodec;
         codecHolder.set(newCodec);
       }

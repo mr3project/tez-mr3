@@ -19,12 +19,9 @@
 package org.apache.tez.mapreduce.hadoop;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.Map;
 import java.util.Vector;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.conf.Configuration;
@@ -33,11 +30,9 @@ import org.apache.hadoop.yarn.api.ApplicationConstants.Environment;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.tez.common.TezUtils;
 import org.apache.tez.common.TezYARNUtils;
-import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.mapreduce.combine.MRCombiner;
 import org.apache.tez.mapreduce.partition.MRPartitioner;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
-
 
 /**
  * This class contains helper methods for frameworks which migrate from MapReduce to Tez, and need
@@ -46,9 +41,6 @@ import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 @Public
 @Evolving
 public class MRHelpers {
-
-  private static final Logger LOG = LoggerFactory.getLogger(MRHelpers.class);
-
 
   /**
    * Translate MapReduce configuration keys to the equivalent Tez keys in the provided
@@ -119,13 +111,6 @@ public class MRHelpers {
         jobConf = new JobConf(baseConf);
         conf.set(MRJobConfig.MAP_OUTPUT_KEY_CLASS, jobConf
             .getMapOutputKeyClass().getName());
-
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Setting " + MRJobConfig.MAP_OUTPUT_KEY_CLASS
-              + " for stage: " + stage
-              + " based on job level configuration. Value: "
-              + conf.get(MRJobConfig.MAP_OUTPUT_KEY_CLASS));
-        }
       }
     }
 
@@ -137,12 +122,6 @@ public class MRHelpers {
         }
         conf.set(MRJobConfig.MAP_OUTPUT_VALUE_CLASS, jobConf
             .getMapOutputValueClass().getName());
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Setting " + MRJobConfig.MAP_OUTPUT_VALUE_CLASS
-              + " for stage: " + stage
-              + " based on job level configuration. Value: "
-              + conf.get(MRJobConfig.MAP_OUTPUT_VALUE_CLASS));
-        }
       }
     }
   }
@@ -161,12 +140,6 @@ public class MRHelpers {
         } else if (!preferTez) {
           conf.set(dep.getValue(), mrValue, "TRANSLATED_TO_TEZ_AND_MR_OVERRIDE");
         }
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Config: mr(unset):" + dep.getKey() + ", mr initial value="
-              + mrValue
-              + ", tez(original):" + dep.getValue() + "=" + tezValue
-              + ", tez(final):" + dep.getValue() + "=" + conf.get(dep.getValue()));
-        }
       }
     }
   }
@@ -182,13 +155,6 @@ public class MRHelpers {
           MRJobConfig.REDUCE_LOG_LEVEL,
           MRJobConfig.DEFAULT_LOG_LEVEL
           );
-    }
-  }
-
-  private static void ensureNotSet(Configuration conf, String attr, String msg)
-      throws IOException {
-    if (conf.get(attr) != null) {
-      throw new IOException(attr + " is incompatible with " + msg + " mode.");
     }
   }
 

@@ -43,8 +43,7 @@ public class ConfigUtils {
   public static Class<? extends CompressionCodec> getIntermediateOutputCompressorClass(
       Configuration conf, Class<DefaultCodec> defaultValue) {
     Class<? extends CompressionCodec> codecClass = defaultValue;
-    String name = conf
-        .get(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS_CODEC);
+    String name = conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS_CODEC);
     if (name != null) {
       try {
         codecClass = conf.getClassByName(name).asSubclass(
@@ -60,8 +59,7 @@ public class ConfigUtils {
   // TODO Move defaults over to a constants file.
   
   public static boolean shouldCompressIntermediateOutput(Configuration conf) {
-    return conf.getBoolean(
-        TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS, false);
+    return conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS, false);
   }
 
   public static <V> Class<V> getIntermediateOutputValueClass(Configuration conf) {

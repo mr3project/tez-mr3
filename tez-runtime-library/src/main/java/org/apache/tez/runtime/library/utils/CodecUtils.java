@@ -73,9 +73,8 @@ public final class CodecUtils {
 
     String auxiliaryService = conf.get(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
         TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT);
-    SecretKey shuffleSecret = ShuffleUtils
-        .getJobTokenSecretFromTokenBytes(taskContext
-            .getServiceConsumerMetaData(auxiliaryService));
+    SecretKey shuffleSecret = ShuffleUtils.getJobTokenSecretFromTokenBytes(
+        taskContext.getServiceConsumerMetaData(auxiliaryService));
     JobTokenSecretManager jobTokenSecretMgr = new JobTokenSecretManager(shuffleSecret);
 
     Configuration codecConf = CodecUtils.reduceConfForCodec(conf);

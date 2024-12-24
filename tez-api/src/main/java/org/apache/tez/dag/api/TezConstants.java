@@ -51,13 +51,6 @@ public class TezConstants {
    */
   public static final String TEZ_SHUFFLE_HANDLER_SERVICE_ID = "mapreduce_shuffle";
 
-  public static final String TEZ_PREWARM_DAG_NAME_PREFIX = "TezPreWarmDAG";
-
-  public static final String DAG_RECOVERY_DATA_DIR_NAME = "recovery";
-  public static final String DAG_RECOVERY_SUMMARY_FILE_SUFFIX = "summary";
-  public static final String DAG_RECOVERY_RECOVER_FILE_SUFFIX = ".recovery";
-
-
   // Configuration keys used internally and not set by the users
   
   // These are session specific DAG ACL's. Currently here because these can only be specified
@@ -71,38 +64,5 @@ public class TezConstants {
    * such as killing the DAG.
    */
   public static final String TEZ_DAG_MODIFY_ACLS = TezConfiguration.TEZ_AM_PREFIX + "dag.modify-acls";
-
-  public static final long TEZ_DAG_SLEEP_TIME_BEFORE_EXIT = 5000;
-
-  /// Version-related Environment variables
-  public static final String TEZ_CLIENT_VERSION_ENV = "TEZ_CLIENT_VERSION";
-
-  private static final String TEZ_AM_SERVICE_PLUGIN_NAME_YARN_CONTAINERS = "TezYarn";
-  private static final String TEZ_AM_SERVICE_PLUGIN_NAME_IN_AM = "TezUber";
-
-  public static String getTezYarnServicePluginName() {
-    return TEZ_AM_SERVICE_PLUGIN_NAME_YARN_CONTAINERS;
-  }
-
-  public static String getTezUberServicePluginName() {
-    return TEZ_AM_SERVICE_PLUGIN_NAME_IN_AM;
-  }
-
-  /**
-   * Minimum heartbeat timeout value for the Client to AM heartbeat.
-   */
-  public static final int TEZ_AM_CLIENT_HEARTBEAT_TIMEOUT_SECS_MINIMUM = 10;
-
-  /**
-   * Minimum polling interval used for the client-AM heartbeat.
-   */
-  public static final long TEZ_AM_CLIENT_HEARTBEAT_POLL_INTERVAL_MILLIS_MINIMUM = 1000;
-
-  /**
-   * For container JVM Xmx auto determination
-   */
-  public static final int TEZ_CONTAINER_SMALL_SLAB_BOUND_MB = 4096;
-  public static final double TEZ_CONTAINER_MAX_JAVA_HEAP_FRACTION_SMALL_SLAB = 0.7;
-  public static final double TEZ_CONTAINER_MAX_JAVA_HEAP_FRACTION_LARGE_SLAB = 0.8;
 
 }
