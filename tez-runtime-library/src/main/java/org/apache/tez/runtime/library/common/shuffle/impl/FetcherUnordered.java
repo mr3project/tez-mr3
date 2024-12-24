@@ -101,7 +101,6 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
   private volatile DataInputStream input;
 
   private CompressionCodec codec;
-  private static final ThreadLocal<CompressionCodec> codecHolder = new ThreadLocal<>();
 
   public FetcherUnordered(ShuffleServer fetcherCallback,
                           Configuration conf, ApplicationId appId,

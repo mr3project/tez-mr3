@@ -18,6 +18,7 @@
 
 package org.apache.tez.runtime.library.common.shuffle;
 
+import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 
@@ -27,6 +28,8 @@ import java.util.concurrent.Callable;
 
 // T = FetcherInput
 public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchResult> {
+
+  protected static final ThreadLocal<CompressionCodec> codecHolder = new ThreadLocal<>();
 
   protected final int numInputs;
   protected InputHost.PartitionToInputs pendingInputsSeq;

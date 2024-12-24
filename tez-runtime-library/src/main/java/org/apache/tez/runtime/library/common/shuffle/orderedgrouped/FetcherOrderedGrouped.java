@@ -119,7 +119,6 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
   private final Object cleanupLock = new Object();
 
   private CompressionCodec codec;
-  private static final ThreadLocal<CompressionCodec> codecHolder = new ThreadLocal<>();
 
   public FetcherOrderedGrouped(
       ShuffleServer shuffleSchedulerServer,
