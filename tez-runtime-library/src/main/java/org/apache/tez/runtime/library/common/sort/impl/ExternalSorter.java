@@ -31,6 +31,7 @@ import com.google.common.collect.Maps;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.OutputStatisticsReporter;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
+import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -225,8 +226,8 @@ public abstract class ExternalSorter {
     numAdditionalSpills = outputContext.getCounters().findCounter(TaskCounter.ADDITIONAL_SPILL_COUNT);
     numShuffleChunks = outputContext.getCounters().findCounter(TaskCounter.SHUFFLE_CHUNK_COUNT);
 
-    // compression
-    this.codec = CodecUtils.getCodec(conf);
+    Configuration codecConf = ShuffleServer.getInstance().getCodecConf();
+    this.codec = CodecUtils.getCodec(codecConf);
 
     this.ifileReadAhead = this.conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD,

@@ -23,6 +23,7 @@ import java.util.Iterator;
 import java.util.List;
 
 import org.apache.hadoop.io.serializer.Serialization;
+import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -143,7 +144,8 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
 
     // compression
     try {
-      this.codec = CodecUtils.getCodec(conf);
+      Configuration codecConf = ShuffleServer.getInstance().getCodecConf();
+      this.codec = CodecUtils.getCodec(codecConf);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }

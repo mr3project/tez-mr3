@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.tez.common.TezUtilsInternal;
 import org.apache.tez.runtime.api.ProgressFailedException;
+import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -113,9 +114,8 @@ public class UnorderedKVInput extends AbstractLogicalInput {
       ////// Initial configuration
       memoryUpdateCallbackHandler.validateUpdateReceived();
 
-      // no need to call CodecUtils.reduceConfForCodec(conf)
-      // because this codec is shared by ShuffleInputEventHandlerImpl and kvReader anyway
-      CompressionCodec codec = CodecUtils.getCodec(conf);
+      Configuration codecConf = ShuffleServer.getInstance().getCodecConf();
+      CompressionCodec codec = CodecUtils.getCodec(codecConf);
 
       boolean compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
       boolean ifileReadAhead = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD,

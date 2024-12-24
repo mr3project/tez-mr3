@@ -30,6 +30,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.tez.runtime.api.TaskFailureType;
+import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -101,7 +102,8 @@ public class Shuffle implements ExceptionReporter {
     this.inputContext = inputContext;
     this.srcNameTrimmed = TezUtilsInternal.cleanVertexName(inputContext.getSourceVertexName());
 
-    CompressionCodec codec = CodecUtils.getCodec(conf);
+    Configuration codecConf = ShuffleServer.getInstance().getCodecConf();
+    CompressionCodec codec = CodecUtils.getCodec(codecConf);
 
     boolean ifileReadAhead = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD,

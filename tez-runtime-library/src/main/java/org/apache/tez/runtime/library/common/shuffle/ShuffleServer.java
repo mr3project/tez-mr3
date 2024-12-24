@@ -67,12 +67,21 @@ public class ShuffleServer implements FetcherCallback {
   private static final Logger LOG = LoggerFactory.getLogger(ShuffleServer.class);
   private final boolean isDebugEnabled = LOG.isDebugEnabled();
 
+  private volatile static ShuffleServer instance = null;
+
   public static ShuffleServer createInstance(
       TaskContext context, Configuration conf) throws IOException {
+    assert instance == null;
     int numFetchers = conf.getInt(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_TOTAL_PARALLEL_COPIES,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_TOTAL_PARALLEL_COPIES_DEFAULT);
-    return new ShuffleServer(context, conf, numFetchers, context.getUniqueIdentifier());
+    instance = new ShuffleServer(context, conf, numFetchers, context.getUniqueIdentifier());
+    return instance;
+  }
+
+  public static ShuffleServer getInstance() {
+    assert instance != null;
+    return instance;
   }
 
   // parameters required by Fetchers
@@ -273,6 +282,13 @@ public class ShuffleServer implements FetcherCallback {
 
     LOG.info("{} Configuration: numFetchers={}, maxTaskOutputAtOnce={}, FetcherConfig={}, rangesScheme={}, maxNumInputHosts={}",
         serverName, numFetchers, maxTaskOutputAtOnce, fetcherConfig, rangesScheme, maxNumInputHosts);
+  }
+
+  // Since ShuffleServer starts before executing tasks, all CompressionCode must use
+  // clones of ShuffleServer.fetcherConfig.codecConf for consistency.
+  public Configuration getCodecConf() {
+    // clone because Decompressor uses locks on the Configuration object
+    return new Configuration(fetcherConfig.codecConf);
   }
 
   public int[] getLocalShufflePorts() {
