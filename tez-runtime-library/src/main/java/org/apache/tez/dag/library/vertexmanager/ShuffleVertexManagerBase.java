@@ -19,6 +19,7 @@
 package org.apache.tez.dag.library.vertexmanager;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.protobuf.UnsafeByteOperations;
 import org.apache.tez.common.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
@@ -359,7 +360,7 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
       VertexManagerEventPayloadProto proto;
       try {
         proto = VertexManagerEventPayloadProto.parseFrom(
-            ByteString.copyFrom(vmEvent.getUserPayload()));
+            UnsafeByteOperations.unsafeWrap(vmEvent.getUserPayload()));
       } catch (InvalidProtocolBufferException e) {
         throw new TezUncheckedException(e);
       }

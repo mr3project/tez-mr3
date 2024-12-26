@@ -30,9 +30,9 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
 import com.google.common.base.Function;
+import com.google.protobuf.UnsafeByteOperations;
 import org.apache.tez.common.Preconditions;
 import com.google.common.collect.Lists;
-import com.google.protobuf.ByteString;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -168,7 +168,7 @@ public class MultiMRInput extends MRInputBase {
     if (LOG.isDebugEnabled()) {
       LOG.debug(getContext().getSourceVertexName() + " initializing Reader: " + eventCount.get());
     }
-    MRSplitProto splitProto = MRSplitProto.parseFrom(ByteString.copyFrom(event.getUserPayload()));
+    MRSplitProto splitProto = MRSplitProto.parseFrom(UnsafeByteOperations.unsafeWrap(event.getUserPayload()));
     MRReader reader = null;
     JobConf localJobConf = new JobConf(jobConf);
     long splitLength = -1;

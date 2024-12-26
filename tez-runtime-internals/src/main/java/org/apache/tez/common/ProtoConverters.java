@@ -19,10 +19,10 @@
 package org.apache.tez.common;
 
 import com.google.common.base.Charsets;
-import com.google.protobuf.ByteString;
 
 import java.nio.ByteBuffer;
 
+import com.google.protobuf.UnsafeByteOperations;
 import org.apache.tez.runtime.api.events.CompositeDataMovementEvent;
 import org.apache.tez.runtime.api.events.CustomProcessorEvent;
 import org.apache.tez.runtime.api.events.DataMovementEvent;
@@ -40,7 +40,7 @@ public class ProtoConverters {
     EventProtos.CustomProcessorEventProto.Builder builder =
         EventProtos.CustomProcessorEventProto.newBuilder();
     if (event.getPayload() != null) {
-      builder.setUserPayload(ByteString.copyFrom(event.getPayload()));
+      builder.setUserPayload(UnsafeByteOperations.unsafeWrap(event.getPayload()));
     }
     builder.setVersion(event.getVersion());
     return builder.build();
@@ -59,7 +59,7 @@ public class ProtoConverters {
     builder.setSourceIndex(event.getSourceIndex()).
         setTargetIndex(event.getTargetIndex()).setVersion(event.getVersion());
     if (event.getUserPayload() != null) {
-      builder.setUserPayload(ByteString.copyFrom(event.getUserPayload()));
+      builder.setUserPayload(UnsafeByteOperations.unsafeWrap(event.getUserPayload()));
     }
     return builder.build();
   }
@@ -79,7 +79,7 @@ public class ProtoConverters {
     builder.setSourceIndex(event.getSourceIndex()).
         setTargetIndex(event.getTargetIndex()).setVersion(event.getVersion()).setCount(event.getCount());
     if (event.getUserPayload() != null) {
-      builder.setUserPayload(ByteString.copyFrom(event.getUserPayload()));
+      builder.setUserPayload(UnsafeByteOperations.unsafeWrap(event.getUserPayload()));
     }
     return builder.build();
   }
@@ -101,7 +101,7 @@ public class ProtoConverters {
     builder.setStartIndex(event.getSourceIndexStart());
     builder.setCount(event.getCount());
     if (event.getUserPayload() != null) {
-      builder.setUserPayload(ByteString.copyFrom(event.getUserPayload()));
+      builder.setUserPayload(UnsafeByteOperations.unsafeWrap(event.getUserPayload()));
     }
     return builder.build();
   }
@@ -118,7 +118,7 @@ public class ProtoConverters {
     EventProtos.VertexManagerEventProto.Builder vmBuilder = VertexManagerEventProto.newBuilder();
     vmBuilder.setTargetVertexName(event.getTargetVertexName());
     if (event.getUserPayload() != null) {
-      vmBuilder.setUserPayload(ByteString.copyFrom(event.getUserPayload()));
+      vmBuilder.setUserPayload(UnsafeByteOperations.unsafeWrap(event.getUserPayload()));
     }
     return vmBuilder.build();
   }
@@ -136,10 +136,10 @@ public class ProtoConverters {
     builder.setSourceIndex(event.getSourceIndex());
     builder.setTargetIndex(event.getTargetIndex());
     if (event.getUserPayload() != null) {
-      builder.setUserPayload(ByteString.copyFrom(event.getUserPayload()));
+      builder.setUserPayload(UnsafeByteOperations.unsafeWrap(event.getUserPayload()));
     }
     if (event.getSerializedPath() != null) {
-      builder.setSerializedPath(ByteString.copyFrom(event.getSerializedPath().getBytes(Charsets.UTF_8)));
+      builder.setSerializedPath(UnsafeByteOperations.unsafeWrap(event.getSerializedPath().getBytes(Charsets.UTF_8)));
     }
     return builder.build();
   }
@@ -165,7 +165,7 @@ public class ProtoConverters {
     builder.setTargetVertexName(event.getTargetVertexName());
     builder.setTargetInputName(event.getTargetInputName());
     if (event.getUserPayload() != null) {
-      builder.setUserPayload(ByteString.copyFrom(event.getUserPayload()));
+      builder.setUserPayload(UnsafeByteOperations.unsafeWrap(event.getUserPayload()));
     }
     return builder.build();
   }

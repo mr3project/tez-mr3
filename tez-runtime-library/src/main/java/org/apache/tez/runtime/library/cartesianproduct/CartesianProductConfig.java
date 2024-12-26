@@ -18,9 +18,9 @@
 package org.apache.tez.runtime.library.cartesianproduct;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.protobuf.UnsafeByteOperations;
 import org.apache.tez.common.Preconditions;
 import com.google.common.primitives.Ints;
-import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.tez.dag.api.TezConfiguration;
@@ -197,7 +197,7 @@ public class CartesianProductConfig {
         builder.setFilterClassName(filterDescriptor.getClassName());
         UserPayload filterUesrPayload = filterDescriptor.getUserPayload();
         if (filterUesrPayload != null) {
-          builder.setFilterUserPayload(ByteString.copyFrom(filterUesrPayload.getPayload()));
+          builder.setFilterUserPayload(UnsafeByteOperations.unsafeWrap(filterUesrPayload.getPayload()));
         }
       }
     }
@@ -248,7 +248,7 @@ public class CartesianProductConfig {
     Preconditions.checkArgument(payload != null, "UserPayload is null");
     Preconditions.checkArgument(payload.getPayload() != null, "UserPayload carreis null payload");
     return
-      CartesianProductConfigProto.parseFrom(ByteString.copyFrom(payload.getPayload()));
+      CartesianProductConfigProto.parseFrom(UnsafeByteOperations.unsafeWrap(payload.getPayload()));
   }
 
   protected static CartesianProductConfig fromUserPayload(UserPayload payload)

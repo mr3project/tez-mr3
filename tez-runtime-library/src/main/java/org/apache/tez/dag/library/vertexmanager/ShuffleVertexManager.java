@@ -18,9 +18,9 @@
 
 package org.apache.tez.dag.library.vertexmanager;
 
+import com.google.protobuf.UnsafeByteOperations;
 import org.apache.tez.common.Preconditions;
 import com.google.common.collect.Lists;
-import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 
 import org.apache.tez.common.TezUtils;
@@ -479,7 +479,7 @@ public class ShuffleVertexManager extends ShuffleVertexManagerBase {
     public static CustomShuffleEdgeManagerConfig fromUserPayload(
         UserPayload payload) throws InvalidProtocolBufferException {
       ShuffleEdgeManagerConfigPayloadProto proto =
-          ShuffleEdgeManagerConfigPayloadProto.parseFrom(ByteString.copyFrom(payload.getPayload()));
+          ShuffleEdgeManagerConfigPayloadProto.parseFrom(UnsafeByteOperations.unsafeWrap(payload.getPayload()));
       return new CustomShuffleEdgeManagerConfig(
           proto.getNumSourceTaskOutputs(),
           proto.getNumDestinationTasks(),

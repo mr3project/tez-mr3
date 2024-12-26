@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.Inflater;
 
-import com.google.protobuf.ByteString;
+import com.google.protobuf.UnsafeByteOperations;
 import org.apache.tez.runtime.api.events.CompositeRoutedDataMovementEvent;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleEventHandler;
@@ -97,7 +97,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
       DataMovementEvent dmEvent = (DataMovementEvent)event;
       DataMovementEventPayloadProto shufflePayload;
       try {
-        shufflePayload = DataMovementEventPayloadProto.parseFrom(ByteString.copyFrom(dmEvent.getUserPayload()));
+        shufflePayload = DataMovementEventPayloadProto.parseFrom(UnsafeByteOperations.unsafeWrap(dmEvent.getUserPayload()));
       } catch (InvalidProtocolBufferException e) {
         throw new TezUncheckedException("Unable to parse DataMovementEvent payload", e);
       }
@@ -115,7 +115,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
       CompositeRoutedDataMovementEvent crdme = (CompositeRoutedDataMovementEvent)event;
       DataMovementEventPayloadProto shufflePayload;
       try {
-        shufflePayload = DataMovementEventPayloadProto.parseFrom(ByteString.copyFrom(crdme.getUserPayload()));
+        shufflePayload = DataMovementEventPayloadProto.parseFrom(UnsafeByteOperations.unsafeWrap(crdme.getUserPayload()));
       } catch (InvalidProtocolBufferException e) {
         throw new TezUncheckedException("Unable to parse DataMovementEvent payload", e);
       }
