@@ -113,7 +113,6 @@ public abstract class MRInputBase extends AbstractLogicalInput {
     this.inputRecordCounter = getContext().getCounters().findCounter(
         TaskCounter.INPUT_RECORDS_PROCESSED);
 
-
     return null;
   }
 }

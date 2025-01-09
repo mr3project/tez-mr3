@@ -42,7 +42,6 @@ import org.apache.tez.runtime.api.OutputContext;
 import org.apache.tez.runtime.api.ProcessorContext;
 import org.apache.tez.runtime.api.TaskContext;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import org.apache.tez.common.Preconditions;
 import com.google.common.collect.Iterables;
@@ -60,7 +59,7 @@ public class MemoryDistributor {
   private AtomicInteger numInputsSeen = new AtomicInteger(0);
   private AtomicInteger numOutputsSeen = new AtomicInteger(0);
 
-  private long totalJvmMemory;
+  private final long totalJvmMemory;
   private final boolean isEnabled;
   private final String allocatorClassName;
   private final Set<TaskContext> dupSet = Collections
@@ -160,18 +159,6 @@ public class MemoryDistributor {
       }
       rInfo.getCallback().memoryAssigned(allocated);
     }
-  }
-
-
-
-  /**
-   * Allow tests to set memory.
-   * @param size
-   */
-  @Private
-  @VisibleForTesting
-  void setJvmMemory(long size) {
-    this.totalJvmMemory = size;
   }
 
   private long registerRequest(long requestSize, MemoryUpdateCallback callback,
