@@ -18,8 +18,8 @@
 package org.apache.tez.runtime.library.cartesianproduct;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.protobuf.UnsafeByteOperations;
 import org.apache.tez.common.Preconditions;
+import com.google.protobuf.ByteString;
 import org.apache.tez.dag.api.EdgeManagerPluginContext;
 import org.apache.tez.dag.api.EdgeManagerPluginOnDemand;
 
@@ -43,7 +43,7 @@ public class CartesianProductEdgeManager extends EdgeManagerPluginOnDemand {
   public void initialize() throws Exception {
     Preconditions.checkArgument(getContext().getUserPayload() != null);
     CartesianProductConfigProto config = CartesianProductConfigProto.parseFrom(
-      UnsafeByteOperations.unsafeWrap(getContext().getUserPayload().getPayload()));
+      ByteString.copyFrom(getContext().getUserPayload().getPayload()));
     // no need to check config because config comes from VM and is already checked by VM
     edgeManagerReal = config.getIsPartitioned()
       ? new CartesianProductEdgeManagerPartitioned(getContext())

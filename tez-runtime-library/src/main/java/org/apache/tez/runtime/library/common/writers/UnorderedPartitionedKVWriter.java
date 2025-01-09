@@ -42,7 +42,6 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.zip.Deflater;
 
 import com.google.common.collect.Lists;
-import com.google.protobuf.UnsafeByteOperations;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -944,7 +943,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
     if (canSendDataOverDME()) {
       ShuffleUserPayloads.DataProto.Builder dataProtoBuilder = ShuffleUserPayloads.DataProto.newBuilder();
-      dataProtoBuilder.setData(UnsafeByteOperations.unsafeWrap(readDataForDME()));
+      dataProtoBuilder.setData(ByteString.copyFrom(readDataForDME()));
       dataProtoBuilder.setRawLength((int) this.writer.getRawLength());
 
       dataProtoBuilder.setCompressedLength((int) this.writer.getCompressedLength());

@@ -18,9 +18,9 @@
 
 package org.apache.tez.dag.library.vertexmanager;
 
+import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 
-import com.google.protobuf.UnsafeByteOperations;
 import org.apache.tez.dag.api.UserPayload;
 import org.apache.tez.dag.library.vertexmanager.FairShuffleUserPayloads.FairShuffleEdgeManagerConfigPayloadProto;
 import org.apache.tez.dag.library.vertexmanager.FairShuffleUserPayloads.FairShuffleEdgeManagerDestinationTaskPropProto;
@@ -77,7 +77,7 @@ class FairEdgeConfiguration {
     HashMap<Integer, DestinationTaskInputsProperty> routingTable = new HashMap<>();
     FairShuffleEdgeManagerConfigPayloadProto proto =
         FairShuffleEdgeManagerConfigPayloadProto.parseFrom(
-            UnsafeByteOperations.unsafeWrap(payload.getPayload()));
+            ByteString.copyFrom(payload.getPayload()));
     int numBuckets = proto.getNumBuckets();
     if (proto.getDestinationTaskPropsList() != null) {
       for (int i = 0; i < proto.getDestinationTaskPropsList().size(); i++) {

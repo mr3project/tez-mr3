@@ -26,15 +26,17 @@ import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.tez.common.counters.DAGCounter;
 import org.apache.tez.common.counters.TezCounters;
-import org.apache.tez.dag.records.TaskAttemptIDAware;
 import org.apache.tez.dag.records.TaskAttemptTerminationCause;
+import org.apache.tez.dag.records.TezDAGID;
 import org.apache.tez.dag.records.TezTaskAttemptID;
+import org.apache.tez.dag.records.TezTaskID;
+import org.apache.tez.dag.records.TezVertexID;
 import org.apache.tez.runtime.api.impl.TezEvent;
 
 /**
  * Read only view of TaskAttempt.
  */
-public interface TaskAttempt extends TaskAttemptIDAware {
+public interface TaskAttempt {
 
   public static class TaskAttemptStatus {
     public TezTaskAttemptID id;
@@ -61,6 +63,11 @@ public interface TaskAttempt extends TaskAttemptIDAware {
       }
     }
   }
+  
+  TezTaskAttemptID getID();
+  TezTaskID getTaskID();
+  TezVertexID getVertexID();
+  TezDAGID getDAGID();
   
   List<String> getDiagnostics();
   TaskAttemptTerminationCause getTerminationCause();

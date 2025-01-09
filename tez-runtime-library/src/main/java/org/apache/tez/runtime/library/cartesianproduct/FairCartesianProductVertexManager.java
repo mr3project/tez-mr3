@@ -19,7 +19,7 @@ package org.apache.tez.runtime.library.cartesianproduct;
 
 import com.google.common.math.LongMath;
 import com.google.common.primitives.Ints;
-import com.google.protobuf.UnsafeByteOperations;
+import com.google.protobuf.ByteString;
 import org.apache.tez.dag.api.EdgeProperty;
 import org.apache.tez.dag.api.UserPayload;
 import org.apache.tez.dag.api.VertexManagerPluginContext;
@@ -353,7 +353,7 @@ class FairCartesianProductVertexManager extends CartesianProductVertexManagerRea
       }
 
       VertexManagerEventPayloadProto proto =
-        VertexManagerEventPayloadProto.parseFrom(UnsafeByteOperations.unsafeWrap(vmEvent.getUserPayload()));
+        VertexManagerEventPayloadProto.parseFrom(ByteString.copyFrom(vmEvent.getUserPayload()));
       srcV.numRecord += proto.getNumRecord();
       srcV.taskWithVMEvent.add(
         vmEvent.getProducerAttemptIdentifier().getTaskIdentifier().getIdentifier());

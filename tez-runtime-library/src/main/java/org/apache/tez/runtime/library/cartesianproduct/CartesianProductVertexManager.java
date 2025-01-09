@@ -18,8 +18,8 @@
 package org.apache.tez.runtime.library.cartesianproduct;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.protobuf.UnsafeByteOperations;
 import org.apache.tez.common.Preconditions;
+import com.google.protobuf.ByteString;
 import org.apache.tez.dag.api.EdgeManagerPluginDescriptor;
 import org.apache.tez.dag.api.EdgeProperty;
 import org.apache.tez.dag.api.InputDescriptor;
@@ -126,7 +126,7 @@ public class CartesianProductVertexManager extends VertexManagerPlugin {
   @Override
   public void initialize() throws Exception {
     CartesianProductConfigProto config = CartesianProductConfigProto.parseFrom(
-      UnsafeByteOperations.unsafeWrap(getContext().getUserPayload().getPayload()));
+      ByteString.copyFrom(getContext().getUserPayload().getPayload()));
     // check whether DAG and config are is consistent
     Map<String, EdgeProperty> edgePropertyMap = getContext().getInputVertexEdgeProperties();
     Set<String> sourceVerticesDAG = edgePropertyMap.keySet();

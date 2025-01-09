@@ -38,7 +38,7 @@ import org.apache.tez.util.FastNumberFormat;
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
-public class TezTaskID extends TezID implements VertexIDAware {
+public class TezTaskID extends TezID {
   public static final String TASK = "task";
   private final int serializingHash;
   
@@ -81,7 +81,6 @@ public class TezTaskID extends TezID implements VertexIDAware {
   }
 
   /** Returns the {@link TezVertexID} object that this task belongs to */
-  @Override
   public TezVertexID getVertexID() {
     return vertexId;
   }

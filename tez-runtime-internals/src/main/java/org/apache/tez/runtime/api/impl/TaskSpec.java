@@ -31,12 +31,11 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.util.StringInterner;
 import org.apache.tez.dag.api.ProcessorDescriptor;
-import org.apache.tez.dag.records.TaskAttemptIDAware;
 import org.apache.tez.dag.records.TezTaskAttemptID;
 
 import com.google.common.collect.Lists;
 
-public class TaskSpec implements Writable, TaskAttemptIDAware {
+public class TaskSpec implements Writable {
 
   private TezTaskAttemptID taskAttemptId;
   private String dagName;
@@ -129,7 +128,7 @@ public class TaskSpec implements Writable, TaskAttemptIDAware {
   }
 
   public int getDagIdentifier() {
-    return taskAttemptId.getDAGID().getId();
+    return taskAttemptId.getTaskID().getVertexID().getDAGId().getId();
   }
 
   public int getVertexParallelism() {
@@ -140,7 +139,6 @@ public class TaskSpec implements Writable, TaskAttemptIDAware {
     return vertexName;
   }
 
-  @Override
   public TezTaskAttemptID getTaskAttemptID() {
     return taskAttemptId;
   }
@@ -268,4 +266,5 @@ public class TaskSpec implements Writable, TaskAttemptIDAware {
     }
     return sb.toString();
   }
+
 }

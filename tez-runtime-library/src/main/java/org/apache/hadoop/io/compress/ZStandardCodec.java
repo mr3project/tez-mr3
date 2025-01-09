@@ -116,9 +116,7 @@ public class ZStandardCodec implements
   }
 
   private static int getBufferSize(Configuration conf) {
-    // for Zstd, we ignore IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_KEY in ShuffleServer.fetcherConfig.codecConf because
-    // CodecUtils.getDecompressedInputStreamWithBufferSize() sets it to 0 anyway
-    return true ? 0 : conf.getInt(IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_KEY,
+    return conf.getInt(IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_KEY,
         IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_DEFAULT);
   }
 

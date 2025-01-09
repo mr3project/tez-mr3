@@ -33,7 +33,6 @@ import java.util.Objects;
 import com.google.common.base.Function;
 import com.google.common.base.Strings;
 
-import com.google.protobuf.UnsafeByteOperations;
 import org.apache.tez.common.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
@@ -151,7 +150,7 @@ public class MRInputHelpers {
   @InterfaceAudience.LimitedPrivate({"hive, pig"})
   public static MRRuntimeProtos.MRInputUserPayloadProto parseMRInputPayload(UserPayload payload)
       throws IOException {
-    return MRRuntimeProtos.MRInputUserPayloadProto.parseFrom(UnsafeByteOperations.unsafeWrap(payload.getPayload()));
+    return MRRuntimeProtos.MRInputUserPayloadProto.parseFrom(ByteString.copyFrom(payload.getPayload()));
   }
 
   /**
@@ -810,6 +809,6 @@ public class MRInputHelpers {
   private static MRSplitProto readProtoFromPayload(InputDataInformationEvent initEvent) throws IOException {
     ByteBuffer payload = initEvent.getUserPayload();
     LOG.info("Reading InputDataInformationEvent from payload: {}", payload);
-    return MRSplitProto.parseFrom(UnsafeByteOperations.unsafeWrap(payload));
+    return MRSplitProto.parseFrom(ByteString.copyFrom(payload));
   }
 }

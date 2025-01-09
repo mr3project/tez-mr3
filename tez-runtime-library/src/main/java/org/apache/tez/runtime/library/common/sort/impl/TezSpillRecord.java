@@ -28,13 +28,11 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ChecksumException;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.PureJavaCrc32;
-import org.apache.hadoop.util.functional.FutureIO;
 import org.apache.tez.runtime.library.common.Constants;
 
 public class TezSpillRecord {
@@ -68,10 +66,11 @@ public class TezSpillRecord {
                      String expectedIndexOwner)
       throws IOException {
 
-    FileStatus fileStatus = rfs.getFileStatus(indexFileName);
-    final long length = fileStatus.getLen();
-    try (FSDataInputStream in = FutureIO.awaitFuture(rfs.openFile(indexFileName).withFileStatus(fileStatus).build())) {
-      final int partitions = (int) length / Constants.MAP_OUTPUT_INDEX_RECORD_LENGTH;
+    final FSDataInputStream in = rfs.open(indexFileName);
+    try {
+      final long length = rfs.getFileStatus(indexFileName).getLen();
+      final int partitions = 
+          (int) length / Constants.MAP_OUTPUT_INDEX_RECORD_LENGTH;
       final int size = partitions * Constants.MAP_OUTPUT_INDEX_RECORD_LENGTH;
 
       buf = ByteBuffer.allocate(size);
@@ -80,12 +79,15 @@ public class TezSpillRecord {
         CheckedInputStream chk = new CheckedInputStream(in, crc);
         IOUtils.readFully(chk, buf.array(), 0, size);
         if (chk.getChecksum().getValue() != in.readLong()) {
-          throw new ChecksumException("Checksum error reading spill index: " + indexFileName, -1);
+          throw new ChecksumException("Checksum error reading spill index: " +
+                                indexFileName, -1);
         }
       } else {
         IOUtils.readFully(in, buf.array(), 0, size);
       }
       entries = buf.asLongBuffer();
+    } finally {
+      in.close();
     }
   }
 

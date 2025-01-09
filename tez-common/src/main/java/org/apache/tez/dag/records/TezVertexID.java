@@ -41,7 +41,7 @@ import org.apache.tez.util.FastNumberFormat;
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
-public class TezVertexID extends TezID implements DAGIDAware {
+public class TezVertexID extends TezID {
   public static final String VERTEX = "vertex";
   static final ThreadLocal<FastNumberFormat> tezVertexIdFormat = new ThreadLocal<FastNumberFormat>() {
 
@@ -81,8 +81,7 @@ public class TezVertexID extends TezID implements DAGIDAware {
   }
 
   /** Returns the {@link TezDAGID} object that this tip belongs to */
-  @Override
-  public TezDAGID getDAGID() {
+  public TezDAGID getDAGId() {
     return dagId;
   }
 
@@ -161,4 +160,5 @@ public class TezVertexID extends TezID implements DAGIDAware {
     }
     return null;
   }
+
 }

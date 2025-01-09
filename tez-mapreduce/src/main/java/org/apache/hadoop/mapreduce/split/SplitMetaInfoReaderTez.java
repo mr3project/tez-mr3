@@ -33,7 +33,6 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.mapreduce.split.JobSplit.TaskSplitMetaInfo;
-import org.apache.hadoop.util.functional.FutureIO;
 import org.apache.tez.common.MRFrameworkConfigs;
 import org.apache.tez.mapreduce.hadoop.MRJobConfig;
 
@@ -77,7 +76,7 @@ public class SplitMetaInfoReaderTez {
         throw new IOException("Split metadata size exceeded " + maxMetaInfoSize
             + ". Aborting job ");
       }
-      in = FutureIO.awaitFuture(fs.openFile(metaSplitFile).withFileStatus(fStatus).build());
+      in = fs.open(metaSplitFile);
       byte[] header = new byte[JobSplit.META_SPLIT_FILE_HEADER.length];
       in.readFully(header);
       if (!Arrays.equals(JobSplit.META_SPLIT_FILE_HEADER, header)) {

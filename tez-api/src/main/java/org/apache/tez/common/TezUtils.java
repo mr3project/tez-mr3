@@ -27,7 +27,6 @@ import java.util.Objects;
 
 import com.google.protobuf.ByteString;
 
-import com.google.protobuf.UnsafeByteOperations;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -123,7 +122,7 @@ public class TezUtils {
    * @throws java.io.IOException
    */
   public static Configuration createConfFromUserPayload(UserPayload payload) throws IOException {
-    return createConfFromByteString(UnsafeByteOperations.unsafeWrap(payload.getPayload()));
+    return createConfFromByteString(ByteString.copyFrom(payload.getPayload()));
   }
 
 

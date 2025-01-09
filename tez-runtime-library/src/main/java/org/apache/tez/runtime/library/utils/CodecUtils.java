@@ -168,19 +168,11 @@ public final class CodecUtils {
       Configurable configurableCodec = (Configurable) codec;
       Configuration conf = configurableCodec.getConf();
 
-      // for Zstd, newBufSize is always 0 because defaultBufferSize == 0 in Math.min(compressedLength, defaultBufferSize)
-      // hence, we skip conf.getInt/setInt().
-      if (bufferSizeProp.equals(CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_KEY)) {
-        synchronized (conf) {
-          in = codec.createInputStream(checksumIn, decompressor);
-        }
-        return in;
-      }
-
       synchronized (conf) {
         int defaultBufferSize = getDefaultBufferSize(codec);
         int originalSize = conf.getInt(bufferSizeProp, defaultBufferSize);
         int newBufSize = Math.min(compressedLength, defaultBufferSize);
+        // for Zstd, newBufSize is always 0 because defaultBufferSize == 0
 
         if (LOG.isDebugEnabled()) {
           LOG.debug("buffer size was set according to min({}, {}) => {}={}",
