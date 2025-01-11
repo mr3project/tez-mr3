@@ -87,7 +87,7 @@ public class UnorderedKVInput extends AbstractLogicalInput {
   @Override
   public synchronized List<Event> initialize() throws Exception {
     Preconditions.checkArgument(getNumPhysicalInputs() != -1, "Number of Inputs has not been set");
-    this.conf = getContext().getConfigurationFromUserPayload();
+    this.conf = getContext().getConfigurationFromUserPayload(true);
 
     if (getNumPhysicalInputs() == 0) {
       getContext().requestInitialMemory(0l, null);

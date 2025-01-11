@@ -79,7 +79,7 @@ public class MRCombiner implements Combiner {
   private final TaskAttemptID mrTaskAttemptID;
 
   public MRCombiner(TaskContext taskContext) throws IOException {
-    final Configuration userConf = taskContext.getConfigurationFromUserPayload();
+    final Configuration userConf = taskContext.getConfigurationFromUserPayload(true);
     useNewApi = ConfigUtils.useNewApi(userConf);
     if (useNewApi) {
       conf = new JobConf(userConf);

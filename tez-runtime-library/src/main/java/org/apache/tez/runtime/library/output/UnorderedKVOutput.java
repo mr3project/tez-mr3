@@ -76,9 +76,8 @@ public class UnorderedKVOutput extends AbstractLogicalOutput {
   @Override
   public synchronized List<Event> initialize()
       throws Exception {
-    this.conf = getContext().getConfigurationFromUserPayload();
-    this.conf.setStrings(TezRuntimeFrameworkConfigs.LOCAL_DIRS,
-        getContext().getWorkDirs());
+    this.conf = getContext().getConfigurationFromUserPayload(true);
+    this.conf.setStrings(TezRuntimeFrameworkConfigs.LOCAL_DIRS, getContext().getWorkDirs());
 
     this.conf.set(TezRuntimeConfiguration.TEZ_RUNTIME_PARTITIONER_CLASS, CustomPartitioner.class
         .getName());

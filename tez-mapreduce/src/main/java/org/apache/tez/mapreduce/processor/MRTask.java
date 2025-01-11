@@ -141,7 +141,7 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
             processorContext.getTaskIndex()),
         processorContext.getTaskAttemptNumber());
 
-    Configuration conf = processorContext.getConfigurationFromUserPayload();
+    Configuration conf = processorContext.getConfigurationFromUserPayload(true);
     if (conf instanceof JobConf) {
       this.jobConf = (JobConf)conf;
     } else {

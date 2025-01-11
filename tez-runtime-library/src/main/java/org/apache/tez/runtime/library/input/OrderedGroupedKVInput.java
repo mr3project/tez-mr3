@@ -98,7 +98,7 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput {
 
   @Override
   public synchronized List<Event> initialize() throws IOException {
-    this.conf = getContext().getConfigurationFromUserPayload();
+    this.conf = getContext().getConfigurationFromUserPayload(true);
 
     if (this.getNumPhysicalInputs() == 0) {
       getContext().requestInitialMemory(0l, null);

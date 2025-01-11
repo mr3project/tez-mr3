@@ -104,7 +104,7 @@ public interface TaskContext extends DecompressorPool {
    */
   public UserPayload getUserPayload();
 
-  public Configuration getConfigurationFromUserPayload();
+  public Configuration getConfigurationFromUserPayload(boolean createCopy);
 
   /**
    * Get the work directories for the Input/Output/Processor
