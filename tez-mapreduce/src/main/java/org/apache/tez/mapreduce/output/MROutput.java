@@ -391,7 +391,7 @@ public class MROutput extends AbstractLogicalOutput {
     taskNumberFormat.setGroupingUsed(false);
     nonTaskNumberFormat.setMinimumIntegerDigits(3);
     nonTaskNumberFormat.setGroupingUsed(false);
-    Configuration conf = TezUtils.createConfFromUserPayload(getContext().getUserPayload());
+    Configuration conf = getContext().getConfigurationFromUserPayload();
     this.jobConf = new JobConf(conf);
     // Add tokens to the jobConf - in case they are accessed within the RW / OF
     jobConf.getCredentials().mergeAll(UserGroupInformation.getCurrentUser().getCredentials());

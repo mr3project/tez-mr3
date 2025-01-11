@@ -21,13 +21,13 @@ package org.apache.tez.runtime.api;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
 
 import javax.annotation.Nullable;
 
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.tez.common.counters.TezCounters;
 import org.apache.tez.dag.api.UserPayload;
@@ -103,6 +103,8 @@ public interface TaskContext extends DecompressorPool {
    * @return User Payload
    */
   public UserPayload getUserPayload();
+
+  public Configuration getConfigurationFromUserPayload();
 
   /**
    * Get the work directories for the Input/Output/Processor

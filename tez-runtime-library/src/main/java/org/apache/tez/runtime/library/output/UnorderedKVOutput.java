@@ -76,7 +76,7 @@ public class UnorderedKVOutput extends AbstractLogicalOutput {
   @Override
   public synchronized List<Event> initialize()
       throws Exception {
-    this.conf = TezUtils.createConfFromUserPayload(getContext().getUserPayload());
+    this.conf = getContext().getConfigurationFromUserPayload();
     this.conf.setStrings(TezRuntimeFrameworkConfigs.LOCAL_DIRS,
         getContext().getWorkDirs());
 

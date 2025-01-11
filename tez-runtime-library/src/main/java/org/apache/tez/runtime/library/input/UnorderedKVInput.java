@@ -87,7 +87,7 @@ public class UnorderedKVInput extends AbstractLogicalInput {
   @Override
   public synchronized List<Event> initialize() throws Exception {
     Preconditions.checkArgument(getNumPhysicalInputs() != -1, "Number of Inputs has not been set");
-    this.conf = TezUtils.createConfFromUserPayload(getContext().getUserPayload());
+    this.conf = getContext().getConfigurationFromUserPayload();
 
     if (getNumPhysicalInputs() == 0) {
       getContext().requestInitialMemory(0l, null);

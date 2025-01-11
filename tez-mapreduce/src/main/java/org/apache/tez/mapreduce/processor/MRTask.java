@@ -141,8 +141,7 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
             processorContext.getTaskIndex()),
         processorContext.getTaskAttemptNumber());
 
-    UserPayload userPayload = processorContext.getUserPayload();
-    Configuration conf = TezUtils.createConfFromUserPayload(userPayload);
+    Configuration conf = processorContext.getConfigurationFromUserPayload();
     if (conf instanceof JobConf) {
       this.jobConf = (JobConf)conf;
     } else {
@@ -168,7 +167,7 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
 
     jobConf.set(MRJobConfig.VERTEX_NAME, processorContext.getTaskVertexName());
 
-    if (LOG.isDebugEnabled() && userPayload != null) {
+    if (LOG.isDebugEnabled()) {
       Iterator<Entry<String, String>> iter = jobConf.iterator();
       String taskIdStr = taskAttemptId.getTaskID().toString();
       while (iter.hasNext()) {

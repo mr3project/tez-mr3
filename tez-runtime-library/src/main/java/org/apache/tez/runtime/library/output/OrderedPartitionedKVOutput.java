@@ -89,7 +89,7 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
 
   @Override
   public synchronized List<Event> initialize() throws IOException {
-    this.conf = TezUtils.createConfFromUserPayload(getContext().getUserPayload());
+    this.conf = getContext().getConfigurationFromUserPayload();
     this.localFs = (RawLocalFileSystem) FileSystem.getLocal(conf).getRaw();
 
     // Initializing this parametr in this conf since it is used in multiple

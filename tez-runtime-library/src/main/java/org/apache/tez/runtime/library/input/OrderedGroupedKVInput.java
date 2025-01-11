@@ -98,7 +98,7 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput {
 
   @Override
   public synchronized List<Event> initialize() throws IOException {
-    this.conf = TezUtils.createConfFromUserPayload(getContext().getUserPayload());
+    this.conf = getContext().getConfigurationFromUserPayload();
 
     if (this.getNumPhysicalInputs() == 0) {
       getContext().requestInitialMemory(0l, null);
