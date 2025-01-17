@@ -37,7 +37,6 @@ import org.apache.tez.dag.api.EdgeProperty.DataMovementType;
 import org.apache.tez.dag.api.InputDescriptor;
 import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.dag.api.VertexManagerPluginContext;
-import org.apache.tez.dag.api.VertexLocationHint;
 import org.apache.tez.dag.api.VertexManagerPlugin;
 import org.apache.tez.dag.api.VertexManagerPluginContext.ScheduleTaskRequest;
 import org.apache.tez.dag.api.event.VertexState;
@@ -197,30 +196,23 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
 
   static class ReconfigVertexParams {
     final private int finalParallelism;
-    final private VertexLocationHint locationHint;
     final int[] mapping;
     final int[][] indexes;
 
-    public ReconfigVertexParams(final int finalParallelism,
-        final VertexLocationHint locationHint) {
+    public ReconfigVertexParams(final int finalParallelism) {
       this.finalParallelism = finalParallelism;
-      this.locationHint = locationHint;
       this.mapping = null;
       this.indexes = null;
     }
 
     public ReconfigVertexParams(int[] mapping, int[][] indexes) {
       this.finalParallelism = indexes.length;
-      this.locationHint = null;
       this.mapping = mapping;
       this.indexes = indexes;
     }
 
     public int getFinalParallelism() {
       return finalParallelism;
-    }
-    public VertexLocationHint getLocationHint() {
-      return locationHint;
     }
   }
 
@@ -552,7 +544,7 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
       TaskAttemptIdentifier completedSourceAttempt) {
     List<ScheduleTaskRequest> scheduledTasks =
         getTasksToSchedule(completedSourceAttempt);
-    if (scheduledTasks != null && scheduledTasks.size() > 0) {
+    if (scheduledTasks != null && !scheduledTasks.isEmpty()) {
       getContext().scheduleTasks(scheduledTasks);
     }
   }

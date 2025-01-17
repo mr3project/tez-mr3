@@ -677,7 +677,7 @@ public class ShuffleVertexManager extends ShuffleVertexManagerBase {
         for(Map.Entry<String, SourceVertexInfo> entry : bipartiteItr) {
       entry.getValue().newDescriptor = descriptor;
     }
-    ReconfigVertexParams params = new ReconfigVertexParams(finalTaskParallelism, null);
+    ReconfigVertexParams params = new ReconfigVertexParams(finalTaskParallelism);
     return params;
   }
 
