@@ -77,6 +77,7 @@ import java.util.zip.Inflater;
 @Evolving
 abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
   static long MB = 1024l * 1024l;
+  static long KB = 1024l;
 
   private static final Logger LOG =
      LoggerFactory.getLogger(ShuffleVertexManagerBase.class);
@@ -133,7 +134,7 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
     // The total uncompressed size
     long outputSize;
     // The uncompressed size of each partition. The size might not be precise
-    int[] statsInMB;
+    int[] statsInMB;  // TODO: rename to statsInKB[]
     EdgeManagerPluginDescriptor newDescriptor;  // used only in reconfigVertex()
 
     SourceVertexInfo(final EdgeProperty edgeProperty,
@@ -157,7 +158,7 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
          BigInteger.valueOf(statsInMB[index]).
            multiply(BigInteger.valueOf(numTasks)).
            divide(BigInteger.valueOf(numVMEventsReceived)).
-           multiply(BigInteger.valueOf(MB));
+           multiply(BigInteger.valueOf(KB));
     }
   }
 
@@ -312,10 +313,13 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
     }
   }
 
+  private static final long KB_THRESHOLD = 1024l * 1024l * 1024l;   // corresponds to 1TB, ShuffleUtils.KB_THRESHOLD
+
   void parseDetailedPartitionStats(SourceVertexInfo srcInfo,
       List<Integer> partitionStats) {
     for (int i=0; i<partitionStats.size(); i++) {
-      srcInfo.statsInMB[i] += partitionStats.get(i);
+      long sum = srcInfo.statsInMB[i] + partitionStats.get(i);
+      srcInfo.statsInMB[i] = (int)(sum >= KB_THRESHOLD ? KB_THRESHOLD : sum);
     }
   }
 
@@ -467,11 +471,11 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
   }
 
   int getCurrentlyKnownStatsAtIndex(int index) {
-    int stats = 0;
+    long stats = 0L;
     for(SourceVertexInfo entry : getAllSourceVertexInfo()) {
       stats += entry.statsInMB[index];
     }
-    return stats;
+    return (int)(stats >= KB_THRESHOLD ? KB_THRESHOLD : stats);
   }
 
   long getExpectedStatsAtIndex(int index) {

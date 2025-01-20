@@ -79,6 +79,8 @@ public class ShuffleUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(ShuffleUtils.class);
   private static final long MB = 1024l * 1024l;
+  private static final long KB = 1024l;
+  private static final long KB_THRESHOLD = 1024l * 1024l * 1024l;   // corresponds to 1TB
 
   public static final ThreadLocal<DecimalFormat> MBPS_FORMAT =
       new ThreadLocal<DecimalFormat>() {
@@ -539,15 +541,15 @@ public class ShuffleUtils {
    * @param sizes actual partition sizes
    */
   public static DetailedPartitionStatsProto getDetailedPartitionStatsForPhysicalOutput(long[] sizes) {
-    DetailedPartitionStatsProto.Builder builder =
-        DetailedPartitionStatsProto.newBuilder();
+    DetailedPartitionStatsProto.Builder builder = DetailedPartitionStatsProto.newBuilder();
     for (int i=0; i<sizes.length; i++) {
       // Round the size up. So 1 byte -> the value of sizeInMB == 1
       // Throws IllegalArgumentException if value is greater than
       // Integer.MAX_VALUE. That should be ok given Integer.MAX_VALUE * MB
-      // means PB.
-      int sizeInMb = Ints.checkedCast(ceil(sizes[i], MB));
-      builder.addSizeInMb(sizeInMb);
+      // means PB. --> revised to use KB with truncation
+      long sizeInKb = ceil(sizes[i], KB);
+      long adjustedSizeInKb = sizeInKb >= KB_THRESHOLD ? KB_THRESHOLD : sizeInKb;
+      builder.addSizeInMb((int)adjustedSizeInKb);
     }
     return builder.build();
   }
