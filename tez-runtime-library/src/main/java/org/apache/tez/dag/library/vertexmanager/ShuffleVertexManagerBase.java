@@ -313,7 +313,7 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
     }
   }
 
-  private static final long KB_THRESHOLD = 1024l * 1024l * 1024l;   // corresponds to 1TB, ShuffleUtils.KB_THRESHOLD
+  protected static final long KB_THRESHOLD = 1024l * 1024l * 1024l;   // corresponds to 1TB, ShuffleUtils.KB_THRESHOLD
 
   void parseDetailedPartitionStats(SourceVertexInfo srcInfo,
       List<Integer> partitionStats) {
