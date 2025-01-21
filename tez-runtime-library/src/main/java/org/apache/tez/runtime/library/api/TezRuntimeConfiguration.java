@@ -386,10 +386,17 @@ public class TezRuntimeConfiguration {
 
   /**
    * If the shuffle input is on the local host bypass the http fetch and access the files directly
+   * only for unordered fetch
    */
   @ConfigurationProperty(type = "boolean")
   public static final String TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH = TEZ_RUNTIME_PREFIX + "optimize.local.fetch";
   public static final boolean TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_DEFAULT = true;
+
+  // for ordered fetched
+  // set to false when tez.runtime.shuffle.memory-to-memory.enable=true
+  @ConfigurationProperty(type = "boolean")
+  public static final String TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_ORDERED = TEZ_RUNTIME_PREFIX + "optimize.local.fetch.ordered";
+  public static final boolean TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_ORDERED_DEFAULT = true;
 
   /**
    * Expert level setting. Enable pipelined shuffle in ordered outputs and in unordered

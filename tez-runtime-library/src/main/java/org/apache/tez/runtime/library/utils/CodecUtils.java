@@ -86,6 +86,8 @@ public final class CodecUtils {
 
     boolean localDiskFetchEnabled = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH,
         TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_DEFAULT);
+    boolean localDiskFetchOrderedEnabled = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_ORDERED,
+      TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_ORDERED_DEFAULT);
     boolean verifyDiskChecksum = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_VERIFY_DISK_CHECKSUM,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_VERIFY_DISK_CHECKSUM_DEFAULT);
@@ -105,6 +107,7 @@ public final class CodecUtils {
         localDirAllocator,
         localHostName,
         localDiskFetchEnabled,
+        localDiskFetchOrderedEnabled,
         verifyDiskChecksum,
         compositeFetch,
         connectionFailAllInput);

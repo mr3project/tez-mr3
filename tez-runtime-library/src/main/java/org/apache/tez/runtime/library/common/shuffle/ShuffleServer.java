@@ -96,6 +96,7 @@ public class ShuffleServer implements FetcherCallback {
     public final LocalDirAllocator localDirAllocator;
     public final String localHostName;
     public final boolean localDiskFetchEnabled;
+    public final boolean localDiskFetchOrderedEnabled;
     public final boolean verifyDiskChecksum;
     public final boolean compositeFetch;
     public final boolean connectionFailAllInput;
@@ -111,6 +112,7 @@ public class ShuffleServer implements FetcherCallback {
         LocalDirAllocator localDirAllocator,
         String localHostName,
         boolean localDiskFetchEnabled,
+        boolean localDiskFetchOrderedEnabled,
         boolean verifyDiskChecksum,
         boolean compositeFetch,
         boolean connectionFailAllInput) {
@@ -124,6 +126,7 @@ public class ShuffleServer implements FetcherCallback {
       this.localDirAllocator = localDirAllocator;
       this.localHostName = localHostName;
       this.localDiskFetchEnabled = localDiskFetchEnabled;
+      this.localDiskFetchOrderedEnabled = localDiskFetchOrderedEnabled;
       this.verifyDiskChecksum = verifyDiskChecksum;
       this.compositeFetch = compositeFetch;
       this.connectionFailAllInput = connectionFailAllInput;
