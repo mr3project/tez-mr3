@@ -187,10 +187,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       }
     }
 
-    shutdown();
-
     // skip sanity check because we check the invariant in HostFetchResult()
-
     return hostFetchResult.fetchResult;
   }
 

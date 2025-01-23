@@ -626,6 +626,7 @@ public class ShuffleServer implements FetcherCallback {
         }
       } else {
         if (result != null) {
+          // use '==' instead of 'equals' because we want to avoid conversion from long to Long
           assert result.getShuffleClientId() == fetcher.getShuffleClient().getShuffleClientId();
 
           Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs = result.getPendingInputs();
