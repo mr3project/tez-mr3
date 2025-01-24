@@ -62,7 +62,6 @@ public class TezRuntimeConfiguration {
    * Prefixes from Hadoop configuration which are allowed.
    */
   private static final List<String> allowedPrefixes = new ArrayList<String>();
-  private static List<String> unmodifiableAllowedPrefixes;
 
   /**
    * Configuration key to enable/disable IFile readahead.
@@ -537,7 +536,6 @@ public class TezRuntimeConfiguration {
 
     umnodifiableTezRuntimeKeySet = Collections.unmodifiableSet(tezRuntimeKeys);
     unmodifiableOtherKeySet = Collections.unmodifiableSet(otherKeys);
-    unmodifiableAllowedPrefixes = Collections.unmodifiableList(allowedPrefixes);
   }
 
   @Private
