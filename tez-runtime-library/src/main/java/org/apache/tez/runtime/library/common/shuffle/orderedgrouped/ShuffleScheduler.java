@@ -315,7 +315,7 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
       }
     } else {
       // input is already finished. duplicate fetch.
-      LOG.warn("Duplicate fetch of input no longer needs to be fetched: " + srcAttemptIdentifier);
+      LOG.warn("Duplicate fetch of ordered input: {}", srcAttemptIdentifier);
       // free the resource - especially memory
 
       // If the src does not generate data, output will be null.

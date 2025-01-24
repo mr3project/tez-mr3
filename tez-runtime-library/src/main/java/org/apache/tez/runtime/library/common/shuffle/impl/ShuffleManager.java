@@ -266,6 +266,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
         }
         updateStats = true;
       } else {
+        LOG.warn("Duplicate fetch of unordered input: {}", srcAttemptIdentifier);
         fetchedInput.abort();
       }
     }
