@@ -96,6 +96,10 @@ public final class CodecUtils {
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_CONNECTION_FAIL_ALL_INPUT,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_CONNECTION_FAIL_ALL_INPUT_DEFAULT);
 
+    long speculativeExecutionWaitMillis = (long)conf.getInt(
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_SPECULATIVE_FETCH_WAIT_MILLIS,
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_SPECULATIVE_FETCH_WAIT_MILLIS_DEFAULT);
+
     return new ShuffleServer.FetcherConfig(
         codecConf,
         ifileReadAhead,
@@ -110,7 +114,8 @@ public final class CodecUtils {
         localDiskFetchOrderedEnabled,
         verifyDiskChecksum,
         compositeFetch,
-        connectionFailAllInput);
+        connectionFailAllInput,
+        speculativeExecutionWaitMillis);
   }
 
   private static Configuration reduceConfForCodec(Configuration conf) {

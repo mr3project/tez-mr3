@@ -445,6 +445,11 @@ public class TezRuntimeConfiguration {
       "use.free.memory.fetched.input";
   public static final boolean TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT_DEFAULT = false;
 
+  @ConfigurationProperty(type = "integer")
+  public static final String TEZ_RUNTIME_SHUFFLE_SPECULATIVE_FETCH_WAIT_MILLIS = TEZ_RUNTIME_PREFIX +
+      "shuffle.speculative.fetch.wait.millis";
+  public static final int TEZ_RUNTIME_SHUFFLE_SPECULATIVE_FETCH_WAIT_MILLIS_DEFAULT = 20 * 1000;
+
   static {
     tezRuntimeKeys.add(TEZ_RUNTIME_IFILE_READAHEAD);
     tezRuntimeKeys.add(TEZ_RUNTIME_IFILE_READAHEAD_BYTES);
@@ -502,6 +507,7 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT);
     tezRuntimeKeys.add(TEZ_RUNTIME_UNORDERED_PARTITIONED_KVWRITER_BUFFER_MERGE_PERCENT);
     tezRuntimeKeys.add(TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT);
+    tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_SPECULATIVE_FETCH_WAIT_MILLIS);
 
     // Do not keep defaultConf as a static member because it holds a reference to ClassLoader
     // of the Thread that is active at the time of loading this class. The active Thread usually

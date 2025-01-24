@@ -100,6 +100,7 @@ public class ShuffleServer implements FetcherCallback {
     public final boolean verifyDiskChecksum;
     public final boolean compositeFetch;
     public final boolean connectionFailAllInput;
+    public final long speculativeExecutionWaitMillis;
 
     public FetcherConfig(
         Configuration codecConf,
@@ -115,7 +116,8 @@ public class ShuffleServer implements FetcherCallback {
         boolean localDiskFetchOrderedEnabled,
         boolean verifyDiskChecksum,
         boolean compositeFetch,
-        boolean connectionFailAllInput) {
+        boolean connectionFailAllInput,
+        long speculativeExecutionWaitMillis) {
       this.codecConf = codecConf;
       this.ifileReadAhead = ifileReadAhead;
       this.ifileReadAheadLength = ifileReadAheadLength;
@@ -130,6 +132,7 @@ public class ShuffleServer implements FetcherCallback {
       this.verifyDiskChecksum = verifyDiskChecksum;
       this.compositeFetch = compositeFetch;
       this.connectionFailAllInput = connectionFailAllInput;
+      this.speculativeExecutionWaitMillis = speculativeExecutionWaitMillis;
     }
 
     public String toString() {
@@ -205,7 +208,6 @@ public class ShuffleServer implements FetcherCallback {
 
   private final ListeningExecutorService fetcherExecutor;
   private final FetcherConfig fetcherConfig;
-  private final long speculativeExecutionWaitMillis = 15L * 1000L;
 
   // taskContext.useShuffleHandlerProcessOnK8s() == false:
   //   do not use localShufflePorts[] because taskContext.getServiceProviderMetaData(auxiliaryService)
@@ -349,7 +351,7 @@ public class ShuffleServer implements FetcherCallback {
       // speculative execution
       long currentMillis = System.currentTimeMillis();
       for (Fetcher<?> fetcher: runningFetchers) {
-        if (currentMillis - fetcher.startMillis > speculativeExecutionWaitMillis) {
+        if (currentMillis - fetcher.startMillis > fetcherConfig.speculativeExecutionWaitMillis) {
           Fetcher<?> speculativeFetcher = fetcher.createClone(currentMillis);
           runFetcher(speculativeFetcher);
           count += 1;
