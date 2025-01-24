@@ -377,6 +377,12 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
                           boolean readFailed, boolean connectFailed) {
     failedShuffleCounter.increment(1);
 
+    if (isInputFinished(srcAttemptIdentifier.getInputIdentifier())) {
+      LOG.warn("{}, Ordered fetch failed, but input already completed: InputIdentifier={}",
+          srcNameTrimmed, srcAttemptIdentifier);
+      return;
+    }
+
     if (isObsoleteInputAttemptIdentifier(srcAttemptIdentifier)) {
       LOG.info("Do not report obsolete input: " + srcAttemptIdentifier);
       return;

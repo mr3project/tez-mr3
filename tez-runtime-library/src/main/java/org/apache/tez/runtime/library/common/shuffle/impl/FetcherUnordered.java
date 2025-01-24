@@ -33,7 +33,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.tez.http.BaseHttpConnection;
 import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.library.common.shuffle.DiskFetchedInput;
@@ -41,6 +40,7 @@ import org.apache.tez.runtime.library.common.shuffle.FetchResult;
 import org.apache.tez.runtime.library.common.shuffle.FetchedInput;
 import org.apache.tez.runtime.library.common.shuffle.FetchedInputCallback;
 import org.apache.tez.runtime.library.common.shuffle.Fetcher;
+import org.apache.tez.runtime.library.common.shuffle.HostPort;
 import org.apache.tez.runtime.library.common.shuffle.InputHost;
 import org.apache.tez.runtime.library.common.shuffle.LocalDiskFetchedInput;
 import org.apache.tez.runtime.library.common.shuffle.MemoryFetchedInput;
@@ -49,6 +49,7 @@ import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleServer.PathPartition;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.shuffle.api.ShuffleHandlerError;
+import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.FetcherOrderedGrouped;
 import org.apache.tez.runtime.library.utils.CodecUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,33 +74,36 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
   private static final AtomicInteger fetcherIdGen = new AtomicInteger(0);
   private static final boolean isDebugEnabled = LOG.isDebugEnabled();
 
-  // set in the constructor
+  private final ShuffleManager shuffleManager;
+  private final Long shuffleManagerId;
   private final int fetcherIdentifier;
   private final String logIdentifier;
 
   private final AtomicBoolean isShutDown = new AtomicBoolean(false);
 
-  // set in assignShuffleClient()
-  // never updated after assignShuffleClient(), so effectively immutable
-  private ShuffleManager shuffleManager;
-  private Long shuffleManagerId;
-
   public FetcherUnordered(ShuffleServer fetcherCallback,
                           Configuration conf,
-                          InputHost inputHost,
+                          HostPort inputHost,
                           InputHost.PartitionToInputs pendingInputsSeq,
                           ShuffleServer.FetcherConfig fetcherConfig,
                           TaskContext taskContext,
+                          long startMillis, int attempt,
                           ShuffleManager shuffleManager) {
-    super(fetcherCallback, conf, inputHost, fetcherConfig, taskContext, pendingInputsSeq);
+    super(fetcherCallback, conf, inputHost, fetcherConfig, taskContext, pendingInputsSeq,
+        startMillis, attempt);
 
+    this.shuffleManager = shuffleManager;
+    this.shuffleManagerId = shuffleManager.getShuffleClientId();
     this.fetcherIdentifier = fetcherIdGen.getAndIncrement();
-    this.logIdentifier = shuffleManager.getLogIdentifier() + "-U-" + fetcherIdentifier;
+    this.logIdentifier = attempt == 0 ?
+        shuffleManager.getLogIdentifier() + "-U-" + fetcherIdentifier :
+        shuffleManager.getLogIdentifier() + "-U-" + fetcherIdentifier + "/" + attempt;
   }
 
-  public void assignShuffleClient(ShuffleClient<FetchedInput> shuffleClient) {
-    this.shuffleManager = (ShuffleManager)shuffleClient;
-    this.shuffleManagerId = shuffleClient.getShuffleClientId();
+  public FetcherUnordered createClone(long currentMillis) {
+    return new FetcherUnordered(
+      fetcherCallback, conf, new HostPort(this.host, this.port), pendingInputsSeq,
+      fetcherConfig, taskContext, currentMillis, this.attempt + 1, shuffleManager);
   }
 
   public ShuffleClient<FetchedInput> getShuffleClient() {

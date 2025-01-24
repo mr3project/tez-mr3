@@ -205,6 +205,7 @@ public class ShuffleServer implements FetcherCallback {
 
   private final ListeningExecutorService fetcherExecutor;
   private final FetcherConfig fetcherConfig;
+  private final long speculativeExecutionWaitMillis = 15L * 1000L;
 
   // taskContext.useShuffleHandlerProcessOnK8s() == false:
   //   do not use localShufflePorts[] because taskContext.getServiceProviderMetaData(auxiliaryService)
@@ -333,9 +334,9 @@ public class ShuffleServer implements FetcherCallback {
       lock.lock();
       try {
         while (!isShutdown.get() &&
-            (runningFetchers.size() >= numFetchers ||
-             pendingHosts.isEmpty() ||
-             !existsShouldScanPendingInputs())) {
+               (runningFetchers.size() >= numFetchers ||
+                pendingHosts.isEmpty() ||
+                !existsShouldScanPendingInputs())) {
           wakeLoop.await(1000, TimeUnit.MILLISECONDS);
         }
       } finally {
@@ -344,10 +345,24 @@ public class ShuffleServer implements FetcherCallback {
 
       int maxFetchersToRun = numFetchers - runningFetchers.size();
       int count = 0;
+
+      // speculative execution
+      long currentMillis = System.currentTimeMillis();
+      for (Fetcher<?> fetcher: runningFetchers) {
+        if (currentMillis - fetcher.startMillis > speculativeExecutionWaitMillis) {
+          Fetcher<?> speculativeFetcher = fetcher.createClone(currentMillis);
+          runFetcher(speculativeFetcher);
+          count += 1;
+          LOG.warn("Speculative execution of Fetcher: {}, after {}ms, {}",
+              fetcher.getFetcherIdentifier(), (currentMillis - fetcher.startMillis),
+              speculativeFetcher.getFetcherIdentifier());
+        }
+      }
+
       InputHost peekInputHost = pendingHosts.peek();
       while (count < maxFetchersToRun &&
-        peekInputHost != null &&
-        existsShouldScanPendingInputs()) {
+             peekInputHost != null &&
+             existsShouldScanPendingInputs()) {
         // for every ShuffleClient,
         //   1. 'numPartitionRanges > 0' remains the same until the current thread consumes existing inputs
         //   2. 'numFetchers < maxNumFetchers' remains the same until the current thread creates new Fetchers
@@ -367,7 +382,7 @@ public class ShuffleServer implements FetcherCallback {
           LOG.debug("Processing InputHost: " + inputHost.toDetailedString());
         }
 
-        Fetcher fetcher = constructFetcherForHost(inputHost, conf);
+        Fetcher<?> fetcher = constructFetcherForHost(inputHost, conf, currentMillis);
         // even when fetcher == null, inputHost may have inputs if 'ShuffleClient == null'
         inputHost.addToPendingHostsIfNecessary(pendingHosts);
         if (fetcher == null) {
@@ -375,13 +390,9 @@ public class ShuffleServer implements FetcherCallback {
           continue;
         }
 
-        runningFetchers.add(fetcher);
-        fetcher.getShuffleClient().fetcherStarted();
-
-        ListenableFuture<FetchResult> future = fetcherExecutor.submit(fetcher);
-        Futures.addCallback(future, new FetchFutureCallback(fetcher));
-
+        runFetcher(fetcher);
         count += 1;
+
         peekInputHost = pendingHosts.peek();
       }
     }
@@ -392,7 +403,14 @@ public class ShuffleServer implements FetcherCallback {
     }
   }
 
-  private Fetcher constructFetcherForHost(InputHost inputHost, Configuration conf) {
+  private void runFetcher(Fetcher<?> fetcher) {
+    runningFetchers.add(fetcher);
+    fetcher.getShuffleClient().fetcherStarted();
+    ListenableFuture<FetchResult> future = fetcherExecutor.submit(fetcher);
+    Futures.addCallback(future, new FetchFutureCallback(fetcher));
+  }
+
+  private Fetcher<?> constructFetcherForHost(InputHost inputHost, Configuration conf, long currentMillis) {
     InputHost.PartitionToInputs pendingInputs = inputHost.clearAndGetOnePartitionRange(
         shuffleClients, maxTaskOutputAtOnce, rangesScheme);
     if (pendingInputs == null) {
@@ -417,17 +435,13 @@ public class ShuffleServer implements FetcherCallback {
     }
 
     if (shuffleClient instanceof ShuffleManager) {
-      FetcherUnordered fetcher = constructFetcherUnordered(
-          conf, fetcherConfig, taskContext, inputHost, pendingInputs, (ShuffleManager)shuffleClient);
-      // do not merge assignShuffleClient() to constructFetcher() because
-      // type variable T should not appear both in argument types and in return type
-      fetcher.assignShuffleClient((ShuffleManager)shuffleClient);
-      return fetcher;
+      return new FetcherUnordered(this,
+          conf, inputHost, pendingInputs, fetcherConfig, taskContext,
+          currentMillis, 0, (ShuffleManager)shuffleClient);
     } else {
-      FetcherOrderedGrouped fetcher = constructFetcherOrdered(
-          conf, fetcherConfig, taskContext, inputHost, pendingInputs, (ShuffleScheduler)shuffleClient);
-      fetcher.assignShuffleClient((ShuffleScheduler)shuffleClient);
-      return fetcher;
+      return new FetcherOrderedGrouped(this,
+          conf, inputHost, pendingInputs, fetcherConfig, taskContext,
+          currentMillis, 0, (ShuffleScheduler)shuffleClient);
     }
   }
 
@@ -554,28 +568,6 @@ public class ShuffleServer implements FetcherCallback {
         this.fetcherExecutor.shutdownNow();   // interrupt all running fetchers
       }
     }
-  }
-
-  private FetcherUnordered constructFetcherUnordered(
-      Configuration conf,
-      FetcherConfig fetcherConfig,
-      TaskContext taskContext,
-      InputHost inputHost,
-      InputHost.PartitionToInputs pendingInputsSeq,
-      ShuffleManager shuffleManager) {
-    return new FetcherUnordered(this,
-        conf, inputHost, pendingInputsSeq, fetcherConfig, taskContext, shuffleManager);
-  }
-
-  private FetcherOrderedGrouped constructFetcherOrdered(
-      Configuration conf,
-      FetcherConfig fetcherConfig,
-      TaskContext taskContext,
-      InputHost inputHost,
-      InputHost.PartitionToInputs pendingInputsSeq,
-      ShuffleScheduler shuffleScheduler) {
-    return new FetcherOrderedGrouped(this,
-        conf, inputHost, pendingInputsSeq, fetcherConfig, taskContext, shuffleScheduler);
   }
 
   public void informAM(Long shuffleSchedulerId, InputAttemptIdentifier srcAttempt) {

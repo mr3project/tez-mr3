@@ -376,10 +376,20 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
   public void fetchFailed(
       InputAttemptIdentifier srcAttemptIdentifier, boolean readFailed, boolean connectFailed) {
     assert !readFailed;   // ignore in ShuffleManager
+    final int inputIdentifier = srcAttemptIdentifier.getInputIdentifier();
+    failedShufflesCounter.increment(1);
+
+    synchronized (completedInputSet) {
+      boolean isCompleted = completedInputSet.get(inputIdentifier);
+      if (isCompleted) {
+        LOG.warn("{}, Unordered fetch failed, but input already completed: InputIdentifier={}",
+          srcNameTrimmed, srcAttemptIdentifier);
+        return;
+      }
+    }
 
     LOG.info("{}: Fetch failed, InputIdentifier={}, connectFailed={}",
         srcNameTrimmed, srcAttemptIdentifier, connectFailed);
-    failedShufflesCounter.increment(1);
 
     if (srcAttemptIdentifier == null) {
       reportNonFatalError(null, "Received fetchFailure for an unknown source (null)");
@@ -395,7 +405,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
         "Unordered: Fetch failure while fetching from "
             + TezRuntimeUtils.getTaskAttemptIdentifier(
             inputContext.getSourceVertexName(),
-            srcAttemptIdentifier.getInputIdentifier(),
+            inputIdentifier,
             srcAttemptIdentifier.getAttemptNumber()),
         srcAttemptIdentifier.getInputIdentifier(),
         srcAttemptIdentifier.getAttemptNumber());
@@ -405,7 +415,6 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
 
     if (srcAttemptIdentifier.canRetrieveInputInChunks()) {
       synchronized (shuffleInfoEventsMap) {
-        int inputIdentifier = srcAttemptIdentifier.getInputIdentifier();
         ShuffleEventInfo eventInfo = shuffleInfoEventsMap.get(inputIdentifier);
 
         if (eventInfo != null && srcAttemptIdentifier.getAttemptNumber() == eventInfo.attemptNum) {

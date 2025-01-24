@@ -49,6 +49,9 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
   protected final int minPartition;
   protected final int maxPartition;
 
+  public final long startMillis;
+  public final int attempt;   // 0, 1, 2, ...
+
   //
   // fields set during the execution of call()
   //
@@ -68,10 +71,11 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
 
   public Fetcher(ShuffleServer fetcherCallback,
                  Configuration conf,
-                 InputHost inputHost,
+                 HostPort inputHost,
                  ShuffleServer.FetcherConfig fetcherConfig,
                  TaskContext taskContext,
-                 InputHost.PartitionToInputs pendingInputsSeq) {
+                 InputHost.PartitionToInputs pendingInputsSeq,
+                 long startMillis, int attempt) {
     this.fetcherCallback = fetcherCallback;
     this.conf = conf;
     this.applicationId = taskContext.getApplicationId().toString();
@@ -86,15 +90,18 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
     this.minPartition = pendingInputsSeq.getPartition();
     this.maxPartition = pendingInputsSeq.getPartition() + pendingInputsSeq.getPartitionCount() - 1;
 
+    this.startMillis = startMillis;
+    this.attempt = attempt;
+
     this.pathToAttemptMap = new HashMap<ShuffleServer.PathPartition, InputAttemptIdentifier>();
   }
 
-  abstract public void assignShuffleClient(ShuffleClient<T> shuffleClient);
   abstract public ShuffleClient<T> getShuffleClient();
   abstract public boolean useSingleShuffleClientId(Long shuffleClientId);
   abstract public String getFetcherIdentifier();
   abstract public void shutdown();
   abstract public FetchResult call() throws Exception;
+  abstract public Fetcher<T> createClone(long currentMillis);
 
   protected InputAttemptIdentifier[] buildInputSeqFromIndex(int pendingInputsIndex) {
     // TODO: just create a sub-array

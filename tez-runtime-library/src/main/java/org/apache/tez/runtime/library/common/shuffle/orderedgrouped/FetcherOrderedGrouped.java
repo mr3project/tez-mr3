@@ -36,12 +36,12 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
-import org.apache.tez.http.BaseHttpConnection;
 import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.shuffle.FetchResult;
 import org.apache.tez.runtime.library.common.shuffle.Fetcher;
+import org.apache.tez.runtime.library.common.shuffle.HostPort;
 import org.apache.tez.runtime.library.common.shuffle.InputHost;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleClient;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
@@ -88,43 +88,49 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     }
   }
 
-  // set in the constructor
   private final int fetcherIdentifier;
   private final String logIdentifier;
+  private final ShuffleScheduler shuffleScheduler;
+  private final Long shuffleSchedulerId;
+  private final int dagId;
+
+  private final FetchedInputAllocatorOrderedGrouped allocator;
+  private final ExceptionReporter exceptionReporter;
+  private final ShuffleErrorCounterGroup shuffleErrorCounterGroup;
 
   private volatile boolean stopped = false;
   private final Object cleanupLock = new Object();
 
-  // set in assignShuffleClient()
-  private ShuffleScheduler shuffleScheduler;
-  private Long shuffleSchedulerId;
-  private int dagId;
-  private FetchedInputAllocatorOrderedGrouped allocator;
-  private ExceptionReporter exceptionReporter;
-  private ShuffleErrorCounterGroup shuffleErrorCounterGroup;
-
   public FetcherOrderedGrouped(
       ShuffleServer fetcherCallback,
       Configuration conf,
-      InputHost inputHost,
+      HostPort inputHost,
       InputHost.PartitionToInputs pendingInputsSeq,
       ShuffleServer.FetcherConfig fetcherConfig,
       TaskContext taskContext,
+      long startMillis, int attempt,
       ShuffleScheduler shuffleScheduler) {
-    super(fetcherCallback, conf, inputHost, fetcherConfig, taskContext, pendingInputsSeq);
+    super(fetcherCallback, conf, inputHost, fetcherConfig, taskContext, pendingInputsSeq,
+        startMillis, attempt);
+
+    this.shuffleScheduler = shuffleScheduler;
+    this.shuffleSchedulerId = shuffleScheduler.getShuffleClientId();
+    this.dagId = shuffleScheduler.getDagIdentifier();
 
     this.fetcherIdentifier = fetcherIdGen.incrementAndGet();
-    this.logIdentifier = shuffleScheduler.getLogIdentifier() + "-O-" + fetcherIdentifier;
-  }
-
-  public void assignShuffleClient(ShuffleClient<MapOutput> shuffleClient) {
-    this.shuffleScheduler = (ShuffleScheduler)shuffleClient;
-    this.shuffleSchedulerId = shuffleClient.getShuffleClientId();
-    this.dagId = shuffleClient.getDagIdentifier();
+    this.logIdentifier = attempt == 0 ?
+        shuffleScheduler.getLogIdentifier() + "-O-" + fetcherIdentifier :
+        shuffleScheduler.getLogIdentifier() + "-O-" + fetcherIdentifier + "/" + attempt;
 
     this.allocator = shuffleScheduler.getAllocator();
     this.exceptionReporter = shuffleScheduler.getExceptionReporter();
     this.shuffleErrorCounterGroup = shuffleScheduler.getShuffleErrorCounterGroup();
+  }
+
+  public FetcherOrderedGrouped createClone(long currentMillis) {
+    return new FetcherOrderedGrouped(
+        fetcherCallback, conf, new HostPort(this.host, this.port), pendingInputsSeq,
+        fetcherConfig, taskContext, currentMillis, this.attempt + 1, shuffleScheduler);
   }
 
   public ShuffleClient<MapOutput> getShuffleClient() {
