@@ -447,7 +447,7 @@ public class TezRuntimeConfiguration {
   @ConfigurationProperty(type = "integer")
   public static final String TEZ_RUNTIME_SHUFFLE_SPECULATIVE_FETCH_WAIT_MILLIS = TEZ_RUNTIME_PREFIX +
       "shuffle.speculative.fetch.wait.millis";
-  public static final int TEZ_RUNTIME_SHUFFLE_SPECULATIVE_FETCH_WAIT_MILLIS_DEFAULT = 20 * 1000;
+  public static final int TEZ_RUNTIME_SHUFFLE_SPECULATIVE_FETCH_WAIT_MILLIS_DEFAULT = 30 * 1000;
 
   static {
     tezRuntimeKeys.add(TEZ_RUNTIME_IFILE_READAHEAD);
