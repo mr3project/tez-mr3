@@ -338,11 +338,15 @@ public class ShuffleServer implements FetcherCallback {
     while (!isShutdown.get()) {
       lock.lock();
       try {
+        // stay inside the loop no longer than fetcherConfig.speculativeExecutionWaitMillis
+        long remainingMillis = fetcherConfig.speculativeExecutionWaitMillis;
         while (!isShutdown.get() &&
+               remainingMillis > 0 &&
                (runningFetchers.size() >= numFetchers ||
                 pendingHosts.isEmpty() ||
                 !existsShouldScanPendingInputs())) {
           wakeLoop.await(1000, TimeUnit.MILLISECONDS);
+          remainingMillis -= 1000;
         }
       } finally {
         lock.unlock();
