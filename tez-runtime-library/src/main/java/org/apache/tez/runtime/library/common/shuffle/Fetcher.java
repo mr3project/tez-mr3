@@ -18,10 +18,14 @@
 
 package org.apache.tez.runtime.library.common.shuffle;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.tez.http.BaseHttpConnection;
+import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 
+import java.io.DataInputStream;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -31,15 +35,52 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
 
   protected static final ThreadLocal<CompressionCodec> codecHolder = new ThreadLocal<>();
 
+  protected final ShuffleServer fetcherCallback;
+  protected final Configuration conf;
+  protected final String applicationId;
+  protected final ShuffleServer.FetcherConfig fetcherConfig;
+  protected final TaskContext taskContext;
+
+  protected final String host;
+  protected final int port;
+
   protected final int numInputs;
-  protected InputHost.PartitionToInputs pendingInputsSeq;
-  protected int minPartition;
-  protected int maxPartition;
+  protected final InputHost.PartitionToInputs pendingInputsSeq;   // contents are also immutable after initialization
+  protected final int minPartition;
+  protected final int maxPartition;
+
+  //
+  // fields set during the execution of call()
+  //
 
   // Maps from the pathComponents (unique per srcTaskId) to the specific taskId
+  // filled in buildPathToAttemptMap() at the beginning of call()
   protected final Map<ShuffleServer.PathPartition, InputAttemptIdentifier> pathToAttemptMap;
 
-  public Fetcher(InputHost.PartitionToInputs pendingInputsSeq) {
+  // Initial value is 0, which means it hasn't retried yet.
+  protected long retryStartTime = 0;
+
+  // volatile because it can be read in multiple threads
+  protected volatile BaseHttpConnection httpConnection;
+  protected volatile DataInputStream input;
+
+  protected CompressionCodec codec;
+
+  public Fetcher(ShuffleServer fetcherCallback,
+                 Configuration conf,
+                 InputHost inputHost,
+                 ShuffleServer.FetcherConfig fetcherConfig,
+                 TaskContext taskContext,
+                 InputHost.PartitionToInputs pendingInputsSeq) {
+    this.fetcherCallback = fetcherCallback;
+    this.conf = conf;
+    this.applicationId = taskContext.getApplicationId().toString();
+    this.fetcherConfig = fetcherConfig;
+    this.taskContext = taskContext;
+
+    this.host = inputHost.getHost();
+    this.port = inputHost.getPort();
+
     this.numInputs = pendingInputsSeq.getInputs().size();
     this.pendingInputsSeq = pendingInputsSeq;
     this.minPartition = pendingInputsSeq.getPartition();

@@ -509,7 +509,7 @@ public class ShuffleServer implements FetcherCallback {
       } else {
         ShuffleScheduler sc = (ShuffleScheduler)shuffleClient;
         sc.fetchSucceeded(
-          srcAttemptIdentifier, (MapOutput)fetchedInput, fetchedBytes, decompressedLength, copyDuration);
+            srcAttemptIdentifier, (MapOutput)fetchedInput, fetchedBytes, decompressedLength, copyDuration);
       }
     }
   }
@@ -564,7 +564,7 @@ public class ShuffleServer implements FetcherCallback {
       InputHost.PartitionToInputs pendingInputsSeq,
       ShuffleManager shuffleManager) {
     return new FetcherUnordered(this,
-        conf, taskContext.getApplicationId(), inputHost, pendingInputsSeq, fetcherConfig, taskContext, shuffleManager);
+        conf, inputHost, pendingInputsSeq, fetcherConfig, taskContext, shuffleManager);
   }
 
   private FetcherOrderedGrouped constructFetcherOrdered(

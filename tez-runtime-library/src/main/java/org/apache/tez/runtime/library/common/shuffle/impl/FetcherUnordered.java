@@ -55,7 +55,6 @@ import org.slf4j.LoggerFactory;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
@@ -66,62 +65,36 @@ import org.apache.tez.runtime.library.exceptions.FetcherReadTimeoutException;
 import org.apache.tez.runtime.library.common.shuffle.FetchedInput.Type;
 
 /**
- * Responsible for fetching inputs served by the ShuffleHandler for a single
- * host. Construct using {@link FetcherBuilder}
+ * Responsible for fetching inputs served by the ShuffleHandler for a single host.
  */
 public class FetcherUnordered extends Fetcher<FetchedInput> {
 
   private static final Logger LOG = LoggerFactory.getLogger(FetcherUnordered.class);
   private static final AtomicInteger fetcherIdGen = new AtomicInteger(0);
-  private final boolean isDebugEnabled = LOG.isDebugEnabled();
+  private static final boolean isDebugEnabled = LOG.isDebugEnabled();
 
-  private final ShuffleServer fetcherCallback;
-  private final Configuration conf;
-  private final ApplicationId appId;
-  private final ShuffleServer.FetcherConfig fetcherConfig;
-  private final TaskContext taskContext;
-
-  private final String host;
-  private final int port;
-
+  // set in the constructor
   private final int fetcherIdentifier;
   private final String logIdentifier;
 
   private final AtomicBoolean isShutDown = new AtomicBoolean(false);
-
-  // Initiative value is 0, which means it hasn't retried yet.
-  private long retryStartTime = 0;
 
   // set in assignShuffleClient()
   // never updated after assignShuffleClient(), so effectively immutable
   private ShuffleManager shuffleManager;
   private Long shuffleManagerId;
 
-  private BaseHttpConnection httpConnection;
-  private volatile DataInputStream input;
-
-  private CompressionCodec codec;
-
   public FetcherUnordered(ShuffleServer fetcherCallback,
-                          Configuration conf, ApplicationId appId,
+                          Configuration conf,
                           InputHost inputHost,
                           InputHost.PartitionToInputs pendingInputsSeq,
                           ShuffleServer.FetcherConfig fetcherConfig,
                           TaskContext taskContext,
                           ShuffleManager shuffleManager) {
-    super(pendingInputsSeq);
-
-    this.fetcherCallback = fetcherCallback;
-    this.conf = conf;
-    this.appId = appId;
-    this.fetcherConfig = fetcherConfig;
-    this.taskContext = taskContext;
+    super(fetcherCallback, conf, inputHost, fetcherConfig, taskContext, pendingInputsSeq);
 
     this.fetcherIdentifier = fetcherIdGen.getAndIncrement();
     this.logIdentifier = shuffleManager.getLogIdentifier() + "-U-" + fetcherIdentifier;
-
-    this.host = inputHost.getHost();
-    this.port = inputHost.getPort();
   }
 
   public void assignShuffleClient(ShuffleClient<FetchedInput> shuffleClient) {
@@ -208,7 +181,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
 
       InputHost.PartitionRange range = pendingInputsSeq.getPartitionRange();
       StringBuilder baseURI = ShuffleUtils.constructBaseURIForShuffleHandler(finalHost,
-          port, range, appId.toString(), shuffleManager.getDagIdentifier(), httpConnectionParams.isSslShuffle());
+          port, range, applicationId, shuffleManager.getDagIdentifier(), httpConnectionParams.isSslShuffle());
 
       Collection<InputAttemptIdentifier> inputsForPathComponents =
         pendingInputsSeq.getInputs().subList(currentIndex, pendingInputsSeq.getInputs().size());

@@ -144,6 +144,7 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
   // inside ShuffleServer.call() thread
   protected boolean cleanInputHostForConstructFetcher(InputHost.PartitionToInputs pendingInputs) {
     // safe to update pendingInputs because we are running in ShuffleServer.call() thread
+    // use '==' instead of 'equals' because we want to avoid conversion from long to Long
     assert pendingInputs.getShuffleClientId() == shuffleClientId;
     assert pendingInputs.getInputs().size() <= shuffleServer.getMaxTaskOutputAtOnce();
 
