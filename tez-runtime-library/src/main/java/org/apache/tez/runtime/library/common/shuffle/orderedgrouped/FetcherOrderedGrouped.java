@@ -108,10 +108,9 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       InputHost.PartitionToInputs pendingInputsSeq,
       ShuffleServer.FetcherConfig fetcherConfig,
       TaskContext taskContext,
-      long startMillis, int attempt,
+      int attempt,
       ShuffleScheduler shuffleScheduler) {
-    super(fetcherCallback, conf, inputHost, fetcherConfig, taskContext, pendingInputsSeq,
-        startMillis, attempt);
+    super(fetcherCallback, conf, inputHost, fetcherConfig, taskContext, pendingInputsSeq, attempt);
 
     this.shuffleScheduler = shuffleScheduler;
     this.shuffleSchedulerId = shuffleScheduler.getShuffleClientId();
@@ -127,10 +126,10 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     this.shuffleErrorCounterGroup = shuffleScheduler.getShuffleErrorCounterGroup();
   }
 
-  public FetcherOrderedGrouped createClone(long currentMillis) {
+  public FetcherOrderedGrouped createClone() {
     return new FetcherOrderedGrouped(
         fetcherCallback, conf, new HostPort(this.host, this.port), pendingInputsSeq,
-        fetcherConfig, taskContext, currentMillis, this.attempt + 1, shuffleScheduler);
+        fetcherConfig, taskContext, this.attempt + 1, shuffleScheduler);
   }
 
   public ShuffleClient<MapOutput> getShuffleClient() {
@@ -148,6 +147,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
   public FetchResult call() {
     assert !pendingInputsSeq.getInputs().isEmpty();
 
+    startMillis = System.currentTimeMillis();
     buildPathToAttemptMap();
 
     Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs = null;

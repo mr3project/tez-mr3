@@ -49,9 +49,8 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
   protected final int minPartition;
   protected final int maxPartition;
 
-  public final long startMillis;
   public final int attempt;   // 0, 1, 2, ...
-  private boolean checkForSpeculativeExec = true;
+  private boolean checkForSpeculativeExec = true;   // accessed only in ShuffleServer.call() thread
 
   //
   // fields set during the execution of call()
@@ -70,13 +69,17 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
 
   protected CompressionCodec codec;
 
+  // Set at the start of call(), so may be invalid when accessed from ShuffleServer.call() thread
+  // Hence, we initialize it to Long.MAX_VALUE.
+  public volatile long startMillis = Long.MAX_VALUE;
+
   public Fetcher(ShuffleServer fetcherCallback,
                  Configuration conf,
                  HostPort inputHost,
                  ShuffleServer.FetcherConfig fetcherConfig,
                  TaskContext taskContext,
                  InputHost.PartitionToInputs pendingInputsSeq,
-                 long startMillis, int attempt) {
+                 int attempt) {
     this.fetcherCallback = fetcherCallback;
     this.conf = conf;
     this.applicationId = taskContext.getApplicationId().toString();
@@ -91,7 +94,6 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
     this.minPartition = pendingInputsSeq.getPartition();
     this.maxPartition = pendingInputsSeq.getPartition() + pendingInputsSeq.getPartitionCount() - 1;
 
-    this.startMillis = startMillis;
     this.attempt = attempt;
 
     this.pathToAttemptMap = new HashMap<ShuffleServer.PathPartition, InputAttemptIdentifier>();
@@ -102,7 +104,7 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
   abstract public String getFetcherIdentifier();
   abstract public void shutdown();
   abstract public FetchResult call() throws Exception;
-  abstract public Fetcher<T> createClone(long currentMillis);
+  abstract public Fetcher<T> createClone();
 
   public boolean getCheckForSpeculativeExec() {
     return this.checkForSpeculativeExec;

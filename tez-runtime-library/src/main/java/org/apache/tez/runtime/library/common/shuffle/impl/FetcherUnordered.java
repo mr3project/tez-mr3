@@ -87,10 +87,9 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
                           InputHost.PartitionToInputs pendingInputsSeq,
                           ShuffleServer.FetcherConfig fetcherConfig,
                           TaskContext taskContext,
-                          long startMillis, int attempt,
+                          int attempt,
                           ShuffleManager shuffleManager) {
-    super(fetcherCallback, conf, inputHost, fetcherConfig, taskContext, pendingInputsSeq,
-        startMillis, attempt);
+    super(fetcherCallback, conf, inputHost, fetcherConfig, taskContext, pendingInputsSeq, attempt);
 
     this.shuffleManager = shuffleManager;
     this.shuffleManagerId = shuffleManager.getShuffleClientId();
@@ -100,10 +99,10 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         shuffleManager.getLogIdentifier() + "-U-" + fetcherIdentifier + "/" + attempt;
   }
 
-  public FetcherUnordered createClone(long currentMillis) {
+  public FetcherUnordered createClone() {
     return new FetcherUnordered(
       fetcherCallback, conf, new HostPort(this.host, this.port), pendingInputsSeq,
-      fetcherConfig, taskContext, currentMillis, this.attempt + 1, shuffleManager);
+      fetcherConfig, taskContext, this.attempt + 1, shuffleManager);
   }
 
   public ShuffleClient<FetchedInput> getShuffleClient() {
@@ -122,6 +121,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
   public FetchResult call() throws Exception {
     assert !pendingInputsSeq.getInputs().isEmpty();
 
+    startMillis = System.currentTimeMillis();
     buildPathToAttemptMap();
 
     codec = codecHolder.get();

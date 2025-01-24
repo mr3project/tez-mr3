@@ -357,10 +357,10 @@ public class ShuffleServer implements FetcherCallback {
         if (fetcher.getCheckForSpeculativeExec() &&
             fetcher.attempt < MAX_SPECULATIVE_FETCH_ATTEMPTS &&
             currentMillis - fetcher.startMillis > fetcherConfig.speculativeExecutionWaitMillis) {
-          fetcher.unsetCheckForSpeculativeExec();
-          Fetcher<?> speculativeFetcher = fetcher.createClone(currentMillis);
+          fetcher.unsetCheckForSpeculativeExec();   // now 'fetcher' no longer spawn new speculative Fetchers
+          Fetcher<?> speculativeFetcher = fetcher.createClone();
           runFetcher(speculativeFetcher);
-          count += 1;
+          count += 1;   // may reach maxFetchersToRun, but not a problem
           LOG.warn("Speculative execution of Fetcher: {}, after {}ms, {}",
               fetcher.getFetcherIdentifier(), (currentMillis - fetcher.startMillis),
               speculativeFetcher.getFetcherIdentifier());
@@ -445,11 +445,11 @@ public class ShuffleServer implements FetcherCallback {
     if (shuffleClient instanceof ShuffleManager) {
       return new FetcherUnordered(this,
           conf, inputHost, pendingInputs, fetcherConfig, taskContext,
-          currentMillis, 0, (ShuffleManager)shuffleClient);
+          0, (ShuffleManager)shuffleClient);
     } else {
       return new FetcherOrderedGrouped(this,
           conf, inputHost, pendingInputs, fetcherConfig, taskContext,
-          currentMillis, 0, (ShuffleScheduler)shuffleClient);
+          0, (ShuffleScheduler)shuffleClient);
     }
   }
 
