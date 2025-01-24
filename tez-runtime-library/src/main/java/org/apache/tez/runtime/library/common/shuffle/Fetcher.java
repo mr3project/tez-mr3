@@ -51,6 +51,7 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
 
   public final long startMillis;
   public final int attempt;   // 0, 1, 2, ...
+  private boolean checkForSpeculativeExec = true;
 
   //
   // fields set during the execution of call()
@@ -102,6 +103,14 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
   abstract public void shutdown();
   abstract public FetchResult call() throws Exception;
   abstract public Fetcher<T> createClone(long currentMillis);
+
+  public boolean getCheckForSpeculativeExec() {
+    return this.checkForSpeculativeExec;
+  }
+
+  public void unsetCheckForSpeculativeExec() {
+    this.checkForSpeculativeExec = false;
+  }
 
   protected InputAttemptIdentifier[] buildInputSeqFromIndex(int pendingInputsIndex) {
     // TODO: just create a sub-array

@@ -237,6 +237,9 @@ public class ShuffleServer implements FetcherCallback {
 
   private final AtomicBoolean isShutdown = new AtomicBoolean(false);
 
+  // TODO: introduce a configuration key if it is necessary to create two or more speculative fetchers
+  private static final int MAX_SPECULATIVE_FETCH_ATTEMPTS = 1;
+
   public ShuffleServer(
       TaskContext taskContext,
       Configuration conf,
@@ -351,7 +354,10 @@ public class ShuffleServer implements FetcherCallback {
       // speculative execution
       long currentMillis = System.currentTimeMillis();
       for (Fetcher<?> fetcher: runningFetchers) {
-        if (currentMillis - fetcher.startMillis > fetcherConfig.speculativeExecutionWaitMillis) {
+        if (fetcher.getCheckForSpeculativeExec() &&
+            fetcher.attempt < MAX_SPECULATIVE_FETCH_ATTEMPTS &&
+            currentMillis - fetcher.startMillis > fetcherConfig.speculativeExecutionWaitMillis) {
+          fetcher.unsetCheckForSpeculativeExec();
           Fetcher<?> speculativeFetcher = fetcher.createClone(currentMillis);
           runFetcher(speculativeFetcher);
           count += 1;
