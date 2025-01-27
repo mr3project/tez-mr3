@@ -34,7 +34,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class HttpConnection extends BaseHttpConnection {
@@ -78,8 +77,7 @@ public class HttpConnection extends BaseHttpConnection {
     }
   }
 
-  @VisibleForTesting
-  public void computeEncHash() throws IOException {
+  private void computeEncHash() throws IOException {
     // generate hash of the url
     msgToEncode = SecureShuffleUtils.buildMsgFrom(url);
     encHash = SecureShuffleUtils.hashFromString(msgToEncode, jobTokenSecretMgr);
@@ -94,10 +92,12 @@ public class HttpConnection extends BaseHttpConnection {
       sslFactory.configure(connection);
     }
 
-    computeEncHash();
+    if (!httpConnParams.isSkipVerifyRequest()) {
+      // put url hash into http header
+      computeEncHash();
+      connection.addRequestProperty(SecureShuffleUtils.HTTP_HEADER_URL_HASH, encHash);
+    }
 
-    // put url hash into http header
-    connection.addRequestProperty(SecureShuffleUtils.HTTP_HEADER_URL_HASH, encHash);
     // set the read timeout
     connection.setReadTimeout(httpConnParams.getReadTimeout());
     // put shuffle version into http header
@@ -200,27 +200,26 @@ public class HttpConnection extends BaseHttpConnection {
     }
 
     // get the shuffle version
-    if (!ShuffleHeader.DEFAULT_HTTP_HEADER_NAME.equals(connection
-        .getHeaderField(ShuffleHeader.HTTP_HEADER_NAME))
-        || !ShuffleHeader.DEFAULT_HTTP_HEADER_VERSION.equals(connection
-        .getHeaderField(ShuffleHeader.HTTP_HEADER_VERSION))) {
+    if (!ShuffleHeader.DEFAULT_HTTP_HEADER_NAME.equals(
+          connection.getHeaderField(ShuffleHeader.HTTP_HEADER_NAME))
+        || !ShuffleHeader.DEFAULT_HTTP_HEADER_VERSION.equals(
+            connection.getHeaderField(ShuffleHeader.HTTP_HEADER_VERSION))) {
       throw new IOException("Incompatible shuffle response version");
     }
 
-    // get the replyHash which is HMac of the encHash we sent to the server
-    String replyHash =
-        connection
-            .getHeaderField(SecureShuffleUtils.HTTP_HEADER_REPLY_URL_HASH);
-    if (replyHash == null) {
-      throw new IOException("security validation of TT Map output failed");
+    if (!httpConnParams.isSkipVerifyRequest()) {
+      // get the replyHash which is HMac of the encHash we sent to the server
+      String replyHash = connection.getHeaderField(SecureShuffleUtils.HTTP_HEADER_REPLY_URL_HASH);
+      if (replyHash == null) {
+        throw new IOException("security validation of TT Map output failed");
+      }
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("url=" + msgToEncode + "; encHash=" + encHash + "; replyHash=" + replyHash);
+      }
+      // verify that replyHash is HMac of encHash
+      SecureShuffleUtils.verifyReply(replyHash, encHash, jobTokenSecretMgr);
     }
 
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("url=" + msgToEncode + "; encHash=" + encHash + "; replyHash=" + replyHash);
-    }
-
-    // verify that replyHash is HMac of encHash
-    SecureShuffleUtils.verifyReply(replyHash, encHash, jobTokenSecretMgr);
     // Log summary
     if (urlLogCount.incrementAndGet() % 1000 == 0) {
       LOG.info("Sent hash and received reply for {} urls", urlLogCount);

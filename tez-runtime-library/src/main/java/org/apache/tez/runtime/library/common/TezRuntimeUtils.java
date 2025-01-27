@@ -31,6 +31,7 @@ import org.apache.tez.http.BaseHttpConnection;
 import org.apache.tez.http.HttpConnection;
 import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.http.SSLFactory;
+import org.apache.tez.runtime.library.common.security.SecureShuffleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -234,10 +235,12 @@ public class TezRuntimeUtils {
       }
     }
 
-    HttpConnectionParams httpConnParams = new HttpConnectionParams(keepAlive,
-        keepAliveMaxConnections, connectionTimeout, readTimeout, bufferSize, sslShuffle,
-        sslFactory);
-    return httpConnParams;
+    boolean skipVerifyRequest = conf.getBoolean(
+        SecureShuffleUtils.SHUFFLE_SKIP_VERIFY_REQUEST, SecureShuffleUtils.SHUFFLE_SKIP_VERIFY_REQUEST_DEFAULT);
+
+    return new HttpConnectionParams(keepAlive,
+        keepAliveMaxConnections, connectionTimeout, readTimeout, bufferSize,
+        sslShuffle, sslFactory, skipVerifyRequest);
   }
 
   public static BaseHttpConnection getHttpConnection(

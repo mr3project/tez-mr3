@@ -28,9 +28,11 @@ public class HttpConnectionParams {
   private final boolean sslShuffle;
   private final SSLFactory sslFactory;
 
+  private final boolean skipVerifyRequest;
+
   public HttpConnectionParams(boolean keepAlive, int keepAliveMaxConnections, int
-      connectionTimeout, int readTimeout, int bufferSize, boolean sslShuffle, SSLFactory
-      sslFactory) {
+      connectionTimeout, int readTimeout, int bufferSize,
+      boolean sslShuffle, SSLFactory sslFactory, boolean skipVerifyRequest) {
     this.keepAlive = keepAlive;
     this.keepAliveMaxConnections = keepAliveMaxConnections;
     this.connectionTimeout = connectionTimeout;
@@ -38,6 +40,7 @@ public class HttpConnectionParams {
     this.bufferSize = bufferSize;
     this.sslShuffle = sslShuffle;
     this.sslFactory = sslFactory;
+    this.skipVerifyRequest = skipVerifyRequest;
   }
 
   public int getBufferSize() {
@@ -68,6 +71,9 @@ public class HttpConnectionParams {
     return sslFactory;
   }
 
+  public boolean isSkipVerifyRequest() {
+    return skipVerifyRequest;
+  }
 
   public String toString() {
     StringBuilder sb = new StringBuilder();
