@@ -80,8 +80,19 @@ public class ShuffleServer implements FetcherCallback {
   }
 
   public static ShuffleServer getInstance() {
-    assert instance != null;
     return instance;
+  }
+
+  // Since ShuffleServer usually starts before executing tasks, all CompressionCode must use
+  // clones of ShuffleServer.fetcherConfig.codecConf for consistency.
+  public static Configuration getCodecConf(Configuration conf) {
+    if (instance != null) {
+      // clone because Decompressor uses locks on the Configuration object
+      return new Configuration(instance.fetcherConfig.codecConf);
+    } else {
+      // instance can be null if tasks start fast while ShuffleServer is loading, or when ShuffleServer is unsed
+      return new Configuration(conf);
+    }
   }
 
   // parameters required by Fetchers
@@ -291,13 +302,6 @@ public class ShuffleServer implements FetcherCallback {
 
     LOG.info("{} Configuration: numFetchers={}, maxTaskOutputAtOnce={}, FetcherConfig={}, rangesScheme={}, maxNumInputHosts={}",
         serverName, numFetchers, maxTaskOutputAtOnce, fetcherConfig, rangesScheme, maxNumInputHosts);
-  }
-
-  // Since ShuffleServer starts before executing tasks, all CompressionCode must use
-  // clones of ShuffleServer.fetcherConfig.codecConf for consistency.
-  public Configuration getCodecConf() {
-    // clone because Decompressor uses locks on the Configuration object
-    return new Configuration(fetcherConfig.codecConf);
   }
 
   public int[] getLocalShufflePorts() {

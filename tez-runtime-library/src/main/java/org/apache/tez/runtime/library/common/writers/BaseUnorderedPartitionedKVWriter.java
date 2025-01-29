@@ -144,7 +144,7 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
 
     // compression
     try {
-      Configuration codecConf = ShuffleServer.getInstance().getCodecConf();
+      Configuration codecConf = ShuffleServer.getCodecConf(conf);
       this.codec = CodecUtils.getCodec(codecConf);
     } catch (IOException e) {
       throw new RuntimeException(e);

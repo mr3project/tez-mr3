@@ -95,10 +95,8 @@ public abstract class MRInputBase extends AbstractLogicalInput {
             getContext().getTaskIndex()),
         getContext().getTaskAttemptNumber());
 
-    jobConf.set(MRJobConfig.TASK_ATTEMPT_ID,
-        taskAttemptId.toString());
-    jobConf.setInt(MRJobConfig.APPLICATION_ATTEMPT_ID,
-        getContext().getDAGAttemptNumber());
+    jobConf.set(MRJobConfig.TASK_ATTEMPT_ID, taskAttemptId.toString());
+    jobConf.setInt(MRJobConfig.APPLICATION_ATTEMPT_ID, getContext().getDAGAttemptNumber());
 
     TezDAGID tezDAGID = TezDAGID.getInstance(getContext().getApplicationId(), getContext().getDagIdentifier());
     TezVertexID tezVertexID = TezVertexID.getInstance(tezDAGID, getContext().getTaskVertexIndex());
