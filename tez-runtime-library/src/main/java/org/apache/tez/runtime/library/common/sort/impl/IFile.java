@@ -473,7 +473,7 @@ public class IFile {
         keyLength = buffer.getLength();
         assert(keyLength >= 0);
         if (rle && (keyLength == previous.getLength())) {
-          sameKey = (BufferUtils.compare(previous, buffer) == 0);
+          sameKey = BufferUtils.compareEqual(previous, buffer);
         }
       }
 
@@ -585,7 +585,7 @@ public class IFile {
 
       sameKey = (key == REPEAT_KEY);
       if (!sameKey && rle) {
-        sameKey = (keyLength != 0) && (BufferUtils.compare(previous, key) == 0);
+        sameKey = (keyLength != 0) && BufferUtils.compareEqual(previous, key);
       }
 
       if (!sameKey) {
