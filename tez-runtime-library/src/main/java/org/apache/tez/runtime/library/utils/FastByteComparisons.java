@@ -224,58 +224,34 @@ public final class FastByteComparisons {
       @Override
       public int compareTo(byte[] buffer1, int offset1, int length1,
           byte[] buffer2, int offset2, int length2) {
-        // Short circuit equal case
         if (buffer1 == buffer2 &&
             offset1 == offset2 &&
             length1 == length2) {
           return 0;
         }
+
+        final int stride = 8;
         int minLength = Math.min(length1, length2);
-        int minWords = minLength / Longs.BYTES;
+        int strideLimit = minLength & ~(stride - 1);
         int offset1Adj = offset1 + BYTE_ARRAY_BASE_OFFSET;
         int offset2Adj = offset2 + BYTE_ARRAY_BASE_OFFSET;
+        int i;
 
-        /*
-         * Compare 8 bytes at a time. Benchmarking shows comparing 8 bytes at a
-         * time is no slower than comparing 4 bytes at a time even on 32-bit.
-         * On the other hand, it is substantially faster on 64-bit.
-         */
-        for (int i = 0; i < minWords * Longs.BYTES; i += Longs.BYTES) {
+        for (i = 0; i < strideLimit; i += stride) {
           long lw = theUnsafe.getLong(buffer1, offset1Adj + (long) i);
           long rw = theUnsafe.getLong(buffer2, offset2Adj + (long) i);
-          long diff = lw ^ rw;
 
-          if (diff != 0) {
+          if (lw != rw) {
             if (!littleEndian) {
               return lessThanUnsigned(lw, rw) ? -1 : 1;
             }
 
-            // Use binary search
-            int n = 0;
-            int y;
-            int x = (int) diff;
-            if (x == 0) {
-              x = (int) (diff >>> 32);
-              n = 32;
-            }
-
-            y = x << 16;
-            if (y == 0) {
-              n += 16;
-            } else {
-              x = y;
-            }
-
-            y = x << 8;
-            if (y == 0) {
-              n += 8;
-            }
-            return (int) (((lw >>> n) & 0xFFL) - ((rw >>> n) & 0xFFL));
+            int n = Long.numberOfTrailingZeros(lw ^ rw) & ~0x7;
+            return ((int) ((lw >>> n) & 0xFF)) - ((int) ((rw >>> n) & 0xFF));
           }
         }
 
-        // The epilogue to cover the last (minLength % 8) elements.
-        for (int i = minWords * Longs.BYTES; i < minLength; i++) {
+        for (; i < minLength; i++) {
           int result = UnsignedBytes.compare(
               buffer1[offset1 + i],
               buffer2[offset2 + i]);
