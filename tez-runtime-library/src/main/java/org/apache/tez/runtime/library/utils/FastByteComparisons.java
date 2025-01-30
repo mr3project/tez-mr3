@@ -35,7 +35,7 @@ import com.google.common.primitives.UnsignedBytes;
  * This is borrowed and slightly modified from Guava's {@link com.google.common.primitives.UnsignedBytes}
  * class to be able to compare arrays that start at non-zero offsets.
  */
-final class FastByteComparisons {
+public final class FastByteComparisons {
 
   /**
    * Lexicographically compare two byte arrays.
