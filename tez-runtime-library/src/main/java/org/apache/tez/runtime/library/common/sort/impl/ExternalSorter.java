@@ -226,7 +226,7 @@ public abstract class ExternalSorter {
     numAdditionalSpills = outputContext.getCounters().findCounter(TaskCounter.ADDITIONAL_SPILL_COUNT);
     numShuffleChunks = outputContext.getCounters().findCounter(TaskCounter.SHUFFLE_CHUNK_COUNT);
 
-    Configuration codecConf = ShuffleServer.getCodecConf(conf);
+    Configuration codecConf = ShuffleServer.getCodecConf((ShuffleServer)outputContext.getShuffleServer());
     this.codec = CodecUtils.getCodec(codecConf);
 
     this.ifileReadAhead = this.conf.getBoolean(

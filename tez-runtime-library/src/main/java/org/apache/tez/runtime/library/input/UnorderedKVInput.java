@@ -114,7 +114,7 @@ public class UnorderedKVInput extends AbstractLogicalInput {
       ////// Initial configuration
       memoryUpdateCallbackHandler.validateUpdateReceived();
 
-      Configuration codecConf = ShuffleServer.getCodecConf(conf);
+      Configuration codecConf = ShuffleServer.getCodecConf((ShuffleServer)getContext().getShuffleServer());
       CompressionCodec codec = CodecUtils.getCodec(codecConf);
 
       boolean compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
