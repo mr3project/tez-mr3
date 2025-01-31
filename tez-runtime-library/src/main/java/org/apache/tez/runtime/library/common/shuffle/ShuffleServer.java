@@ -248,7 +248,8 @@ public class ShuffleServer implements FetcherCallback {
 
   private final AtomicBoolean isShutdown = new AtomicBoolean(false);
 
-  // TODO: introduce a configuration key if it is necessary to create two or more speculative fetchers
+  // If even a speculative fetch fails, just fail the running TaskAttempt.
+  // Hence, we do not introduce a configuration key for MAX_SPECULATIVE_FETCH_ATTEMPTS. 
   private static final int MAX_SPECULATIVE_FETCH_ATTEMPTS = 1;
 
   public ShuffleServer(
