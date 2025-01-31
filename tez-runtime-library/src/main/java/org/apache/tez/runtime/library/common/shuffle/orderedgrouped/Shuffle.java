@@ -164,7 +164,9 @@ public class Shuffle implements ExceptionReporter {
         ShuffleUtils.isTezShuffleHandler(conf));
 
     ExecutorService rawExecutor = Executors.newFixedThreadPool(1, new ThreadFactoryBuilder()
-        .setDaemon(true).setNameFormat("ShuffleAndMergeRunner {" + srcNameTrimmed + "}").build());
+        .setDaemon(true)
+        .setNameFormat("ShuffleMerge " + srcNameTrimmed + "/" + inputContext.getUniqueIdentifier())
+        .build());
 
     executor = MoreExecutors.listeningDecorator(rawExecutor);
     runShuffleCallable = new RunShuffleCallable();
