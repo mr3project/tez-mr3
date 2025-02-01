@@ -102,7 +102,7 @@ public class Shuffle implements ExceptionReporter {
     this.inputContext = inputContext;
     this.srcNameTrimmed = TezUtilsInternal.cleanVertexName(inputContext.getSourceVertexName());
 
-    Configuration codecConf = ShuffleServer.getCodecConf((ShuffleServer)inputContext.getShuffleServer());
+    Configuration codecConf = ShuffleServer.getCodecConf(inputContext.peekShuffleServer(), conf);
     CompressionCodec codec = CodecUtils.getCodec(codecConf);
 
     boolean ifileReadAhead = conf.getBoolean(

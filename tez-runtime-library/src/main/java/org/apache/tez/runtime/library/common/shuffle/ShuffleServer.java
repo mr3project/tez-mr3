@@ -75,9 +75,13 @@ public class ShuffleServer implements FetcherCallback {
     return new ShuffleServer(context, conf, numFetchers, context.getUniqueIdentifier());
   }
 
-  public static Configuration getCodecConf(ShuffleServer instance) {
+  public static Configuration getCodecConf(Object instance, Configuration conf) {
     // clone because Decompressor uses locks on the Configuration object
-    return new Configuration(instance.fetcherConfig.codecConf);
+    if (instance != null) {
+      return new Configuration(((ShuffleServer)instance).fetcherConfig.codecConf);
+    } else {
+      return new Configuration(conf);
+    }
   }
 
   // parameters required by Fetchers

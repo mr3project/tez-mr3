@@ -264,4 +264,5 @@ public interface TaskContext extends DecompressorPool {
   // we use Object (instead of ShuffleServer) because of dependency issues
   public void setShuffleServer(Object shuffleServer);
   public Object getShuffleServer() throws IOException;
+  public Object peekShuffleServer();
 }
