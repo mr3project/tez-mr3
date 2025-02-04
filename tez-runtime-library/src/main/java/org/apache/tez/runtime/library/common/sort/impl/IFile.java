@@ -79,6 +79,8 @@ public class IFile {
 
   private static final ThreadLocal<Decompressor> decompressorHolder = new ThreadLocal<>();
 
+  private static final int INT_SIZE = 4;
+
   public static Decompressor returnThreadLocalDecompressor() {
     Decompressor decompressor = decompressorHolder.get();
     decompressorHolder.remove();
@@ -151,8 +153,7 @@ public class IFile {
      * @return size of the base cache needed
      */
     static int getBaseCacheSize() {
-      return (HEADER.length + checksumSize
-          + (2 * WritableUtils.getVIntSize(EOF_MARKER)));
+      return (HEADER.length + checksumSize + (2 * INT_SIZE));
     }
 
     boolean shouldWriteToDisk() {
@@ -222,8 +223,8 @@ public class IFile {
       if (!bufferFull) {
         // Compute actual payload size: write RLE marker, length info and then entire data.
         totalSize += ((prevKey == REPEAT_KEY) ? V_END_MARKER_SIZE : 0)
-            + WritableUtils.getVIntSize(keyLength) + keyLength
-            + WritableUtils.getVIntSize(valueLength) + valueLength;
+            + INT_SIZE + keyLength
+            + INT_SIZE + valueLength;
 
         if (shouldWriteToDisk()) {
           resetToFileBasedWriter();
@@ -235,8 +236,7 @@ public class IFile {
     @Override
     protected void writeValue(byte[] data, int offset, int length) throws IOException {
       if (!bufferFull) {
-        totalSize += ((prevKey != REPEAT_KEY) ? RLE_MARKER_SIZE : 0)
-            + WritableUtils.getVIntSize(length) + length;
+        totalSize += ((prevKey != REPEAT_KEY) ? RLE_MARKER_SIZE : 0) + INT_SIZE + length;
 
         if (shouldWriteToDisk()) {
           resetToFileBasedWriter();
@@ -316,8 +316,8 @@ public class IFile {
     @VisibleForTesting
     boolean sameKey = false;
 
-    final int RLE_MARKER_SIZE = WritableUtils.getVIntSize(RLE_MARKER);
-    final int V_END_MARKER_SIZE = WritableUtils.getVIntSize(V_END_MARKER);
+    final int RLE_MARKER_SIZE = INT_SIZE;
+    final int V_END_MARKER_SIZE = INT_SIZE;
 
     // de-dup keys or not
     protected final boolean rle;
@@ -417,8 +417,8 @@ public class IFile {
       writeValueMarker(out);
 
       // Write EOF_MARKER for key/value length
-      WritableUtils.writeVInt(out, EOF_MARKER);
-      WritableUtils.writeVInt(out, EOF_MARKER);
+      out.writeInt(EOF_MARKER);
+      out.writeInt(EOF_MARKER);
       decompressedBytesWritten += 2 * WritableUtils.getVIntSize(EOF_MARKER);
       //account for header bytes
       decompressedBytesWritten += HEADER.length;
@@ -604,7 +604,7 @@ public class IFile {
 
     protected void writeValue(byte[] data, int offset, int length) throws IOException {
       writeRLE(out);
-      WritableUtils.writeVInt(out, length); // value length
+      out.writeInt(length); // value length
       out.write(data, offset, length);
       // Update bytes written
       decompressedBytesWritten +=
@@ -618,8 +618,8 @@ public class IFile {
     protected void writeKVPair(byte[] keyData, int keyPos, int keyLength,
         byte[] valueData, int valPos, int valueLength) throws IOException {
       writeValueMarker(out);
-      WritableUtils.writeVInt(out, keyLength);
-      WritableUtils.writeVInt(out, valueLength);
+      out.writeInt(keyLength);
+      out.writeInt(valueLength);
       out.write(keyData, keyPos, keyLength);
       out.write(valueData, valPos, valueLength);
 
@@ -641,7 +641,7 @@ public class IFile {
        * {RLE, VL2, V2, VL3, V3, ...V_END_MARKER}
        */
       if (prevKey != REPEAT_KEY) {
-        WritableUtils.writeVInt(out, RLE_MARKER);
+        out.writeInt(RLE_MARKER);
         decompressedBytesWritten += RLE_MARKER_SIZE;
         rleWritten++;
       }
@@ -654,7 +654,7 @@ public class IFile {
        * stream.
        */
       if (prevKey == REPEAT_KEY) {
-        WritableUtils.writeVInt(out, V_END_MARKER);
+        out.writeInt(V_END_MARKER);
         decompressedBytesWritten += V_END_MARKER_SIZE;
       }
     }
@@ -958,7 +958,7 @@ public class IFile {
     }
 
     protected void readValueLength(DataInput dIn) throws IOException {
-      currentValueLength = WritableUtils.readVInt(dIn);
+      currentValueLength = dIn.readInt();
       bytesRead += WritableUtils.getVIntSize(currentValueLength);
       if (currentValueLength == V_END_MARKER) {
         readKeyValueLength(dIn);
@@ -966,8 +966,8 @@ public class IFile {
     }
 
     protected void readKeyValueLength(DataInput dIn) throws IOException {
-      currentKeyLength = WritableUtils.readVInt(dIn);
-      currentValueLength = WritableUtils.readVInt(dIn);
+      currentKeyLength = dIn.readInt();
+      currentValueLength = dIn.readInt();
       if (currentKeyLength != RLE_MARKER) {
         // original key length
         originalKeyLength = currentKeyLength;
