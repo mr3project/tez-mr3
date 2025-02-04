@@ -940,16 +940,14 @@ public class IFile {
      * Read up to len bytes into buf starting at offset off.
      *
      * @param buf buffer
-     * @param off offset
      * @param len length of buffer
      * @return the no. of bytes read
      * @throws IOException
      */
-    private int readData(byte[] buf, int off, int len) throws IOException {
+    private int readData(byte[] buf, int len) throws IOException {
       int bytesRead = 0;
       while (bytesRead < len) {
-        int n = IOUtils.wrappedReadForCompressedData(in, buf, off + bytesRead,
-            len - bytesRead);
+        int n = IOUtils.wrappedReadForCompressedData(in, buf, bytesRead, len - bytesRead);
         if (n < 0) {
           return bytesRead;
         }
@@ -1055,7 +1053,7 @@ public class IFile {
       if (keyBytes.length < currentKeyLength) {
         keyBytes = createLargerArray(currentKeyLength);
       }
-      int i = readData(keyBytes, 0, currentKeyLength);
+      int i = readData(keyBytes, currentKeyLength);
       if (i != currentKeyLength) {
         throw new IOException(String.format(INCOMPLETE_READ, currentKeyLength, i));
       }
@@ -1072,7 +1070,7 @@ public class IFile {
         valBytes = value.getData();
       }
 
-      int i = readData(valBytes, 0, currentValueLength);
+      int i = readData(valBytes, currentValueLength);
       if (i != currentValueLength) {
         throw new IOException(String.format(INCOMPLETE_READ, currentValueLength, i));
       }
