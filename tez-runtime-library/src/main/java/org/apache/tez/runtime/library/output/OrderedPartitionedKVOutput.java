@@ -68,6 +68,7 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
   private static final Logger LOG = LoggerFactory.getLogger(OrderedPartitionedKVOutput.class);
 
   protected ExternalSorter sorter;
+  private boolean usePipelinedSorter = false;
   protected Configuration conf;
   private RawLocalFileSystem localFs;
   protected MemoryUpdateCallbackHandler memoryUpdateCallbackHandler;
@@ -150,6 +151,7 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
       if (sorterImpl.equals(SorterImpl.PIPELINED)) {
         sorter = new PipelinedSorter(getContext(), conf, getNumPhysicalOutputs(),
             memoryUpdateCallbackHandler.getMemoryAssigned());
+        usePipelinedSorter = true;
       } else if (sorterImpl.equals(SorterImpl.LEGACY)) {
         sorter = new DefaultSorter(getContext(), conf, getNumPhysicalOutputs(),
             memoryUpdateCallbackHandler.getMemoryAssigned());
@@ -214,9 +216,16 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
         // this occurs when PipelinedSorter threads gets interrupted and LogicalOutput.close() is closed
         return eventList;
       }
+
+      // In PipelinedSorter.flush() skips renaming output directories if finalMergeEnabled == true && numSpills == 1.
+      // Here we adjust pathComponent in accordance so that downstream tasks can request, e.g., ".../...10031_0/file.out".
+      String pathComponent = (usePipelinedSorter && sorter.getNumSpills() == 1) ?
+          getContext().getUniqueIdentifier() + "_0" :   // use original output directory ".../...10031_0"
+          getContext().getUniqueIdentifier();           // use renamed output directory ".../...10031"
+
       ShuffleUtils.generateEventOnSpill(eventList, finalMergeEnabled, isLastEvent,
           getContext(), 0, new TezSpillRecord(sorter.getFinalIndexFile(), localFs),
-          getNumPhysicalOutputs(), sendEmptyPartitionDetails, getContext().getUniqueIdentifier(),
+          getNumPhysicalOutputs(), sendEmptyPartitionDetails, pathComponent,
           sorter.getPartitionStats(), sorter.reportDetailedPartitionStats(), auxiliaryService, deflater,
           compositeFetch);
     }

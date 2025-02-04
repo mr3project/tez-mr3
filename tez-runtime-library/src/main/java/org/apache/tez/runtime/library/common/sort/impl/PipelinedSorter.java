@@ -239,6 +239,7 @@ public class PipelinedSorter extends ExternalSorter {
     keySerializer.open(span.out);
     minSpillsForCombine = this.conf.getInt(TezRuntimeConfiguration.TEZ_RUNTIME_COMBINE_MIN_SPILLS, 3);
     deflater = TezCommonUtils.newBestCompressionDeflater();
+
     finalEvents = Lists.newLinkedList();
   }
 
@@ -713,8 +714,7 @@ public class PipelinedSorter extends ExternalSorter {
       }
 
       if (!isFinalMergeEnabled()) {
-
-        //For pipelined shuffle, previous events are already sent. Just generate the last event alone
+        // For pipelined shuffle, previous events are already sent. Just generate the last event alone
         int startIndex = (pipelinedShuffle) ? (numSpills - 1) : 0;
         int endIndex = numSpills;
 
@@ -734,22 +734,26 @@ public class PipelinedSorter extends ExternalSorter {
 
       numAdditionalSpills.increment(numSpills - 1);
 
-      //In case final merge is required, the following code path is executed.
+      // In case final merge is required, the following code path is executed.
       if (numSpills == 1) {
         // someday be able to pass this directly to shuffle
         // without writing to disk
+        // Originally we rename the directory by removing the suffix _0, e.g.:
+        //   .../attempt_1734148871257_0437_1_02_000001_0_10031_0/file.out
+        //   -->
+        //   .../attempt_1734148871257_0437_1_02_000001_0_10031/file.out
+        // As a minor optimization, we skip renaming and use the existing output, e.g., ".../...10031_0/file.out".
+        // OrderedPartitionedKVOutput.generateEvents() adjusts pathComponent by appending "_0" so that
+        // downstream tasks can request ".../...10031_0/file.out" instead of ".../...10031/file.out".
         final Path filename = spillFilePaths.get(0);
         final Path indexFilename = spillFileIndexPaths.get(0);
-        finalOutputFile = mapOutputFile.getOutputFileForWriteInVolume(filename);
-        finalIndexFile = mapOutputFile.getOutputIndexFileForWriteInVolume(indexFilename);
+        finalOutputFile = filename;
+        finalIndexFile = indexFilename;
 
-        sameVolRename(filename, finalOutputFile);
-        sameVolRename(indexFilename, finalIndexFile);
         if (LOG.isDebugEnabled()) {
           LOG.debug(outputContext.getDestinationVertexName() + ": numSpills=" + numSpills +
               ", finalOutputFile=" + finalOutputFile + ", "
-              + "finalIndexFile=" + finalIndexFile + ", filename=" + filename + ", indexFilename=" +
-              indexFilename);
+              + "finalIndexFile=" + finalIndexFile);
         }
         TezSpillRecord spillRecord = new TezSpillRecord(finalIndexFile, localFs);
         if (reportPartitionStats()) {
