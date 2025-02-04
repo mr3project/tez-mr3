@@ -37,6 +37,7 @@ import org.apache.hadoop.io.compress.CompressionOutputStream;
 import org.apache.hadoop.io.compress.Compressor;
 import org.apache.hadoop.io.compress.Decompressor;
 import org.apache.hadoop.io.compress.DefaultCodec;
+import org.apache.hadoop.io.compress.SnappyCodec;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.security.JobTokenSecretManager;
@@ -180,9 +181,27 @@ public final class CodecUtils {
       Configurable configurableCodec = (Configurable) codec;
       Configuration conf = configurableCodec.getConf();
 
+      if (bufferSizeProp.equals(CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_KEY)) {
+        int defaultBufferSize = CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_DEFAULT;
+        int newBufSize = Math.min(compressedLength, defaultBufferSize);
+        SnappyCodec snappyCodec = (SnappyCodec)codec;
+        synchronized (conf) {
+          int originalSize = snappyCodec.getBufferSize();
+          if (originalSize != newBufSize) {
+            snappyCodec.setBufferSize(newBufSize);
+          }
+          in = snappyCodec.createInputStream(checksumIn, decompressor);
+          if (originalSize != newBufSize) {
+            snappyCodec.setBufferSize(originalSize);
+          }
+        }
+        return in;
+      }
+
       // for Zstd, newBufSize is always 0 because defaultBufferSize == 0 in Math.min(compressedLength, defaultBufferSize)
       // hence, we skip conf.getInt/setInt().
       if (bufferSizeProp.equals(CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_KEY)) {
+        assert CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_DEFAULT == 0;
         synchronized (conf) {
           in = codec.createInputStream(checksumIn, decompressor);
         }
@@ -272,14 +291,14 @@ public final class CodecUtils {
 
   public static String getBufferSizeProperty(String codecClassName) {
     switch (codecClassName) {
-    case "org.apache.hadoop.io.compress.DefaultCodec":
-    case "org.apache.hadoop.io.compress.BZip2Codec":
-    case "org.apache.hadoop.io.compress.GzipCodec":
-      return CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_KEY;
     case "org.apache.hadoop.io.compress.SnappyCodec":
       return CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_KEY;
     case "org.apache.hadoop.io.compress.ZStandardCodec":
       return CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_KEY;
+    case "org.apache.hadoop.io.compress.DefaultCodec":
+    case "org.apache.hadoop.io.compress.BZip2Codec":
+    case "org.apache.hadoop.io.compress.GzipCodec":
+      return CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_KEY;
     case "org.apache.hadoop.io.compress.LzoCodec":
     case "com.hadoop.compression.lzo.LzoCodec":
       return CommonConfigurationKeys.IO_COMPRESSION_CODEC_LZO_BUFFERSIZE_KEY;
@@ -296,14 +315,14 @@ public final class CodecUtils {
 
   public static int getDefaultBufferSize(String codecClassName) {
     switch (codecClassName) {
-    case "org.apache.hadoop.io.compress.DefaultCodec":
-    case "org.apache.hadoop.io.compress.BZip2Codec":
-    case "org.apache.hadoop.io.compress.GzipCodec":
-      return CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_DEFAULT;
     case "org.apache.hadoop.io.compress.SnappyCodec":
       return CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_DEFAULT;
     case "org.apache.hadoop.io.compress.ZStandardCodec":
       return CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_DEFAULT;
+    case "org.apache.hadoop.io.compress.DefaultCodec":
+    case "org.apache.hadoop.io.compress.BZip2Codec":
+    case "org.apache.hadoop.io.compress.GzipCodec":
+      return CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_DEFAULT;
     case "org.apache.hadoop.io.compress.LzoCodec":
     case "com.hadoop.compression.lzo.LzoCodec":
       return CommonConfigurationKeys.IO_COMPRESSION_CODEC_LZO_BUFFERSIZE_DEFAULT;
