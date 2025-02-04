@@ -264,11 +264,6 @@ public abstract class ExternalSorter {
     this.compositeFetch = ShuffleUtils.isTezShuffleHandler(this.conf);
   }
 
-  @VisibleForTesting
-  public boolean isFinalMergeEnabled() {
-    return finalMergeEnabled;
-  }
-
   /**
    * Exception indicating that the allocated sort buffer is insufficient to hold
    * the current record.

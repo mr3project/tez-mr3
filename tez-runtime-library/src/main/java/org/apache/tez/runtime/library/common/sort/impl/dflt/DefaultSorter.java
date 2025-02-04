@@ -176,7 +176,7 @@ public final class DefaultSorter extends ExternalSorter implements IndexedSortab
     bufferRemaining = softLimit;
     LOG.info("{}: {}={}, soft limit={}, bufstart={}, bufvoid={}, kvstart{}, legnth={}, finalMergeEnabled={}",
       outputContext.getDestinationVertexName(), TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB, sortmb, softLimit,
-      bufstart, bufvoid, kvstart, maxRec, isFinalMergeEnabled());
+      bufstart, bufvoid, kvstart, maxRec, finalMergeEnabled);
 
     // k/v serialization
     valSerializer.open(bb);
@@ -727,7 +727,7 @@ public final class DefaultSorter extends ExternalSorter implements IndexedSortab
       cleanup();
       Thread.currentThread().interrupt();
     }
-    if (isFinalMergeEnabled()) {
+    if (finalMergeEnabled) {
       fileOutputByteCounter.increment(rfs.getFileStatus(finalOutputFile).getLen());
     }
   }
@@ -842,7 +842,7 @@ public final class DefaultSorter extends ExternalSorter implements IndexedSortab
   }
 
   private void adjustSpillCounters(long rawLen, long compLength) {
-    if (!isFinalMergeEnabled()) {
+    if (!finalMergeEnabled) {
       outputBytesWithOverheadCounter.increment(rawLen);
     } else {
       if (numSpills > 0) {
@@ -932,7 +932,7 @@ public final class DefaultSorter extends ExternalSorter implements IndexedSortab
           final TezIndexRecord rec =
               new TezIndexRecord(segmentStart, rawLength, partLength);
           spillRec.putIndex(rec, i);
-          if (!isFinalMergeEnabled() && reportPartitionStats() && writer != null) {
+          if (!finalMergeEnabled && reportPartitionStats() && writer != null) {
             partitionStats[i] += rawLength;
           }
           writer = null;
@@ -956,7 +956,7 @@ public final class DefaultSorter extends ExternalSorter implements IndexedSortab
       LOG.info("{}: Finished spill {} at {}",
           outputContext.getDestinationVertexName(), numSpills, filename.toString());
       ++numSpills;
-      if (!isFinalMergeEnabled()) {
+      if (!finalMergeEnabled) {
         numShuffleChunks.setValue(numSpills);
       } else if (numSpills > 1) {
         //Increment only when there was atleast one previous spill
@@ -1035,7 +1035,7 @@ public final class DefaultSorter extends ExternalSorter implements IndexedSortab
           spillRec.size() * MAP_OUTPUT_INDEX_RECORD_LENGTH;
       }
       ++numSpills;
-      if (!isFinalMergeEnabled()) {
+      if (!finalMergeEnabled) {
         numShuffleChunks.setValue(numSpills);
       } else if (numSpills > 1) {
         //Increment only when there is atleast one previous spill
@@ -1140,13 +1140,13 @@ public final class DefaultSorter extends ExternalSorter implements IndexedSortab
 
   private void maybeSendEventForSpill(List<Event> events, boolean isLastEvent,
       TezSpillRecord spillRecord, int index, boolean sendEvent) throws IOException {
-    if (isFinalMergeEnabled()) {
+    if (finalMergeEnabled) {
       return;
     }
     Preconditions.checkArgument(spillRecord != null, "Spill record can not be null");
 
     String pathComponent = (outputContext.getUniqueIdentifier() + "_" + index);
-    ShuffleUtils.generateEventOnSpill(events, isFinalMergeEnabled(), isLastEvent,
+    ShuffleUtils.generateEventOnSpill(events, finalMergeEnabled, isLastEvent,
         outputContext, index, spillRecord, partitions, sendEmptyPartitionDetails, pathComponent,
         partitionStats, reportDetailedPartitionStats(), auxiliaryService, deflater,
         compositeFetch);
@@ -1160,7 +1160,7 @@ public final class DefaultSorter extends ExternalSorter implements IndexedSortab
   }
 
   private void maybeAddEventsForSpills() throws IOException {
-    if (isFinalMergeEnabled()) {
+    if (finalMergeEnabled) {
       return;
     }
     List<Event> events = Lists.newLinkedList();
@@ -1198,7 +1198,7 @@ public final class DefaultSorter extends ExternalSorter implements IndexedSortab
     }
     if (numSpills == 1) { //the spill is the final output
       TezSpillRecord spillRecord = null;
-      if (isFinalMergeEnabled()) {
+      if (finalMergeEnabled) {
         finalOutputFile = mapOutputFile.getOutputFileForWriteInVolume(filename[0]);
         finalIndexFile = mapOutputFile.getOutputIndexFileForWriteInVolume(filename[0]);
         sameVolRename(filename[0], finalOutputFile);
@@ -1236,7 +1236,7 @@ public final class DefaultSorter extends ExternalSorter implements IndexedSortab
     }
 
     //Check if it is needed to do final merge. Or else, exit early.
-    if (numSpills > 0 && !isFinalMergeEnabled()) {
+    if (numSpills > 0 && !finalMergeEnabled) {
       maybeAddEventsForSpills();
       //No need to do final merge.
       return;
@@ -1247,7 +1247,7 @@ public final class DefaultSorter extends ExternalSorter implements IndexedSortab
     finalOutFileSize += partitions * APPROX_HEADER_LENGTH;
     finalIndexFileSize = partitions * MAP_OUTPUT_INDEX_RECORD_LENGTH;
 
-    if (isFinalMergeEnabled()) {
+    if (finalMergeEnabled) {
       finalOutputFile = mapOutputFile.getOutputFileForWrite(finalOutFileSize);
       finalIndexFile = mapOutputFile.getOutputIndexFileForWrite(finalIndexFileSize);
     } else if (numSpills == 0) {
@@ -1291,7 +1291,7 @@ public final class DefaultSorter extends ExternalSorter implements IndexedSortab
         finalOut.close();
       }
       ++numSpills;
-      if (!isFinalMergeEnabled()) {
+      if (!finalMergeEnabled) {
         List<Event> events = Lists.newLinkedList();
         maybeSendEventForSpill(events, true, sr, 0, true);
         fileOutputByteCounter.increment(rfs.getFileStatus(finalOutputFile).getLen());

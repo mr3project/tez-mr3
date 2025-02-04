@@ -166,7 +166,7 @@ public class PipelinedSorter extends ExternalSorter {
         .TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED, TezRuntimeConfiguration
         .TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT);
 
-    pipelinedShuffle = !isFinalMergeEnabled() && confPipelinedShuffle;
+    pipelinedShuffle = !finalMergeEnabled && confPipelinedShuffle;
     auxiliaryService = conf.get(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
         TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT);
     //sanity checks
@@ -217,7 +217,7 @@ public class PipelinedSorter extends ExternalSorter {
       initialSetupLogLine.append(", useSoftReference=").append(useSoftReference);
       initialSetupLogLine.append(", minBlockSize=").append(MIN_BLOCK_SIZE);
       initialSetupLogLine.append(", initial BLOCK_SIZE=").append(buffers.get(0).capacity());
-      initialSetupLogLine.append(", finalMergeEnabled=").append(isFinalMergeEnabled());
+      initialSetupLogLine.append(", finalMergeEnabled=").append(finalMergeEnabled);
       initialSetupLogLine.append(", pipelinedShuffle=").append(pipelinedShuffle);
       initialSetupLogLine.append(", sendEmptyPartitions=").append(sendEmptyPartitionDetails);
       initialSetupLogLine.append(", ").append(TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB).append("=").append(sortmb);
@@ -381,7 +381,7 @@ public class PipelinedSorter extends ExternalSorter {
   private void sendPipelinedShuffleEvents() throws IOException{
     List<Event> events = Lists.newLinkedList();
     String pathComponent = (outputContext.getUniqueIdentifier() + "_" + (numSpills-1));
-    ShuffleUtils.generateEventOnSpill(events, isFinalMergeEnabled(), false,
+    ShuffleUtils.generateEventOnSpill(events, finalMergeEnabled, false,
         outputContext, (numSpills - 1), indexCacheList.get(numSpills - 1),
         partitions, sendEmptyPartitionDetails, pathComponent, partitionStats,
         reportDetailedPartitionStats(), auxiliaryService, deflater,
@@ -473,7 +473,7 @@ public class PipelinedSorter extends ExternalSorter {
   }
 
   private void adjustSpillCounters(long rawLength, long compLength) {
-    if (!isFinalMergeEnabled()) {
+    if (!finalMergeEnabled) {
       outputBytesWithOverheadCounter.increment(rawLength);
     } else {
       if (numSpills > 0) {
@@ -549,7 +549,7 @@ public class PipelinedSorter extends ExternalSorter {
       //TODO: honor cache limits
       indexCacheList.add(spillRec);
       ++numSpills;
-      if (!isFinalMergeEnabled()) {
+      if (!finalMergeEnabled) {
           fileOutputByteCounter.increment(rfs.getFileStatus(filename).getLen());
           //No final merge. Set the number of files offered via shuffle-handler
           numShuffleChunks.setValue(numSpills);
@@ -625,7 +625,7 @@ public class PipelinedSorter extends ExternalSorter {
         final TezIndexRecord rec =
             new TezIndexRecord(segmentStart, rawLength, partLength);
         spillRec.putIndex(rec, i);
-        if (!isFinalMergeEnabled() && reportPartitionStats()) {
+        if (!finalMergeEnabled && reportPartitionStats()) {
           partitionStats[i] += rawLength;
         }
       }
@@ -638,7 +638,7 @@ public class PipelinedSorter extends ExternalSorter {
       //TODO: honor cache limits
       indexCacheList.add(spillRec);
       ++numSpills;
-      if (!isFinalMergeEnabled()) {
+      if (!finalMergeEnabled) {
         fileOutputByteCounter.increment(rfs.getFileStatus(filename).getLen());
         //No final merge. Set the number of files offered via shuffle-handler
         numShuffleChunks.setValue(numSpills);
@@ -714,7 +714,7 @@ public class PipelinedSorter extends ExternalSorter {
         return;
       }
 
-      if (!isFinalMergeEnabled()) {
+      if (!finalMergeEnabled) {
         // For pipelined shuffle, previous events are already sent. Just generate the last event alone
         int startIndex = (pipelinedShuffle) ? (numSpills - 1) : 0;
         int endIndex = numSpills;
@@ -722,7 +722,7 @@ public class PipelinedSorter extends ExternalSorter {
         for (int i = startIndex; i < endIndex; i++) {
           boolean isLastEvent = (i == numSpills - 1);
           String pathComponent = (outputContext.getUniqueIdentifier() + "_" + i);
-          ShuffleUtils.generateEventOnSpill(finalEvents, isFinalMergeEnabled(), isLastEvent,
+          ShuffleUtils.generateEventOnSpill(finalEvents, finalMergeEnabled, isLastEvent,
               outputContext, i, indexCacheList.get(i), partitions,
               sendEmptyPartitionDetails, pathComponent, partitionStats,
               reportDetailedPartitionStats(), auxiliaryService, deflater,
