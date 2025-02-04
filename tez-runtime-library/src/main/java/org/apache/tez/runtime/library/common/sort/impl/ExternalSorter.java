@@ -26,7 +26,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.OutputStatisticsReporter;

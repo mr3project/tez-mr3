@@ -66,6 +66,7 @@ import org.apache.tez.common.counters.TezCounter;
 @InterfaceStability.Unstable
 public class IFile {
   private static final Logger LOG = LoggerFactory.getLogger(IFile.class);
+  private static final boolean isDebugEnabled = LOG.isDebugEnabled();
   public static final int EOF_MARKER = -1; // End of File Marker
   public static final int RLE_MARKER = -2; // Repeat same key marker
   public static final int V_END_MARKER = -3; // End of values marker
@@ -447,7 +448,7 @@ public class IFile {
       if (writtenRecordsCounter != null) {
         writtenRecordsCounter.increment(numRecordsWritten);
       }
-      if (LOG.isDebugEnabled()) {
+      if (isDebugEnabled) {
         LOG.debug("Total keys written=" + numRecordsWritten + "; rleEnabled=" + rle + "; Savings" +
             "(due to multi-kv/rle)=" + totalKeySaving + "; number of RLEs written=" +
             rleWritten + "; compressedLen=" + compressedBytesWritten + "; rawLen="
@@ -870,7 +871,7 @@ public class IFile {
           try {
             in.close();
           } catch(IOException e) {
-            if(LOG.isDebugEnabled()) {
+            if(isDebugEnabled) {
               LOG.debug("Exception in closing " + in, e);
             }
           }
@@ -1037,7 +1038,7 @@ public class IFile {
 
     public KeyState readRawKey(DataInputBuffer key) throws IOException {
       if (!positionToNextRecord(dataIn)) {
-        if (LOG.isDebugEnabled()) {
+        if (isDebugEnabled) {
           LOG.debug("currentKeyLength=" + currentKeyLength +
               ", currentValueLength=" + currentValueLength +
               ", bytesRead=" + bytesRead +
