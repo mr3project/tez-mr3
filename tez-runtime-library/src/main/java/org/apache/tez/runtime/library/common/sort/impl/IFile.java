@@ -45,7 +45,6 @@ import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.tez.runtime.library.utils.BufferUtils;
 import org.apache.tez.runtime.library.utils.CodecUtils;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.io.compress.CodecPool;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.io.compress.CompressionOutputStream;
@@ -417,9 +416,12 @@ public class IFile {
       writeValueMarker(out);
 
       // Write EOF_MARKER for key/value length
-      out.writeInt(EOF_MARKER);
-      out.writeInt(EOF_MARKER);
-      decompressedBytesWritten += 2 * WritableUtils.getVIntSize(EOF_MARKER);
+      // out.writeInt(EOF_MARKER);
+      // out.writeInt(EOF_MARKER);
+      long combined = ((long) EOF_MARKER << 32) | (EOF_MARKER & 0xFFFFFFFFL);
+      out.writeLong(combined);
+
+      decompressedBytesWritten += 2 * INT_SIZE;
       //account for header bytes
       decompressedBytesWritten += HEADER.length;
 
@@ -607,8 +609,7 @@ public class IFile {
       out.writeInt(length); // value length
       out.write(data, offset, length);
       // Update bytes written
-      decompressedBytesWritten +=
-          length + WritableUtils.getVIntSize(length);
+      decompressedBytesWritten += length + INT_SIZE;
       if (serializedUncompressedBytes != null) {
         serializedUncompressedBytes.increment(length);
       }
@@ -618,15 +619,17 @@ public class IFile {
     protected void writeKVPair(byte[] keyData, int keyPos, int keyLength,
         byte[] valueData, int valPos, int valueLength) throws IOException {
       writeValueMarker(out);
-      out.writeInt(keyLength);
-      out.writeInt(valueLength);
+
+      // out.writeInt(keyLength);
+      // out.writeInt(valueLength);
+      long combined = ((long) keyLength << 32) | (valueLength & 0xFFFFFFFFL);
+      out.writeLong(combined);
+
       out.write(keyData, keyPos, keyLength);
       out.write(valueData, valPos, valueLength);
 
       // Update bytes written
-      decompressedBytesWritten +=
-          keyLength + valueLength + WritableUtils.getVIntSize(keyLength)
-              + WritableUtils.getVIntSize(valueLength);
+      decompressedBytesWritten += keyLength + valueLength + INT_SIZE + INT_SIZE;
       if (serializedUncompressedBytes != null) {
         serializedUncompressedBytes.increment(keyLength + valueLength);
       }
@@ -959,22 +962,24 @@ public class IFile {
 
     protected void readValueLength(DataInput dIn) throws IOException {
       currentValueLength = dIn.readInt();
-      bytesRead += WritableUtils.getVIntSize(currentValueLength);
+      bytesRead += INT_SIZE;
       if (currentValueLength == V_END_MARKER) {
         readKeyValueLength(dIn);
       }
     }
 
     protected void readKeyValueLength(DataInput dIn) throws IOException {
-      currentKeyLength = dIn.readInt();
-      currentValueLength = dIn.readInt();
+      // currentKeyLength = dIn.readInt();
+      // currentValueLength = dIn.readInt();
+      long combined = dIn.readLong();
+      currentKeyLength = (int) (combined >> 32);
+      currentValueLength = (int) combined;
+
       if (currentKeyLength != RLE_MARKER) {
         // original key length
         originalKeyLength = currentKeyLength;
       }
-      bytesRead +=
-          WritableUtils.getVIntSize(currentKeyLength)
-              + WritableUtils.getVIntSize(currentValueLength);
+      bytesRead += INT_SIZE + INT_SIZE;
     }
 
     /**
