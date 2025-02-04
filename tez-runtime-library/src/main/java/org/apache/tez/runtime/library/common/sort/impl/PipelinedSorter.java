@@ -68,7 +68,8 @@ import static org.apache.tez.runtime.library.common.sort.impl.TezSpillRecord.ens
 public class PipelinedSorter extends ExternalSorter {
   
   private static final Logger LOG = LoggerFactory.getLogger(PipelinedSorter.class);
-  
+  private static final boolean isDebugEnabled = LOG.isDebugEnabled();
+
   /**
    * The size of each record in the index file for the map-outputs.
    */
@@ -209,7 +210,7 @@ public class PipelinedSorter extends ExternalSorter {
     }
 
     Preconditions.checkState(buffers.size() > 0, "At least one buffer needs to be present");
-    if (LOG.isDebugEnabled()) {
+    if (isDebugEnabled) {
       initialSetupLogLine.append("#blocks=").append(maxNumberOfBlocks);
       initialSetupLogLine.append(", maxMemUsage=").append(maxMemLimit);
       initialSetupLogLine.append(", lazyAllocateMem=").append(lazyAllocateMem);
@@ -275,7 +276,7 @@ public class PipelinedSorter extends ExternalSorter {
     Preconditions.checkState(buffers.size() <= maxNumberOfBlocks,
         "{} exceeds {}", buffers.size(), maxNumberOfBlocks);
 
-    if (LOG.isDebugEnabled()) {
+    if (isDebugEnabled) {
       StringBuilder allocLog = new StringBuilder("Newly allocated block size=" + size);
       allocLog.append(", index=").append(bufferIndex);
       allocLog.append(", Number of buffers=").append(buffers.size());
@@ -677,7 +678,7 @@ public class PipelinedSorter extends ExternalSorter {
     }
 
     try {
-      if (LOG.isDebugEnabled()) { LOG.debug(outputContext.getDestinationVertexName() + ": Starting flush of map output"); }
+      if (isDebugEnabled) { LOG.debug(outputContext.getDestinationVertexName() + ": Starting flush of map output"); }
       span.end();
       merger.add(span.sort(sorter));
       // force a spill in flush()
@@ -706,7 +707,7 @@ public class PipelinedSorter extends ExternalSorter {
          * If we do not have this check, and if the task gets killed in the middle, it can throw
          * NPE leading to distraction when debugging.
          */
-        if (LOG.isDebugEnabled()) {
+        if (isDebugEnabled) {
           LOG.debug(outputContext.getDestinationVertexName()
               + ": Index list is empty... returning");
         }
@@ -750,7 +751,7 @@ public class PipelinedSorter extends ExternalSorter {
         finalOutputFile = filename;
         finalIndexFile = indexFilename;
 
-        if (LOG.isDebugEnabled()) {
+        if (isDebugEnabled) {
           LOG.debug(outputContext.getDestinationVertexName() + ": numSpills=" + numSpills +
               ", finalOutputFile=" + finalOutputFile + ", "
               + "finalIndexFile=" + finalIndexFile);
@@ -772,7 +773,7 @@ public class PipelinedSorter extends ExternalSorter {
       finalIndexFile =
           mapOutputFile.getOutputIndexFileForWrite(0); //TODO
 
-      if (LOG.isDebugEnabled()) {
+      if (isDebugEnabled) {
         LOG.debug(outputContext.getDestinationVertexName() + ": " +
             "numSpills: " + numSpills + ", finalOutputFile:" + finalOutputFile + ", finalIndexFile:"
                 + finalIndexFile);
@@ -958,7 +959,7 @@ public class PipelinedSorter extends ExternalSorter {
       }
       ByteBuffer reserved = source.duplicate();
       reserved.mark();
-      if (LOG.isDebugEnabled()) {
+      if (isDebugEnabled) {
         LOG.debug("{}: reserved.remaining()={}, reserved.metasize={}",
             outputContext.getDestinationVertexName(), reserved.remaining(), metasize);
       }
@@ -982,7 +983,7 @@ public class PipelinedSorter extends ExternalSorter {
       if (length() > 1) {
         sorter.sort(this, 0, length(), progressable);
       }
-      if (LOG.isDebugEnabled()) { LOG.debug("{}: done sorting span={}, length={}, time={}",
+      if (isDebugEnabled) { LOG.debug("{}: done sorting span={}, length={}, time={}",
           outputContext.getDestinationVertexName(), index, length(), System.currentTimeMillis() - start); }
       return new SpanIterator((SortSpan)this);
     }
@@ -1058,7 +1059,7 @@ public class PipelinedSorter extends ExternalSorter {
         }
         newSpan = new SortSpan(remaining, items, perItem, newComparator);
         newSpan.index = index+1;
-        if (LOG.isDebugEnabled()) {
+        if (isDebugEnabled) {
           LOG.debug("{}, counter:{}",
               String.format(outputContext.getDestinationVertexName() + ": New Span%d.length = %d, perItem = %d", newSpan.index, newSpan.length(), perItem),
               mapOutputRecordCounter.getValue());
@@ -1083,7 +1084,7 @@ public class PipelinedSorter extends ExternalSorter {
         return null;
       }
       int perItem = kvbuffer.position()/items;
-      if (LOG.isDebugEnabled()) {
+      if (isDebugEnabled) {
         LOG.debug("{}: {}", outputContext.getDestinationVertexName(),
             String.format("Span%d.length = %d, perItem = %d", index, length(), perItem));
       }
@@ -1422,7 +1423,7 @@ public class PipelinedSorter extends ExternalSorter {
           total += sp.span.length();
           eq += sp.span.getEq();
         }
-        if (LOG.isDebugEnabled()) {
+        if (isDebugEnabled) {
           StringBuilder sb = new StringBuilder();
           for(SpanIterator sp: heap) {
               sb.append(sp.toString());
