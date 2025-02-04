@@ -31,7 +31,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.TaskContext;
@@ -49,7 +48,6 @@ import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleServer.PathPartition;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.shuffle.api.ShuffleHandlerError;
-import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.FetcherOrderedGrouped;
 import org.apache.tez.runtime.library.utils.CodecUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -589,7 +587,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       // read the first part - partitionCount
       if (fetcherConfig.compositeFetch) {
         // multiple partitions are fetched
-        partitionCount = WritableUtils.readVInt(input);
+        partitionCount = input.readInt();
       }
 
       // read the second part - ShuffleHeader[]

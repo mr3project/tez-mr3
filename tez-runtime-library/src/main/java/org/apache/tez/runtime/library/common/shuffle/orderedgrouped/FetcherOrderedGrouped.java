@@ -33,7 +33,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.runtime.api.TaskContext;
@@ -441,7 +440,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
 
       if (fetcherConfig.compositeFetch) {
         // Multiple partitions are fetched
-        partitionCount = WritableUtils.readVInt(input);
+        partitionCount = input.readInt();
       }
       ArrayList<MapOutputStat> mapOutputStats = new ArrayList<>(partitionCount);
       for (int mapOutputIndex = 0; mapOutputIndex < partitionCount; mapOutputIndex++) {

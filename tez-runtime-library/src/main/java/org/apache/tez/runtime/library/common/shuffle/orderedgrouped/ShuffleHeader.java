@@ -20,12 +20,12 @@ package org.apache.tez.runtime.library.common.shuffle.orderedgrouped;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
-import org.apache.hadoop.io.WritableUtils;
 
 /**
  * Shuffle Header information that is sent by the TaskTracker and 
@@ -79,28 +79,38 @@ public class ShuffleHeader implements Writable {
   }
 
   public void readFields(DataInput in) throws IOException {
-    mapId = WritableUtils.readStringSafely(in, MAX_ID_LENGTH);
-    compressedLength = WritableUtils.readVLong(in);
-    uncompressedLength = WritableUtils.readVLong(in);
-    forReduce = WritableUtils.readVInt(in);
+    // mapId = WritableUtils.readStringSafely(in, MAX_ID_LENGTH);
+    int length = in.readInt();
+    if (length < 0 || length > MAX_ID_LENGTH) {
+      throw new IllegalArgumentException("Encoded byte size for String was " + length +
+                                         ", which is outside of 0.." +
+                                         MAX_ID_LENGTH + " range.");
+    }
+
+    byte [] bytes = new byte[length];
+    in.readFully(bytes, 0, length);
+    mapId = Text.decode(bytes);
+
+    compressedLength = in.readLong();
+    uncompressedLength = in.readLong();
+    forReduce = in.readInt();
   }
 
   public int writeLength() throws IOException {
-    int length = 0;
-    int mapIdLength = Text.encode(mapId).limit();
-    length += mapIdLength;
-
-    length += WritableUtils.getVIntSize(mapIdLength);
-    length += WritableUtils.getVIntSize(compressedLength);
-    length += WritableUtils.getVIntSize(uncompressedLength);
-    length += WritableUtils.getVIntSize(forReduce);
-
+    int length = Text.encode(mapId).limit();
+    length += 4 + 8 + 8 + 4;  // encoding of mapIdLength, compressedLength, uncompressedLength, forReduce
     return length;
   }
+
   public void write(DataOutput out) throws IOException {
-    Text.writeString(out, mapId);
-    WritableUtils.writeVLong(out, compressedLength);
-    WritableUtils.writeVLong(out, uncompressedLength);
-    WritableUtils.writeVInt(out, forReduce);
+    // Text.writeString(out, mapId);
+    ByteBuffer bytes = Text.encode(mapId);
+    int length = bytes.limit();
+    out.writeInt(length);
+    out.write(bytes.array(), 0, length);
+
+    out.writeLong(compressedLength);
+    out.writeLong(uncompressedLength);
+    out.writeInt(forReduce);
   }
 }
