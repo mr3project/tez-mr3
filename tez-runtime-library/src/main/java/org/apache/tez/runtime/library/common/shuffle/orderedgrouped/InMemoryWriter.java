@@ -19,12 +19,9 @@ package org.apache.tez.runtime.library.common.shuffle.orderedgrouped;
 
 import java.io.IOException;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.BoundedByteArrayOutputStream;
-import org.apache.hadoop.io.WritableUtils;
 import org.apache.tez.common.io.NonSyncDataOutputStream;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.apache.tez.runtime.library.common.sort.impl.IFileOutputStream;
@@ -33,8 +30,6 @@ import org.apache.tez.runtime.library.common.sort.impl.IFile.Writer;
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class InMemoryWriter extends Writer {
-  private static final Logger LOG = LoggerFactory.getLogger(InMemoryWriter.class);
-
   // TODO Verify and fix counters if required.
 
   private static class InMemoryBoundedByteArrayOutputStream extends BoundedByteArrayOutputStream {
@@ -67,8 +62,10 @@ public class InMemoryWriter extends Writer {
     writeValueMarker(out);
 
     // Write EOF_MARKER for key/value length
-    WritableUtils.writeVInt(out, IFile.EOF_MARKER);
-    WritableUtils.writeVInt(out, IFile.EOF_MARKER);
+    // out.writeInt(EOF_MARKER);
+    // out.writeInt(EOF_MARKER);
+    long combined = ((long) IFile.EOF_MARKER << 32) | (IFile.EOF_MARKER & 0xFFFFFFFFL);
+    out.writeLong(combined);
 
     // Close the stream
     out.close();
