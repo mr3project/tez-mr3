@@ -969,11 +969,11 @@ public class IFile {
     }
 
     protected void readKeyValueLength(DataInput dIn) throws IOException {
-      // currentKeyLength = dIn.readInt();
-      // currentValueLength = dIn.readInt();
-      long combined = dIn.readLong();
-      currentKeyLength = (int) (combined >> 32);
-      currentValueLength = (int) combined;
+      currentKeyLength = dIn.readInt();
+      currentValueLength = dIn.readInt();
+      // long combined = dIn.readLong();
+      // currentKeyLength = (int) (combined >> 32);
+      // currentValueLength = (int) combined;
 
       if (currentKeyLength != RLE_MARKER) {
         // original key length
