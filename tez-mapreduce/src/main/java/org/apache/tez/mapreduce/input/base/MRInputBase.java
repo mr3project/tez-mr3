@@ -94,16 +94,11 @@ public abstract class MRInputBase extends AbstractLogicalInput {
             getContext().getApplicationId().getId(), TaskType.MAP,
             getContext().getTaskIndex()),
         getContext().getTaskAttemptNumber());
-
     jobConf.set(MRJobConfig.TASK_ATTEMPT_ID, taskAttemptId.toString());
     jobConf.setInt(MRJobConfig.APPLICATION_ATTEMPT_ID, getContext().getDAGAttemptNumber());
 
-    TezDAGID tezDAGID = TezDAGID.getInstance(getContext().getApplicationId(), getContext().getDagIdentifier());
-    TezVertexID tezVertexID = TezVertexID.getInstance(tezDAGID, getContext().getTaskVertexIndex());
-    TezTaskID tezTaskID = TezTaskID.getInstance(tezVertexID, getContext().getTaskIndex());
-    TezTaskAttemptID tezTaskAttemptID = TezTaskAttemptID.getInstance(tezTaskID, getContext().getTaskAttemptNumber());
-    jobConf.set(MRInput.TEZ_MAPREDUCE_DAG_ID, tezDAGID.toString());
-    jobConf.set(MRInput.TEZ_MAPREDUCE_TASK_ATTEMPT_ID, tezTaskAttemptID.toString());
+    jobConf.set(MRInput.TEZ_MAPREDUCE_DAG_ID, "DAG_" + getContext().getDagIdentifier());
+    jobConf.set(MRInput.TEZ_MAPREDUCE_TASK_ATTEMPT_ID, getContext().getUniqueIdentifier());
 
     jobConf.setBoolean(MRInput.TEZ_MR3_SCHEDULED_ON_HOST, getContext().getScheduledOnHost());
 

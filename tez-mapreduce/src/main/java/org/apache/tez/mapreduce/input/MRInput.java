@@ -83,7 +83,13 @@ import com.google.common.collect.Lists;
 @Public
 public class MRInput extends MRInputBase {
 
+  // Not read in Tez-MR3, but required by Hive-MR3 LlapRecordReader for MDC.
+  // Can be set to any string because it is used only for MDC.
   @Private public static final String TEZ_MAPREDUCE_DAG_ID= "tez.mapreduce.dag.id";
+
+  // Not read in Tez-MR3, but required by Hive-MR3 LlapRecordReader as the identifier for FragmentCountersMap.
+  // Can be set to any string in MRInputBase as long as it is consistent with the setting in
+  // TezProcessor.initializeAndRunProcessor().
   @Private public static final String TEZ_MAPREDUCE_TASK_ATTEMPT_ID = "tez.mapreduce.task.attempt.id";
 
   @Private public static final String TEZ_MR3_SCHEDULED_ON_HOST = "tez.mr3.scheduled.on.host";
