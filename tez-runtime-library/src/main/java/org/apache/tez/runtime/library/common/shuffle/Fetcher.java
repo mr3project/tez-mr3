@@ -116,7 +116,6 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
     return state;
   }
 
-
   public Fetcher(ShuffleServer fetcherCallback,
                  Configuration conf,
                  InputHost inputHost,
