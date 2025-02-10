@@ -432,7 +432,7 @@ public class ShuffleServer implements FetcherCallback {
           // try to transition: from NORMAL with stage == INITIAL to STUCK
           tempFetchers.clear();
           runningFetchers.forEach(fetcher -> {
-            assert fetcher.getState() == Fetcher.STATE_NORMAL;
+            assert fetcher.getState() != Fetcher.STATE_STUCK;
             long elapsed = currentMillis - fetcher.getStartMillis();
             if (elapsed > CHECK_BACKPRESSURE_STUCK_MILLIS &&
                 fetcher.getStage() != Fetcher.STAGE_FIRST_FETCHED) {
