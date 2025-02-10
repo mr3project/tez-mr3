@@ -337,7 +337,7 @@ public class ShuffleServer implements FetcherCallback {
       shouldLaunchNewFetchers =
         currentNumFetchers < maxNumFetchers &&
         !pendingHosts.isEmpty() &&
-        pendingHosts.stream().anyMatch(p -> isHostNormal(p.getHost()));
+        pendingHosts.stream().anyMatch(p -> p.hasFetcherToLaunch() && isHostNormal(p.getHost()));
 
       existsFetcherFromStuckToRecovered =
         stuckFetchers.stream().anyMatch(f -> f.getStage() == Fetcher.STAGE_FIRST_FETCHED);

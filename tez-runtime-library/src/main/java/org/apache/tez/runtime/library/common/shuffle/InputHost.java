@@ -102,6 +102,11 @@ public class InputHost extends HostPort {
     this.hasPendingInput = false;
   }
 
+  public synchronized boolean hasFetcherToLaunch() {
+    assert hasPendingInput;
+    return !partitionToInputs.isEmpty();
+  }
+
   public synchronized InputHost takeFromPendingHosts(
       BlockingQueue<InputHost> pendingHosts) throws InterruptedException {
     assert hasPendingInput;
