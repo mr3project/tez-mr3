@@ -324,6 +324,9 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         }
         if (index == firstFetchIndex) {
           setStage(STAGE_FIRST_FETCHED);
+          if (getState() == STATE_STUCK) {
+            fetcherCallback.wakeupLoop();
+          }
         }
         index++;
       } catch (FetcherReadTimeoutException e) {
