@@ -29,11 +29,13 @@ import java.io.DataInputStream;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicInteger;
 
 // T = FetcherInput
 public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchResult> {
 
   protected static final ThreadLocal<CompressionCodec> codecHolder = new ThreadLocal<>();
+  protected static final AtomicInteger fetcherIdGen = new AtomicInteger(0);
 
   protected final ShuffleServer fetcherCallback;
   protected final Configuration conf;
@@ -41,6 +43,7 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
   protected final ShuffleServer.FetcherConfig fetcherConfig;
   protected final TaskContext taskContext;
 
+  public final InputHost inputHost;
   protected final String host;
   protected final int port;
 
@@ -50,7 +53,6 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
   protected final int maxPartition;
 
   public final int attempt;   // 0, 1, 2, ...
-  private boolean checkForSpeculativeExec = true;   // accessed only in ShuffleServer.call() thread
 
   //
   // fields set during the execution of call()
@@ -73,9 +75,51 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
   // Hence, we initialize it to Long.MAX_VALUE.
   public volatile long startMillis = Long.MAX_VALUE;
 
+  public static int STAGE_INITIAL = 0;  // all until STAGE_FIRST_FETCHED
+  public static int STAGE_FIRST_FETCHED = 1;
+  private volatile int stage = STAGE_INITIAL;
+
+  public static int STATE_NORMAL = 10;
+  public static int STATE_STUCK = 11;
+  public static int STATE_RECOVERED = 12;
+  public static int STATE_SPECULATIVE = 13;
+  public static int STATE_FINISHED = 14;
+  private volatile int state = STATE_NORMAL;
+
+  // set by Fetcher
+  protected void setStartMillis(long newStartMillis) {
+    startMillis = newStartMillis;
+  }
+
+  // read by ShuffleServer
+  public long getStartMillis() {
+    return startMillis;
+  }
+
+  // set by Fetcher
+  protected void setStage(int newStage) {
+    stage = newStage;
+  }
+
+  // read by ShuffleServer
+  public int getStage() {
+    return stage;
+  }
+
+  // set by ShuffleServer
+  public void setState(int newState) {
+    state = newState;
+  }
+
+  // read by Fetcher
+  protected int getState() {
+    return state;
+  }
+
+
   public Fetcher(ShuffleServer fetcherCallback,
                  Configuration conf,
-                 HostPort inputHost,
+                 InputHost inputHost,
                  ShuffleServer.FetcherConfig fetcherConfig,
                  TaskContext taskContext,
                  InputHost.PartitionToInputs pendingInputsSeq,
@@ -86,6 +130,7 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
     this.fetcherConfig = fetcherConfig;
     this.taskContext = taskContext;
 
+    this.inputHost = inputHost;
     this.host = inputHost.getHost();
     this.port = inputHost.getPort();
 
@@ -105,14 +150,6 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
   abstract public void shutdown();
   abstract public FetchResult call() throws Exception;
   abstract public Fetcher<T> createClone();
-
-  public boolean getCheckForSpeculativeExec() {
-    return this.checkForSpeculativeExec;
-  }
-
-  public void unsetCheckForSpeculativeExec() {
-    this.checkForSpeculativeExec = false;
-  }
 
   protected InputAttemptIdentifier[] buildInputSeqFromIndex(int pendingInputsIndex) {
     // TODO: just create a sub-array

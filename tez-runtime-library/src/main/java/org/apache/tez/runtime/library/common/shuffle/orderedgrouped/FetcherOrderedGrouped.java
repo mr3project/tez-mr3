@@ -28,7 +28,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.LocalDirAllocator;
@@ -40,7 +39,6 @@ import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.shuffle.FetchResult;
 import org.apache.tez.runtime.library.common.shuffle.Fetcher;
-import org.apache.tez.runtime.library.common.shuffle.HostPort;
 import org.apache.tez.runtime.library.common.shuffle.InputHost;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleClient;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
@@ -59,7 +57,6 @@ import org.slf4j.LoggerFactory;
 public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
 
   private static final Logger LOG = LoggerFactory.getLogger(FetcherOrderedGrouped.class);
-  private static final AtomicInteger fetcherIdGen = new AtomicInteger(0);
   private static final boolean isDebugEnabled = LOG.isDebugEnabled();
 
   private static final InputAttemptIdentifier[] EMPTY_ATTEMPT_ID_ARRAY = new InputAttemptIdentifier[0];
@@ -103,7 +100,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
   public FetcherOrderedGrouped(
       ShuffleServer fetcherCallback,
       Configuration conf,
-      HostPort inputHost,
+      InputHost inputHost,
       InputHost.PartitionToInputs pendingInputsSeq,
       ShuffleServer.FetcherConfig fetcherConfig,
       TaskContext taskContext,
@@ -127,7 +124,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
 
   public FetcherOrderedGrouped createClone() {
     return new FetcherOrderedGrouped(
-        fetcherCallback, conf, new HostPort(this.host, this.port), pendingInputsSeq,
+        fetcherCallback, conf, inputHost, pendingInputsSeq,
         fetcherConfig, taskContext, this.attempt + 1, shuffleScheduler);
   }
 
@@ -237,7 +234,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     // yet_to_be_fetched list and marking the failed tasks.
     int index = 0;  // points to the next input to be consumed
     InputAttemptIdentifier[] failedInputs = null;
-
+    final int firstFetchIndex = 0;
     while (index < numInputs) {
       InputAttemptIdentifier inputAttemptIdentifier = pendingInputsSeq.getInputs().get(index);
 
@@ -248,6 +245,9 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         failedInputs = copyMapOutput(input, inputAttemptIdentifier);
         if (failedInputs != null) {
           break;
+        }
+        if (index == firstFetchIndex) {
+          setStage(STAGE_FIRST_FETCHED);
         }
         index++;
       } catch (FetcherReadTimeoutException e) {
@@ -332,6 +332,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       String finalHost;
       boolean sslShuffle = fetcherConfig.httpConnectionParams.isSslShuffle();
       if (sslShuffle) {
+        // TODO: cache in host
         finalHost = InetAddress.getByName(host).getHostName();
       } else {
         finalHost = host;
@@ -392,7 +393,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     }
 
     try {
-      input = httpConnection.getInputStream();
+      input = httpConnection.getInputStream();  // incurs a network transmission
       httpConnection.validate();
     } catch (IOException | InterruptedException ie) {
       if (ie instanceof InterruptedException) {
@@ -578,7 +579,6 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         long endTime = System.currentTimeMillis();
         // Reset retryStartTime as map task make progress if retried before.
         retryStartTime = 0;
-
         fetcherCallback.fetchSucceeded(shuffleSchedulerId, host, srcAttemptId, mapOutput,
             compressedLength, decompressedLength, endTime - startTime);
       }
@@ -636,6 +636,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
 
     int index = 0;  // points to the next input to be consumed
     List<InputAttemptIdentifier> failedFetches = new ArrayList<>();
+    final int firstFetchIndex = 0;
     while (index < numInputs) {
       // Avoid fetching more if already stopped
       if (stopped) {
@@ -686,6 +687,9 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         failedFetches.add(inputAttemptIdentifier);
       }
 
+      if (index == firstFetchIndex) {
+        setStage(STAGE_FIRST_FETCHED);
+      }
       index++;
     }
 

@@ -47,6 +47,8 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -224,22 +226,25 @@ public class ShuffleServer implements FetcherCallback {
 
   // Invariant: pendingHosts[] \subset knownSrcHosts.InputHost[]
   private final ConcurrentMap<HostPort, InputHost> knownSrcHosts;
-  private final Set<Fetcher> runningFetchers;   // thread-safe because we use ConcurrentHashMap
 
   private final AtomicLong shuffleClientCount = new AtomicLong(0L);
   protected final ConcurrentMap<Long, ShuffleClient<?>> shuffleClients;
   private final Object registerLock = new Object();
 
   private final BlockingQueue<InputHost> pendingHosts;
-  // required to be held when manipulating pendingHosts[]
+
+  // use lock to access runningFetchers[], stuckFetchers[], and hostBlocked[]
   private final ReentrantLock lock = new ReentrantLock();
   private final Condition wakeLoop = lock.newCondition();
+  private final Set<Fetcher<?>> runningFetchers;
+  private final Set<Fetcher<?>> stuckFetchers;
+  private final Map<String, Set<Fetcher<?>>> hostBlocked;
 
   private final AtomicBoolean isShutdown = new AtomicBoolean(false);
 
-  // If even a speculative fetch fails, just fail the running TaskAttempt.
-  // Hence, we do not introduce a configuration key for MAX_SPECULATIVE_FETCH_ATTEMPTS. 
-  private static final int MAX_SPECULATIVE_FETCH_ATTEMPTS = 1;
+  private static final int CHECK_BACKPRESSURE_INTERVAL_MILLIS = 1000;
+  private static final int CHECK_BACKPRESSURE_STUCK_MILLIS = 5000;
+  private static final int MAX_SPECULATIVE_FETCH_ATTEMPTS = 3;
 
   public ShuffleServer(
       TaskContext taskContext,
@@ -282,9 +287,13 @@ public class ShuffleServer implements FetcherCallback {
     this.rangesScheme = scheme.equalsIgnoreCase("max") ? RangesScheme.SCHEME_MAX : RangesScheme.SCHEME_FIRST;
 
     knownSrcHosts = new ConcurrentHashMap<HostPort, InputHost>();
-    runningFetchers = Collections.newSetFromMap(new ConcurrentHashMap<Fetcher, Boolean>());
+
     shuffleClients = new ConcurrentHashMap<Long, ShuffleClient<?>>();
     pendingHosts = new LinkedBlockingQueue<InputHost>();
+
+    runningFetchers = new HashSet<Fetcher<?>>();
+    stuckFetchers = new HashSet<Fetcher<?>>();
+    hostBlocked = new HashMap<String, Set<Fetcher<?>>>();
 
     this.maxNumInputHosts = conf.getInt(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MAX_INPUT_HOSTPORTS,
@@ -315,91 +324,169 @@ public class ShuffleServer implements FetcherCallback {
     }
   }
 
-  // if true, continue to scan pendingInputs[]
-  // if false, every Fetcher is either full or with no partition range, so no need to scan pendingInputs[]
-  private boolean existsShouldScanPendingInputs() {
-    Iterator<Map.Entry<Long, ShuffleClient<?>>> iterator = shuffleClients.entrySet().iterator();
-    while (iterator.hasNext()) {
-      Map.Entry<Long, ShuffleClient<?>> entry = iterator.next();
-      if (entry.getValue().shouldScanPendingInputs()) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   private void call() throws Exception {
+    boolean shouldLaunchNewFetchers;
+    boolean existsFetcherFromStuckToRecovered, existsFetcherFromStuckToSpeculative;
+    long remainingMillis = CHECK_BACKPRESSURE_INTERVAL_MILLIS;
+
     while (!isShutdown.get()) {
       lock.lock();
       try {
-        // stay inside the loop no longer than fetcherConfig.speculativeExecutionWaitMillis
-        long remainingMillis = fetcherConfig.speculativeExecutionWaitMillis;
+        shouldLaunchNewFetchers =
+          runningFetchers.size() < numFetchers &&
+          !pendingHosts.isEmpty() &&
+          pendingHosts.stream().anyMatch(p -> isHostNormal(p.getHost()));
+        existsFetcherFromStuckToRecovered =
+          stuckFetchers.stream().anyMatch(f -> f.getStage() == Fetcher.STAGE_FIRST_FETCHED);
+        final long currentMillis = System.currentTimeMillis();
+        existsFetcherFromStuckToSpeculative =
+          stuckFetchers.stream().anyMatch(f ->
+            (f.getStage() < Fetcher.STAGE_FIRST_FETCHED) &&
+            (currentMillis - f.getStartMillis() >= fetcherConfig.speculativeExecutionWaitMillis)
+          );
         while (!isShutdown.get() &&
-               remainingMillis > 0 &&
-               (runningFetchers.size() >= numFetchers ||
-                pendingHosts.isEmpty() ||
-                !existsShouldScanPendingInputs())) {
-          wakeLoop.await(1000, TimeUnit.MILLISECONDS);
-          remainingMillis -= 1000;
+               !shouldLaunchNewFetchers &&
+               !existsFetcherFromStuckToRecovered &&
+               !existsFetcherFromStuckToSpeculative &&
+               remainingMillis > 0) {
+          wakeLoop.await(250, TimeUnit.MILLISECONDS);
+          shouldLaunchNewFetchers =
+            runningFetchers.size() < numFetchers &&
+            !pendingHosts.isEmpty() &&
+            pendingHosts.stream().anyMatch(p -> isHostNormal(p.getHost()));
+          existsFetcherFromStuckToRecovered =
+            stuckFetchers.stream().anyMatch(f -> f.getStage() == Fetcher.STAGE_FIRST_FETCHED);
+          final long currentMillisLoop = System.currentTimeMillis();
+          existsFetcherFromStuckToSpeculative =
+            stuckFetchers.stream().anyMatch(f ->
+              (f.getStage() < Fetcher.STAGE_FIRST_FETCHED) &&
+              (currentMillisLoop - f.getStartMillis() >= fetcherConfig.speculativeExecutionWaitMillis)
+            );
+          remainingMillis -= 250;   // conservative because less than 250ms could have passed
         }
       } finally {
         lock.unlock();
       }
 
-      int maxFetchersToRun = numFetchers - runningFetchers.size();
-      int count = 0;
-
-      // speculative execution
       long currentMillis = System.currentTimeMillis();
-      for (Fetcher<?> fetcher: runningFetchers) {
-        if (fetcher.getCheckForSpeculativeExec() &&
-            fetcher.attempt < MAX_SPECULATIVE_FETCH_ATTEMPTS &&
-            currentMillis - fetcher.startMillis > fetcherConfig.speculativeExecutionWaitMillis) {
-          fetcher.unsetCheckForSpeculativeExec();   // now 'fetcher' no longer spawn new speculative Fetchers
-          Fetcher<?> speculativeFetcher = fetcher.createClone();
-          runFetcher(speculativeFetcher);
-          count += 1;   // may reach maxFetchersToRun, but not a problem
-          LOG.warn("Speculative execution of Fetcher: {}, after {}ms, {}",
-              fetcher.getFetcherIdentifier(), (currentMillis - fetcher.startMillis),
-              speculativeFetcher.getFetcherIdentifier());
+
+      if (isDebugEnabled) {
+        LOG.debug("ShuffleServer loop: existsFetcherFromStuckToRecovered={}, existsFetcherFromStuckToSpeculative={}, remainingMillis={}ms, shouldLaunchNewFetchers={}",
+            existsFetcherFromStuckToRecovered, existsFetcherFromStuckToSpeculative,
+            remainingMillis, shouldLaunchNewFetchers);
+      }
+
+      if (existsFetcherFromStuckToRecovered) {
+        lock.lock();
+        try {
+          // transition: from STUCK to RECOVERED
+          stuckFetchers.forEach(fetcher -> {
+            assert fetcher.getState() == Fetcher.STATE_STUCK;
+            if (fetcher.getStage() == Fetcher.STAGE_FIRST_FETCHED) {
+              fetcher.setState(Fetcher.STATE_RECOVERED);
+              removeHostBlocked(fetcher);
+              stuckFetchers.remove(fetcher);
+              runningFetchers.add(fetcher);
+            }
+          });
+        } finally {
+          lock.unlock();
         }
       }
 
-      InputHost peekInputHost = pendingHosts.peek();
-      while (count < maxFetchersToRun &&
-             peekInputHost != null &&
-             existsShouldScanPendingInputs()) {
-        // for every ShuffleClient,
-        //   1. 'numPartitionRanges > 0' remains the same until the current thread consumes existing inputs
-        //   2. 'numFetchers < maxNumFetchers' remains the same until the current thread creates new Fetchers
-        InputHost inputHost;
+      if (existsFetcherFromStuckToSpeculative) {
+        lock.lock();
         try {
-          inputHost = peekInputHost.takeFromPendingHosts(pendingHosts);
-        } catch (InterruptedException e) {
-          if (isShutdown.get()) {
-            LOG.info("Interrupted and has been shutdown, breaking out of the loop");
-            Thread.currentThread().interrupt();
-            break;
-          } else {
-            throw e;
+          // try to transition: from STUCK to SPECULATIVE
+          stuckFetchers.forEach(fetcher -> {
+            assert fetcher.getState() == Fetcher.STATE_STUCK;
+            if (fetcher.getStage() != Fetcher.STAGE_FIRST_FETCHED &&
+              (currentMillis - fetcher.getStartMillis()) >= fetcherConfig.speculativeExecutionWaitMillis) {
+              fetcher.setState(Fetcher.STATE_SPECULATIVE);
+              removeHostBlocked(fetcher);
+              stuckFetchers.remove(fetcher);
+              runningFetchers.add(fetcher);
+
+              if (fetcher.attempt < MAX_SPECULATIVE_FETCH_ATTEMPTS) {
+                // create a speculative Fetcher
+                Fetcher<?> speculativeFetcher = fetcher.createClone();
+                runFetcher(speculativeFetcher);
+                LOG.warn("Speculative execution of Fetcher: {} in stage {}, {}",
+                  fetcher.getFetcherIdentifier(), fetcher.getState(), speculativeFetcher.getFetcherIdentifier());
+              }
+            }
+          });
+        } finally {
+          lock.unlock();
+        }
+      }
+
+      if (remainingMillis <= 0) {
+        lock.lock();
+        try {
+          // try to transition: from NORMAL with stage == INITIAL to STUCK
+          final Set<Fetcher<?>> fetchersToStuck = new HashSet<>();
+          runningFetchers.forEach(fetcher -> {
+            assert fetcher.getState() == Fetcher.STATE_NORMAL;
+            long elapsed = currentMillis - fetcher.getStartMillis();
+            if (elapsed > CHECK_BACKPRESSURE_STUCK_MILLIS &&
+                fetcher.getStage() != Fetcher.STAGE_FIRST_FETCHED) {
+              fetchersToStuck.add(fetcher);
+            }
+          });
+          fetchersToStuck.forEach(fetcher -> {
+            fetcher.setState(Fetcher.STATE_STUCK);
+            runningFetchers.remove(fetcher);
+            stuckFetchers.add(fetcher);
+            addHostBlocked(fetcher);
+          });
+        } finally {
+          lock.unlock();
+        }
+        remainingMillis = CHECK_BACKPRESSURE_INTERVAL_MILLIS;   // reset
+      }
+
+      if (shouldLaunchNewFetchers) {
+        lock.lock();
+        try {
+          // speculative Fetcher may have been launched, so maxFetchersToRun can be 0
+          int maxFetchersToRun = numFetchers - runningFetchers.size();
+          int count = 0;
+
+          InputHost peekInputHost = pendingHosts.peek();
+          while (count < maxFetchersToRun &&
+                 peekInputHost != null) {
+            // for every ShuffleClient,
+            //   1. 'numPartitionRanges > 0' remains the same until the current thread consumes existing inputs
+            //   2. 'numFetchers < maxNumFetchers' remains the same until the current thread creates new Fetchers
+            InputHost inputHost;
+            try {
+              inputHost = peekInputHost.takeFromPendingHosts(pendingHosts);
+            } catch (InterruptedException e) {
+              if (isShutdown.get()) {
+                LOG.info("Interrupted and has been shutdown, breaking out of the loop");
+                Thread.currentThread().interrupt();
+                break;
+              } else {
+                throw e;
+              }
+            }
+
+            Fetcher<?> fetcher = isHostNormal(inputHost.getHost()) ?
+                constructFetcherForHost(inputHost, conf) : null;
+            // even when fetcher == null, inputHost may have inputs if 'ShuffleClient == null'
+            inputHost.addToPendingHostsIfNecessary(pendingHosts);
+
+            if (fetcher != null) {
+              runFetcher(fetcher);
+              count += 1;
+            }
+
+            peekInputHost = pendingHosts.peek();
           }
+        } finally {
+          lock.unlock();
         }
-        if (isDebugEnabled) {
-          LOG.debug("Processing InputHost: " + inputHost.toDetailedString());
-        }
-
-        Fetcher<?> fetcher = constructFetcherForHost(inputHost, conf, currentMillis);
-        // even when fetcher == null, inputHost may have inputs if 'ShuffleClient == null'
-        inputHost.addToPendingHostsIfNecessary(pendingHosts);
-        if (fetcher == null) {
-          peekInputHost = pendingHosts.peek();
-          continue;
-        }
-
-        runFetcher(fetcher);
-        count += 1;
-
-        peekInputHost = pendingHosts.peek();
       }
     }
 
@@ -409,6 +496,32 @@ public class ShuffleServer implements FetcherCallback {
     }
   }
 
+  // Invariant: inside lock.lock()
+  private void addHostBlocked(Fetcher<?> fetcher) {
+    String host = fetcher.host;
+    Set<Fetcher<?>> set = hostBlocked.get(host);
+    if (set == null) {
+      Set<Fetcher<?>> newSet = new HashSet<>();
+      hostBlocked.put(host, newSet);
+      set = newSet;
+    }
+    set.add(fetcher);
+  }
+
+  // Invariant: inside lock.lock()
+  private void removeHostBlocked(Fetcher<?> fetcher) {
+    String host = fetcher.host;
+    Set<Fetcher<?>> set = hostBlocked.get(host);
+    set.remove(fetcher);
+  }
+
+  // Invariant: inside lock.lock()
+  private boolean isHostNormal(String host) {
+    Set<Fetcher<?>> set = hostBlocked.get(host);
+    return set == null || set.isEmpty();
+  }
+
+  // Invariant: inside lock.lock()
   private void runFetcher(Fetcher<?> fetcher) {
     runningFetchers.add(fetcher);
     fetcher.getShuffleClient().fetcherStarted();
@@ -416,7 +529,7 @@ public class ShuffleServer implements FetcherCallback {
     Futures.addCallback(future, new FetchFutureCallback(fetcher));
   }
 
-  private Fetcher<?> constructFetcherForHost(InputHost inputHost, Configuration conf, long currentMillis) {
+  private Fetcher<?> constructFetcherForHost(InputHost inputHost, Configuration conf) {
     InputHost.PartitionToInputs pendingInputs = inputHost.clearAndGetOnePartitionRange(
         shuffleClients, maxTaskOutputAtOnce, rangesScheme);
     if (pendingInputs == null) {
@@ -466,12 +579,24 @@ public class ShuffleServer implements FetcherCallback {
       inputHost.clearShuffleClientId(shuffleClientId);
     }
 
-    for (Fetcher fetcher: runningFetchers) {
-      if (fetcher.useSingleShuffleClientId(shuffleClientId)) {
-        LOG.warn("Shutting down active Fetcher for ShuffleManger: {} {}",
+    lock.lock();
+    try {
+      runningFetchers.forEach(fetcher -> {
+        if (fetcher.useSingleShuffleClientId(shuffleClientId)) {
+          LOG.warn("Shutting down running Fetcher for ShuffleClient: {} {}",
             shuffleClientId, fetcher.getFetcherIdentifier());
-        fetcher.shutdown();
-      }
+          fetcher.shutdown();
+        }
+      });
+      stuckFetchers.forEach(fetcher -> {
+        if (fetcher.useSingleShuffleClientId(shuffleClientId)) {
+          LOG.warn("Shutting down stuck Fetcher for ShuffleClient: {} {}",
+            shuffleClientId, fetcher.getFetcherIdentifier());
+          fetcher.shutdown();
+        }
+      });
+    } finally {
+      lock.unlock();
     }
 
     synchronized (registerLock) {
@@ -552,20 +677,11 @@ public class ShuffleServer implements FetcherCallback {
 
   public void shutdown() {
     if (!isShutdown.getAndSet(true)) {
-      // Shut down any pending fetchers
-      LOG.info("Shutting down pending fetchers: {}", runningFetchers.size());
       lock.lock();
       try {
         wakeLoop.signal();
-        for (Fetcher fetcher : runningFetchers) {
-          try {
-            fetcher.shutdown();
-          } catch (Exception e) {
-            LOG.warn(
-              "Error while stopping fetcher during shutdown. Ignoring and continuing. Message={}",
-              e.getMessage());
-          }
-        }
+        runningFetchers.forEach(fetcher -> { fetcher.shutdown(); });
+        stuckFetchers.forEach(fetcher -> { fetcher.shutdown(); });
       } finally {
         lock.unlock();
       }
@@ -605,10 +721,15 @@ public class ShuffleServer implements FetcherCallback {
 
     private void doBookKeepingForFetcherComplete() {
       fetcher.getShuffleClient().fetcherFinished();
-      runningFetchers.remove(fetcher);
-
       lock.lock();
       try {
+        // this is the only place where Fetcher can be completely removed from runningFetchers/stuckFetchers
+        if (fetcher.getState() == Fetcher.STATE_STUCK) {
+          removeHostBlocked(fetcher);
+          stuckFetchers.remove(fetcher);
+        } else {
+          runningFetchers.remove(fetcher);
+        }
         wakeLoop.signal();
       } finally {
         lock.unlock();
@@ -657,7 +778,7 @@ public class ShuffleServer implements FetcherCallback {
       fetcher.shutdown();
       if (isShutdown.get()) {
         if (isDebugEnabled) {
-          LOG.debug("Already shutdown. Ignoring error from fetcher: " + t);
+          LOG.debug("Already shutdown. Ignoring error from fetcher: ", t);
         }
       } else {
         LOG.error("Fetcher failed with error: ", t);

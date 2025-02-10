@@ -143,7 +143,7 @@ public class HttpConnection extends BaseHttpConnection {
     while (true) {
       long connectStartTime = System.currentTimeMillis();
       try {
-        connection.connect();
+        connection.connect();   // incurs a network transmission
         connectionSucceeed = true;
         break;
       } catch (IOException ioe) {
@@ -199,6 +199,8 @@ public class HttpConnection extends BaseHttpConnection {
           + ": " + connection.getResponseMessage());
     }
 
+    // Cf. connection.getHeaderFields() does not incur a new network transmission
+
     // get the shuffle version
     if (!ShuffleHeader.DEFAULT_HTTP_HEADER_NAME.equals(
           connection.getHeaderField(ShuffleHeader.HTTP_HEADER_NAME))
@@ -235,6 +237,7 @@ public class HttpConnection extends BaseHttpConnection {
   @Override
   public DataInputStream getInputStream() throws IOException {
     if (connectionSucceeed) {
+      // Cf. connection.getInputStream() incurs a network transmission
       input = new DataInputStream(new BufferedInputStream(
               connection.getInputStream(), httpConnParams.getBufferSize()));
     }

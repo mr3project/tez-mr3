@@ -29,7 +29,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.tez.http.HttpConnectionParams;
@@ -39,7 +38,6 @@ import org.apache.tez.runtime.library.common.shuffle.FetchResult;
 import org.apache.tez.runtime.library.common.shuffle.FetchedInput;
 import org.apache.tez.runtime.library.common.shuffle.FetchedInputCallback;
 import org.apache.tez.runtime.library.common.shuffle.Fetcher;
-import org.apache.tez.runtime.library.common.shuffle.HostPort;
 import org.apache.tez.runtime.library.common.shuffle.InputHost;
 import org.apache.tez.runtime.library.common.shuffle.LocalDiskFetchedInput;
 import org.apache.tez.runtime.library.common.shuffle.MemoryFetchedInput;
@@ -69,7 +67,6 @@ import org.apache.tez.runtime.library.common.shuffle.FetchedInput.Type;
 public class FetcherUnordered extends Fetcher<FetchedInput> {
 
   private static final Logger LOG = LoggerFactory.getLogger(FetcherUnordered.class);
-  private static final AtomicInteger fetcherIdGen = new AtomicInteger(0);
   private static final boolean isDebugEnabled = LOG.isDebugEnabled();
 
   private final ShuffleManager shuffleManager;
@@ -81,7 +78,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
 
   public FetcherUnordered(ShuffleServer fetcherCallback,
                           Configuration conf,
-                          HostPort inputHost,
+                          InputHost inputHost,
                           InputHost.PartitionToInputs pendingInputsSeq,
                           ShuffleServer.FetcherConfig fetcherConfig,
                           TaskContext taskContext,
@@ -99,7 +96,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
 
   public FetcherUnordered createClone() {
     return new FetcherUnordered(
-      fetcherCallback, conf, new HostPort(this.host, this.port), pendingInputsSeq,
+      fetcherCallback, conf, inputHost, pendingInputsSeq,
       fetcherConfig, taskContext, this.attempt + 1, shuffleManager);
   }
 
@@ -239,7 +236,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     }
 
     try {
-      input = httpConnection.getInputStream();
+      input = httpConnection.getInputStream();  // incurs a network transmission
       httpConnection.validate();
       // validateConnectionResponse(msgToEncode, encHash);
     } catch (IOException e) {
@@ -297,9 +294,9 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     // On any error, failedInputs is not null and we exit
     // after putting back the remaining maps to the
     // yet_to_be_fetched list and marking the failed tasks.
-    InputAttemptIdentifier[] failedInputs = null;
-
     int index = 0;  // points to the next input to be consumed
+    InputAttemptIdentifier[] failedInputs = null;
+    final int firstFetchIndex = 0;
     while (index < numInputs) {
       InputAttemptIdentifier inputAttemptIdentifier = pendingInputsSeq.getInputs().get(index);
 
@@ -324,6 +321,9 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         //   5. null, success, increment index
         if (failedInputs != null) {
           break;
+        }
+        if (index == firstFetchIndex) {
+          setStage(STAGE_FIRST_FETCHED);
         }
         index++;
       } catch (FetcherReadTimeoutException e) {
@@ -386,6 +386,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
 
     int index = 0;  // points to the next input to be consumed
     List<InputAttemptIdentifier> failedFetches = new ArrayList<>();
+    final int firstFetchIndex = 0;
     while (index < numInputs) {
       if (isShutDown.get()) {
         if (isDebugEnabled) {
@@ -431,6 +432,9 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         failedFetches.add(inputAttemptIdentifier);
       }
 
+      if (index == firstFetchIndex) {
+        setStage(STAGE_FIRST_FETCHED);
+      }
       index++;
     }
 
