@@ -46,10 +46,12 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
@@ -325,6 +327,8 @@ public class ShuffleServer implements FetcherCallback {
   }
 
   private void call() throws Exception {
+    final List<Fetcher<?>> tempFetchers = new ArrayList<>();
+
     boolean shouldLaunchNewFetchers;
     boolean existsFetcherFromStuckToRecovered, existsFetcherFromStuckToSpeculative;
     long remainingMillis = CHECK_BACKPRESSURE_INTERVAL_MILLIS;
@@ -380,15 +384,19 @@ public class ShuffleServer implements FetcherCallback {
         lock.lock();
         try {
           // transition: from STUCK to RECOVERED
+          tempFetchers.clear();
           stuckFetchers.forEach(fetcher -> {
             assert fetcher.getState() == Fetcher.STATE_STUCK;
             if (fetcher.getStage() == Fetcher.STAGE_FIRST_FETCHED) {
-              fetcher.setState(Fetcher.STATE_RECOVERED);
-              removeHostBlocked(fetcher);
-              stuckFetchers.remove(fetcher);
-              runningFetchers.add(fetcher);
+              tempFetchers.add(fetcher);
             }
           });
+          for (Fetcher<?> fetcher: tempFetchers) {
+            fetcher.setState(Fetcher.STATE_RECOVERED);
+            removeHostBlocked(fetcher);
+            stuckFetchers.remove(fetcher);
+            runningFetchers.add(fetcher);
+          }
         } finally {
           lock.unlock();
         }
@@ -398,14 +406,12 @@ public class ShuffleServer implements FetcherCallback {
         lock.lock();
         try {
           // try to transition: from STUCK to SPECULATIVE
+          tempFetchers.clear();
           stuckFetchers.forEach(fetcher -> {
             assert fetcher.getState() == Fetcher.STATE_STUCK;
             if (fetcher.getStage() != Fetcher.STAGE_FIRST_FETCHED &&
               (currentMillis - fetcher.getStartMillis()) >= fetcherConfig.speculativeExecutionWaitMillis) {
-              fetcher.setState(Fetcher.STATE_SPECULATIVE);
-              removeHostBlocked(fetcher);
-              stuckFetchers.remove(fetcher);
-              runningFetchers.add(fetcher);
+              tempFetchers.add(fetcher);
 
               if (fetcher.attempt < MAX_SPECULATIVE_FETCH_ATTEMPTS) {
                 // create a speculative Fetcher
@@ -416,6 +422,12 @@ public class ShuffleServer implements FetcherCallback {
               }
             }
           });
+          for (Fetcher<?> fetcher: tempFetchers) {
+            fetcher.setState(Fetcher.STATE_SPECULATIVE);
+            removeHostBlocked(fetcher);
+            stuckFetchers.remove(fetcher);
+            runningFetchers.add(fetcher);
+          }
         } finally {
           lock.unlock();
         }
@@ -425,16 +437,16 @@ public class ShuffleServer implements FetcherCallback {
         lock.lock();
         try {
           // try to transition: from NORMAL with stage == INITIAL to STUCK
-          final Set<Fetcher<?>> fetchersToStuck = new HashSet<>();
+          tempFetchers.clear();
           runningFetchers.forEach(fetcher -> {
             assert fetcher.getState() == Fetcher.STATE_NORMAL;
             long elapsed = currentMillis - fetcher.getStartMillis();
             if (elapsed > CHECK_BACKPRESSURE_STUCK_MILLIS &&
                 fetcher.getStage() != Fetcher.STAGE_FIRST_FETCHED) {
-              fetchersToStuck.add(fetcher);
+              tempFetchers.add(fetcher);
             }
           });
-          fetchersToStuck.forEach(fetcher -> {
+          tempFetchers.forEach(fetcher -> {
             fetcher.setState(Fetcher.STATE_STUCK);
             runningFetchers.remove(fetcher);
             stuckFetchers.add(fetcher);
@@ -561,6 +573,15 @@ public class ShuffleServer implements FetcherCallback {
       return new FetcherOrderedGrouped(this,
           conf, inputHost, pendingInputs, fetcherConfig, taskContext,
           0, (ShuffleScheduler)shuffleClient);
+    }
+  }
+
+  public void wakeupLoop() {
+    lock.lock();
+    try {
+      wakeLoop.signal();
+    } finally {
+      lock.unlock();
     }
   }
 
