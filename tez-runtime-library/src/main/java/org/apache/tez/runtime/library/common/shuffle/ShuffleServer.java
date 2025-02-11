@@ -328,13 +328,12 @@ public class ShuffleServer implements FetcherCallback {
 
   // variables local to call()
   private boolean shouldLaunchNewFetchers;
-  private int currentNumFetchers;
   private boolean existsFetcherFromStuckToRecovered;
   private boolean existsFetcherFromStuckToSpeculative;
 
   private void updateLoopConditions() {
     synchronized (fetcherLock) {
-      currentNumFetchers = runningFetchers.size();
+      int currentNumFetchers = runningFetchers.size() + stuckFetchers.size();
       shouldLaunchNewFetchers =
         currentNumFetchers < maxNumFetchers &&
         !pendingHosts.isEmpty() &&
@@ -463,16 +462,22 @@ public class ShuffleServer implements FetcherCallback {
       if (shouldLaunchNewFetchers) {
         tempFetchers.clear();
 
-        int maxFetchersToRun = maxNumFetchers - currentNumFetchers;
-        // speculative Fetcher may have been launched, so maxFetchersToRun can be 0
-        int currentNumPendingHosts = pendingHosts.size();
         // limit the number of iterations because InputHost is added back to pendingsHosts[] if it is blocked
-        int countLimit = Math.min(maxFetchersToRun, currentNumPendingHosts);
+        int countLimit = pendingHosts.size();
+        // speculative Fetcher may have been launched and some Fetcher may been finished,
+        // so we cannot reuse currentNumFetchers in updateLoopConditions()
+        int initialNumFetchers;
+        synchronized (fetcherLock) {
+          initialNumFetchers = runningFetchers.size() + stuckFetchers.size();
+        }
+        int maxFetchersToRun = maxNumFetchers - initialNumFetchers;
 
         int count = 0;  // # of InputHosts in pendingHosts[] to consider
+        int numNewFetchers = 0;
         InputHost peekInputHost = pendingHosts.peek();
+        assert peekInputHost != null;
         while (count < countLimit &&
-               peekInputHost != null) {
+               numNewFetchers < maxFetchersToRun) {
           InputHost inputHost;
           try {
             inputHost = peekInputHost.takeFromPendingHosts(pendingHosts);
@@ -495,10 +500,12 @@ public class ShuffleServer implements FetcherCallback {
           inputHost.addToPendingHostsIfNecessary(pendingHosts);
           if (fetcher != null) {
             tempFetchers.add(fetcher);
+            numNewFetchers += 1;
           }
 
           count += 1;
           peekInputHost = pendingHosts.peek();
+          assert peekInputHost != null;
         }
 
         if (!tempFetchers.isEmpty()) {
@@ -509,6 +516,8 @@ public class ShuffleServer implements FetcherCallback {
           }
         }
       }
+
+      // end of while{} loop
     }
 
     LOG.info("Shutting down {}, Interrupted: {}", serverName, Thread.currentThread().isInterrupted());
