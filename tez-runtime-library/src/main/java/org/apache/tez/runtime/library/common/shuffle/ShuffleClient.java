@@ -103,12 +103,15 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
   // InputAttemptIdentifier is immutable
   private final Set<InputAttemptIdentifier> obsoletedInputs;
 
+  protected final int maxNumFetchers;
+
   // to track shuffleInfo events when finalMerge is disabled in source or pipelined shuffle is enabled in source
   // Invariant: guard with this.synchronized in ShuffleScheduler
   //            guard with: synchronized (shuffleInfoEventsMap) in ShuffleManager
   protected final Map<Integer, ShuffleEventInfo> shuffleInfoEventsMap;
 
   private int numFetchers = 0;
+  private int numPartitionRanges = 0;
   private final Object lock = new Object();
 
   public ShuffleClient(
@@ -126,6 +129,10 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
     this.completedInputSet = new BitSet(numInputs);
 
     this.obsoletedInputs = Collections.newSetFromMap(new ConcurrentHashMap<InputAttemptIdentifier, Boolean>());
+
+    this.maxNumFetchers = conf.getInt(
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_PARALLEL_COPIES,
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_PARALLEL_COPIES_DEFAULT);
 
     this.shuffleInfoEventsMap = new HashMap<Integer, ShuffleEventInfo>();
   }
@@ -232,6 +239,30 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
     synchronized (lock) {
       numFetchers -= 1;
       assert numFetchers >= 0;
+    }
+  }
+
+  // partitionRangeAdded/Removed() are called only from the inside of synchronized(InputHost),
+  // so numPartitionRanges is up-to-date and accurate.
+
+  public void partitionRangeAdded() {
+    synchronized (lock) {
+      numPartitionRanges += 1;
+    }
+  }
+
+  public void partitionRangeRemoved() {
+    synchronized (lock) {
+      numPartitionRanges -= 1;
+      assert numPartitionRanges >= 0;
+    }
+  }
+
+  // if true, we should scan pending InputHosts in ShuffleServer
+  // if false, no need to consider this ShuffleManager for now
+  public boolean shouldScanPendingInputs() {
+    synchronized (lock) {
+      return numPartitionRanges > 0 && numFetchers < maxNumFetchers;
     }
   }
 
