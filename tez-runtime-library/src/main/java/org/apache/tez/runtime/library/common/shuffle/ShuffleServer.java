@@ -536,6 +536,9 @@ public class ShuffleServer implements FetcherCallback {
       hostBlocked.put(host, newSet);
       set = newSet;
     }
+    if (set.isEmpty()) {
+      LOG.warn("Host blocked: {}", host);
+    }
     set.add(fetcher);
   }
 
@@ -545,6 +548,9 @@ public class ShuffleServer implements FetcherCallback {
     String host = fetcher.host;
     Set<Fetcher<?>> set = hostBlocked.get(host);
     set.remove(fetcher);
+    if (set.isEmpty()) {
+      LOG.warn("Host unblocked: {}", host);
+    }
   }
 
   // Invariant: inside synchronized (fetcherLock)
