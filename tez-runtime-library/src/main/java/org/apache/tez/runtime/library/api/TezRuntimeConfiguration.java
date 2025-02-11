@@ -223,6 +223,11 @@ public class TezRuntimeConfiguration {
   public static final String TEZ_RUNTIME_COMBINER_CLASS = TEZ_RUNTIME_PREFIX + "combiner.class";
 
   @ConfigurationProperty(type = "integer")
+  public static final String TEZ_RUNTIME_SHUFFLE_PARALLEL_COPIES = TEZ_RUNTIME_PREFIX +
+      "shuffle.parallel.copies";
+  public static final int TEZ_RUNTIME_SHUFFLE_PARALLEL_COPIES_DEFAULT = 20;
+
+  @ConfigurationProperty(type = "integer")
   public static final String TEZ_RUNTIME_SHUFFLE_TOTAL_PARALLEL_COPIES = TEZ_RUNTIME_PREFIX +
       "shuffle.total.parallel.copies";
   public static final int TEZ_RUNTIME_SHUFFLE_TOTAL_PARALLEL_COPIES_DEFAULT = 40;
@@ -461,6 +466,7 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_UNORDERED_OUTPUT_MAX_PER_BUFFER_SIZE_BYTES);
     tezRuntimeKeys.add(TEZ_RUNTIME_PARTITIONER_CLASS);
     tezRuntimeKeys.add(TEZ_RUNTIME_COMBINER_CLASS);
+    tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_PARALLEL_COPIES);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_TOTAL_PARALLEL_COPIES);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_FETCH_MAX_TASK_OUTPUT_AT_ONCE);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_MAX_INPUT_HOSTPORTS);
