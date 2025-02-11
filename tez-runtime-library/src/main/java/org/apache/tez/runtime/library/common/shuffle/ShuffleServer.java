@@ -553,11 +553,6 @@ public class ShuffleServer implements FetcherCallback {
   }
 
   // Invariant: inside synchronized (fetcherLock)
-  private boolean isHostNormal(InputHost inputHost) {
-    return inputHost.isHostNormal();
-  }
-
-  // Invariant: inside synchronized (fetcherLock)
   private void runFetcher(Fetcher<?> fetcher) {
     runningFetchers.add(fetcher);
     fetcher.getShuffleClient().fetcherStarted();
