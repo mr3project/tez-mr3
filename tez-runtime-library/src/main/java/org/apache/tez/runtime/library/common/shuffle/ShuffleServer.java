@@ -326,6 +326,7 @@ public class ShuffleServer implements FetcherCallback {
     }
   }
 
+  // variables local to call()
   private boolean shouldLaunchNewFetchers;
   private int currentNumFetchers;
   private boolean existsFetcherFromStuckToRecovered;
@@ -337,7 +338,8 @@ public class ShuffleServer implements FetcherCallback {
       shouldLaunchNewFetchers =
         currentNumFetchers < maxNumFetchers &&
         !pendingHosts.isEmpty() &&
-        pendingHosts.stream().anyMatch(p -> p.hasFetcherToLaunch() && isHostNormal(p.getHost()));
+        pendingHosts.stream().anyMatch(p ->
+          p.hasFetcherToLaunch(shuffleClients) && isHostNormal(p.getHost()));
 
       existsFetcherFromStuckToRecovered =
         stuckFetchers.stream().anyMatch(f -> f.getStage() == Fetcher.STAGE_FIRST_FETCHED);
@@ -457,16 +459,13 @@ public class ShuffleServer implements FetcherCallback {
         int maxFetchersToRun = maxNumFetchers - currentNumFetchers;
         // speculative Fetcher may have been launched, so maxFetchersToRun can be 0
         int currentNumPendingHosts = pendingHosts.size();
-        // limit the number of iterations because InputHost is added back to pendingsHosts if it is blocked
+        // limit the number of iterations because InputHost is added back to pendingsHosts[] if it is blocked
         int countLimit = Math.min(maxFetchersToRun, currentNumPendingHosts);
 
-        int count = 0;
+        int count = 0;  // # of InputHosts in pendingHosts[] to consider
         InputHost peekInputHost = pendingHosts.peek();
         while (count < countLimit &&
                peekInputHost != null) {
-          // for every ShuffleClient,
-          //   1. 'numPartitionRanges > 0' remains the same until the current thread consumes existing inputs
-          //   2. 'numFetchers < maxNumFetchers' remains the same until the current thread creates new Fetchers
           InputHost inputHost;
           try {
             inputHost = peekInputHost.takeFromPendingHosts(pendingHosts);
@@ -546,8 +545,7 @@ public class ShuffleServer implements FetcherCallback {
     InputHost.PartitionToInputs pendingInputs = inputHost.clearAndGetOnePartitionRange(
         shuffleClients, maxTaskOutputAtOnce, rangesScheme);
     if (pendingInputs == null) {
-      // assert { inputHost.partitionToInputs.keys.forall { s => !shuffleClients[s].shouldScanPendingInputs() } }
-      // is not valid because some Fetcher may have returned
+      // note that some Fetcher may have returned
       return null;
     }
 

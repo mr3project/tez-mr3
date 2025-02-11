@@ -102,9 +102,12 @@ public class InputHost extends HostPort {
     this.hasPendingInput = false;
   }
 
-  public synchronized boolean hasFetcherToLaunch() {
-    assert hasPendingInput;
-    return !partitionToInputs.isEmpty();
+  // should be consistent with clearAndGetOnePartitionRange()
+  public synchronized boolean hasFetcherToLaunch(ConcurrentMap<Long, ShuffleClient<?>> shuffleClients) {
+    assert hasPendingInput;   // because we remove from pendingHosts[] only later in ShuffleServer.call()
+    return
+      !partitionToInputs.isEmpty() &&
+      partitionToInputs.keySet().stream().anyMatch(id -> shuffleClients.get(id) != null);
   }
 
   public synchronized InputHost takeFromPendingHosts(
@@ -142,7 +145,6 @@ public class InputHost extends HostPort {
     if (inputs == null) {
       inputs = new ArrayList<InputAttemptIdentifier>();
       partitionMap.put(partitionRange, inputs);
-      shuffleClient.partitionRangeAdded();
     }
 
     inputs.add(srcAttempt);
@@ -195,7 +197,6 @@ public class InputHost extends HostPort {
     if (queue.size() <= maxTaskOutputAtOnce) {
       ret = new PartitionToInputs(shuffleClientId, range, queue);
       partitionMap.remove(range);
-      shuffleClient.partitionRangeRemoved();
     } else {
       List<InputAttemptIdentifier> inputToConsume = new ArrayList<>(queue.subList(0, maxTaskOutputAtOnce));
       queue.subList(0, maxTaskOutputAtOnce).clear();
@@ -227,9 +228,6 @@ public class InputHost extends HostPort {
         iterator.remove();
         continue;
       }
-      if (!shuffleClient.shouldScanPendingInputs()) {
-        continue;
-      }
 
       return shuffleClient;
     }
@@ -253,9 +251,6 @@ public class InputHost extends HostPort {
       ShuffleClient<?> shuffleClient = shuffleClients.get(shuffleClientId);
       if (shuffleClient == null) {
         iterator.remove();
-        continue;
-      }
-      if (!shuffleClient.shouldScanPendingInputs()) {
         continue;
       }
 
