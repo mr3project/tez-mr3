@@ -475,9 +475,9 @@ public class ShuffleServer implements FetcherCallback {
         int count = 0;  // # of InputHosts in pendingHosts[] to consider
         int numNewFetchers = 0;
         InputHost peekInputHost = pendingHosts.peek();
-        assert peekInputHost != null;
         while (count < countLimit &&
-               numNewFetchers < maxFetchersToRun) {
+               numNewFetchers < maxFetchersToRun &&
+               peekInputHost != null) {
           InputHost inputHost;
           try {
             inputHost = peekInputHost.takeFromPendingHosts(pendingHosts);
@@ -505,7 +505,6 @@ public class ShuffleServer implements FetcherCallback {
 
           count += 1;
           peekInputHost = pendingHosts.peek();
-          assert peekInputHost != null;
         }
 
         if (!tempFetchers.isEmpty()) {
