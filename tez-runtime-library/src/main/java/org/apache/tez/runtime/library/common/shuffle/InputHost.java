@@ -20,9 +20,11 @@ package org.apache.tez.runtime.library.common.shuffle;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
@@ -97,9 +99,33 @@ public class InputHost extends HostPort {
 
   private boolean hasPendingInput;
 
+  // accessed only within synchronized (ShuffleServer.fetcherLock)
+  private final Set<Fetcher<?>> hostBlocked;
+
   public InputHost(HostPort hostPort) {
     super(hostPort.getHost(), hostPort.getPort());
     this.hasPendingInput = false;
+    this.hostBlocked = new HashSet<Fetcher<?>>();
+  }
+
+  // Invariant: inside synchronized (ShuffleServer.fetcherLock)
+  // return true if this InputHost is now blocked
+  public boolean addHostBlocked(Fetcher<?> fetcher) {
+    boolean isEmpty = hostBlocked.isEmpty();
+    hostBlocked.add(fetcher);
+    return isEmpty;
+  }
+
+  // Invariant: inside synchronized (ShuffleServer.fetcherLock)
+  // return true if this InputHost is now free
+  public boolean removeHostBlocked(Fetcher<?> fetcher) {
+    hostBlocked.remove(fetcher);
+    return hostBlocked.isEmpty();
+  }
+
+  // Invariant: inside synchronized (ShuffleServer.fetcherLock)
+  public boolean isHostNormal() {
+    return hostBlocked.isEmpty();
   }
 
   // should be consistent with clearAndGetOnePartitionRange()

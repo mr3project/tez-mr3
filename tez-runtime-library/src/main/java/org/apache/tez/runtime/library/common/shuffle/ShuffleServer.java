@@ -338,7 +338,7 @@ public class ShuffleServer implements FetcherCallback {
         currentNumFetchers < maxNumFetchers &&
         !pendingHosts.isEmpty() &&
         pendingHosts.stream().anyMatch(p ->
-          p.hasFetcherToLaunch(shuffleClients) && isHostNormal(p.getHost()));
+          p.hasFetcherToLaunch(shuffleClients) && p.isHostNormal());
 
       existsFetcherFromStuckToRecovered =
         stuckFetchers.stream().anyMatch(f -> f.getStage() == Fetcher.STAGE_FIRST_FETCHED);
@@ -493,7 +493,7 @@ public class ShuffleServer implements FetcherCallback {
 
           boolean isInputHostNormal;
           synchronized (fetcherLock) {
-            isInputHostNormal = isHostNormal(inputHost.getHost());
+            isInputHostNormal = inputHost.isHostNormal();
           }
           Fetcher<?> fetcher = isInputHostNormal ? constructFetcherForHost(inputHost, conf) : null;
           // even when fetcher == null, inputHost may have inputs if 'ShuffleClient == null' or it is blocked due to stuck Fetchers
@@ -528,34 +528,24 @@ public class ShuffleServer implements FetcherCallback {
   // Invariant: inside synchronized (fetcherLock)
   private void addHostBlocked(Fetcher<?> fetcher) {
     assert fetcher.getState() == Fetcher.STATE_STUCK;
-    String host = fetcher.host;
-    Set<Fetcher<?>> set = hostBlocked.get(host);
-    if (set == null) {
-      Set<Fetcher<?>> newSet = new HashSet<>();
-      hostBlocked.put(host, newSet);
-      set = newSet;
+    boolean isBlockedNew = fetcher.inputHost.addHostBlocked(fetcher);
+    if (isBlockedNew) {
+      LOG.warn("Host blocked: {}", fetcher.inputHost);
     }
-    if (set.isEmpty()) {
-      LOG.warn("Host blocked: {}", host);
-    }
-    set.add(fetcher);
   }
 
   // Invariant: inside synchronized (fetcherLock)
   private void removeHostBlocked(Fetcher<?> fetcher) {
     assert fetcher.getState() == Fetcher.STATE_STUCK;
-    String host = fetcher.host;
-    Set<Fetcher<?>> set = hostBlocked.get(host);
-    set.remove(fetcher);
-    if (set.isEmpty()) {
-      LOG.warn("Host unblocked: {}", host);
+    boolean isFreeNew = fetcher.inputHost.removeHostBlocked(fetcher);
+    if (isFreeNew) {
+      LOG.warn("Host unblocked: {}", fetcher.inputHost);
     }
   }
 
   // Invariant: inside synchronized (fetcherLock)
-  private boolean isHostNormal(String host) {
-    Set<Fetcher<?>> set = hostBlocked.get(host);
-    return set == null || set.isEmpty();
+  private boolean isHostNormal(InputHost inputHost) {
+    return inputHost.isHostNormal();
   }
 
   // Invariant: inside synchronized (fetcherLock)
