@@ -240,7 +240,7 @@ public class ShuffleServer implements FetcherCallback {
   private final Object fetcherLock = new Object();
   private final Set<Fetcher<?>> runningFetchers;
   private final Set<Fetcher<?>> stuckFetchers;
-  private final Map<String, Set<Fetcher<?>>> hostBlocked;
+  private final Map<String, Set<Fetcher<?>>> hostBlocked;   // set of Fetcher in state STUCK
 
   private final AtomicBoolean isShutdown = new AtomicBoolean(false);
 
@@ -393,8 +393,8 @@ public class ShuffleServer implements FetcherCallback {
             }
           });
           for (Fetcher<?> fetcher: tempFetchers) {
-            fetcher.setState(Fetcher.STATE_RECOVERED);
             removeHostBlocked(fetcher);
+            fetcher.setState(Fetcher.STATE_RECOVERED);
             stuckFetchers.remove(fetcher);
             runningFetchers.add(fetcher);
             LOG.info("Fetcher STUCK to RECOVERED: {} in stage {}",
@@ -410,7 +410,7 @@ public class ShuffleServer implements FetcherCallback {
           stuckFetchers.forEach(fetcher -> {
             assert fetcher.getState() == Fetcher.STATE_STUCK;
             if (fetcher.getStage() != Fetcher.STAGE_FIRST_FETCHED &&
-              (currentMillis - fetcher.getStartMillis()) >= fetcherConfig.speculativeExecutionWaitMillis) {
+                (currentMillis - fetcher.getStartMillis()) >= fetcherConfig.speculativeExecutionWaitMillis) {
               tempFetchers.add(fetcher);
 
               if (fetcher.attempt < MAX_SPECULATIVE_FETCH_ATTEMPTS) {
@@ -423,8 +423,8 @@ public class ShuffleServer implements FetcherCallback {
             }
           });
           for (Fetcher<?> fetcher: tempFetchers) {
-            fetcher.setState(Fetcher.STATE_SPECULATIVE);
             removeHostBlocked(fetcher);
+            fetcher.setState(Fetcher.STATE_SPECULATIVE);
             stuckFetchers.remove(fetcher);
             runningFetchers.add(fetcher);
             LOG.warn("Fetcher STUCK to SPECULATIVE: {} in stage {}",
@@ -440,18 +440,19 @@ public class ShuffleServer implements FetcherCallback {
           runningFetchers.forEach(fetcher -> {
             int state = fetcher.getState();
             assert state != Fetcher.STATE_STUCK;
-            long elapsed = currentMillis - fetcher.getStartMillis();
-            if (state == Fetcher.STATE_NORMAL &&
-                elapsed > CHECK_BACKPRESSURE_STUCK_MILLIS &&
-                fetcher.getStage() != Fetcher.STAGE_FIRST_FETCHED) {
-              tempFetchers.add(fetcher);
+            if (state == Fetcher.STATE_NORMAL) {
+              long elapsed = currentMillis - fetcher.getStartMillis();
+              if (elapsed > CHECK_BACKPRESSURE_STUCK_MILLIS &&
+                  fetcher.getStage() != Fetcher.STAGE_FIRST_FETCHED) {
+                tempFetchers.add(fetcher);
+              }
             }
           });
           tempFetchers.forEach(fetcher -> {
             fetcher.setState(Fetcher.STATE_STUCK);
+            addHostBlocked(fetcher);
             runningFetchers.remove(fetcher);
             stuckFetchers.add(fetcher);
-            addHostBlocked(fetcher);
             LOG.warn("Fetcher NORMAL to STUCK: {} in stage {}, {}ms",
               fetcher.getFetcherIdentifier(), fetcher.getStage(), currentMillis - fetcher.getStartMillis());
           });
@@ -500,9 +501,11 @@ public class ShuffleServer implements FetcherCallback {
           peekInputHost = pendingHosts.peek();
         }
 
-        synchronized (fetcherLock) {
-          for (Fetcher<?> fetcher: tempFetchers) {
-            runFetcher(fetcher);
+        if (!tempFetchers.isEmpty()) {
+          synchronized (fetcherLock) {
+            for (Fetcher<?> fetcher: tempFetchers) {
+              runFetcher(fetcher);
+            }
           }
         }
       }
@@ -516,6 +519,7 @@ public class ShuffleServer implements FetcherCallback {
 
   // Invariant: inside synchronized (fetcherLock)
   private void addHostBlocked(Fetcher<?> fetcher) {
+    assert fetcher.getState() == Fetcher.STATE_STUCK;
     String host = fetcher.host;
     Set<Fetcher<?>> set = hostBlocked.get(host);
     if (set == null) {
@@ -528,6 +532,7 @@ public class ShuffleServer implements FetcherCallback {
 
   // Invariant: inside synchronized (fetcherLock)
   private void removeHostBlocked(Fetcher<?> fetcher) {
+    assert fetcher.getState() == Fetcher.STATE_STUCK;
     String host = fetcher.host;
     Set<Fetcher<?>> set = hostBlocked.get(host);
     set.remove(fetcher);
@@ -734,9 +739,10 @@ public class ShuffleServer implements FetcherCallback {
     }
 
     private void doBookKeepingForFetcherComplete() {
-        // this is the only place where Fetcher can be completely removed from runningFetchers/stuckFetchers
+      // this is the only place where Fetcher can be completely removed from runningFetchers/stuckFetchers
       int finalState = fetcher.getState();
       synchronized (fetcherLock) {
+        // do not set fetcher.state which must be update only inside call()
         if (finalState == Fetcher.STATE_STUCK) {
           removeHostBlocked(fetcher);
           stuckFetchers.remove(fetcher);
@@ -745,7 +751,7 @@ public class ShuffleServer implements FetcherCallback {
         }
       }
       wakeupLoop();
-      if (fetcher.attempt > 0) {  // speculative Fetcher
+      if (fetcher.attempt > 0) {  // this is a speculative Fetcher
         LOG.info("Speculative Fetcher finished: {} in final state {}",
           fetcher.getFetcherIdentifier(), finalState);
       }
