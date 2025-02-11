@@ -556,6 +556,7 @@ public class ShuffleServer implements FetcherCallback {
   // Invariant: inside synchronized (fetcherLock)
   private void runFetcher(Fetcher<?> fetcher) {
     runningFetchers.add(fetcher);
+    fetcher.getShuffleClient().fetcherStarted();
     ListenableFuture<FetchResult> future = fetcherExecutor.submit(fetcher);
     Futures.addCallback(future, new FetchFutureCallback(fetcher));
   }
@@ -748,6 +749,7 @@ public class ShuffleServer implements FetcherCallback {
     }
 
     private void doBookKeepingForFetcherComplete() {
+      fetcher.getShuffleClient().fetcherFinished();
       // this is the only place where Fetcher can be completely removed from runningFetchers/stuckFetchers
       int finalState = fetcher.getState();
       synchronized (fetcherLock) {
