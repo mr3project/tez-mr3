@@ -340,7 +340,8 @@ public class ShuffleServer implements FetcherCallback {
         currentNumFetchers < maxNumFetchers &&
         !pendingHosts.isEmpty() &&
         pendingHosts.stream().anyMatch(p ->
-          p.hasFetcherToLaunch(shuffleClients) && p.isHostNormal());
+            p.isHostNormal() &&
+            p.hasFetcherToLaunch(shuffleClients));
 
       existsFetcherFromStuckToRecovered =
         stuckFetchers.stream().anyMatch(f -> f.getStage() == Fetcher.STAGE_FIRST_FETCHED);
@@ -483,6 +484,9 @@ public class ShuffleServer implements FetcherCallback {
         while (count < countLimit &&
                numNewFetchers < maxFetchersToRun &&
                peekInputHost != null) {
+          // for every ShuffleClient,
+          //   1. 'numPartitionRanges > 0' remains the same until the current thread consumes existing inputs
+          //   2. 'numFetchers < maxNumFetchers' remains the same until the current thread creates new Fetchers
           InputHost inputHost;
           try {
             inputHost = peekInputHost.takeFromPendingHosts(pendingHosts);
@@ -565,7 +569,8 @@ public class ShuffleServer implements FetcherCallback {
     InputHost.PartitionToInputs pendingInputs = inputHost.clearAndGetOnePartitionRange(
         shuffleClients, maxTaskOutputAtOnce, rangesScheme);
     if (pendingInputs == null) {
-      // note that some Fetcher may have returned
+      // assert { inputHost.partitionToInputs.keys.forall { s => !shuffleClients[s].shouldScanPendingInputs() } }
+      // is not valid because some Fetcher may have returned
       return null;
     }
 

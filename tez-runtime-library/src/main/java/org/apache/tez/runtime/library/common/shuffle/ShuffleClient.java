@@ -259,7 +259,7 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
   }
 
   // if true, we should scan pending InputHosts in ShuffleServer
-  // if false, no need to consider this ShuffleManager for now
+  // if false, no need to consider this ShuffleClient for now
   public boolean shouldScanPendingInputs() {
     synchronized (lock) {
       return numPartitionRanges > 0 && numFetchers < maxNumFetchers;
