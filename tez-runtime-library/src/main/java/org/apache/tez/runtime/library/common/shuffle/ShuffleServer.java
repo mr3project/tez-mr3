@@ -330,6 +330,8 @@ public class ShuffleServer implements FetcherCallback {
   private boolean shouldLaunchNewFetchers;
   private boolean existsFetcherFromStuckToRecovered;
   private boolean existsFetcherFromStuckToSpeculative;
+  private long nextCheckStuckFetchers;
+  private boolean shouldCheckStuckFetchers;
 
   private void updateLoopConditions() {
     synchronized (fetcherLock) {
@@ -344,18 +346,21 @@ public class ShuffleServer implements FetcherCallback {
         stuckFetchers.stream().anyMatch(f -> f.getStage() == Fetcher.STAGE_FIRST_FETCHED);
 
       final long currentMillis = System.currentTimeMillis();
+
       existsFetcherFromStuckToSpeculative =
         stuckFetchers.stream().anyMatch(f ->
           (f.getStage() < Fetcher.STAGE_FIRST_FETCHED) &&
           (currentMillis - f.getStartMillis() >= fetcherConfig.speculativeExecutionWaitMillis)
         );
+
+      shouldCheckStuckFetchers = currentMillis > nextCheckStuckFetchers;
     }
   }
 
   private void call() throws Exception {
     final List<Fetcher<?>> tempFetchers = new ArrayList<>();
 
-    long remainingMillis = CHECK_BACKPRESSURE_INTERVAL_MILLIS;
+    nextCheckStuckFetchers = System.currentTimeMillis() + CHECK_BACKPRESSURE_INTERVAL_MILLIS;
     while (!isShutdown.get()) {
       lock.lock();
       try {
@@ -364,22 +369,19 @@ public class ShuffleServer implements FetcherCallback {
                !shouldLaunchNewFetchers &&
                !existsFetcherFromStuckToRecovered &&
                !existsFetcherFromStuckToSpeculative &&
-               remainingMillis > 0) {
+               !shouldCheckStuckFetchers) {
           wakeLoop.await(250, TimeUnit.MILLISECONDS);
           updateLoopConditions();
-          remainingMillis -= 250;   // conservative because less than 250ms could have passed
         }
       } finally {
         lock.unlock();
       }
 
       if (isDebugEnabled) {
-        LOG.debug("ShuffleServer loop: existsFetcherFromStuckToRecovered={}, existsFetcherFromStuckToSpeculative={}, remainingMillis={}ms, shouldLaunchNewFetchers={}",
+        LOG.debug("ShuffleServer loop: existsFetcherFromStuckToRecovered={}, existsFetcherFromStuckToSpeculative={}, shouldLaunchNewFetchers={}, shouldCheckStuckFetchers={}",
             existsFetcherFromStuckToRecovered, existsFetcherFromStuckToSpeculative,
-            remainingMillis, shouldLaunchNewFetchers);
+            shouldLaunchNewFetchers, shouldCheckStuckFetchers);
       }
-
-      final long currentMillis = System.currentTimeMillis();
 
       if (existsFetcherFromStuckToRecovered) {
         synchronized (fetcherLock) {
@@ -401,6 +403,8 @@ public class ShuffleServer implements FetcherCallback {
           }
         }
       }
+
+      final long currentMillis = System.currentTimeMillis();
 
       if (existsFetcherFromStuckToSpeculative) {
         synchronized (fetcherLock) {
@@ -432,7 +436,7 @@ public class ShuffleServer implements FetcherCallback {
         }
       }
 
-      if (remainingMillis <= 0) {
+      if (shouldCheckStuckFetchers) {
         synchronized (fetcherLock) {
           // try to transition: from NORMAL with stage == INITIAL to STUCK
           tempFetchers.clear();
@@ -456,7 +460,8 @@ public class ShuffleServer implements FetcherCallback {
               fetcher.getFetcherIdentifier(), fetcher.getStage(), currentMillis - fetcher.getStartMillis());
           });
         }
-        remainingMillis = CHECK_BACKPRESSURE_INTERVAL_MILLIS;   // reset
+        // reset nextCheckStuckFetchers
+        nextCheckStuckFetchers = currentMillis + CHECK_BACKPRESSURE_INTERVAL_MILLIS;
       }
 
       if (shouldLaunchNewFetchers) {
