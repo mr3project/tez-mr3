@@ -108,9 +108,6 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
   //            guard with: synchronized (shuffleInfoEventsMap) in ShuffleManager
   protected final Map<Integer, ShuffleEventInfo> shuffleInfoEventsMap;
 
-  private int numFetchers = 0;
-  private final Object lock = new Object();
-
   public ShuffleClient(
       InputContext inputContext,
       Configuration conf,
@@ -220,19 +217,6 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
 
   public int getDagIdentifier() {
     return inputContext.getDagIdentifier();
-  }
-
-  public void fetcherStarted() {
-    synchronized (lock) {
-      numFetchers += 1;
-    }
-  }
-
-  public void fetcherFinished() {
-    synchronized (lock) {
-      numFetchers -= 1;
-      assert numFetchers >= 0;
-    }
   }
 
   public abstract void fetchSucceeded(

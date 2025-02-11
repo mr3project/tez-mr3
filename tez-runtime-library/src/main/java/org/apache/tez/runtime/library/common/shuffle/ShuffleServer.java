@@ -542,7 +542,6 @@ public class ShuffleServer implements FetcherCallback {
   // Invariant: inside synchronized (fetcherLock)
   private void runFetcher(Fetcher<?> fetcher) {
     runningFetchers.add(fetcher);
-    fetcher.getShuffleClient().fetcherStarted();
     ListenableFuture<FetchResult> future = fetcherExecutor.submit(fetcher);
     Futures.addCallback(future, new FetchFutureCallback(fetcher));
   }
@@ -735,10 +734,10 @@ public class ShuffleServer implements FetcherCallback {
     }
 
     private void doBookKeepingForFetcherComplete() {
-      fetcher.getShuffleClient().fetcherFinished();
         // this is the only place where Fetcher can be completely removed from runningFetchers/stuckFetchers
+      int finalState = fetcher.getState();
       synchronized (fetcherLock) {
-        if (fetcher.getState() == Fetcher.STATE_STUCK) {
+        if (finalState == Fetcher.STATE_STUCK) {
           removeHostBlocked(fetcher);
           stuckFetchers.remove(fetcher);
         } else {
@@ -746,6 +745,10 @@ public class ShuffleServer implements FetcherCallback {
         }
       }
       wakeupLoop();
+      if (fetcher.attempt > 0) {  // speculative Fetcher
+        LOG.info("Speculative Fetcher finished: {} in final state {}",
+          fetcher.getFetcherIdentifier(), finalState);
+      }
     }
 
     @Override
