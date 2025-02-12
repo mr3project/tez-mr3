@@ -46,11 +46,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
@@ -238,7 +234,7 @@ public class ShuffleServer implements FetcherCallback {
   private final ReentrantLock lock = new ReentrantLock();
   private final Condition wakeLoop = lock.newCondition();
 
-  private final Set<Fetcher> runningFetchers;   // thread-safe because we use ConcurrentHashMap
+  private final Set<Fetcher<?>> runningFetchers;   // thread-safe because we use ConcurrentHashMap
 
   private final AtomicBoolean isShutdown = new AtomicBoolean(false);
 
@@ -291,7 +287,7 @@ public class ShuffleServer implements FetcherCallback {
     shuffleClients = new ConcurrentHashMap<Long, ShuffleClient<?>>();
     pendingHosts = new LinkedBlockingQueue<InputHost>();
 
-    runningFetchers = Collections.newSetFromMap(new ConcurrentHashMap<Fetcher, Boolean>());
+    runningFetchers = Collections.newSetFromMap(new ConcurrentHashMap<Fetcher<?>, Boolean>());
 
     this.maxNumInputHosts = conf.getInt(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MAX_INPUT_HOSTPORTS,
@@ -405,7 +401,10 @@ public class ShuffleServer implements FetcherCallback {
             removeHostBlocked(fetcher);
             LOG.warn("Fetcher STUCK to SPECULATIVE: {} in stage {}",
                 fetcher.getFetcherIdentifier(), fetcher.getStage());
-            if (fetcher.attempt < MAX_SPECULATIVE_FETCH_ATTEMPTS) {
+
+            // create a speculative fetcher only if its ShuffleClient is still alive
+            if (fetcher.attempt < MAX_SPECULATIVE_FETCH_ATTEMPTS &&
+                shuffleClients.get(fetcher.getShuffleClient().getShuffleClientId()) != null) {
               Fetcher<?> speculativeFetcher = fetcher.createClone();
               runFetcher(speculativeFetcher);   // concurrent modification
               LOG.warn("Speculative execution of Fetcher: {} to {}",
@@ -474,7 +473,7 @@ public class ShuffleServer implements FetcherCallback {
           peekInputHost = pendingHosts.peek();
         }
 
-        LOG.info("Fetcher launched={}, runningFetchers={}, stuckFetchers={}", numNewFetchers, runningFetchers.size());
+        LOG.info("Fetcher launched={}, runningFetchers={}", numNewFetchers, runningFetchers.size());
       }
 
       // end of while{} loop
@@ -562,7 +561,12 @@ public class ShuffleServer implements FetcherCallback {
     for (InputHost inputHost: knownSrcHosts.values()) {
       inputHost.clearShuffleClientId(shuffleClientId);
     }
+    // but some Fetcher for shuffleClientId may have been chosen in constructFetcherForHost() and get executed later
 
+    // add()/remove() can be called while traversing
+    // add() with Fetcher for shuffleClientId is okay:
+    //   this Fetcher is orphaned because ShuffleClient is gone.
+    //   later, it will be removed from runningFetchers[] when it is finished.
     runningFetchers.forEach(fetcher -> {
       if (fetcher.useSingleShuffleClientId(shuffleClientId)) {
         LOG.warn("Shutting down running Fetcher for ShuffleClient: {} {}",
@@ -645,6 +649,7 @@ public class ShuffleServer implements FetcherCallback {
   public void shutdown() {
     if (!isShutdown.getAndSet(true)) {
       wakeupLoop();
+      // add()/remove() can be called while traversing (which is okay because DaemonTask is stopping)
       runningFetchers.forEach(fetcher -> { fetcher.shutdown(); });
 
       if (this.fetcherExecutor != null && !this.fetcherExecutor.isShutdown()) {
@@ -703,7 +708,8 @@ public class ShuffleServer implements FetcherCallback {
           LOG.debug("Already shutdown. Ignoring event from fetcher");
         }
       } else {
-        if (result != null) {
+        // if ShuffleClient for this fetcher is gone, do not consume result
+        if (result != null && shuffleClients.get(result.getShuffleClientId()) != null) {
           // use '==' instead of 'equals' because we want to avoid conversion from long to Long
           assert result.getShuffleClientId() == fetcher.getShuffleClient().getShuffleClientId();
 
