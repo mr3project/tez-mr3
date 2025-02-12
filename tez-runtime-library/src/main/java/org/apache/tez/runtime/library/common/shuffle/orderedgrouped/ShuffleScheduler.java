@@ -299,7 +299,8 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
 
       if (remainingMaps.get() == 0) {
         notifyAll();
-        LOG.info("All inputs fetched for input vertex: " + inputContext.getSourceVertexName());
+        LOG.info("All inputs fetched for input vertex: {} {}",
+          inputContext.getUniqueIdentifier(), inputContext.getSourceVertexName());
       }
 
       // update the status

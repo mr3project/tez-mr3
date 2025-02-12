@@ -368,7 +368,8 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
     if (numComplete == numInputs) {
       // Poison pill End of Input message to awake blocking take call
       completedInputs.add(endOfInputMarker);
-      LOG.info("All inputs fetched for input vertex : " + inputContext.getSourceVertexName());
+      LOG.info("All inputs fetched for input vertex: {} {}",
+          inputContext.getUniqueIdentifier(), inputContext.getSourceVertexName());
     }
   }
 
