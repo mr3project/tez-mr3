@@ -79,17 +79,12 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
   public static int STAGE_FIRST_FETCHED = 1;
   private volatile int stage = STAGE_INITIAL;
 
+  // accessed only from
   public static int STATE_NORMAL = 10;
   public static int STATE_STUCK = 11;
   public static int STATE_RECOVERED = 12;
   public static int STATE_SPECULATIVE = 13;
-  public static int STATE_FINISHED = 14;
   private volatile int state = STATE_NORMAL;
-
-  // set by Fetcher
-  protected void setStartMillis(long newStartMillis) {
-    startMillis = newStartMillis;
-  }
 
   // read by ShuffleServer
   public long getStartMillis() {

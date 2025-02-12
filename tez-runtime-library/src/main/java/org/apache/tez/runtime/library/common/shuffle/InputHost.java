@@ -99,7 +99,6 @@ public class InputHost extends HostPort {
 
   private boolean hasPendingInput;
 
-  // accessed only within synchronized (ShuffleServer.fetcherLock)
   private final Set<Fetcher<?>> hostBlocked;
   private long blockStartMillis;
   private static int numHostBlocked = 0;
@@ -110,33 +109,36 @@ public class InputHost extends HostPort {
     this.hostBlocked = new HashSet<Fetcher<?>>();
   }
 
-  // Invariant: inside synchronized (ShuffleServer.fetcherLock)
   // return true if this InputHost is now blocked
   public void addHostBlocked(Fetcher<?> fetcher) {
-    boolean isEmpty = hostBlocked.isEmpty();
-    if (isEmpty) {
-      blockStartMillis = System.currentTimeMillis();
-      numHostBlocked += 1;
-      LOG.warn("Host blocked: {}, numHostBlocked={}", this, numHostBlocked);
+    synchronized (hostBlocked) {
+      boolean isEmpty = hostBlocked.isEmpty();
+      if (isEmpty) {
+        blockStartMillis = System.currentTimeMillis();
+        numHostBlocked += 1;
+        LOG.warn("Host blocked: {}, numHostBlocked={}", this, numHostBlocked);
+      }
+      hostBlocked.add(fetcher);
     }
-    hostBlocked.add(fetcher);
   }
 
-  // Invariant: inside synchronized (ShuffleServer.fetcherLock)
   // return true if this InputHost is now free
   public void removeHostBlocked(Fetcher<?> fetcher) {
-    hostBlocked.remove(fetcher);
-    boolean isEmpty = hostBlocked.isEmpty();
-    if (isEmpty) {
-      numHostBlocked -= 1;
-      LOG.info("Host unblocked: {}, duration={}, numHostBlocked={}",
-          this, System.currentTimeMillis() - blockStartMillis, numHostBlocked);
+    synchronized (hostBlocked) {
+      hostBlocked.remove(fetcher);
+      boolean isEmpty = hostBlocked.isEmpty();
+      if (isEmpty) {
+        numHostBlocked -= 1;
+        LOG.info("Host unblocked: {}, duration={}, numHostBlocked={}",
+            this, System.currentTimeMillis() - blockStartMillis, numHostBlocked);
+      }
     }
   }
 
-  // Invariant: inside synchronized (ShuffleServer.fetcherLock)
   public boolean isHostNormal() {
-    return hostBlocked.isEmpty();
+    synchronized (hostBlocked) {
+      return hostBlocked.isEmpty();
+    }
   }
 
   // should be consistent with clearAndGetOnePartitionRange()
