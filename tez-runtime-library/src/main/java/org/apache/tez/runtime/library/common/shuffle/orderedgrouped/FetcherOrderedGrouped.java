@@ -637,9 +637,10 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     int partitionId = pendingInputsSeq.getPartition();
     int partitionCount = pendingInputsSeq.getPartitionCount();
 
+    setStage(STAGE_FIRST_FETCHED);  // local reads should not interfere with stage
+
     int index = 0;  // points to the next input to be consumed
     List<InputAttemptIdentifier> failedFetches = new ArrayList<>();
-    final int firstFetchIndex = 0;
     while (index < numInputs) {
       // Avoid fetching more if already stopped
       if (stopped) {
@@ -690,9 +691,6 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         failedFetches.add(inputAttemptIdentifier);
       }
 
-      if (index == firstFetchIndex) {
-        setStage(STAGE_FIRST_FETCHED);
-      }
       index++;
     }
 

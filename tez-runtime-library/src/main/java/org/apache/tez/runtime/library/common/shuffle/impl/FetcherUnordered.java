@@ -387,9 +387,10 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     int partitionId = pendingInputsSeq.getPartition();
     int partitionCount = pendingInputsSeq.getPartitionCount();
 
+    setStage(STAGE_FIRST_FETCHED);  // local reads should not interfere with stage
+
     int index = 0;  // points to the next input to be consumed
     List<InputAttemptIdentifier> failedFetches = new ArrayList<>();
-    final int firstFetchIndex = 0;
     while (index < numInputs) {
       if (isShutDown.get()) {
         if (isDebugEnabled) {
@@ -435,9 +436,6 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         failedFetches.add(inputAttemptIdentifier);
       }
 
-      if (index == firstFetchIndex) {
-        setStage(STAGE_FIRST_FETCHED);
-      }
       index++;
     }
 
