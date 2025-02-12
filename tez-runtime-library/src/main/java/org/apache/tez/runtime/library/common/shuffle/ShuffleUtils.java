@@ -140,8 +140,9 @@ public class ShuffleUtils {
       // finished reading shuffleData.length bytes from identifier
     } catch (InternalError | Exception e) {
       // Close the streams
-      LOG.info("Failed to read data to memory for {}. len={}, decomp={}. ExceptionMessage={}",
-          identifier, compressedLength, decompressedLength, e.getMessage());
+      LOG.info("Failed to read data to memory for {}. len={}, decomp={}. ExceptionMessage={} for {}",
+          identifier, compressedLength, decompressedLength, e.getMessage(),
+          taskContext.getUniqueIdentifier());
       ioCleanup(input);
       if (e instanceof InternalError) {
         // The codec for lz0,lz4,snappy,bz2,etc. throw java.lang.InternalError

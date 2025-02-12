@@ -109,28 +109,28 @@ public class InputHost extends HostPort {
     this.hostBlocked = new HashSet<Fetcher<?>>();
   }
 
-  // return true if this InputHost is now blocked
   public void addHostBlocked(Fetcher<?> fetcher) {
     synchronized (hostBlocked) {
-      boolean isEmpty = hostBlocked.isEmpty();
-      if (isEmpty) {
+      boolean result = hostBlocked.add(fetcher);
+      assert result;  // can be called only once per Fetcher
+      numHostBlocked += 1;
+      if (numHostBlocked == 1) {
         blockStartMillis = System.currentTimeMillis();
-        numHostBlocked += 1;
         LOG.warn("Host blocked: {}, numHostBlocked={}", this, numHostBlocked);
       }
-      hostBlocked.add(fetcher);
     }
   }
 
-  // return true if this InputHost is now free
   public void removeHostBlocked(Fetcher<?> fetcher) {
+    // fetcher might be removed more than once because removeHostBlocked() can be called from different threads
     synchronized (hostBlocked) {
-      hostBlocked.remove(fetcher);
-      boolean isEmpty = hostBlocked.isEmpty();
-      if (isEmpty) {
+      boolean result = hostBlocked.remove(fetcher);
+      if (result) {
         numHostBlocked -= 1;
-        LOG.info("Host unblocked: {}, duration={}, numHostBlocked={}",
-            this, System.currentTimeMillis() - blockStartMillis, numHostBlocked);
+      }
+      assert numHostBlocked >= 0;
+      if (numHostBlocked == 0) {
+        LOG.info("Host unblocked: {}, duration={}", this, System.currentTimeMillis() - blockStartMillis);
       }
     }
   }

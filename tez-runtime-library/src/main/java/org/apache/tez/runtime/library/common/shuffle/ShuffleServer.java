@@ -385,8 +385,8 @@ public class ShuffleServer implements FetcherCallback {
         runningFetchers.forEach(fetcher -> {
           if (fetcher.getState() == Fetcher.STATE_STUCK &&
               fetcher.getStage() == Fetcher.STAGE_FIRST_FETCHED) {
-            removeHostBlocked(fetcher);
             fetcher.setState(Fetcher.STATE_RECOVERED);
+            removeHostBlocked(fetcher);
             LOG.info("Fetcher STUCK to RECOVERED: {} in stage {}",
                 fetcher.getFetcherIdentifier(), Fetcher.STAGE_FIRST_FETCHED);
           }
@@ -401,8 +401,8 @@ public class ShuffleServer implements FetcherCallback {
           if (fetcher.getState() == Fetcher.STATE_STUCK &&
               fetcher.getStage() != Fetcher.STAGE_FIRST_FETCHED &&
               (currentMillis - fetcher.getStartMillis()) >= fetcherConfig.speculativeExecutionWaitMillis) {
-            removeHostBlocked(fetcher);
             fetcher.setState(Fetcher.STATE_SPECULATIVE);
+            removeHostBlocked(fetcher);
             LOG.warn("Fetcher STUCK to SPECULATIVE: {} in stage {}",
                 fetcher.getFetcherIdentifier(), fetcher.getStage());
             if (fetcher.attempt < MAX_SPECULATIVE_FETCH_ATTEMPTS) {
@@ -486,13 +486,14 @@ public class ShuffleServer implements FetcherCallback {
     }
   }
 
+  // can be called only once from call()
   private void addHostBlocked(Fetcher<?> fetcher) {
     assert fetcher.getState() == Fetcher.STATE_STUCK;
     fetcher.inputHost.addHostBlocked(fetcher);
   }
 
+  // can be called twice for the same Fetcher: from call() and doBookKeepingForFetcherComplete()
   private void removeHostBlocked(Fetcher<?> fetcher) {
-    assert fetcher.getState() == Fetcher.STATE_STUCK;
     fetcher.inputHost.removeHostBlocked(fetcher);
   }
 
