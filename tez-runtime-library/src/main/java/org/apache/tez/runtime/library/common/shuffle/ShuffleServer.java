@@ -511,13 +511,15 @@ public class ShuffleServer implements FetcherCallback {
           synchronized (fetcherLock) {
             isInputHostNormal = inputHost.isHostNormal();
           }
-          Fetcher<?> fetcher = isInputHostNormal ? constructFetcherForHost(inputHost, conf) : null;
-          // even when fetcher == null, inputHost may have inputs if 'ShuffleClient == null' or it is blocked due to stuck Fetchers
-          inputHost.addToPendingHostsIfNecessary(pendingHosts);
-          if (fetcher != null) {
-            tempFetchers.add(fetcher);
-            numNewFetchers += 1;
+          if (isInputHostNormal) {
+            Fetcher<?> fetcher = constructFetcherForHost(inputHost, conf);
+            // even when fetcher == null, inputHost may still have inputs if 'ShuffleClient == null'
+            if (fetcher != null) {
+              tempFetchers.add(fetcher);
+              numNewFetchers += 1;
+            }
           }
+          inputHost.addToPendingHostsIfNecessary(pendingHosts);
 
           peekInputHost = pendingHosts.peek();
         }

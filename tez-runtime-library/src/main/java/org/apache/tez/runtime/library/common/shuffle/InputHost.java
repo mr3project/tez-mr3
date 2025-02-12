@@ -128,6 +128,7 @@ public class InputHost extends HostPort {
     hostBlocked.remove(fetcher);
     boolean isEmpty = hostBlocked.isEmpty();
     if (isEmpty) {
+      numHostBlocked -= 1;
       LOG.info("Host unblocked: {}, duration={}, numHostBlocked={}",
           this, System.currentTimeMillis() - blockStartMillis, numHostBlocked);
     }
