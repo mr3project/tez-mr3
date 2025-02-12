@@ -333,15 +333,25 @@ public class ShuffleServer implements FetcherCallback {
   private long nextCheckStuckFetchers;
   private boolean shouldCheckStuckFetchers;
 
+  // Invariant: inside synchronized (fetcherLock)
+  private boolean getShouldLaunchNewFetchers() {
+    return
+      !pendingHosts.isEmpty() &&
+      pendingHosts.stream().anyMatch(p ->
+          p.isHostNormal() &&
+          p.hasFetcherToLaunch(shuffleClients));
+  }
+
+  private boolean getShouldLaunchNewFetchersLock() {
+    synchronized (fetcherLock) {
+      return getShouldLaunchNewFetchers();
+    }
+  }
+
   private void updateLoopConditions() {
     synchronized (fetcherLock) {
       int currentNumFetchers = runningFetchers.size() + stuckFetchers.size();
-      shouldLaunchNewFetchers =
-        currentNumFetchers < maxNumFetchers &&
-        !pendingHosts.isEmpty() &&
-        pendingHosts.stream().anyMatch(p ->
-            p.isHostNormal() &&
-            p.hasFetcherToLaunch(shuffleClients));
+      shouldLaunchNewFetchers = currentNumFetchers < maxNumFetchers && getShouldLaunchNewFetchers();
 
       existsFetcherFromStuckToRecovered =
         stuckFetchers.stream().anyMatch(f -> f.getStage() == Fetcher.STAGE_FIRST_FETCHED);
@@ -468,8 +478,6 @@ public class ShuffleServer implements FetcherCallback {
       if (shouldLaunchNewFetchers) {
         tempFetchers.clear();
 
-        // limit the number of iterations because InputHost is added back to pendingsHosts[] if it is blocked
-        int countLimit = pendingHosts.size();
         // speculative Fetcher may have been launched and some Fetcher may been finished,
         // so we cannot reuse currentNumFetchers in updateLoopConditions()
         int initialNumFetchers;
@@ -478,10 +486,9 @@ public class ShuffleServer implements FetcherCallback {
         }
         int maxFetchersToRun = maxNumFetchers - initialNumFetchers;
 
-        int count = 0;  // # of InputHosts in pendingHosts[] to consider
         int numNewFetchers = 0;
         InputHost peekInputHost = pendingHosts.peek();
-        while (count < countLimit &&
+        while (getShouldLaunchNewFetchersLock() &&
                numNewFetchers < maxFetchersToRun &&
                peekInputHost != null) {
           // for every ShuffleClient,
@@ -512,7 +519,6 @@ public class ShuffleServer implements FetcherCallback {
             numNewFetchers += 1;
           }
 
-          count += 1;
           peekInputHost = pendingHosts.peek();
         }
 
