@@ -527,10 +527,8 @@ public class ShuffleServer implements FetcherCallback {
             for (Fetcher<?> fetcher: tempFetchers) {
               runFetcher(fetcher);
             }
-            if (isDebugEnabled) {
-              LOG.debug("Fetcher launched={}, runningFetchers={}, stuckFetchers={}",
+            LOG.info("Fetcher launched={}, runningFetchers={}, stuckFetchers={}",
                 tempFetchers.size(), runningFetchers.size(), stuckFetchers.size());
-            }
           }
         }
       }
