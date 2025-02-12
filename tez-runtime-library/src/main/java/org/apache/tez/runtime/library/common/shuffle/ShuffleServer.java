@@ -521,6 +521,10 @@ public class ShuffleServer implements FetcherCallback {
             for (Fetcher<?> fetcher: tempFetchers) {
               runFetcher(fetcher);
             }
+            if (isDebugEnabled) {
+              LOG.debug("Fetcher launched={}, runningFetchers={}, stuckFetchers={}",
+                tempFetchers.size(), runningFetchers.size(), stuckFetchers.size());
+            }
           }
         }
       }
@@ -537,19 +541,13 @@ public class ShuffleServer implements FetcherCallback {
   // Invariant: inside synchronized (fetcherLock)
   private void addHostBlocked(Fetcher<?> fetcher) {
     assert fetcher.getState() == Fetcher.STATE_STUCK;
-    boolean isBlockedNew = fetcher.inputHost.addHostBlocked(fetcher);
-    if (isBlockedNew) {
-      LOG.warn("Host blocked: {}", fetcher.inputHost);
-    }
+    fetcher.inputHost.addHostBlocked(fetcher);
   }
 
   // Invariant: inside synchronized (fetcherLock)
   private void removeHostBlocked(Fetcher<?> fetcher) {
     assert fetcher.getState() == Fetcher.STATE_STUCK;
-    boolean isFreeNew = fetcher.inputHost.removeHostBlocked(fetcher);
-    if (isFreeNew) {
-      LOG.warn("Host unblocked: {}", fetcher.inputHost);
-    }
+    fetcher.inputHost.removeHostBlocked(fetcher);
   }
 
   // Invariant: inside synchronized (fetcherLock)

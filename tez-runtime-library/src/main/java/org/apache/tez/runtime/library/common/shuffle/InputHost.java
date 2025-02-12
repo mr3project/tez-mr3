@@ -101,6 +101,7 @@ public class InputHost extends HostPort {
 
   // accessed only within synchronized (ShuffleServer.fetcherLock)
   private final Set<Fetcher<?>> hostBlocked;
+  private long blockStartMillis;
 
   public InputHost(HostPort hostPort) {
     super(hostPort.getHost(), hostPort.getPort());
@@ -110,17 +111,23 @@ public class InputHost extends HostPort {
 
   // Invariant: inside synchronized (ShuffleServer.fetcherLock)
   // return true if this InputHost is now blocked
-  public boolean addHostBlocked(Fetcher<?> fetcher) {
+  public void addHostBlocked(Fetcher<?> fetcher) {
     boolean isEmpty = hostBlocked.isEmpty();
+    if (isEmpty) {
+      blockStartMillis = System.currentTimeMillis();
+      LOG.warn("Host blocked: {}", this);
+    }
     hostBlocked.add(fetcher);
-    return isEmpty;
   }
 
   // Invariant: inside synchronized (ShuffleServer.fetcherLock)
   // return true if this InputHost is now free
-  public boolean removeHostBlocked(Fetcher<?> fetcher) {
+  public void removeHostBlocked(Fetcher<?> fetcher) {
     hostBlocked.remove(fetcher);
-    return hostBlocked.isEmpty();
+    boolean isEmpty = hostBlocked.isEmpty();
+    if (isEmpty) {
+      LOG.info("Host unblocked: {}, duration={}", this, System.currentTimeMillis() - blockStartMillis);
+    }
   }
 
   // Invariant: inside synchronized (ShuffleServer.fetcherLock)
