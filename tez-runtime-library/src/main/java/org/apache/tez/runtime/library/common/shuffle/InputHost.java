@@ -111,10 +111,12 @@ public class InputHost extends HostPort {
 
   public void addHostBlocked(Fetcher<?> fetcher) {
     synchronized (hostBlocked) {
+      boolean wasEmpty = hostBlocked.isEmpty();
       boolean result = hostBlocked.add(fetcher);
       assert result;  // can be called only once per Fetcher
-      numHostBlocked += 1;
-      if (numHostBlocked == 1) {
+
+      if (wasEmpty) {
+        numHostBlocked += 1;
         blockStartMillis = System.currentTimeMillis();
         LOG.warn("Host blocked: {}, numHostBlocked={}", this, numHostBlocked);
       }
@@ -124,13 +126,15 @@ public class InputHost extends HostPort {
   public void removeHostBlocked(Fetcher<?> fetcher) {
     // fetcher might be removed more than once because removeHostBlocked() can be called from different threads
     synchronized (hostBlocked) {
-      boolean result = hostBlocked.remove(fetcher);
-      if (result) {
-        numHostBlocked -= 1;
-      }
-      assert numHostBlocked >= 0;
-      if (numHostBlocked == 0) {
-        LOG.info("Host unblocked: {}, duration={}", this, System.currentTimeMillis() - blockStartMillis);
+      boolean wasEmpty = hostBlocked.isEmpty();
+      if (!wasEmpty) {
+        hostBlocked.remove(fetcher);  // fetcher may or may not be found in hostBlocked[]
+        boolean isEmpty = hostBlocked.isEmpty();
+        if (isEmpty) {
+          numHostBlocked -= 1;
+          LOG.info("Host unblocked: {}, numHostBlocked={}, duration={}",
+              this, numHostBlocked, System.currentTimeMillis() - blockStartMillis);
+        }
       }
     }
   }
