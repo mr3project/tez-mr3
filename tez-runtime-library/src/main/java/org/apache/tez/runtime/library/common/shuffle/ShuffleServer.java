@@ -333,6 +333,8 @@ public class ShuffleServer implements FetcherCallback {
           p.hasFetcherToLaunch(shuffleClients));
   }
 
+  // The four boolean values computed here may not be up-to-date, but this is okay because
+  // new additions/removals() during the traversal will be accounted for at the next iteration.
   private void updateLoopConditions() {
     int currentNumFetchers = runningFetchers.size();
     shouldLaunchNewFetchers = currentNumFetchers < maxNumFetchers && getShouldLaunchNewFetchers();
@@ -346,8 +348,7 @@ public class ShuffleServer implements FetcherCallback {
     existsFetcherFromStuckToSpeculative = runningFetchers.stream().anyMatch(f ->
         f.getState() == Fetcher.STATE_STUCK &&
         f.getStage() < Fetcher.STAGE_FIRST_FETCHED &&
-        (currentMillis - f.getStartMillis() >= fetcherConfig.speculativeExecutionWaitMillis)
-      );
+        (currentMillis - f.getStartMillis() >= fetcherConfig.speculativeExecutionWaitMillis));
 
     shouldCheckStuckFetchers = currentMillis > nextCheckStuckFetchers;
   }
@@ -355,19 +356,19 @@ public class ShuffleServer implements FetcherCallback {
   private void call() throws Exception {
     nextCheckStuckFetchers = System.currentTimeMillis() + CHECK_BACKPRESSURE_INTERVAL_MILLIS;
     while (!isShutdown.get()) {
-      lock.lock();
-      try {
-        updateLoopConditions();
-        while (!isShutdown.get() &&
-               !shouldLaunchNewFetchers &&
-               !existsFetcherFromStuckToRecovered &&
-               !existsFetcherFromStuckToSpeculative &&
-               !shouldCheckStuckFetchers) {
+      updateLoopConditions();
+      while (!isShutdown.get() &&
+             !shouldLaunchNewFetchers &&
+             !existsFetcherFromStuckToRecovered &&
+             !existsFetcherFromStuckToSpeculative &&
+             !shouldCheckStuckFetchers) {
+        lock.lock();
+        try {
           wakeLoop.await(250, TimeUnit.MILLISECONDS);
-          updateLoopConditions();
+        } finally {
+          lock.unlock();
         }
-      } finally {
-        lock.unlock();
+        updateLoopConditions();
       }
 
       if (isDebugEnabled) {
