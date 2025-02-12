@@ -76,7 +76,7 @@ public class Shuffle implements ExceptionReporter {
 
   private final ShuffleInputEventHandlerOrderedGrouped eventHandler;
   @VisibleForTesting
-  final ShuffleScheduler scheduler;
+  final ShuffleScheduler shuffleScheduler;
   @VisibleForTesting
   final MergeManager merger;
 
@@ -145,7 +145,7 @@ public class Shuffle implements ExceptionReporter {
         ifileReadAhead,
         ifileReadAheadLength);
 
-    scheduler = new ShuffleScheduler(
+    shuffleScheduler = new ShuffleScheduler(
         this.inputContext,
         conf,
         numInputs,
@@ -159,9 +159,7 @@ public class Shuffle implements ExceptionReporter {
     this.shufflePhaseTime = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_PHASE_TIME);
 
     eventHandler= new ShuffleInputEventHandlerOrderedGrouped(
-        inputContext,
-        scheduler,
-        ShuffleUtils.isTezShuffleHandler(conf));
+        inputContext, shuffleScheduler, ShuffleUtils.isTezShuffleHandler(conf));
 
     ExecutorService rawExecutor = Executors.newFixedThreadPool(1, new ThreadFactoryBuilder()
         .setDaemon(true)
@@ -250,7 +248,8 @@ public class Shuffle implements ExceptionReporter {
   public void shutdown() {
     if (!isShutDown.getAndSet(true)) {
       // Interrupt so that the scheduler / merger sees this interrupt.
-      LOG.info("Shutting down Shuffle for source: " + srcNameTrimmed);
+      LOG.info("Shutting down Shuffle for shuffleClientId={}, source={}",
+          shuffleScheduler.getShuffleClientId(), srcNameTrimmed);
       runShuffleFuture.cancel(true);
       cleanupIgnoreErrors();
     }
@@ -263,7 +262,7 @@ public class Shuffle implements ExceptionReporter {
 
       if (!isShutDown.get()) {
         try {
-          scheduler.start();
+          shuffleScheduler.start();
         } catch (Throwable e) {
           throw new ShuffleError("Error during shuffle", e);
         } finally {
@@ -320,7 +319,7 @@ public class Shuffle implements ExceptionReporter {
 
   private void cleanupShuffleScheduler() throws InterruptedException {
     if (!schedulerClosed.getAndSet(true)) {
-      scheduler.close();
+      shuffleScheduler.close();
     }
   }
 

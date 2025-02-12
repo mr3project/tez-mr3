@@ -444,7 +444,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
     // As of now relying on job cleanup (when all directories would be cleared)
 
     if (!isShutdown.getAndSet(true)) {
-      LOG.info("Shutting down pending fetchers on source {}", srcNameTrimmed);
+      LOG.info("Shutting down pending fetchers: shuffleClientId={}, source={}", shuffleClientId, srcNameTrimmed);
       shuffleServer.unregister(shuffleClientId);
     }
   }
