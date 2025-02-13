@@ -238,7 +238,7 @@ public class ShuffleServer implements FetcherCallback {
 
   private final AtomicBoolean isShutdown = new AtomicBoolean(false);
 
-  private static final int LAUNCH_NEW_FETCHER_PERIOD_MILLIS = 100;
+  private static final int LAUNCH_LOOP_WAIT_PERIOD_MILLIS = 1000;
   private static final int CHECK_STUCK_FETCHER_PERIOD_MILLIS = 1000;
   private static final int STUCK_FETCHER_DURATION_MILLIS = 5000;
   private static final int MAX_SPECULATIVE_FETCH_ATTEMPTS = 3;
@@ -320,7 +320,6 @@ public class ShuffleServer implements FetcherCallback {
   }
 
   // variables local to call()
-  private long nextLaunchNewFetcherMillis;
   private boolean shouldLaunchNewFetchers;
   private boolean existsFetcherFromStuckToRecovered;
   private boolean existsFetcherFromStuckToSpeculative;
@@ -341,7 +340,6 @@ public class ShuffleServer implements FetcherCallback {
     int currentNumFetchers = runningFetchers.size();
     shouldLaunchNewFetchers =
         currentNumFetchers < maxNumFetchers &&
-        currentMillis > nextLaunchNewFetcherMillis &&
         getShouldLaunchNewFetchers();
 
     existsFetcherFromStuckToRecovered = runningFetchers.stream().anyMatch(f ->
@@ -359,7 +357,6 @@ public class ShuffleServer implements FetcherCallback {
 
   private void call() throws Exception {
     long initialMillis = System.currentTimeMillis();
-    nextLaunchNewFetcherMillis = initialMillis + LAUNCH_NEW_FETCHER_PERIOD_MILLIS;
     nextCheckStuckFetcherMillis = initialMillis + CHECK_STUCK_FETCHER_PERIOD_MILLIS;
     while (!isShutdown.get()) {
       lock.lock();
@@ -370,7 +367,7 @@ public class ShuffleServer implements FetcherCallback {
                !existsFetcherFromStuckToRecovered &&
                !existsFetcherFromStuckToSpeculative &&
                !shouldCheckStuckFetcher) {
-          wakeLoop.await(LAUNCH_NEW_FETCHER_PERIOD_MILLIS, TimeUnit.MILLISECONDS);
+          wakeLoop.await(LAUNCH_LOOP_WAIT_PERIOD_MILLIS, TimeUnit.MILLISECONDS);
           updateLoopConditions();
         }
       } finally {
@@ -480,7 +477,6 @@ public class ShuffleServer implements FetcherCallback {
           peekInputHost = pendingHosts.peek();
         }
 
-        nextLaunchNewFetcherMillis = currentMillis + LAUNCH_NEW_FETCHER_PERIOD_MILLIS;
         LOG.info("Fetcher launched={}, runningFetchers={}", numNewFetchers, runningFetchers.size());
       }
 
