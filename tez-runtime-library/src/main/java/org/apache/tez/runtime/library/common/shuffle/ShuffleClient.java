@@ -137,6 +137,10 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
     this.shuffleInfoEventsMap = new HashMap<Integer, ShuffleEventInfo>();
   }
 
+  public int getNumInputs() {
+    return numInputs;
+  }
+
   public String getLogIdentifier() {
     return logIdentifier;
   }

@@ -53,7 +53,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
   private final boolean compositeFetch;
   private final Inflater inflater;
 
-  private final AtomicInteger nextToLogEventCount = new AtomicInteger(0);
+  private final AtomicInteger nextToLogEventCount = new AtomicInteger(1);
   private final AtomicInteger numDmeEvents = new AtomicInteger(0);
   private final AtomicInteger numObsoletionEvents = new AtomicInteger(0);
   private final AtomicInteger numDmeEventsNoData = new AtomicInteger(0);
@@ -142,10 +142,9 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
       numObsoletionEvents.incrementAndGet();
       processTaskFailedEvent((InputFailedEvent) event);
     }
-    if (numDmeEvents.get() + numObsoletionEvents.get() > nextToLogEventCount.get()) {
+    if (numDmeEvents.get() + numObsoletionEvents.get() == nextToLogEventCount.get()) {
       logProgress(false);
-      // Log every 1000 events seen.
-      nextToLogEventCount.addAndGet(1000);
+      nextToLogEventCount.set(shuffleScheduler.getNumInputs());   // print after receiving all events
     }
   }
 

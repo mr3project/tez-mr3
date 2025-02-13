@@ -67,7 +67,7 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
   private final boolean compositeFetch;
   private final Inflater inflater;
 
-  private final AtomicInteger nextToLogEventCount = new AtomicInteger(0);
+  private final AtomicInteger nextToLogEventCount = new AtomicInteger(1);
   private final AtomicInteger numDmeEvents = new AtomicInteger(0);
   private final AtomicInteger numObsoletionEvents = new AtomicInteger(0);
   private final AtomicInteger numDmeEventsNoData = new AtomicInteger(0);
@@ -152,10 +152,9 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
     } else {
       throw new TezUncheckedException("Unexpected event type: " + event.getClass().getName());
     }
-    if (numDmeEvents.get() + numObsoletionEvents.get() > nextToLogEventCount.get()) {
+    if (numDmeEvents.get() + numObsoletionEvents.get() == nextToLogEventCount.get()) {
       logProgress(false);
-      // Log every 1000 events seen.
-      nextToLogEventCount.addAndGet(1000);
+      nextToLogEventCount.set(shuffleManager.getNumInputs());   // print after receiving all events
     }
   }
 
