@@ -145,6 +145,21 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
   abstract public FetchResult call() throws Exception;
   abstract public Fetcher<T> createClone();
 
+  // for reporting errors
+  public String getReportStatus() {
+    StringBuilder sb = new StringBuilder();
+    sb.append(getFetcherIdentifier());
+    sb.append("/");
+    sb.append(inputHost);
+    sb.append("/");
+    sb.append(System.currentTimeMillis() - startMillis);
+    sb.append("ms/state=");
+    sb.append(state);
+    sb.append("/stage=");
+    sb.append(stage);
+    return sb.toString();
+  }
+
   protected InputAttemptIdentifier[] buildInputSeqFromIndex(int pendingInputsIndex) {
     // TODO: just create a sub-array
     InputAttemptIdentifier[] inputsSeq = new InputAttemptIdentifier[numInputs - pendingInputsIndex];

@@ -573,8 +573,8 @@ public class ShuffleServer implements FetcherCallback {
     //   later, it will be removed from runningFetchers[] when it is finished.
     runningFetchers.forEach(fetcher -> {
       if (fetcher.useSingleShuffleClientId(shuffleClientId)) {
-        LOG.warn("Shutting down running Fetcher for ShuffleClient: {} {}",
-            shuffleClientId, fetcher.getFetcherIdentifier());
+        LOG.warn("Shutting down running Fetcher for ShuffleClient {}: {}",
+            shuffleClientId, fetcher.getReportStatus());
         fetcher.shutdown();
       }
     });
