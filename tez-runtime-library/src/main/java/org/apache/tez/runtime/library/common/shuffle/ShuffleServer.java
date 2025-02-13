@@ -238,8 +238,9 @@ public class ShuffleServer implements FetcherCallback {
 
   private final AtomicBoolean isShutdown = new AtomicBoolean(false);
 
-  private static final int CHECK_BACKPRESSURE_INTERVAL_MILLIS = 1000;
-  private static final int CHECK_BACKPRESSURE_STUCK_MILLIS = 5000;
+  private static final int LAUNCH_NEW_FETCHER_PERIOD_MILLIS = 100;
+  private static final int CHECK_STUCK_FETCHER_PERIOD_MILLIS = 1000;
+  private static final int STUCK_FETCHER_DURATION_MILLIS = 5000;
   private static final int MAX_SPECULATIVE_FETCH_ATTEMPTS = 3;
 
   public ShuffleServer(
@@ -319,11 +320,12 @@ public class ShuffleServer implements FetcherCallback {
   }
 
   // variables local to call()
+  private long nextLaunchNewFetcherMillis;
   private boolean shouldLaunchNewFetchers;
   private boolean existsFetcherFromStuckToRecovered;
   private boolean existsFetcherFromStuckToSpeculative;
-  private long nextCheckStuckFetchers;
-  private boolean shouldCheckStuckFetchers;
+  private long nextCheckStuckFetcherMillis;
+  private boolean shouldCheckStuckFetcher;
 
   private boolean getShouldLaunchNewFetchers() {
     return
@@ -334,14 +336,17 @@ public class ShuffleServer implements FetcherCallback {
   }
 
   private void updateLoopConditions() {
+    final long currentMillis = System.currentTimeMillis();
+
     int currentNumFetchers = runningFetchers.size();
-    shouldLaunchNewFetchers = currentNumFetchers < maxNumFetchers && getShouldLaunchNewFetchers();
+    shouldLaunchNewFetchers =
+        currentNumFetchers < maxNumFetchers &&
+        currentMillis > nextLaunchNewFetcherMillis &&
+        getShouldLaunchNewFetchers();
 
     existsFetcherFromStuckToRecovered = runningFetchers.stream().anyMatch(f ->
         f.getState() == Fetcher.STATE_STUCK &&
         f.getStage() == Fetcher.STAGE_FIRST_FETCHED);
-
-    final long currentMillis = System.currentTimeMillis();
 
     existsFetcherFromStuckToSpeculative = runningFetchers.stream().anyMatch(f ->
         f.getState() == Fetcher.STATE_STUCK &&
@@ -349,11 +354,13 @@ public class ShuffleServer implements FetcherCallback {
         (currentMillis - f.getStartMillis() >= fetcherConfig.speculativeExecutionWaitMillis)
       );
 
-    shouldCheckStuckFetchers = currentMillis > nextCheckStuckFetchers;
+    shouldCheckStuckFetcher = currentMillis > nextCheckStuckFetcherMillis;
   }
 
   private void call() throws Exception {
-    nextCheckStuckFetchers = System.currentTimeMillis() + CHECK_BACKPRESSURE_INTERVAL_MILLIS;
+    long initialMillis = System.currentTimeMillis();
+    nextLaunchNewFetcherMillis = initialMillis + LAUNCH_NEW_FETCHER_PERIOD_MILLIS;
+    nextCheckStuckFetcherMillis = initialMillis + CHECK_STUCK_FETCHER_PERIOD_MILLIS;
     while (!isShutdown.get()) {
       lock.lock();
       try {
@@ -362,8 +369,8 @@ public class ShuffleServer implements FetcherCallback {
                !shouldLaunchNewFetchers &&
                !existsFetcherFromStuckToRecovered &&
                !existsFetcherFromStuckToSpeculative &&
-               !shouldCheckStuckFetchers) {
-          wakeLoop.await(250, TimeUnit.MILLISECONDS);
+               !shouldCheckStuckFetcher) {
+          wakeLoop.await(LAUNCH_NEW_FETCHER_PERIOD_MILLIS, TimeUnit.MILLISECONDS);
           updateLoopConditions();
         }
       } finally {
@@ -373,7 +380,7 @@ public class ShuffleServer implements FetcherCallback {
       if (isDebugEnabled) {
         LOG.debug("ShuffleServer loop: existsFetcherFromStuckToRecovered={}, existsFetcherFromStuckToSpeculative={}, shouldLaunchNewFetchers={}, shouldCheckStuckFetchers={}",
             existsFetcherFromStuckToRecovered, existsFetcherFromStuckToSpeculative,
-            shouldLaunchNewFetchers, shouldCheckStuckFetchers);
+            shouldLaunchNewFetchers, shouldCheckStuckFetcher);
       }
 
       if (existsFetcherFromStuckToRecovered) {
@@ -414,12 +421,12 @@ public class ShuffleServer implements FetcherCallback {
         });
       }
 
-      if (shouldCheckStuckFetchers) {
+      if (shouldCheckStuckFetcher) {
         // try to transition: from NORMAL with stage == INITIAL to STUCK
         runningFetchers.forEach(fetcher -> {
           if (fetcher.getState() == Fetcher.STATE_NORMAL) {
             long elapsed = currentMillis - fetcher.getStartMillis();
-            if (elapsed > CHECK_BACKPRESSURE_STUCK_MILLIS &&
+            if (elapsed > STUCK_FETCHER_DURATION_MILLIS &&
                 fetcher.getStage() != Fetcher.STAGE_FIRST_FETCHED) {
               fetcher.setState(Fetcher.STATE_STUCK);
               addHostBlocked(fetcher);
@@ -430,7 +437,7 @@ public class ShuffleServer implements FetcherCallback {
         });
 
         // reset nextCheckStuckFetchers
-        nextCheckStuckFetchers = currentMillis + CHECK_BACKPRESSURE_INTERVAL_MILLIS;
+        nextCheckStuckFetcherMillis = currentMillis + CHECK_STUCK_FETCHER_PERIOD_MILLIS;
       }
 
       if (shouldLaunchNewFetchers) {
@@ -473,6 +480,7 @@ public class ShuffleServer implements FetcherCallback {
           peekInputHost = pendingHosts.peek();
         }
 
+        nextLaunchNewFetcherMillis = currentMillis + LAUNCH_NEW_FETCHER_PERIOD_MILLIS;
         LOG.info("Fetcher launched={}, runningFetchers={}", numNewFetchers, runningFetchers.size());
       }
 
