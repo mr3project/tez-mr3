@@ -199,6 +199,10 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
     }
   }
 
+  public void wakeupLoop() {
+    shuffleServer.wakeupLoop();
+  }
+
   public void addKnownMapOutput(
       String inputHostName, int port, int partitionId, CompositeInputAttemptIdentifier srcAttempt) {
     if (!validateInputAttemptForPipelinedShuffle(srcAttempt, false)) {

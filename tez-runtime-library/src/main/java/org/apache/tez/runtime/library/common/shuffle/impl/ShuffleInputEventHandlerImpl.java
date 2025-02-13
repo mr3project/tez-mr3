@@ -97,6 +97,7 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
     for (Event event : events) {
       handleEvent(event);
     }
+    shuffleManager.wakeupLoop();
   }
   
   private void handleEvent(Event event) throws IOException {

@@ -609,7 +609,6 @@ public class ShuffleServer implements FetcherCallback {
 
     host.addKnownInput(shuffleClient, partitionId,
         srcAttemptIdentifier.getInputIdentifierCount(), srcAttemptIdentifier, pendingHosts);
-    wakeupLoop();
   }
 
   public void fetchSucceeded(Long shuffleClientId, String host,

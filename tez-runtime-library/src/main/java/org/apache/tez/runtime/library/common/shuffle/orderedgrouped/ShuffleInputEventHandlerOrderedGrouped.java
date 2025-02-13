@@ -48,7 +48,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
 
   private static final Logger LOG = LoggerFactory.getLogger(ShuffleInputEventHandlerOrderedGrouped.class);
 
-  private final ShuffleScheduler scheduler;
+  private final ShuffleScheduler shuffleScheduler;
   private final InputContext inputContext;
   private final boolean compositeFetch;
   private final Inflater inflater;
@@ -61,10 +61,10 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
   private final int portIndex;
 
   public ShuffleInputEventHandlerOrderedGrouped(InputContext inputContext,
-      ShuffleScheduler scheduler,
+      ShuffleScheduler shuffleScheduler,
       boolean compositeFetch) {
     this.inputContext = inputContext;
-    this.scheduler = scheduler;
+    this.shuffleScheduler = shuffleScheduler;
     this.compositeFetch = compositeFetch;
     this.inflater = TezCommonUtils.newInflater();
 
@@ -78,6 +78,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
     for (Event event : events) {
       handleEvent(event);
     }
+    shuffleScheduler.wakeupLoop();
   }
 
   @Override
@@ -148,7 +149,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
     }
   }
 
-  private void processDataMovementEvent(DataMovementEvent dmEvent, DataMovementEventPayloadProto shufflePayload, BitSet emptyPartitionsBitSet) throws IOException {
+  private void processDataMovementEvent(DataMovementEvent dmEvent, DataMovementEventPayloadProto shufflePayload, BitSet emptyPartitionsBitSet) {
     int partitionId = dmEvent.getSourceIndex();
     CompositeInputAttemptIdentifier srcAttemptIdentifier = constructInputAttemptIdentifier(dmEvent.getTargetIndex(), 1, dmEvent.getVersion(), shufflePayload);
 
@@ -167,7 +168,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
                     + srcAttemptIdentifier + "]. Not fetching.");
           }
           numDmeEventsNoData.getAndIncrement();
-          scheduler.fetchSucceeded(srcAttemptIdentifier.expand(0), null, 0, 0, 0);
+          shuffleScheduler.fetchSucceeded(srcAttemptIdentifier.expand(0), null, 0, 0, 0);
           return;
         }
       } catch (IOException e) {
@@ -175,7 +176,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
       }
     }
     int port = getShufflePort(shufflePayload, dmEvent.getTargetIndex());
-    scheduler.addKnownMapOutput(StringInterner.intern(shufflePayload.getHost()), port,
+    shuffleScheduler.addKnownMapOutput(StringInterner.intern(shufflePayload.getHost()), port,
         partitionId, srcAttemptIdentifier);
   }
 
@@ -205,7 +206,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
                 + srcInputAttemptIdentifier + "]. Not fetching.");
           }
           numDmeEventsNoData.getAndIncrement();
-          scheduler.fetchSucceeded(srcInputAttemptIdentifier, null, 0, 0, 0);
+          shuffleScheduler.fetchSucceeded(srcInputAttemptIdentifier, null, 0, 0, 0);
         }
       }
 
@@ -215,13 +216,13 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
     }
 
     int port = getShufflePort(shufflePayload, crdmEvent.getTargetIndex());
-    scheduler.addKnownMapOutput(StringInterner.intern(shufflePayload.getHost()), port,
+    shuffleScheduler.addKnownMapOutput(StringInterner.intern(shufflePayload.getHost()), port,
         partitionId, compositeInputAttemptIdentifier);
   }
 
   private int getShufflePort(DataMovementEventPayloadProto shufflePayload, int targetIndex) {
     if (inputContext.useShuffleHandlerProcessOnK8s()) {
-      int[] localShufflePorts = scheduler.getLocalShufflePorts();
+      int[] localShufflePorts = shuffleScheduler.getLocalShufflePorts();
       int numPorts = localShufflePorts.length;
       return localShufflePorts[(portIndex + targetIndex) % numPorts];
     } else {
@@ -232,7 +233,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
 
   private void processTaskFailedEvent(InputFailedEvent ifEvent) {
     InputAttemptIdentifier taIdentifier = new InputAttemptIdentifier(ifEvent.getTargetIndex(), ifEvent.getVersion());
-    scheduler.obsoleteKnownInput(taIdentifier);
+    shuffleScheduler.obsoleteKnownInput(taIdentifier);
     if (LOG.isDebugEnabled()) {
       LOG.debug("Obsoleting output of src-task: " + taIdentifier);
     }

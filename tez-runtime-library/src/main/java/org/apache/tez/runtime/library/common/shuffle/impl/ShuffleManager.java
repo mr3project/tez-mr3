@@ -197,6 +197,10 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
     shuffleServer.addKnownInput(this, hostName, port, srcAttemptIdentifier, partitionId);
   }
 
+  public void wakeupLoop() {
+    shuffleServer.wakeupLoop();
+  }
+
   public void addCompletedInputWithNoData(
       InputAttemptIdentifier srcAttemptIdentifier) {
     int inputIdentifier = srcAttemptIdentifier.getInputIdentifier();
