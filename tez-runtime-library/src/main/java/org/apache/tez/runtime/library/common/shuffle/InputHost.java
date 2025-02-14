@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import org.apache.tez.dag.api.TezUncheckedException;
@@ -99,49 +100,52 @@ public class InputHost extends HostPort {
 
   private boolean hasPendingInput;
 
-  private final Set<Fetcher<?>> hostBlocked;
+  // use synchronized (blockingFetchers)
+  private final Set<Fetcher<?>> blockingFetchers;
   private long blockStartMillis;
-  private static int numHostBlocked = 0;
+
+  // shared by all InputHosts
+  private final static AtomicInteger numHostBlocked = new AtomicInteger(0);
 
   public InputHost(HostPort hostPort) {
     super(hostPort.getHost(), hostPort.getPort());
     this.hasPendingInput = false;
-    this.hostBlocked = new HashSet<Fetcher<?>>();
+    this.blockingFetchers = new HashSet<Fetcher<?>>();
   }
 
   public void addHostBlocked(Fetcher<?> fetcher) {
-    synchronized (hostBlocked) {
-      boolean wasEmpty = hostBlocked.isEmpty();
-      boolean result = hostBlocked.add(fetcher);
+    synchronized (blockingFetchers) {
+      boolean wasEmpty = blockingFetchers.isEmpty();
+      boolean result = blockingFetchers.add(fetcher);
       assert result;  // can be called only once per Fetcher
 
       if (wasEmpty) {
-        numHostBlocked += 1;
+        int newNum = numHostBlocked.incrementAndGet();
         blockStartMillis = System.currentTimeMillis();
-        LOG.warn("Host blocked: {}, numHostBlocked={}", this, numHostBlocked);
+        LOG.warn("Host blocked: {}, numHostBlocked={}", this, newNum);
       }
     }
   }
 
   public void removeHostBlocked(Fetcher<?> fetcher) {
     // fetcher might be removed more than once because removeHostBlocked() can be called from different threads
-    synchronized (hostBlocked) {
-      boolean wasEmpty = hostBlocked.isEmpty();
+    synchronized (blockingFetchers) {
+      boolean wasEmpty = blockingFetchers.isEmpty();
       if (!wasEmpty) {
-        hostBlocked.remove(fetcher);  // fetcher may or may not be found in hostBlocked[]
-        boolean isEmpty = hostBlocked.isEmpty();
+        blockingFetchers.remove(fetcher);  // fetcher may or may not be found in hostBlocked[]
+        boolean isEmpty = blockingFetchers.isEmpty();
         if (isEmpty) {
-          numHostBlocked -= 1;
+          int newNum = numHostBlocked.decrementAndGet();
           LOG.info("Host unblocked: {}, numHostBlocked={}, duration={}",
-              this, numHostBlocked, System.currentTimeMillis() - blockStartMillis);
+              this, newNum, System.currentTimeMillis() - blockStartMillis);
         }
       }
     }
   }
 
   public boolean isHostNormal() {
-    synchronized (hostBlocked) {
-      return hostBlocked.isEmpty();
+    synchronized (blockingFetchers) {
+      return blockingFetchers.isEmpty();
     }
   }
 
