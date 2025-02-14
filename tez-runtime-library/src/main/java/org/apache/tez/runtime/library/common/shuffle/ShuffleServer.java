@@ -322,6 +322,7 @@ public class ShuffleServer implements FetcherCallback {
 
   // variables local to call()
   private boolean shouldLaunchNewFetchers;
+  private boolean existsFetcherToRetry;
   private boolean existsFetcherFromStuckToRecovered;
   private boolean existsFetcherFromStuckToSpeculative;
   private long nextCheckStuckFetcherMillis;
@@ -342,6 +343,13 @@ public class ShuffleServer implements FetcherCallback {
     shouldLaunchNewFetchers =
         currentNumFetchers < maxNumFetchers &&
         getShouldLaunchNewFetchers();
+
+    existsFetcherToRetry = runningFetchers.stream().anyMatch(f -> {
+        int state = f.getState();
+        return
+          (state == Fetcher.STATE_NORMAL || state == Fetcher.STATE_RECOVERED) &&
+            (currentMillis - f.getStartMillis() >= fetcherConfig.speculativeExecutionWaitMillis);
+      });
 
     existsFetcherFromStuckToRecovered = runningFetchers.stream().anyMatch(f ->
         f.getState() == Fetcher.STATE_STUCK &&
@@ -365,6 +373,7 @@ public class ShuffleServer implements FetcherCallback {
         updateLoopConditions();
         while (!isShutdown.get() &&
                !shouldLaunchNewFetchers &&
+               !existsFetcherToRetry &&
                !existsFetcherFromStuckToRecovered &&
                !existsFetcherFromStuckToSpeculative &&
                !shouldCheckStuckFetcher) {
@@ -376,9 +385,26 @@ public class ShuffleServer implements FetcherCallback {
       }
 
       if (isDebugEnabled) {
-        LOG.debug("ShuffleServer loop: existsFetcherFromStuckToRecovered={}, existsFetcherFromStuckToSpeculative={}, shouldLaunchNewFetchers={}, shouldCheckStuckFetchers={}",
-            existsFetcherFromStuckToRecovered, existsFetcherFromStuckToSpeculative,
+        LOG.debug("ShuffleServer loop: existsFetcherToRetry={}, existsFetcherFromStuckToRecovered={}, existsFetcherFromStuckToSpeculative={}, shouldLaunchNewFetchers={}, shouldCheckStuckFetchers={}",
+            existsFetcherToRetry, existsFetcherFromStuckToRecovered, existsFetcherFromStuckToSpeculative,
             shouldLaunchNewFetchers, shouldCheckStuckFetcher);
+      }
+
+      final long currentMillis = System.currentTimeMillis();
+
+      if (existsFetcherToRetry) {
+        // transition: from NORMAL/RECOVERED to RETRY
+        runningFetchers.forEach(fetcher -> {
+          int state = fetcher.getState();
+          long elapsed = currentMillis - fetcher.getStartMillis();
+          if ((state == Fetcher.STATE_NORMAL || state == Fetcher.STATE_RECOVERED) &&
+              elapsed >= fetcherConfig.speculativeExecutionWaitMillis) {
+            assert fetcher.getState() == Fetcher.STAGE_FIRST_FETCHED;   // this can be false with wrong configs
+            fetcher.setState(Fetcher.STATE_RETRY);
+            LOG.warn("Fetcher to RETRY: {} in {}ms", fetcher.getFetcherIdentifier(), elapsed);
+            trySpeculativeFetcher(fetcher);
+          }
+        });
       }
 
       if (existsFetcherFromStuckToRecovered) {
@@ -394,8 +420,6 @@ public class ShuffleServer implements FetcherCallback {
         });
       }
 
-      final long currentMillis = System.currentTimeMillis();
-
       if (existsFetcherFromStuckToSpeculative) {
         // try to transition: from STUCK to SPECULATIVE
         runningFetchers.forEach(fetcher -> {
@@ -406,15 +430,7 @@ public class ShuffleServer implements FetcherCallback {
             removeHostBlocked(fetcher);
             LOG.warn("Fetcher STUCK to SPECULATIVE: {} in stage {}",
                 fetcher.getFetcherIdentifier(), fetcher.getStage());
-
-            // create a speculative fetcher only if its ShuffleClient is still alive
-            if (fetcher.attempt < MAX_SPECULATIVE_FETCH_ATTEMPTS &&
-                shuffleClients.get(fetcher.getShuffleClient().getShuffleClientId()) != null) {
-              Fetcher<?> speculativeFetcher = fetcher.createClone();
-              runFetcher(speculativeFetcher);   // incurs concurrent modification
-              LOG.warn("Speculative execution of Fetcher: {} to {}",
-                  fetcher.getFetcherIdentifier(), speculativeFetcher.getFetcherIdentifier());
-            }
+            trySpeculativeFetcher(fetcher);
           }
         });
       }
@@ -487,6 +503,17 @@ public class ShuffleServer implements FetcherCallback {
     LOG.info("Shutting down {}, Interrupted: {}", serverName, Thread.currentThread().isInterrupted());
     if (!fetcherExecutor.isShutdown()) {
       fetcherExecutor.shutdownNow();
+    }
+  }
+
+  private void trySpeculativeFetcher(Fetcher<?> fetcher) {
+    // create a speculative fetcher only if its ShuffleClient is still alive
+    if (fetcher.attempt < MAX_SPECULATIVE_FETCH_ATTEMPTS &&
+      shuffleClients.get(fetcher.getShuffleClient().getShuffleClientId()) != null) {
+      Fetcher<?> speculativeFetcher = fetcher.createClone();
+      runFetcher(speculativeFetcher);   // incurs concurrent modification
+      LOG.warn("Retrying execution of Fetcher: {} to {}",
+        fetcher.getFetcherIdentifier(), speculativeFetcher.getFetcherIdentifier());
     }
   }
 

@@ -84,6 +84,7 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
   public static int STATE_STUCK = 11;
   public static int STATE_RECOVERED = 12;
   public static int STATE_SPECULATIVE = 13;
+  public static int STATE_RETRY = 14;
   private volatile int state = STATE_NORMAL;
 
   // read by ShuffleServer
