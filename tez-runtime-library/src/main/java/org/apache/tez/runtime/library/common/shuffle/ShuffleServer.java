@@ -399,7 +399,7 @@ public class ShuffleServer implements FetcherCallback {
           long elapsed = currentMillis - fetcher.getStartMillis();
           if ((state == Fetcher.STATE_NORMAL || state == Fetcher.STATE_RECOVERED) &&
               elapsed >= fetcherConfig.speculativeExecutionWaitMillis) {
-            assert fetcher.getState() == Fetcher.STAGE_FIRST_FETCHED;   // this can be false with wrong configs
+            assert fetcher.getStage() == Fetcher.STAGE_FIRST_FETCHED;   // this can be false with wrong configs
             fetcher.setState(Fetcher.STATE_RETRY);
             LOG.warn("Fetcher to RETRY: {} in {}ms", fetcher.getFetcherIdentifier(), elapsed);
             trySpeculativeFetcher(fetcher);
