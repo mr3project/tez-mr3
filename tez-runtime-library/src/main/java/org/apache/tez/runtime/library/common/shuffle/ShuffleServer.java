@@ -494,7 +494,9 @@ public class ShuffleServer implements FetcherCallback {
           peekInputHost = pendingHosts.peek();
         }
 
-        LOG.info("Fetcher launched={}, runningFetchers={}", numNewFetchers, runningFetchers.size());
+        if (isDebugEnabled) {
+          LOG.debug("Fetcher launched={}, runningFetchers={}", numNewFetchers, runningFetchers.size());
+        }
       }
 
       // end of while{} loop
