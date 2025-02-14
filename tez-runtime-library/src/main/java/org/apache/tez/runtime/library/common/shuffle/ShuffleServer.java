@@ -241,6 +241,7 @@ public class ShuffleServer implements FetcherCallback {
   private static final int LAUNCH_LOOP_WAIT_PERIOD_MILLIS = 1000;
   private static final int CHECK_STUCK_FETCHER_PERIOD_MILLIS = 1000;
   private static final int STUCK_FETCHER_DURATION_MILLIS = 5000;
+  private static final int STUCK_FETCHER_SPECULATIVE_WAIT_MILLIS = STUCK_FETCHER_DURATION_MILLIS * 2;
   private static final int MAX_SPECULATIVE_FETCH_ATTEMPTS = 3;
 
   public ShuffleServer(
@@ -349,7 +350,7 @@ public class ShuffleServer implements FetcherCallback {
     existsFetcherFromStuckToSpeculative = runningFetchers.stream().anyMatch(f ->
         f.getState() == Fetcher.STATE_STUCK &&
         f.getStage() < Fetcher.STAGE_FIRST_FETCHED &&
-        (currentMillis - f.getStartMillis() >= fetcherConfig.speculativeExecutionWaitMillis)
+        (currentMillis - f.getStartMillis() >= STUCK_FETCHER_SPECULATIVE_WAIT_MILLIS)
       );
 
     shouldCheckStuckFetcher = currentMillis > nextCheckStuckFetcherMillis;
@@ -400,7 +401,7 @@ public class ShuffleServer implements FetcherCallback {
         runningFetchers.forEach(fetcher -> {
           if (fetcher.getState() == Fetcher.STATE_STUCK &&
               fetcher.getStage() != Fetcher.STAGE_FIRST_FETCHED &&
-              (currentMillis - fetcher.getStartMillis()) >= fetcherConfig.speculativeExecutionWaitMillis) {
+              (currentMillis - fetcher.getStartMillis()) >= STUCK_FETCHER_SPECULATIVE_WAIT_MILLIS) {
             fetcher.setState(Fetcher.STATE_SPECULATIVE);
             removeHostBlocked(fetcher);
             LOG.warn("Fetcher STUCK to SPECULATIVE: {} in stage {}",
@@ -410,7 +411,7 @@ public class ShuffleServer implements FetcherCallback {
             if (fetcher.attempt < MAX_SPECULATIVE_FETCH_ATTEMPTS &&
                 shuffleClients.get(fetcher.getShuffleClient().getShuffleClientId()) != null) {
               Fetcher<?> speculativeFetcher = fetcher.createClone();
-              runFetcher(speculativeFetcher);   // concurrent modification
+              runFetcher(speculativeFetcher);   // incurs concurrent modification
               LOG.warn("Speculative execution of Fetcher: {} to {}",
                   fetcher.getFetcherIdentifier(), speculativeFetcher.getFetcherIdentifier());
             }
