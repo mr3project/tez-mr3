@@ -409,7 +409,7 @@ public class ShuffleServer implements FetcherCallback {
             // create a speculative fetcher only if its ShuffleClient is still alive
             if (fetcher.attempt < MAX_SPECULATIVE_FETCH_ATTEMPTS &&
                 shuffleClients.get(fetcher.getShuffleClient().getShuffleClientId()) != null) {
-              Fetcher<?> speculativeFetcher = fetcher.createClone(pendingHosts);
+              Fetcher<?> speculativeFetcher = fetcher.createClone();
               runFetcher(speculativeFetcher);   // concurrent modification
               LOG.warn("Speculative execution of Fetcher: {} to {}",
                   fetcher.getFetcherIdentifier(), speculativeFetcher.getFetcherIdentifier());

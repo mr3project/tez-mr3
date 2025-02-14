@@ -28,7 +28,6 @@ import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import java.io.DataInputStream;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -144,7 +143,7 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
   abstract public String getFetcherIdentifier();
   abstract public void shutdown();
   abstract public FetchResult call() throws Exception;
-  abstract public Fetcher<T> createClone(BlockingQueue<InputHost> pendingHosts);
+  abstract public Fetcher<T> createClone();
 
   // for reporting errors
   public String getReportStatus() {

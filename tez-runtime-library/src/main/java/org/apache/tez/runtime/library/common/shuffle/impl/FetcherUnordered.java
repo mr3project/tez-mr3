@@ -28,8 +28,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.io.compress.CompressionCodec;
@@ -96,14 +94,9 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         shuffleManager.getLogIdentifier() + "-U-" + fetcherIdentifier + "/" + attempt;
   }
 
-  public FetcherUnordered createClone(BlockingQueue<InputHost> pendingHosts) {
-    InputHost newInputHost = pendingHosts.stream()
-      .filter(p ->
-          !p.equals(inputHost) && p.getHost().equals(inputHost.getHost()) && p.isHostNormal())
-      .findFirst()
-      .orElse(inputHost);
+  public FetcherUnordered createClone() {
     return new FetcherUnordered(
-      fetcherCallback, conf, newInputHost, pendingInputsSeq,
+      fetcherCallback, conf, inputHost, pendingInputsSeq,
       fetcherConfig, taskContext, this.attempt + 1, shuffleManager);
   }
 

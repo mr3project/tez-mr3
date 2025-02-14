@@ -28,7 +28,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.BlockingQueue;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.LocalDirAllocator;
@@ -123,14 +122,9 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     this.shuffleErrorCounterGroup = shuffleScheduler.getShuffleErrorCounterGroup();
   }
 
-  public FetcherOrderedGrouped createClone(BlockingQueue<InputHost> pendingHosts) {
-    InputHost newInputHost = pendingHosts.stream()
-      .filter(p ->
-          !p.equals(inputHost) && p.getHost().equals(inputHost.getHost()) && p.isHostNormal())
-      .findFirst()
-      .orElse(inputHost);
+  public FetcherOrderedGrouped createClone() {
     return new FetcherOrderedGrouped(
-        fetcherCallback, conf, newInputHost, pendingInputsSeq,
+        fetcherCallback, conf, inputHost, pendingInputsSeq,
         fetcherConfig, taskContext, this.attempt + 1, shuffleScheduler);
   }
 
