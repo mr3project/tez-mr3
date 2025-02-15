@@ -133,7 +133,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     if (fetcherConfig.localDiskFetchEnabled &&
         host.equals(fetcherConfig.localHostName)) {
       hostFetchResult = doLocalDiskFetch();
-    } else{
+    } else {
       hostFetchResult = doHttpFetch();
     }
 
@@ -227,8 +227,8 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     }
 
     if (isShutDown.get()) {
-      cleanupCurrentConnection(true);  // true because stopped in the middle
-      // TODO: cleanupCurrentConnection(false) has no effect in practice because it was called in shutdown()
+      cleanupCurrentConnection(false);  // TODO: true because stopped in the middle (???)
+      // Cf. cleanupCurrentConnection(false) has no effect in practice because it was called in shutdown()
 
       if (isDebugEnabled) {
         LOG.debug("Detected fetcher has been shutdown after connection establishment. Returning");
@@ -281,8 +281,8 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
 
     // Handle any shutdown which may have been invoked.
     if (isShutDown.get()) {
-      cleanupCurrentConnection(true);  // true because stopped in the middle
-      // TODO: cleanupCurrentConnection(false) has no effect in practice because it was called in shutdown()
+      cleanupCurrentConnection(false);  // TODO: true because stopped in the middle (???)
+      // Cf. cleanupCurrentConnection(false) has no effect in practice because it was called in shutdown()
 
       if (isDebugEnabled) {
         LOG.debug("Detected fetcher has been shutdown after opening stream. Returning");
@@ -540,15 +540,15 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     }
   }
 
-  // TODO: can be called multiple times, and all calls are effective
   private void cleanupCurrentConnection(boolean disconnect) {
-    // Synchronizing on isShutDown to ensure we don't run into a parallel close
-    // Can't synchronize on the main class itself since that would cause the
-    // shutdown request to block
+    // Synchronizing on cleanupLock to ensure we don't run into a parallel close.
+    // Can't synchronize on the main class itself since that would cause the shutdown request to block.
     synchronized (isShutDown) {
       try {
         if (httpConnection != null) {
           httpConnection.cleanup(disconnect);
+          // do not set httpConnection to null because shutdown() can be called at any moment and
+          // we may see NPE from httpConnection.validate(), for example.
         }
       } catch (IOException e) {
         LOG.info("{}: Exception while shutting down: {}", logIdentifier, e.getMessage());

@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
@@ -259,7 +260,6 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         }
         index++;
       } catch (FetcherReadTimeoutException e) {
-        // Setup connection again if disconnected
         cleanupCurrentConnection(true);   // true because of error
         if (stopped) {
           // perhaps cleanupCurrentConnection(false) was already called in shutdown(),
@@ -302,7 +302,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
               " since Fetcher has been stopped");
           }
           // perhaps cleanupCurrentConnection(false) was already called in shutdown()
-          cleanupCurrentConnection(true);   // true because stopped in the middle
+          cleanupCurrentConnection(false);   // TODO: true because stopped in the middle (???)
           return null;
         } else {
           LOG.warn("copyMapOutput failed for tasks: " + Arrays.toString(failedInputs));
@@ -708,22 +708,20 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     return failedFetches;
   }
 
-  // TODO: can be called multiple times, but only the first call is effective
   private void cleanupCurrentConnection(boolean disconnect) {
-    // Synchronizing on cleanupLock to ensure we don't run into a parallel close
-    // Can't synchronize on the main class itself since that would cause the
-    // shutdown request to block
+    // Synchronizing on cleanupLock to ensure we don't run into a parallel close.
+    // Can't synchronize on the main class itself since that would cause the shutdown request to block.
     synchronized (cleanupLock) {
       try {
         if (httpConnection != null) {
           httpConnection.cleanup(disconnect);
-          httpConnection = null;
+          // do not set httpConnection to null because shutdown() can be called at any moment and
+          // we may see NPE from httpConnection.validate(), for example.
         }
       } catch (IOException e) {
+        LOG.info("{}: Exception while shutting down: {}", logIdentifier, e.getMessage());
         if (isDebugEnabled) {
-          LOG.debug("Exception while shutting down fetcher " + logIdentifier, e);
-        } else {
-          LOG.info("Exception while shutting down fetcher {}: {}", logIdentifier, e.getMessage());
+          LOG.debug(StringUtils.EMPTY, e);
         }
       }
     }
