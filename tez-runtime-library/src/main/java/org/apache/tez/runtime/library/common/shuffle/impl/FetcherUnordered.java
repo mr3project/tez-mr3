@@ -227,8 +227,9 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     }
 
     if (isShutDown.get()) {
-      // shutdown would have no effect if in the process of establishing the connection.
-      shutdownInternal(false);  // everything is okay, but isShutDown == true, so disconnect = false (???)
+      cleanupCurrentConnection(true);  // true because stopped in the middle
+      // TODO: cleanupCurrentConnection(false) has no effect in practice because it was called in shutdown()
+
       if (isDebugEnabled) {
         LOG.debug("Detected fetcher has been shutdown after connection establishment. Returning");
       }
@@ -280,8 +281,9 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
 
     // Handle any shutdown which may have been invoked.
     if (isShutDown.get()) {
-      // shutdown would have no effect if in the process of establishing the connection.
-      shutdownInternal(false);  // everything is okay, but isShutDown == true, so disconnect = false (???)
+      cleanupCurrentConnection(true);  // true because stopped in the middle
+      // TODO: cleanupCurrentConnection(false) has no effect in practice because it was called in shutdown()
+
       if (isDebugEnabled) {
         LOG.debug("Detected fetcher has been shutdown after opening stream. Returning");
       }
@@ -301,7 +303,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       InputAttemptIdentifier inputAttemptIdentifier = pendingInputsSeq.getInputs().get(index);
 
       if (isShutDown.get()) {
-        shutdownInternal(true);
+        cleanupCurrentConnection(true);   // true because stopped in the middle
         if (isDebugEnabled) {
           LOG.debug("Fetcher already shutdown. Aborting queued fetches for " + (numInputs - index) + " inputs");
         }
@@ -331,10 +333,10 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         index++;
       } catch (FetcherReadTimeoutException e) {
         // failed to read inputAttemptIdentifier at index, and retry
-
-        // clean up connection
-        shutdownInternal(true);
+        cleanupCurrentConnection(true);   // true because of error
         if (isShutDown.get()) {
+          // perhaps cleanupCurrentConnection(false) was already called in shutdown(),
+          // but we just called cleanupCurrentConnection(true) anyway
           if (isDebugEnabled) {
             LOG.debug("Fetcher already shutdown. Aborting reconnection and queued fetches for " + (numInputs - index) + " inputs");
           }
@@ -534,12 +536,12 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       if (isDebugEnabled) {
         LOG.debug("Shutting down fetcher for host: " + host);
       }
-      shutdownInternal(false);
+      cleanupCurrentConnection(false);  // false to reuse connection by default
     }
   }
 
-  // can be called multiple times
-  private void shutdownInternal(boolean disconnect) {
+  // TODO: can be called multiple times, and all calls are effective
+  private void cleanupCurrentConnection(boolean disconnect) {
     // Synchronizing on isShutDown to ensure we don't run into a parallel close
     // Can't synchronize on the main class itself since that would cause the
     // shutdown request to block

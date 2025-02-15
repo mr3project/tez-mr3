@@ -760,7 +760,7 @@ public class ShuffleServer implements FetcherCallback {
               Long shuffleClientId = result.getShuffleClientId();
               LOG.warn("Reporting fetch failure for all pending inputs because {} for ShuffleClient {} is gone",
                   identifier, shuffleClientId);
-              for (Map.Entry<InputAttemptIdentifier, InputHost.PartitionRange > input : pendingInputs.entrySet()) {
+              for (Map.Entry<InputAttemptIdentifier, InputHost.PartitionRange> input : pendingInputs.entrySet()) {
                 fetchFailed(shuffleClientId, input.getKey(), false, true);
               }
             }

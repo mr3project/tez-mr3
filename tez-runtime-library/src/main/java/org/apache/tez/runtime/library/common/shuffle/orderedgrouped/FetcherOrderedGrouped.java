@@ -708,6 +708,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     return failedFetches;
   }
 
+  // TODO: can be called multiple times, but only the first call is effective
   private void cleanupCurrentConnection(boolean disconnect) {
     // Synchronizing on cleanupLock to ensure we don't run into a parallel close
     // Can't synchronize on the main class itself since that would cause the
