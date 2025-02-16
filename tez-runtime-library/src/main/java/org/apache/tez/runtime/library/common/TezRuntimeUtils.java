@@ -64,7 +64,6 @@ public class TezRuntimeUtils {
     return String.format("%d_%d", taskIndex, taskAttemptNumber);
   }
 
-  // TODO Maybe include a dag name in this.
   public static String getTaskAttemptIdentifier(String vertexName,
       int taskIndex, int taskAttemptNumber) {
     return String.format("%s_%06d_%02d", vertexName, taskIndex,

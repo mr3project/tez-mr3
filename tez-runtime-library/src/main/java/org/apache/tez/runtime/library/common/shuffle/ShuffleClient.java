@@ -38,6 +38,10 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public abstract class ShuffleClient<T extends ShuffleInput> {
 
+  protected static final Logger LOG = LoggerFactory.getLogger(ShuffleClient.class);
+  protected static final Logger LOG_FETCH = LoggerFactory.getLogger(LOG.getName() + ".fetch");
+  protected static final ShuffleUtils.FetchStatsLogger fetchStatsLogger = new ShuffleUtils.FetchStatsLogger(LOG_FETCH, LOG);
+
   /**
    * Placeholder for tracking shuffle events in case we get multiple spills info for the same attempt.
    */
@@ -80,8 +84,6 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
         +  ", id=" + id + ", attemptNum=" + attemptNum + "]";
     }
   }
-
-  private static final Logger LOG = LoggerFactory.getLogger(ShuffleClient.class);
 
   // not thread-safe - accessed from:
   //   1. ShuffleServer.call() thread
@@ -172,7 +174,7 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
         }
 
         if (alreadyCompleted) {
-          LOG.info("Skipping completed input: " + input);
+          LOG.info("Skipping completed input: {}", input);
           inputIter.remove();
           removedAnyInput = true;
         }
@@ -185,7 +187,7 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
 
       // avoid adding attempts which have been marked as OBSOLETE
       if (isObsoleteInputAttemptIdentifier(input)) {
-        LOG.info("Skipping obsolete input: " + input);
+        LOG.info("Skipping obsolete input: {}", input);
         inputIter.remove();
         removedAnyInput = true;
         continue;
@@ -202,7 +204,7 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
 
   public void obsoleteKnownInput(InputAttemptIdentifier srcAttempt) {
     // The incoming srcAttempt does not contain a path component.
-    LOG.info("{}: Adding obsolete input: {}", srcNameTrimmed, srcAttempt);
+    LOG.info("{}/{}: Adding obsolete input: {}", inputContext.getUniqueIdentifier(), srcNameTrimmed, srcAttempt);
 
     // Even if we remove ShuffleEventInfo from shuffleInfoEventsMap[] (see below),
     // new Fetchers may be created from obsolete input again.

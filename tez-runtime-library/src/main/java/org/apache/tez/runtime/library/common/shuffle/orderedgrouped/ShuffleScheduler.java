@@ -36,10 +36,7 @@ import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.TezRuntimeUtils;
 import org.apache.tez.runtime.library.common.shuffle.InputHost;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleClient;
-import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils.FetchStatsLogger;
 import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.MapOutput.Type;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class ShuffleScheduler extends ShuffleClient<MapOutput> {
 
@@ -76,10 +73,6 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
     WRONG_REDUCE
   }
   private final static String SHUFFLE_ERR_GRP_NAME = "Shuffle Errors";
-
-  private static final Logger LOG = LoggerFactory.getLogger(ShuffleScheduler.class);
-  private static final Logger LOG_FETCH = LoggerFactory.getLogger(LOG.getName() + ".fetch");
-  private static final FetchStatsLogger fetchStatsLogger = new FetchStatsLogger(LOG_FETCH, LOG);
 
   private final TezCounter shuffledInputsCounter;
   private final TezCounter skippedInputCounter;
@@ -157,7 +150,8 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
 
     this.skippedInputCounter = inputContext.getCounters().findCounter(TaskCounter.NUM_SKIPPED_INPUTS);
 
-    LOG.info("ShuffleScheduler running for sourceVertex: {}", inputContext.getSourceVertexName());
+    LOG.info("ShuffleScheduler for {}/{}: shuffleClientId={}, numInputs={}",
+      inputContext.getUniqueIdentifier(), srcNameTrimmed, shuffleClientId, numInputs);
   }
 
   public void start() throws Exception {
@@ -236,7 +230,7 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
         }
 
         if (alreadyCompleted) {
-          LOG.info("Skipping completed input: " + input);
+          LOG.info("Skipping completed input: {}", input);
           inputIter.remove();
           removedAnyInput = true;
         }
@@ -249,7 +243,7 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
 
       // avoid adding attempts which have been marked as OBSOLETE
       if (isObsoleteInputAttemptIdentifier(input)) {
-        LOG.info("Skipping obsolete input: " + input);
+        LOG.info("Skipping obsolete input: {}", input);
         inputIter.remove();
         removedAnyInput = true;
         continue;
@@ -303,8 +297,7 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
 
       if (remainingMaps.get() == 0) {
         notifyAll();
-        LOG.info("All inputs fetched for input vertex: {} {}",
-          inputContext.getUniqueIdentifier(), inputContext.getSourceVertexName());
+        LOG.info("All inputs fetched for ShuffleScheduler {}", shuffleClientId);
       }
 
       // update the status
@@ -344,7 +337,7 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
     // corresponds to ShuffleManager.registerCompletedInputForPipelinedShuffle()
 
     if (isObsoleteInputAttemptIdentifier(srcAttemptIdentifier)) {
-      LOG.info("Do not register obsolete input: " + srcAttemptIdentifier);
+      LOG.info("Do not register obsolete input: {}", srcAttemptIdentifier);
       return;
     }
 
@@ -383,13 +376,13 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
     failedShuffleCounter.increment(1);
 
     if (isInputFinished(srcAttemptIdentifier.getInputIdentifier())) {
-      LOG.warn("{}, Ordered fetch failed, but input already completed: InputIdentifier={}",
-          srcNameTrimmed, srcAttemptIdentifier);
+      LOG.warn("Ordered fetch failed for {}, but input already completed: InputIdentifier={}",
+        shuffleClientId, srcAttemptIdentifier);
       return;
     }
 
     if (isObsoleteInputAttemptIdentifier(srcAttemptIdentifier)) {
-      LOG.info("Do not report obsolete input: " + srcAttemptIdentifier);
+      LOG.info("Do not report obsolete input: {}", srcAttemptIdentifier);
       return;
     }
 
@@ -421,16 +414,12 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
 
   // Notify AM
   public void informAM(InputAttemptIdentifier srcAttempt) {
-    LOG.info("{}: Reporting fetch failure for InputIdentifier: {} taskAttemptIdentifier: {}",
-        srcNameTrimmed, srcAttempt,
+    LOG.info("ShuffleScheduler {}: Reporting fetch failure for InputIdentifier: {}, taskAttemptIdentifier: {}",
+        shuffleClientId, srcAttempt,
         TezRuntimeUtils.getTaskAttemptIdentifier(
             inputContext.getSourceVertexName(), srcAttempt.getInputIdentifier(), srcAttempt.getAttemptNumber()));
     InputReadErrorEvent readError = InputReadErrorEvent.create(
-        "Ordered: Fetch failure while fetching from "
-          + TezRuntimeUtils.getTaskAttemptIdentifier(
-          inputContext.getSourceVertexName(),
-          srcAttempt.getInputIdentifier(),
-          srcAttempt.getAttemptNumber()),
+        "Ordered: Fetch failure while fetching from " + inputContext.getUniqueIdentifier(),
         srcAttempt.getInputIdentifier(),
         srcAttempt.getAttemptNumber());
     List<Event> failedEvents = Lists.newArrayListWithCapacity(1);
@@ -497,15 +486,16 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
   private void logProgress() {
     int inputsDone = numInputs - remainingMaps.get();
     if (inputsDone == numInputs || isShutdown.get()) {
-      double mbs = (double) totalBytesShuffledTillNow / (1024 * 1024);
+      long kbs = totalBytesShuffledTillNow / 1024;
       long secsSinceStart = (System.currentTimeMillis() - startTime) / 1000 + 1;
+      long transferRate = kbs / secsSinceStart;
 
-      double transferRate = mbs / secsSinceStart;
       StringBuilder s = new StringBuilder();
-      s.append("copy=" + inputsDone);
+      s.append("ShuffleScheduler " + shuffleClientId);
+      s.append(", copy=" + inputsDone);
       s.append(", numFetchedSpills=" + numFetchedSpills);
       s.append(", numInputs=" + numInputs);
-      s.append(", transfer rate (MB/s) = " + transferRate);  // CumulativeDataFetched/TimeSinceInputStarted
+      s.append(", transfer rate (KB/s) = " + transferRate);
       LOG.info(s.toString());
     }
   }

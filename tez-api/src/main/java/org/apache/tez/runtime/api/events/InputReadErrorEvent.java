@@ -52,8 +52,7 @@ public final class InputReadErrorEvent extends Event {
     this.version = version;
   }
 
-  public static InputReadErrorEvent create(String diagnostics, int index,
-                                           int version) {
+  public static InputReadErrorEvent create(String diagnostics, int index, int version) {
     return new InputReadErrorEvent(diagnostics, index, version);
   }
 

@@ -25,12 +25,10 @@ import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.ByteBuffer;
-import java.text.DecimalFormat;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
 import java.util.zip.Deflater;
 
 import javax.annotation.Nullable;
@@ -38,7 +36,6 @@ import javax.crypto.SecretKey;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.tez.common.Preconditions;
-import com.google.common.primitives.Ints;
 import com.google.protobuf.ByteString;
 
 import org.apache.hadoop.conf.Configuration;
@@ -51,7 +48,6 @@ import org.apache.tez.runtime.api.events.DataMovementEvent;
 import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.TezRuntimeUtils;
 import org.apache.tez.runtime.library.utils.DATA_RANGE_IN_MB;
-import org.apache.tez.util.FastNumberFormat;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,23 +77,6 @@ public class ShuffleUtils {
   private static final long MB = 1024l * 1024l;
   private static final long KB = 1024l;
   private static final long KB_THRESHOLD = 1024l * 1024l * 1024l;   // corresponds to 1TB
-
-  public static final ThreadLocal<DecimalFormat> MBPS_FORMAT =
-      new ThreadLocal<DecimalFormat>() {
-        @Override
-        protected DecimalFormat initialValue() {
-          return new DecimalFormat("0.00");
-        }
-      };
-  public static final ThreadLocal<FastNumberFormat> MBPS_FAST_FORMAT =
-      new ThreadLocal<FastNumberFormat>() {
-        @Override
-        protected FastNumberFormat initialValue() {
-          FastNumberFormat fmt = FastNumberFormat.getInstance();
-          fmt.setMinimumIntegerDigits(2);
-          return fmt;
-        }
-      };
 
   public static SecretKey getJobTokenSecretFromTokenBytes(ByteBuffer meta)
       throws IOException {
@@ -543,11 +522,11 @@ public class ShuffleUtils {
    */
   public static DetailedPartitionStatsProto getDetailedPartitionStatsForPhysicalOutput(long[] sizes) {
     DetailedPartitionStatsProto.Builder builder = DetailedPartitionStatsProto.newBuilder();
-    for (int i=0; i<sizes.length; i++) {
+    for (int i = 0; i < sizes.length; i++) {
       // Round the size up. So 1 byte -> the value of sizeInMB == 1
-      // Throws IllegalArgumentException if value is greater than
-      // Integer.MAX_VALUE. That should be ok given Integer.MAX_VALUE * MB
-      // means PB. --> revised to use KB with truncation
+      // Throws IllegalArgumentException if value is greater than Integer.MAX_VALUE.
+      // That should be ok given Integer.MAX_VALUE * MB means PB.
+      // --> revised to use KB with truncation
       long sizeInKb = ceil(sizes[i], KB);
       long adjustedSizeInKb = sizeInKb >= KB_THRESHOLD ? KB_THRESHOLD : sizeInKb;
       builder.addSizeInMb((int)adjustedSizeInKb);
@@ -581,6 +560,7 @@ public class ShuffleUtils {
       sb.append("}");
       return sb;
     }
+
     /**
      * Log individual fetch complete event.
      * This log information would be used by tez-tool/perf-analzyer/shuffle tools for mining
@@ -597,14 +577,12 @@ public class ShuffleUtils {
     public void logIndividualFetchComplete(long millis, long bytesCompressed,
         long bytesDecompressed, String outputType, InputAttemptIdentifier srcAttemptIdentifier) {
 
+      // Unlike in Tez, we do not use fast math to avoid creating ThreadLocal formatters.
+
       if (activeLogger.isDebugEnabled()) {
         long wholeMBs = 0;
         long partialMBs = 0;
         millis = Math.max(1L, millis);
-        // fast math is done using integer math to avoid double to string conversion
-        // calculate B/s * 100 to preserve MBs precision to two decimal places
-        // multiply numerator by 100000 (2^5 * 5^5) and divide denominator by MB (2^20)
-        // simply fraction to protect ourselves from overflow by factoring out 2^5
         wholeMBs = (bytesCompressed * 3125) / (millis * 32768);
         partialMBs = wholeMBs % 100;
         wholeMBs /= 100;
@@ -623,7 +601,7 @@ public class ShuffleUtils {
         sb.append(", Rate=");
         sb.append(wholeMBs);
         sb.append(".");
-        MBPS_FAST_FORMAT.get().format(partialMBs, sb);
+        sb.append(partialMBs);
         sb.append(" MB/s");
         activeLogger.debug(sb.toString());
       } else {
@@ -633,18 +611,15 @@ public class ShuffleUtils {
         currentDecompressedSize = decompressedSize.addAndGet(bytesDecompressed);
         currentTotalTime = totalTime.addAndGet(millis);
         if (currentCount == 1000) {
-          logCount.set(0);
           compressedSize.set(0);
           decompressedSize.set(0);
           totalTime.set(0);
         }
         if (currentCount % 1000 == 0) {
-          double avgRate = currentTotalTime == 0 ? 0
-              : currentCompressedSize / (double)currentTotalTime / 1000 / 1024 / 1024;
-          aggregateLogger.info("Completed {} fetches, stats for last 1000 fetches: "
-              + "avg csize: {}, avg dsize: {}, avgTime: {}, avgRate: {}", currentCount,
-              currentCompressedSize / 1000, currentDecompressedSize / 1000, currentTotalTime / 1000,
-              MBPS_FORMAT.get().format(avgRate));
+          aggregateLogger.info("Completed {} fetches in total; Stats for last 1000 fetches: average csize: {}, average dsize: {}, average time: {}ms",
+              currentCount,
+              currentCompressedSize / 1000, currentDecompressedSize / 1000,
+              currentTotalTime / 1000);
         }
       }
     }
@@ -690,4 +665,3 @@ public class ShuffleUtils {
     }
   }
 }
-

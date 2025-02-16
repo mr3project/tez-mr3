@@ -31,8 +31,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.tez.runtime.api.TaskFailureType;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.tez.common.counters.TaskCounter;
 import org.apache.tez.common.counters.TezCounter;
@@ -46,7 +44,6 @@ import org.apache.tez.runtime.library.common.shuffle.FetchedInput.Type;
 import org.apache.tez.runtime.library.common.shuffle.FetchedInputAllocator;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleClient;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
-import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils.FetchStatsLogger;
 
 import org.apache.tez.common.Preconditions;
 import com.google.common.collect.Lists;
@@ -55,10 +52,6 @@ import com.google.common.collect.Lists;
 // In case the src task generates multiple outputs for the same target Index
 // (multiple src-indices), modifications will be required.
 public class ShuffleManager extends ShuffleClient<FetchedInput> {
-
-  private static final Logger LOG = LoggerFactory.getLogger(ShuffleManager.class);
-  private static final Logger LOG_FETCH = LoggerFactory.getLogger(LOG.getName() + ".fetch");
-  private static final FetchStatsLogger fetchStatsLogger = new FetchStatsLogger(LOG_FETCH, LOG);
 
   private final FetchedInputAllocator inputManager;
 
@@ -119,7 +112,8 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
     // We do not know upfront the number of spills from source.
     completedInputs = new LinkedBlockingDeque<FetchedInput>();
 
-    LOG.info("ShuffleManager for {}: numInputs={}", srcNameTrimmed, numInputs);
+    LOG.info("ShuffleManager for {}/{}: shuffleClientId={}, numInputs={}",
+        inputContext.getUniqueIdentifier(), srcNameTrimmed, shuffleClientId, numInputs);
   }
 
   public FetchedInputAllocator getInputManager() {
@@ -312,7 +306,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
   private void registerCompletedInputForPipelinedShuffle(
       InputAttemptIdentifier srcAttemptIdentifier, FetchedInput fetchedInput) {
     if (isObsoleteInputAttemptIdentifier(srcAttemptIdentifier)) {
-      LOG.info("Do not register obsolete input: " + srcAttemptIdentifier);
+      LOG.info("Do not register obsolete input: {}", srcAttemptIdentifier);
       return;
     }
 
@@ -372,8 +366,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
     if (numComplete == numInputs) {
       // Poison pill End of Input message to awake blocking take call
       completedInputs.add(endOfInputMarker);
-      LOG.info("All inputs fetched for input vertex: {} {}",
-          inputContext.getUniqueIdentifier(), inputContext.getSourceVertexName());
+      LOG.info("All inputs fetched for ShuffleManager {}", shuffleClientId);
     }
   }
 
@@ -388,21 +381,21 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
     synchronized (completedInputSet) {
       boolean isCompleted = completedInputSet.get(inputIdentifier);
       if (isCompleted) {
-        LOG.warn("{}, Unordered fetch failed, but input already completed: InputIdentifier={}",
-          srcNameTrimmed, srcAttemptIdentifier);
+        LOG.warn("Unordered fetch failed for {}, but input already completed: InputIdentifier={}",
+          shuffleClientId, srcAttemptIdentifier);
         return;
       }
     }
 
-    LOG.info("{}: Fetch failed, InputIdentifier={}, connectFailed={}",
-        srcNameTrimmed, srcAttemptIdentifier, connectFailed);
+    LOG.info("Unordered fetch failed for {}, InputIdentifier={}, connectFailed={}",
+        shuffleClientId, srcAttemptIdentifier, connectFailed);
 
     if (srcAttemptIdentifier == null) {
       reportNonFatalError(null, "Received fetchFailure for an unknown source (null)");
     }
 
     if (isObsoleteInputAttemptIdentifier(srcAttemptIdentifier)) {
-      LOG.info("Do not report obsolete input: " + srcAttemptIdentifier);
+      LOG.info("Do not report obsolete input: {}", srcAttemptIdentifier);
       return;
     }
 
@@ -449,7 +442,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
     // As of now relying on job cleanup (when all directories would be cleared)
 
     if (!isShutdown.getAndSet(true)) {
-      LOG.info("Shutting down pending fetchers: shuffleClientId={}, source={}", shuffleClientId, srcNameTrimmed);
+      LOG.info("Shutting down pending fetchers: ShuffleManager {}", shuffleClientId);
       shuffleServer.unregister(shuffleClientId);
     }
   }
@@ -530,15 +523,16 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
   private void logProgress(long totalBytesShuffledTillNow) {
     int inputsDone = numCompletedInputs.get();
     if (inputsDone == numInputs) {
-      double mbs = (double) totalBytesShuffledTillNow / (1024 * 1024);
+      long kbs = totalBytesShuffledTillNow / 1024;
       long secsSinceStart = (System.currentTimeMillis() - startTime) / 1000 + 1;
+      long transferRate = kbs / secsSinceStart;
 
-      double transferRate = mbs / secsSinceStart;
       StringBuilder s = new StringBuilder();
-      s.append("copy=" + inputsDone);
+      s.append("ShuffleManager " + shuffleClientId);
+      s.append(", copy=" + inputsDone);
       s.append(", numFetchedSpills=" + numFetchedSpills);
       s.append(", numInputs=" + numInputs);
-      s.append(", transfer rate (MB/s) = " + ShuffleUtils.MBPS_FORMAT.get().format(transferRate));  // CumulativeDataFetched/TimeSinceInputStarted
+      s.append(", transfer rate (KB/s) = " + transferRate);
       LOG.info(s.toString());
     }
   }
