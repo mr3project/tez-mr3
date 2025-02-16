@@ -100,6 +100,7 @@ public class ShuffleServer implements FetcherCallback {
     public final boolean compositeFetch;
     public final boolean connectionFailAllInput;
     public final long speculativeExecutionWaitMillis;
+    public final int stuckFetcherDurationMillis;
 
     public FetcherConfig(
         Configuration codecConf,
@@ -116,7 +117,8 @@ public class ShuffleServer implements FetcherCallback {
         boolean verifyDiskChecksum,
         boolean compositeFetch,
         boolean connectionFailAllInput,
-        long speculativeExecutionWaitMillis) {
+        long speculativeExecutionWaitMillis,
+        int stuckFetcherDurationMillis) {
       this.codecConf = codecConf;
       this.ifileReadAhead = ifileReadAhead;
       this.ifileReadAheadLength = ifileReadAheadLength;
@@ -132,6 +134,7 @@ public class ShuffleServer implements FetcherCallback {
       this.compositeFetch = compositeFetch;
       this.connectionFailAllInput = connectionFailAllInput;
       this.speculativeExecutionWaitMillis = speculativeExecutionWaitMillis;
+      this.stuckFetcherDurationMillis = stuckFetcherDurationMillis;
     }
 
     public String toString() {
@@ -146,6 +149,10 @@ public class ShuffleServer implements FetcherCallback {
       sb.append(httpConnectionParams);
       sb.append(", localDiskFetchEnabled=");
       sb.append(localDiskFetchEnabled);
+      sb.append(", speculativeExecutionWaitMillis=");
+      sb.append(speculativeExecutionWaitMillis);
+      sb.append(", stuckFetcherDurationMillis=");
+      sb.append(stuckFetcherDurationMillis);
       sb.append("]");
       return sb.toString();
     }
@@ -238,11 +245,12 @@ public class ShuffleServer implements FetcherCallback {
 
   private final AtomicBoolean isShutdown = new AtomicBoolean(false);
 
+  private final int STUCK_FETCHER_DURATION_MILLIS;
+  private final int STUCK_FETCHER_SPECULATIVE_WAIT_MILLIS;
+
+  private static final int MAX_SPECULATIVE_FETCH_ATTEMPTS = 3;
   private static final int LAUNCH_LOOP_WAIT_PERIOD_MILLIS = 1000;
   private static final int CHECK_STUCK_FETCHER_PERIOD_MILLIS = 1000;
-  private static final int STUCK_FETCHER_DURATION_MILLIS = 5000;
-  private static final int STUCK_FETCHER_SPECULATIVE_WAIT_MILLIS = STUCK_FETCHER_DURATION_MILLIS * 2;
-  private static final int MAX_SPECULATIVE_FETCH_ATTEMPTS = 3;
 
   public ShuffleServer(
       TaskContext taskContext,
@@ -294,6 +302,9 @@ public class ShuffleServer implements FetcherCallback {
     this.maxNumInputHosts = conf.getInt(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MAX_INPUT_HOSTPORTS,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MAX_INPUT_HOSTPORTS_DEFAULT);
+
+    this.STUCK_FETCHER_DURATION_MILLIS = fetcherConfig.stuckFetcherDurationMillis;
+    this.STUCK_FETCHER_SPECULATIVE_WAIT_MILLIS = STUCK_FETCHER_DURATION_MILLIS * 2;
 
     LOG.info("{} Configuration: numFetchers={}, maxTaskOutputAtOnce={}, FetcherConfig={}, rangesScheme={}, maxNumInputHosts={}",
         serverName, numFetchers, maxTaskOutputAtOnce, fetcherConfig, rangesScheme, maxNumInputHosts);
