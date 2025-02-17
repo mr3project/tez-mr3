@@ -109,8 +109,8 @@ public class MultiMRInput extends MRInputBase {
   @Override
   public List<Event> initialize() throws IOException {
     super.initialize();
-    LOG.info("{} using newmapreduce API={}, numPhysicalInputs={}",
-        getContext().getSourceVertexName(), useNewApi, getNumPhysicalInputs());
+    if (LOG.isDebugEnabled()) { LOG.debug("{} using newmapreduce API={}, numPhysicalInputs={}",
+        getContext().getSourceVertexName(), useNewApi, getNumPhysicalInputs()); }
     if (getNumPhysicalInputs() == 0) {
       getContext().inputIsReady();
     }

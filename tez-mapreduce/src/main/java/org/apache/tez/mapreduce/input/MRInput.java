@@ -437,8 +437,8 @@ public class MRInput extends MRInputBase {
     getContext().inputIsReady();
     this.splitInfoViaEvents = jobConf.getBoolean(MRJobConfig.MR_TEZ_SPLITS_VIA_EVENTS,
         MRJobConfig.MR_TEZ_SPLITS_VIA_EVENTS_DEFAULT);
-    LOG.info("{} using newmapreduce API={}, split via event={}, numPhysicalInputs={}",  // log useNewApi to check if Iceberg is correctly handled
-        getContext().getSourceVertexName(), useNewApi, splitInfoViaEvents, getNumPhysicalInputs());
+    if (LOG.isDebugEnabled()) { LOG.debug("{} using newmapreduce API={}, split via event={}, numPhysicalInputs={}",  // log useNewApi to check if Iceberg is correctly handled
+        getContext().getSourceVertexName(), useNewApi, splitInfoViaEvents, getNumPhysicalInputs()); }
     initializeInternal();
     return null;
   }

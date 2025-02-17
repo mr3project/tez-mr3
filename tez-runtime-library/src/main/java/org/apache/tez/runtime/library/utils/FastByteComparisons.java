@@ -25,7 +25,6 @@ import java.security.PrivilegedAction;
 
 import sun.misc.Unsafe;
 
-import com.google.common.primitives.Longs;
 import com.google.common.primitives.UnsignedBytes;
 
 /**
