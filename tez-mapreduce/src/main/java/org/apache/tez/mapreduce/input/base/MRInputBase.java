@@ -98,7 +98,7 @@ public abstract class MRInputBase extends AbstractLogicalInput {
     jobConf.setInt(MRJobConfig.APPLICATION_ATTEMPT_ID, getContext().getDAGAttemptNumber());
 
     jobConf.set(MRInput.TEZ_MAPREDUCE_DAG_ID, "DAG_" + getContext().getDagIdentifier());
-    jobConf.set(MRInput.TEZ_MAPREDUCE_TASK_ATTEMPT_ID, getContext().getUniqueIdentifier());
+    jobConf.set(MRInput.TEZ_MAPREDUCE_TASK_ATTEMPT_ID, getContext().getTaskAttemptIdStr());
 
     jobConf.setBoolean(MRInput.TEZ_MR3_SCHEDULED_ON_HOST, getContext().getScheduledOnHost());
 

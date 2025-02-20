@@ -119,7 +119,9 @@ public interface TaskContext extends DecompressorPool {
    * @return a unique identifier
    */
   public String getUniqueIdentifier();
-  
+
+  public String getTaskAttemptIdStr();
+
   /**
    * Returns a shared {@link ObjectRegistry} to hold user objects in memory 
    * between tasks. 
