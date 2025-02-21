@@ -238,6 +238,10 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
 
     try {
       input = httpConnection.getInputStream();  // incurs a network transmission
+      setStage(STAGE_FIRST_FETCHED);
+      if (getState() == STATE_STUCK) {
+        fetcherCallback.wakeupLoop();
+      }
       httpConnection.validate();
       // validateConnectionResponse(msgToEncode, encHash);
     } catch (IOException e) {
@@ -298,7 +302,6 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     // yet_to_be_fetched list and marking the failed tasks.
     int index = 0;  // points to the next input to be consumed
     InputAttemptIdentifier[] failedInputs = null;
-    final int firstFetchIndex = 0;
     while (index < numInputs) {
       InputAttemptIdentifier inputAttemptIdentifier = pendingInputsSeq.getInputs().get(index);
 
@@ -323,12 +326,6 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         //   5. null, success, increment index
         if (failedInputs != null) {
           break;
-        }
-        if (index == firstFetchIndex) {
-          setStage(STAGE_FIRST_FETCHED);
-          if (getState() == STATE_STUCK) {
-            fetcherCallback.wakeupLoop();
-          }
         }
         index++;
       } catch (FetcherReadTimeoutException e) {

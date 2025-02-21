@@ -250,7 +250,7 @@ public class ShuffleServer implements FetcherCallback {
 
   private static final int MAX_SPECULATIVE_FETCH_ATTEMPTS = 3;
   private static final int LAUNCH_LOOP_WAIT_PERIOD_MILLIS = 1000;
-  private static final int CHECK_STUCK_FETCHER_PERIOD_MILLIS = 1000;
+  private static final int CHECK_STUCK_FETCHER_PERIOD_MILLIS = 250;
 
   public ShuffleServer(
       TaskContext taskContext,
@@ -304,7 +304,7 @@ public class ShuffleServer implements FetcherCallback {
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MAX_INPUT_HOSTPORTS_DEFAULT);
 
     this.STUCK_FETCHER_DURATION_MILLIS = fetcherConfig.stuckFetcherDurationMillis;
-    this.STUCK_FETCHER_SPECULATIVE_WAIT_MILLIS = STUCK_FETCHER_DURATION_MILLIS * 2;
+    this.STUCK_FETCHER_SPECULATIVE_WAIT_MILLIS = 15000;
 
     LOG.info("{} Configuration: numFetchers={}, maxTaskOutputAtOnce={}, FetcherConfig={}, rangesScheme={}, maxNumInputHosts={}",
         serverName, numFetchers, maxTaskOutputAtOnce, fetcherConfig, rangesScheme, maxNumInputHosts);
@@ -441,7 +441,6 @@ public class ShuffleServer implements FetcherCallback {
             removeHostBlocked(fetcher);
             LOG.warn("Fetcher STUCK to SPECULATIVE: {} in stage {}",
                 fetcher.getFetcherIdentifier(), fetcher.getStage());
-            trySpeculativeFetcher(fetcher);
           }
         });
       }

@@ -240,7 +240,6 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     // yet_to_be_fetched list and marking the failed tasks.
     int index = 0;  // points to the next input to be consumed
     InputAttemptIdentifier[] failedInputs = null;
-    final int firstFetchIndex = 0;
     while (index < numInputs) {
       InputAttemptIdentifier inputAttemptIdentifier = pendingInputsSeq.getInputs().get(index);
 
@@ -251,12 +250,6 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         failedInputs = copyMapOutput(input, inputAttemptIdentifier);
         if (failedInputs != null) {
           break;
-        }
-        if (index == firstFetchIndex) {
-          setStage(STAGE_FIRST_FETCHED);
-          if (getState() == STATE_STUCK) {
-            fetcherCallback.wakeupLoop();
-          }
         }
         index++;
       } catch (FetcherReadTimeoutException e) {
@@ -406,6 +399,10 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
 
     try {
       input = httpConnection.getInputStream();  // incurs a network transmission
+      setStage(STAGE_FIRST_FETCHED);
+      if (getState() == STATE_STUCK) {
+        fetcherCallback.wakeupLoop();
+      }
       httpConnection.validate();
     } catch (IOException | InterruptedException ie) {
       if (ie instanceof InterruptedException) {
