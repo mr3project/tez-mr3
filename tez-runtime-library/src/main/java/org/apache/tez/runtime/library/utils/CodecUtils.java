@@ -100,9 +100,12 @@ public final class CodecUtils {
     long speculativeExecutionWaitMillis = (long)conf.getInt(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_SPECULATIVE_FETCH_WAIT_MILLIS,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_SPECULATIVE_FETCH_WAIT_MILLIS_DEFAULT);
-    int stuckFetcherDurationMillis = conf.getInt(
-        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_DURATION_MILLIS,
-        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_DURATION_MILLIS_DEFAULT);
+    int stuckFetcherThresholdMillis = conf.getInt(
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_THRESHOLD_MILLIS,
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_THRESHOLD_MILLIS_DEFAULT);
+    int stuckFetcherReleaseMillis = conf.getInt(
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_RELEASE_MILLIS,
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_RELEASE_MILLIS_DEFAULT);
 
     return new ShuffleServer.FetcherConfig(
         codecConf,
@@ -120,7 +123,8 @@ public final class CodecUtils {
         compositeFetch,
         connectionFailAllInput,
         speculativeExecutionWaitMillis,
-        stuckFetcherDurationMillis);
+        stuckFetcherThresholdMillis,
+        stuckFetcherReleaseMillis);
   }
 
   private static Configuration reduceConfForCodec(Configuration conf) {
