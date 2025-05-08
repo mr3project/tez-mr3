@@ -74,9 +74,9 @@ public class MRPartitioner implements org.apache.tez.runtime.library.api.Partiti
             (Class<? extends org.apache.hadoop.mapred.Partitioner>) conf.getClass(
                 "mapred.partitioner.class", org.apache.hadoop.mapred.lib.HashPartitioner.class);
         LOG.info("Using oldApi, MRpartitionerClass=" + clazz.getName());
-        // TODO: replace new JobConf() with null because Partitioner is stateless
+        // do not use 'new JobConf(conf)' because Partitioner is stateless in Hive-MR3
         oldPartitioner = (org.apache.hadoop.mapred.Partitioner) ReflectionUtils.newInstance(
-            clazz, new JobConf(conf));
+            clazz, null);
       } else {
         oldPartitioner = new org.apache.hadoop.mapred.Partitioner() {
           @Override
