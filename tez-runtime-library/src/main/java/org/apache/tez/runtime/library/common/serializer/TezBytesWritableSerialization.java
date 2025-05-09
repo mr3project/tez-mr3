@@ -18,8 +18,6 @@
 
 package org.apache.tez.runtime.library.common.serializer;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
@@ -55,8 +53,6 @@ import java.io.OutputStream;
 @Public
 @Unstable
 public class TezBytesWritableSerialization extends Configured implements Serialization<Writable> {
-
-  private static final Logger LOG = LoggerFactory.getLogger(TezBytesWritableSerialization.class.getName());
 
   @Override
   public boolean accept(Class<?> c) {

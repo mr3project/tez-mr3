@@ -25,8 +25,6 @@ import java.security.PrivilegedAction;
 
 import sun.misc.Unsafe;
 
-import com.google.common.primitives.UnsignedBytes;
-
 /**
  * Same as {@link org.apache.hadoop.io.FastByteComparisons}
  *
@@ -172,6 +170,10 @@ public final class FastByteComparisons {
       static final int BYTE_ARRAY_BASE_OFFSET;
 
       static {
+        if (ByteOrder.nativeOrder().equals(ByteOrder.BIG_ENDIAN)) {
+          throw new AssertionError("ERROR: Big-endian architectures are not supported.");
+        }
+
         theUnsafe = (Unsafe) AccessController.doPrivileged(
             new PrivilegedAction<Object>() {
               @Override
@@ -197,9 +199,6 @@ public final class FastByteComparisons {
           throw new AssertionError();
         }
       }
-
-      static final boolean littleEndian =
-          ByteOrder.nativeOrder().equals(ByteOrder.LITTLE_ENDIAN);
 
       /**
        * Returns true if x1 is less than x2, when both values are treated as
@@ -241,21 +240,21 @@ public final class FastByteComparisons {
           long rw = theUnsafe.getLong(buffer2, offset2Adj + (long) i);
 
           if (lw != rw) {
-            if (!littleEndian) {
-              return lessThanUnsigned(lw, rw) ? -1 : 1;
-            }
-
-            int n = Long.numberOfTrailingZeros(lw ^ rw) & ~0x7;
-            return ((int) ((lw >>> n) & 0xFF)) - ((int) ((rw >>> n) & 0xFF));
+            // original approach (slower in JMH testing)
+            // int n = Long.numberOfTrailingZeros(lw ^ rw) & ~0x7;
+            // return ((int) ((lw >>> n) & 0xFF)) - ((int) ((rw >>> n) & 0xFF));
+            long bw = Long.reverseBytes(lw);
+            long br = Long.reverseBytes(rw);
+            return Long.compareUnsigned(bw, br);
           }
         }
 
         for (; i < minLength; i++) {
-          int result = UnsignedBytes.compare(
-              buffer1[offset1 + i],
-              buffer2[offset2 + i]);
-          if (result != 0) {
-            return result;
+          // do not use UnsignedBytes.compare() because we want to avoid Guava
+          int b1 = buffer1[offset1 + i] & 0xFF;
+          int b2 = buffer2[offset2 + i] & 0xFF;
+          if (b1 != b2) {
+            return b1 - b2;
           }
         }
         return length1 - length2;
