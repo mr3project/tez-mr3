@@ -26,16 +26,12 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.google.common.annotations.VisibleForTesting;
-
 import org.apache.hadoop.io.BoundedByteArrayOutputStream;
 import org.apache.tez.runtime.api.DecompressorPool;
 import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.library.common.task.local.output.TezTaskOutput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -60,8 +56,6 @@ import org.apache.tez.common.counters.TezCounter;
  * There is a <code>Writer</code> to write out map-outputs in this format and 
  * a <code>Reader</code> to read files of this format.
  */
-@InterfaceAudience.Private
-@InterfaceStability.Unstable
 public class IFile {
   private static final Logger LOG = LoggerFactory.getLogger(IFile.class);
   private static final boolean isDebugEnabled = LOG.isDebugEnabled();
@@ -136,7 +130,7 @@ public class IFile {
         Class<?> keyClass, Class<?> valueClass, CompressionCodec codec, TezCounter writesCounter,
         TezCounter serializedBytesCounter, int cacheSize) throws IOException {
       super(keySerialization, valSerialization, new FSDataOutputStream(createBoundedBuffer(cacheSize), null),
-          keyClass, valueClass, null, writesCounter, serializedBytesCounter);
+          keyClass, valueClass, null, writesCounter, serializedBytesCounter, false);
       this.fs = fs;
       this.cacheStream = (BoundedByteArrayOutputStream) this.rawOut.getWrappedStream();
       this.taskOutput = taskOutput;
@@ -271,8 +265,6 @@ public class IFile {
   /**
    * <code>IFile.Writer</code> to write out intermediate map-outputs.
    */
-  @InterfaceAudience.Private
-  @InterfaceStability.Unstable
   @SuppressWarnings({"unchecked", "rawtypes"})
   public static class Writer {
     protected DataOutputStream out;
@@ -305,7 +297,6 @@ public class IFile {
     final DataOutputBuffer previous = new DataOutputBuffer();
     Object prevKey = null;
     boolean headerWritten = false;
-    @VisibleForTesting
     boolean sameKey = false;
 
     final int RLE_MARKER_SIZE = INT_SIZE;
@@ -320,7 +311,7 @@ public class IFile {
                   TezCounter writesCounter,
                   TezCounter serializedBytesCounter) throws IOException {
       this(keySerialization, valSerialization, fs.create(file), keyClass, valueClass, codec,
-           writesCounter, serializedBytesCounter);
+           writesCounter, serializedBytesCounter, false);
       ownOutputStream = true;
     }
 
@@ -328,13 +319,6 @@ public class IFile {
       writtenRecordsCounter = writesCounter;
       serializedUncompressedBytes = serializedBytesCounter;
       this.rle = rle;
-    }
-
-    public Writer(Serialization keySerialization, Serialization valSerialization, FSDataOutputStream outputStream,
-        Class keyClass, Class valueClass, CompressionCodec codec, TezCounter writesCounter,
-        TezCounter serializedBytesCounter) throws IOException {
-      this(keySerialization, valSerialization, outputStream, keyClass, valueClass, codec, writesCounter,
-          serializedBytesCounter, false);
     }
 
     public Writer(Serialization keySerialization, Serialization valSerialization, FSDataOutputStream outputStream,
@@ -601,13 +585,9 @@ public class IFile {
   /**
    * <code>IFile.Reader</code> to read intermediate map-outputs.
    */
-  @InterfaceAudience.Private
-  @InterfaceStability.Unstable
   public static class Reader {
 
     public enum KeyState {NO_KEY, NEW_KEY, SAME_KEY}
-
-    private static final int DEFAULT_BUFFER_SIZE = 128*1024;
 
     private static final int MAX_BUFFER_SIZE
             = Integer.MAX_VALUE - 8;  // The maximum array size is a little less than the
@@ -627,8 +607,6 @@ public class IFile {
     protected boolean eof = false;
     IFileInputStream checksumIn;
 
-    protected byte[] buffer = null;
-    protected int bufferSize = DEFAULT_BUFFER_SIZE;
     protected DataInputStream dataIn = null;
 
     protected int recNo = 1;
@@ -646,25 +624,6 @@ public class IFile {
     /**
      * Construct an IFile Reader.
      *
-     * @param fs  FileSystem
-     * @param file Path of the file to be opened. This file should have
-     *             checksum bytes for the data at the end of the file.
-     * @param codec codec
-     * @param readsCounter Counter for records read from disk
-     * @throws IOException
-     */
-    public Reader(FileSystem fs, Path file,
-                  CompressionCodec codec,
-                  TezCounter readsCounter, TezCounter bytesReadCounter, boolean ifileReadAhead,
-                  int ifileReadAheadLength, int bufferSize) throws IOException {
-      this(fs.open(file), fs.getFileStatus(file).getLen(), codec,
-          readsCounter, bytesReadCounter, ifileReadAhead,
-          ifileReadAheadLength, bufferSize, null);
-    }
-
-    /**
-     * Construct an IFile Reader.
-     *
      * @param in   The input stream
      * @param length Length of the data in the stream, including the checksum
      *               bytes.
@@ -676,10 +635,10 @@ public class IFile {
         CompressionCodec codec,
         TezCounter readsCounter, TezCounter bytesReadCounter,
         boolean readAhead, int readAheadLength,
-        int bufferSize, DecompressorPool taskContext) throws IOException {
+        DecompressorPool taskContext) throws IOException {
       this(in, ((in != null) ? (length - HEADER.length) : length), codec,
           readsCounter, bytesReadCounter, readAhead, readAheadLength,
-          bufferSize, taskContext, ((in != null) ? isCompressedFlagEnabled(in) : false));
+          taskContext, ((in != null) ? isCompressedFlagEnabled(in) : false));
       if (in != null && bytesReadCounter != null) {
         bytesReadCounter.increment(IFile.HEADER.length);
       }
@@ -695,11 +654,11 @@ public class IFile {
      * @param readsCounter Counter for records read from disk
      * @throws IOException
      */
-    public Reader(InputStream in, long length,
+    private Reader(InputStream in, long length,
                   CompressionCodec codec,
                   TezCounter readsCounter, TezCounter bytesReadCounter,
                   boolean readAhead, int readAheadLength,
-                  int bufferSize, DecompressorPool taskContext, boolean isCompressed) throws IOException {
+                  DecompressorPool taskContext, boolean isCompressed) throws IOException {
       if (in != null) {
         checksumIn = new IFileInputStream(in, length, readAhead,
             readAheadLength/* , isCompressed */);
@@ -728,7 +687,6 @@ public class IFile {
       this.readRecordsCounter = readsCounter;
       this.bytesReadCounter = bytesReadCounter;
       this.fileLength = length;
-      this.bufferSize = Math.max(0, bufferSize);
     }
 
     /**
@@ -1024,7 +982,6 @@ public class IFile {
 
       // Release the buffer
       dataIn = null;
-      buffer = null;
       if (readRecordsCounter != null) {
         readRecordsCounter.increment(numRecordsRead);
       }

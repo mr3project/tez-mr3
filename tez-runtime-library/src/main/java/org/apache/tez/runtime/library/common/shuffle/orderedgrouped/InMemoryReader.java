@@ -152,24 +152,28 @@ public class InMemoryReader extends Reader {
     }
   }
 
-  private final InputAttemptIdentifier taskAttemptId;
   private final MergeManager merger;
-  ByteArrayDataInput memDataIn;
-  private int start;
-  private int length;
+  private final InputAttemptIdentifier taskAttemptId;
   private int originalKeyPos;
 
-  public InMemoryReader(MergeManager merger,
-      InputAttemptIdentifier taskAttemptId, byte[] data, int start,
-      int length)
-      throws IOException {
-    super(null, length - start, null, null, null, false, 0, -1, null);
-    this.taskAttemptId = taskAttemptId;
-    this.merger = merger;
+  private static final int DEFAULT_BUFFER_SIZE = 128*1024;
 
-    buffer = data;
-    bufferSize = (int) length;
-    memDataIn = new ByteArrayDataInput(buffer, start, length);
+  private byte[] buffer = null;
+  private int bufferSize = DEFAULT_BUFFER_SIZE;
+  private ByteArrayDataInput memDataIn;
+  private int start;
+  private int length;
+
+  public InMemoryReader(MergeManager merger, InputAttemptIdentifier taskAttemptId,
+                        byte[] data, int start, int length)
+      throws IOException {
+    super(null, length - start, null, null, null, false, 0, null);
+    this.merger = merger;
+    this.taskAttemptId = taskAttemptId;
+
+    this.buffer = data;
+    this.bufferSize = (int) length;
+    this.memDataIn = new ByteArrayDataInput(buffer, start, length);
     this.start = start;
     this.length = length;
   }

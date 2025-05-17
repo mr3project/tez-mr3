@@ -212,7 +212,7 @@ public class UnorderedKVReader<K, V> extends KeyValueReader {
     }
   }
 
-  public IFile.Reader openIFileReader(FetchedInput fetchedInput)
+  private IFile.Reader openIFileReader(FetchedInput fetchedInput)
       throws IOException {
     if (fetchedInput.getType() == Type.MEMORY) {
       MemoryFetchedInput mfi = (MemoryFetchedInput) fetchedInput;
@@ -222,7 +222,7 @@ public class UnorderedKVReader<K, V> extends KeyValueReader {
     } else {
       return new IFile.Reader(fetchedInput.getInputStream(),
           fetchedInput.getSize(), codec, null, null, ifileReadAhead,
-          ifileReadAheadLength, ifileBufferSize, context);
+          ifileReadAheadLength, context);
     }
   }
 }

@@ -645,7 +645,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
               continue;
             }
             if (writer == null) {
-              writer = new Writer(keySerialization, valSerialization, out, keyClass, valClass, codec, null, null);
+              writer = new Writer(keySerialization, valSerialization, out, keyClass, valClass, codec, null, null, false);
             }
             numRecords += writePartition(buffer.partitionPositions[i], buffer, writer, key, val);
           }
@@ -1105,7 +1105,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           }
           continue;
         }
-        writer = new Writer(keySerialization, valSerialization, out, keyClass, valClass, codec, null, null);
+        writer = new Writer(keySerialization, valSerialization, out, keyClass, valClass, codec, null, null, false);
         try {
           if (currentBuffer.nextPosition != 0
               && currentBuffer.partitionPositions[i] != WrappedBuffer.PARTITION_ABSENT_POSITION) {
@@ -1124,7 +1124,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
               in.seek(indexRecord.getStartOffset());
               IFile.Reader reader = new IFile.Reader(in, indexRecord.getPartLength(), codec, null,
                   additionalSpillBytesReadCounter, ifileReadAhead, ifileReadAheadLength,
-                  ifileBufferSize, outputContext);
+                  outputContext);
               // reader.close() may not be called if the following while{} block throws IOException.
               // In this case, reader.decompressor is not returned to the pool.
               // However, this is not memory leak because reader is eventually garbage collected, at which point
@@ -1223,7 +1223,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           spilledRecordsCounter.increment(1);
           Writer writer = null;
           try {
-            writer = new IFile.Writer(keySerialization, valSerialization, out, keyClass, valClass, codec, null, null);
+            writer = new IFile.Writer(keySerialization, valSerialization, out, keyClass, valClass, codec, null, null, false);
             writer.append(key, value);
             outputLargeRecordsCounter.increment(1);
             numRecordsPerPartition[i]++;

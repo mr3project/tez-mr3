@@ -266,7 +266,7 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput {
     synchronized(this) {
       valuesIter = vIter;
     }
-    return new OrderedGroupedKeyValuesReader(valuesIter, getContext());
+    return new OrderedGroupedKeyValuesReader(valuesIter);
   }
 
   @Override
@@ -327,11 +327,9 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput {
   private static class OrderedGroupedKeyValuesReader extends KeyValuesReader {
 
     private final ValuesIterator valuesIter;
-    private final InputContext context;
 
-    OrderedGroupedKeyValuesReader(ValuesIterator valuesIter, InputContext context) {
+    OrderedGroupedKeyValuesReader(ValuesIterator valuesIter) {
       this.valuesIter = valuesIter;
-      this.context = context;
     }
 
     @Override

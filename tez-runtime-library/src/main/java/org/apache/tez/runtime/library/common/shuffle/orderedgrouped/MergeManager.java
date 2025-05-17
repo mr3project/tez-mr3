@@ -703,7 +703,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
                   + ", usedMemory=" + manager.getUsedMemory()
                   + ", memoryLimit=" + memoryLimit);
             }
-            continue;
           } else {
             mergeOutputSize += mo.getSize();
             IFile.Reader reader = new InMemoryReader(MergeManager.this,
@@ -712,7 +711,9 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
                 (mo.isPrimaryMapOutput() ? mergedMapOutputsCounter : null)));
             lastAddedMapOutput = mo;
             it.remove();
-            LOG.debug("Added segment for merging. mergeOutputSize=" + mergeOutputSize);
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Added segment for merging. mergeOutputSize=" + mergeOutputSize);
+            }
           }
         }
 
@@ -1046,10 +1047,11 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     public RawKVIteratorReader(TezRawKeyValueIterator kvIter, long size)
         throws IOException {
       super(null, size, null, spilledRecordsCounter, null, ifileReadAhead,
-          ifileReadAheadLength, ifileBufferSize, inputContext);
+          ifileReadAheadLength, inputContext);
       this.kvIter = kvIter;
       this.size = size;
     }
+
     @Override
     public KeyState readRawKey(DataInputBuffer key) throws IOException {
       if (kvIter.next()) {
@@ -1062,6 +1064,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       }
       return KeyState.NO_KEY;
     }
+
     public void nextRawValue(DataInputBuffer value) throws IOException {
       final DataInputBuffer vb = kvIter.getValue();
       final int vp = vb.getPosition();
@@ -1069,6 +1072,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       value.reset(vb.getData(), vp, vlen);
       bytesRead += vlen;
     }
+
     public long getPosition() throws IOException {
       return bytesRead;
     }
