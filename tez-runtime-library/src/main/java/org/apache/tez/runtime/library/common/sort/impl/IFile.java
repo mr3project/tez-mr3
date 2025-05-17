@@ -267,18 +267,24 @@ public class IFile {
    */
   @SuppressWarnings({"unchecked", "rawtypes"})
   public static class Writer {
+    // DataOutput: rawOut <-- checksumOut <-- compressedOut <-- out
+
     protected DataOutputStream out;
-    boolean ownOutputStream = false;
-    long start = 0;
-    FSDataOutputStream rawOut;
-    final AtomicBoolean closed = new AtomicBoolean(false);
+    private long start = 0;
 
-    CompressionOutputStream compressedOut;
-    Compressor compressor;
-    boolean compressOutput = false;
+    private CompressionOutputStream compressedOut;
+    private Compressor compressor;
+    private boolean compressOutput = false;
 
-    long decompressedBytesWritten = 0;
-    long compressedBytesWritten = 0;
+    private IFileOutputStream checksumOut;
+
+    protected FSDataOutputStream rawOut;
+    protected boolean ownOutputStream = false;  // true iff this Writer created rawOut
+
+    private final AtomicBoolean closed = new AtomicBoolean(false);
+
+    private long decompressedBytesWritten = 0;
+    private long compressedBytesWritten = 0;
 
     // Count records written to disk
     private long numRecordsWritten = 0;
@@ -287,17 +293,15 @@ public class IFile {
     private final TezCounter writtenRecordsCounter;
     private final TezCounter serializedUncompressedBytes;
 
-    IFileOutputStream checksumOut;
+    private boolean closeSerializers = false;
+    private Serializer keySerializer = null;
+    private Serializer valueSerializer = null;
 
-    boolean closeSerializers = false;
-    Serializer keySerializer = null;
-    Serializer valueSerializer = null;
-
-    final DataOutputBuffer buffer = new DataOutputBuffer();
-    final DataOutputBuffer previous = new DataOutputBuffer();
-    Object prevKey = null;
-    boolean headerWritten = false;
-    boolean sameKey = false;
+    private final DataOutputBuffer buffer = new DataOutputBuffer();
+    private final DataOutputBuffer previous = new DataOutputBuffer();
+    protected Object prevKey = null;
+    protected boolean headerWritten = false;
+    private boolean sameKey = false;
 
     final int RLE_MARKER_SIZE = INT_SIZE;
     final int V_END_MARKER_SIZE = INT_SIZE;
@@ -353,19 +357,15 @@ public class IFile {
         if (this.compressor != null) {
           this.compressor.reset();
           this.compressedOut = CodecUtils.createOutputStream(codec, checksumOut, compressor);
-          this.out = new FSDataOutputStream(this.compressedOut,  null);
+          this.out = new DataOutputStream(this.compressedOut);
           this.compressOutput = true;
         } else {
           LOG.warn("Could not obtain compressor from CodecPool");
-          this.out = new FSDataOutputStream(checksumOut,null);
+          this.out = new DataOutputStream(checksumOut);
         }
       } else {
-        this.out = new FSDataOutputStream(checksumOut,null);
+        this.out = new DataOutputStream(checksumOut);
       }
-    }
-
-    public Writer(Serialization keySerialization, Serialization valSerialization, FileSystem fs, Path file) throws IOException {
-      this(keySerialization, valSerialization, fs, file, null, null, null, null, null);
     }
 
     protected void writeHeader(OutputStream outputStream) throws IOException {
