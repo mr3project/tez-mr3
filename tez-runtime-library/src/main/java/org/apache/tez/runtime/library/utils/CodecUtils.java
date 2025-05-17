@@ -69,8 +69,6 @@ public final class CodecUtils {
     int ifileReadAheadLength =
         ifileReadAhead ? conf.getInt(TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_BYTES,
             TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_BYTES_DEFAULT) : 0;
-    int ifileBufferSize = conf.getInt("io.file.buffer.size",
-        TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_BUFFER_SIZE_DEFAULT);
 
     String auxiliaryService = conf.get(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
         TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT);
@@ -111,7 +109,6 @@ public final class CodecUtils {
         codecConf,
         ifileReadAhead,
         ifileReadAheadLength,
-        ifileBufferSize,
         jobTokenSecretMgr,
         httpConnectionParams,
         localFs,

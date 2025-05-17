@@ -156,13 +156,11 @@ public class InMemoryReader extends Reader {
   private final InputAttemptIdentifier taskAttemptId;
   private int originalKeyPos;
 
-  private static final int DEFAULT_BUFFER_SIZE = 128*1024;
-
   private byte[] buffer = null;
-  private int bufferSize = DEFAULT_BUFFER_SIZE;
-  private ByteArrayDataInput memDataIn;
-  private int start;
-  private int length;
+  private final int bufferSize;
+  private final ByteArrayDataInput memDataIn;
+  private final int start;
+  private final int length;
 
   public InMemoryReader(MergeManager merger, InputAttemptIdentifier taskAttemptId,
                         byte[] data, int start, int length)

@@ -17,12 +17,8 @@
  */
 package org.apache.tez.runtime.library.common.shuffle.orderedgrouped;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.tez.common.Preconditions;
 import org.apache.commons.io.FilenameUtils;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ChecksumFileSystem;
 import org.apache.hadoop.fs.FileStatus;
@@ -72,8 +68,6 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Usage. Create instance. setInitialMemoryAvailable(long), configureAndStart()
  *
  */
-@InterfaceAudience.Private
-@InterfaceStability.Unstable
 @SuppressWarnings(value={"rawtypes"})
 public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   
@@ -92,23 +86,18 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   };
   private final Combiner combiner;  
   
-  @VisibleForTesting
   final Set<MapOutput> inMemoryMergedMapOutputs =
     new TreeSet<MapOutput>(new MapOutput.MapOutputComparator());
   private final IntermediateMemoryToMemoryMerger memToMemMerger;
 
-  @VisibleForTesting
   final Set<MapOutput> inMemoryMapOutputs =
     new TreeSet<MapOutput>(new MapOutput.MapOutputComparator());
   private final InMemoryMerger inMemoryMerger;
 
-  @VisibleForTesting
   final Set<FileChunk> onDiskMapOutputs = new TreeSet<FileChunk>();
-  @VisibleForTesting
   final OnDiskMerger onDiskMerger;
   
   private final long memoryLimit;
-  @VisibleForTesting
   final long postMergeMemLimit;
   private long usedMemory;
   private long commitMemory;
@@ -136,7 +125,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   
   private final boolean ifileReadAhead;
   private final int ifileReadAheadLength;
-  private final int ifileBufferSize;
 
   // Variables for stats
   private final SegmentStatsTracker statsInMemTotal = new SegmentStatsTracker();
@@ -197,9 +185,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     } else {
       this.ifileReadAheadLength = 0;
     }
-    this.ifileBufferSize = conf.getInt("io.file.buffer.size",
-        TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_BUFFER_SIZE_DEFAULT);
-    
+
     // Figure out initial memory req start
     final float maxInMemCopyUse = conf.getFloat(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT,
@@ -311,7 +297,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     this.onDiskMerger.setParentThread(shuffleSchedulerThread);
   }
 
-  @Private
   void configureAndStart() {
     if (this.memToMemMerger != null) {
       memToMemMerger.start();
@@ -323,7 +308,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   /**
    * Exposing this to get an initial memory ask without instantiating the object.
    */
-  @Private
   static long getInitialMemoryRequirement(Configuration conf, long maxAvailableTaskMemory) {
     final float maxInMemCopyUse =
         conf.getFloat(
@@ -628,11 +612,9 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     return null;
   }
 
-  @VisibleForTesting
   public boolean isShutdown() {
     return isShutdown.get();
   }
-
 
   static void cleanup(FileSystem fs, Collection<FileChunk> fileChunkList) {
     for (FileChunk fileChunk : fileChunkList) {
@@ -774,13 +756,10 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
    */
   private class InMemoryMerger extends MergeThread<MapOutput> {
 
-    @VisibleForTesting
     volatile InputAttemptIdentifier srcTaskIdentifier;
 
-    @VisibleForTesting
     volatile Path outputPath;
 
-    @VisibleForTesting
     volatile Path tmpDir;
 
     public InMemoryMerger(MergeManager manager) {
@@ -890,12 +869,9 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   /**
    * Merges multiple on-disk segments
    */
-  @VisibleForTesting
   class OnDiskMerger extends MergeThread<FileChunk> {
 
-    @VisibleForTesting
     volatile Path outputPath;
-    @VisibleForTesting
     volatile Path tmpDir;
 
     public OnDiskMerger(MergeManager manager) {
@@ -936,7 +912,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         final Path file = fileChunk.getPath();
         approxOutputSize += size;
         DiskSegment segment = new DiskSegment(rfs, file, offset, size, codec, ifileReadAhead,
-            ifileReadAheadLength, ifileBufferSize, preserve, inputContext);
+            ifileReadAheadLength, preserve, inputContext);
         inputSegments.add(segment);
       }
 
@@ -1193,7 +1169,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       final long fileOffset = fileChunk.getOffset();
       final boolean preserve = fileChunk.isLocalFile();
       diskSegments.add(new DiskSegment(fs, file, fileOffset, fileLength, codec, ifileReadAhead,
-                                   ifileReadAheadLength, ifileBufferSize, preserve, counter, inputContext));
+                                   ifileReadAheadLength, preserve, counter, inputContext));
     }
     if (LOG.isInfoEnabled()) {
       finalMergeLog.append(". DiskSeg: " + onDisk.length + ", " + onDiskBytes);
@@ -1276,12 +1252,10 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   }
 
   // always called inside synchronized (MergeManager) {}
-  @VisibleForTesting
   long getUsedMemory() {
     return usedMemory;
   }
 
-  @VisibleForTesting
   void waitForMemToMemMerge() throws InterruptedException {
     memToMemMerger.waitForMerge();
   }

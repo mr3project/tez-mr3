@@ -73,15 +73,6 @@ public class TezRuntimeConfiguration {
   public static final int TEZ_RUNTIME_IFILE_READAHEAD_BYTES_DEFAULT =
       4 * 1024 * 1024;
 
-  public static final int TEZ_RUNTIME_IFILE_BUFFER_SIZE_DEFAULT = -1;
-
-  /**
-   * This is copy of io.file.buffer.size from Hadoop, which is used in several places such
-   * as compression codecs, buffer sizes in IFile, while fetching etc.
-   * Variable exists so that it can be referenced, instead of using the string name directly.
-   */
-  public static final String TEZ_RUNTIME_IO_FILE_BUFFER_SIZE = "io.file.buffer.size";
-
   @ConfigurationProperty(type = "integer")
   public static final String TEZ_RUNTIME_IO_SORT_FACTOR = TEZ_RUNTIME_PREFIX +
       "io.sort.factor";
@@ -429,7 +420,6 @@ public class TezRuntimeConfiguration {
   static {
     tezRuntimeKeys.add(TEZ_RUNTIME_IFILE_READAHEAD);
     tezRuntimeKeys.add(TEZ_RUNTIME_IFILE_READAHEAD_BYTES);
-    tezRuntimeKeys.add(TEZ_RUNTIME_IO_FILE_BUFFER_SIZE);
     tezRuntimeKeys.add(TEZ_RUNTIME_IO_SORT_FACTOR);
     tezRuntimeKeys.add(TEZ_RUNTIME_IO_SORT_MB);
     tezRuntimeKeys.add(TEZ_RUNTIME_COMBINE_MIN_SPILLS);

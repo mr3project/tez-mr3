@@ -66,7 +66,6 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
   
   protected final boolean ifileReadAhead;
   protected final int ifileReadAheadLength;
-  protected final int ifileBufferSize;
 
   /**
    * Represents the serialized size of the output records. Does not consider
@@ -160,8 +159,6 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
     } else {
       this.ifileReadAheadLength = 0;
     }
-    this.ifileBufferSize = conf.getInt("io.file.buffer.size",
-        TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_BUFFER_SIZE_DEFAULT);
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Instantiating Partitioner: [" + conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_PARTITIONER_CLASS) + "]");

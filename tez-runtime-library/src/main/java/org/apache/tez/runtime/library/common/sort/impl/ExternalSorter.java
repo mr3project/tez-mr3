@@ -111,7 +111,6 @@ public abstract class ExternalSorter {
   
   protected final boolean ifileReadAhead;
   protected final int ifileReadAheadLength;
-  protected final int ifileBufferSize;
 
   protected final long availableMemoryMb;
 
@@ -238,10 +237,7 @@ public abstract class ExternalSorter {
     } else {
       this.ifileReadAheadLength = 0;
     }
-    this.ifileBufferSize = conf.getInt("io.file.buffer.size",
-        TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_BUFFER_SIZE_DEFAULT);
 
-    
     // Task outputs
     mapOutputFile = TezRuntimeUtils.instantiateTaskOutputManager(conf, outputContext);
 

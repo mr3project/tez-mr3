@@ -30,8 +30,6 @@ import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
@@ -58,7 +56,6 @@ import org.apache.tez.common.Preconditions;
  * unified view to that data. There are no ordering constraints applied by
  * this input.
  */
-@Public
 public class UnorderedKVInput extends AbstractLogicalInput {
 
   private static final Logger LOG = LoggerFactory.getLogger(UnorderedKVInput.class);
@@ -120,14 +117,11 @@ public class UnorderedKVInput extends AbstractLogicalInput {
       boolean ifileReadAhead = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD,
           TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_DEFAULT);
       int ifileReadAheadLength = 0;
-      int ifileBufferSize = 0;
 
       if (ifileReadAhead) {
         ifileReadAheadLength = conf.getInt(TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_BYTES,
             TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_BYTES_DEFAULT);
       }
-      ifileBufferSize = conf.getInt("io.file.buffer.size",
-          TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_BUFFER_SIZE_DEFAULT);
 
       InputContext inputContext = getContext();
       this.inputManager = new SimpleFetchedInputAllocator(
@@ -149,7 +143,7 @@ public class UnorderedKVInput extends AbstractLogicalInput {
 
       this.shuffleManager.run();
       this.kvReader = createReader(inputRecordCounter, codec,
-          ifileBufferSize, ifileReadAhead, ifileReadAheadLength);
+          ifileReadAhead, ifileReadAheadLength);
       List<Event> pending = new LinkedList<Event>();
       pendingEvents.drainTo(pending);
       if (pending.size() > 0) {
@@ -241,10 +235,10 @@ public class UnorderedKVInput extends AbstractLogicalInput {
 
   @SuppressWarnings("rawtypes")
   private UnorderedKVReader createReader(TezCounter inputRecordCounter, CompressionCodec codec,
-      int ifileBufferSize, boolean ifileReadAheadEnabled, int ifileReadAheadLength)
+      boolean ifileReadAheadEnabled, int ifileReadAheadLength)
       throws IOException {
     return new UnorderedKVReader(shuffleManager, conf, codec, ifileReadAheadEnabled,
-        ifileReadAheadLength, ifileBufferSize, inputRecordCounter, getContext());
+        ifileReadAheadLength, inputRecordCounter, getContext());
   }
 
   private static final Set<String> confKeys = new HashSet<String>();
@@ -252,7 +246,6 @@ public class UnorderedKVInput extends AbstractLogicalInput {
   static {
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_BYTES);
-    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_IO_FILE_BUFFER_SIZE);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_FACTOR);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_PARALLEL_COPIES);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT);
@@ -276,7 +269,6 @@ public class UnorderedKVInput extends AbstractLogicalInput {
   // TODO Maybe add helper methods to extract keys
   // TODO Maybe add constants or an Enum to access the keys
 
-  @InterfaceAudience.Private
   public static Set<String> getConfigurationKeySet() {
     return Collections.unmodifiableSet(confKeys);
   }

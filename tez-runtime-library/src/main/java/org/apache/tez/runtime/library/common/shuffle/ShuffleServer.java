@@ -88,7 +88,6 @@ public class ShuffleServer implements FetcherCallback {
     public final Configuration codecConf;
     public final boolean ifileReadAhead;
     public final int ifileReadAheadLength;
-    public final int ifileBufferSize;
     public final JobTokenSecretManager jobTokenSecretMgr;
     public final HttpConnectionParams httpConnectionParams;
     public final RawLocalFileSystem localFs;
@@ -107,7 +106,6 @@ public class ShuffleServer implements FetcherCallback {
         Configuration codecConf,
         boolean ifileReadAhead,
         int ifileReadAheadLength,
-        int ifileBufferSize,
         JobTokenSecretManager jobTokenSecretMgr,
         HttpConnectionParams httpConnectionParams,
         RawLocalFileSystem localFs,
@@ -124,7 +122,6 @@ public class ShuffleServer implements FetcherCallback {
       this.codecConf = codecConf;
       this.ifileReadAhead = ifileReadAhead;
       this.ifileReadAheadLength = ifileReadAheadLength;
-      this.ifileBufferSize = ifileBufferSize;
       this.jobTokenSecretMgr = jobTokenSecretMgr;
       this.httpConnectionParams = httpConnectionParams;
       this.localFs = localFs;
@@ -146,8 +143,6 @@ public class ShuffleServer implements FetcherCallback {
       sb.append(ifileReadAhead);
       sb.append(", ifileReadAheadLength=");
       sb.append(ifileReadAheadLength);
-      sb.append(", ifileBufferSize=");
-      sb.append(ifileBufferSize);
       sb.append(", httpConnectionParams=");
       sb.append(httpConnectionParams);
       sb.append(", localDiskFetchEnabled=");

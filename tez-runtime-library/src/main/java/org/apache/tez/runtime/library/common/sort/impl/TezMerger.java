@@ -24,14 +24,10 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
-import com.google.common.annotations.VisibleForTesting;
-
 import org.apache.tez.runtime.api.DecompressorPool;
 import org.apache.tez.runtime.api.InputContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ChecksumFileSystem;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -48,7 +44,6 @@ import org.apache.hadoop.util.Progressable;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
-import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.serializer.SerializationContext;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader.KeyState;
@@ -60,13 +55,10 @@ import org.apache.tez.runtime.library.utils.LocalProgress;
  * Merger is an utility class used by the Map and Reduce tasks for merging
  * both their memory and disk segments
  */
-@InterfaceAudience.Private
-@InterfaceStability.Unstable
 @SuppressWarnings({"unchecked", "rawtypes"})
 public class TezMerger {
   private static final Logger LOG = LoggerFactory.getLogger(TezMerger.class);
 
-  
   // Local directories
   private static LocalDirAllocator lDirAlloc = 
     new LocalDirAllocator(TezRuntimeFrameworkConfigs.LOCAL_DIRS);
@@ -222,8 +214,6 @@ public class TezMerger {
     }
   }
 
-  @InterfaceAudience.Private
-  @InterfaceStability.Unstable
   static class KeyValueBuffer {
     private byte[] buf;
     private int position;
@@ -252,8 +242,6 @@ public class TezMerger {
     }
   }
 
-  @InterfaceAudience.Private
-  @InterfaceStability.Unstable
   public static class Segment {
     static final byte[] EMPTY_BYTES = new byte[0];
     Reader reader = null;
@@ -333,8 +321,6 @@ public class TezMerger {
     }
   }
 
-  @InterfaceAudience.Private
-  @InterfaceStability.Unstable
   public static class DiskSegment extends Segment {
 
     FileSystem fs = null;
@@ -345,39 +331,38 @@ public class TezMerger {
     long segmentLength = -1;
     boolean ifileReadAhead;
     int ifileReadAheadLength;
-    int bufferSize = -1;
 
     final DecompressorPool inputContext;
 
     public DiskSegment(FileSystem fs, Path file,
         CompressionCodec codec, boolean ifileReadAhead,
-        int ifileReadAheadLength, int bufferSize, boolean preserve, DecompressorPool inputContext)
+        int ifileReadAheadLength, boolean preserve, DecompressorPool inputContext)
     throws IOException {
       this(fs, file, codec, ifileReadAhead, ifileReadAheadLength,
-          bufferSize, preserve, null, inputContext);
+          preserve, null, inputContext);
     }
 
     public DiskSegment(FileSystem fs, Path file,
                    CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLenth,
-                   int bufferSize, boolean preserve, TezCounter mergedMapOutputsCounter, DecompressorPool inputContext)
+                   boolean preserve, TezCounter mergedMapOutputsCounter, DecompressorPool inputContext)
     throws IOException {
       this(fs, file, 0, fs.getFileStatus(file).getLen(), codec,
-          ifileReadAhead, ifileReadAheadLenth, bufferSize, preserve,
+          ifileReadAhead, ifileReadAheadLenth, preserve,
           mergedMapOutputsCounter, inputContext);
     }
 
     public DiskSegment(FileSystem fs, Path file,
                    long segmentOffset, long segmentLength,
                    CompressionCodec codec, boolean ifileReadAhead,
-                   int ifileReadAheadLength,  int bufferSize, 
+                   int ifileReadAheadLength,
                    boolean preserve, DecompressorPool inputContext) throws IOException {
       this(fs, file, segmentOffset, segmentLength, codec, ifileReadAhead,
-          ifileReadAheadLength, bufferSize, preserve, null, inputContext);
+          ifileReadAheadLength, preserve, null, inputContext);
     }
 
     public DiskSegment(FileSystem fs, Path file,
         long segmentOffset, long segmentLength, CompressionCodec codec,
-        boolean ifileReadAhead, int ifileReadAheadLength, int bufferSize,
+        boolean ifileReadAhead, int ifileReadAheadLength,
         boolean preserve, TezCounter mergedMapOutputsCounter, DecompressorPool inputContext)
     throws IOException {
       super(null, mergedMapOutputsCounter);
@@ -386,8 +371,7 @@ public class TezMerger {
       this.codec = codec;
       this.preserve = preserve;
       this.ifileReadAhead = ifileReadAhead;
-      this.ifileReadAheadLength =ifileReadAheadLength;
-      this.bufferSize = bufferSize;
+      this.ifileReadAheadLength = ifileReadAheadLength;
 
       this.segmentOffset = segmentOffset;
       this.segmentLength = segmentLength;
@@ -442,7 +426,6 @@ public class TezMerger {
     }
   }
 
-  @VisibleForTesting
   static class MergeQueue<K extends Object, V extends Object>
   extends PriorityQueue<Segment> implements TezRawKeyValueIterator {
     final Configuration conf;
@@ -451,7 +434,6 @@ public class TezMerger {
     final boolean checkForSameKeys;
     static final boolean ifileReadAhead = TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_DEFAULT;
     static final int ifileReadAheadLength = TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_BYTES_DEFAULT;
-    static final int ifileBufferSize = TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_BUFFER_SIZE_DEFAULT;
     static final long recordsBeforeProgress = TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT;
     
     List<Segment> segments = new ArrayList<Segment>();
@@ -805,7 +787,7 @@ public class TezMerger {
                                 ChecksumFileSystem.getApproxChkSumLength(
                                 s.getLength());
           }
-          Path tmpFilename = 
+          Path tmpFilename =
             new Path(tmpDir, "intermediate").suffix("." + passNo);
 
           Path outputFile =  lDirAlloc.getLocalPathForWrite(
@@ -829,7 +811,7 @@ public class TezMerger {
           // Add the newly create segment to the list of segments to be merged
           Segment tempSegment = 
             new DiskSegment(fs, outputFile, codec, ifileReadAhead,
-                ifileReadAheadLength, ifileBufferSize, false, inputContext);
+                ifileReadAheadLength, false, inputContext);
 
           // Insert new merged segment into the sorted list
           int pos = Collections.binarySearch(segments, tempSegment,
