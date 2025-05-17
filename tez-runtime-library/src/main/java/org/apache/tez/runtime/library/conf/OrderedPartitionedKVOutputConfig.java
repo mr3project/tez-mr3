@@ -55,10 +55,6 @@ public class OrderedPartitionedKVOutputConfig {
    * Currently supported sorter implementations
    */
   public enum SorterImpl {
-    /** Legacy sorter implementation based on Hadoop MapReduce shuffle impl.
-     * Restricted to 2 GB memory limits.
-     */
-    LEGACY,
     /** Pipeline sorter - a more efficient sorter that supports > 2 GB sort buffers */
     PIPELINED
   }

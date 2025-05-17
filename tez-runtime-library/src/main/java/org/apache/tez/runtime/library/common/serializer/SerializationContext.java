@@ -21,7 +21,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.serializer.Serialization;
 import org.apache.hadoop.io.serializer.SerializationFactory;
 import org.apache.hadoop.io.serializer.Serializer;
-import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.ConfigUtils;
 
 /**
@@ -80,8 +79,4 @@ public class SerializationContext {
     return valSerialization.getSerializer((Class) valueClass);
   }
 
-  public void applyToConf(Configuration conf) {
-    conf.set(TezRuntimeConfiguration.TEZ_RUNTIME_KEY_CLASS, keyClass.getName());
-    conf.set(TezRuntimeConfiguration.TEZ_RUNTIME_VALUE_CLASS, valueClass.getName());
-  }
 }

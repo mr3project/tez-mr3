@@ -69,10 +69,12 @@ public class MRPartitioner implements org.apache.tez.runtime.library.api.Partiti
     } else {
       newPartitioner = null;
       if (partitions > 1) {
+        // "mapred.partitioner.class" is set in DAGUtils.createConfiguration()
         Class<? extends org.apache.hadoop.mapred.Partitioner> clazz =
             (Class<? extends org.apache.hadoop.mapred.Partitioner>) conf.getClass(
                 "mapred.partitioner.class", org.apache.hadoop.mapred.lib.HashPartitioner.class);
         LOG.info("Using oldApi, MRpartitionerClass=" + clazz.getName());
+        // TODO: replace new JobConf() with null because Partitioner is stateless
         oldPartitioner = (org.apache.hadoop.mapred.Partitioner) ReflectionUtils.newInstance(
             clazz, new JobConf(conf));
       } else {

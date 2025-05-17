@@ -120,11 +120,8 @@ public class ReduceProcessor extends MRTask {
 
     Class keyClass = ConfigUtils.getIntermediateInputKeyClass(jobConf);
     Class valueClass = ConfigUtils.getIntermediateInputValueClass(jobConf);
-    LOG.info("Using keyClass: " + keyClass);
-    LOG.info("Using valueClass: " + valueClass);
-    RawComparator comparator =
-        ConfigUtils.getInputKeySecondaryGroupingComparator(jobConf);
-    LOG.info("Using comparator: " + comparator);
+    RawComparator comparator = ConfigUtils.getInputKeySecondaryGroupingComparator(jobConf);
+    LOG.info("Using keyClass={}, valueClass={}, comparator={}", keyClass, valueClass, comparator);
 
     reduceInputKeyCounter =
         mrReporter.getCounter(TaskCounter.REDUCE_INPUT_GROUPS);

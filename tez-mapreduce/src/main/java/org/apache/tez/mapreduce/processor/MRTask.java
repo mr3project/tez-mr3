@@ -62,19 +62,15 @@ import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.Progress;
 import org.apache.hadoop.yarn.api.ApplicationConstants.Environment;
 import org.apache.tez.common.MRFrameworkConfigs;
-import org.apache.tez.common.TezUtils;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.counters.TezCounters;
 import org.apache.tez.common.security.JobTokenIdentifier;
 import org.apache.tez.common.security.TokenCache;
-import org.apache.tez.dag.api.UserPayload;
 import org.apache.tez.dag.records.TezDAGID;
-import org.apache.tez.mapreduce.hadoop.DeprecatedKeys;
 import org.apache.tez.mapreduce.hadoop.IDConverter;
 import org.apache.tez.mapreduce.hadoop.MRConfig;
 import org.apache.tez.mapreduce.hadoop.MRJobConfig;
 import org.apache.tez.mapreduce.hadoop.mapred.TaskAttemptContextImpl;
-import org.apache.tez.mapreduce.hadoop.mapreduce.JobContextImpl;
 import org.apache.tez.mapreduce.output.MROutputLegacy;
 import org.apache.tez.runtime.api.AbstractLogicalIOProcessor;
 import org.apache.tez.runtime.api.LogicalInput;
@@ -89,7 +85,6 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
   static final Logger LOG = LoggerFactory.getLogger(MRTask.class);
 
   protected JobConf jobConf;
-  protected JobContext jobContext;
   protected TaskAttemptContext taskAttemptContext;
   protected OutputCommitter committer;
 
@@ -128,8 +123,6 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
   @Override
   public void initialize() throws IOException,
   InterruptedException {
-
-    DeprecatedKeys.init();
 
     processorContext = getContext();
     counters = processorContext.getCounters();
@@ -321,7 +314,6 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
     this.useNewApi = jobConf.getUseNewMapper();
     TezDAGID dagId = IDConverter.fromMRTaskAttemptId(taskAttemptId).getDAGID();
 
-    this.jobContext = new JobContextImpl(jobConf, dagId, mrReporter);
     this.taskAttemptContext =
         new TaskAttemptContextImpl(jobConf, taskAttemptId, mrReporter);
 
@@ -551,10 +543,6 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
 
   public org.apache.hadoop.mapreduce.TaskAttemptContext getTaskAttemptContext() {
     return taskAttemptContext;
-  }
-
-  public JobContext getJobContext() {
-    return jobContext;
   }
 
   public TaskAttemptID getTaskAttemptId() {

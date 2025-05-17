@@ -299,11 +299,4 @@ public class IFileInputStream extends InputStream {
     int result = 0xFF & b[0];
     return result;
   }
-
-  /**
-   * Disable checksum validation when reading the stream
-   */
-  public void disableChecksumValidation() {
-    disableChecksumValidation = true;
-  }
 }

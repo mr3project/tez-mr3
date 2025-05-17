@@ -25,10 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Evolving;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.tez.common.annotation.ConfigurationClass;
 import org.apache.tez.common.annotation.ConfigurationProperty;
@@ -43,9 +39,6 @@ import org.apache.tez.runtime.library.conf.OrderedPartitionedKVOutputConfig.Sort
  * @see <a href="../../../../../configs/tez-runtime-default-template.xml">XML-based Config Template</a>
  */
 
-// TODO EVENTUALLY A description for each property.
-@Public
-@Evolving
 @ConfigurationClass(templateFileName = "tez-runtime-default-template.xml")
 public class TezRuntimeConfiguration {
 
@@ -94,20 +87,9 @@ public class TezRuntimeConfiguration {
       "io.sort.factor";
   public static final int TEZ_RUNTIME_IO_SORT_FACTOR_DEFAULT = 100;
 
-  @ConfigurationProperty(type = "float")
-  public static final String TEZ_RUNTIME_SORT_SPILL_PERCENT = TEZ_RUNTIME_PREFIX +
-      "sort.spill.percent";
-  public static final float TEZ_RUNTIME_SORT_SPILL_PERCENT_DEFAULT = 0.8f;
-
   @ConfigurationProperty(type = "integer")
   public static final String TEZ_RUNTIME_IO_SORT_MB = TEZ_RUNTIME_PREFIX + "io.sort.mb";
   public static final int TEZ_RUNTIME_IO_SORT_MB_DEFAULT = 100;
-
-  @ConfigurationProperty(type = "integer")
-  public static final String TEZ_RUNTIME_INDEX_CACHE_MEMORY_LIMIT_BYTES = TEZ_RUNTIME_PREFIX +
-      "index.cache.memory.limit.bytes";
-  public static final int TEZ_RUNTIME_INDEX_CACHE_MEMORY_LIMIT_BYTES_DEFAULT =
-      1024 * 1024;
 
   // TODO Use the default value
   @ConfigurationProperty(type = "integer")
@@ -202,7 +184,6 @@ public class TezRuntimeConfiguration {
    * Maximum size for individual buffers used in the UnsortedPartitionedOutput.
    * This is only meant to be used by unit tests for now.
    */
-  @Private
   @ConfigurationProperty(type = "integer")
   public static final String TEZ_RUNTIME_UNORDERED_OUTPUT_MAX_PER_BUFFER_SIZE_BYTES =
       TEZ_RUNTIME_PREFIX +
@@ -329,10 +310,6 @@ public class TezRuntimeConfiguration {
   public static final float TEZ_RUNTIME_INPUT_BUFFER_PERCENT_DEFAULT = 0.0f;
 
   @ConfigurationProperty
-  public static final String TEZ_RUNTIME_GROUP_COMPARATOR_CLASS = TEZ_RUNTIME_PREFIX +
-      "group.comparator.class";
-
-  @ConfigurationProperty
   public static final String TEZ_RUNTIME_INTERNAL_SORTER_CLASS = TEZ_RUNTIME_PREFIX +
       "internal.sorter.class";
 
@@ -363,23 +340,17 @@ public class TezRuntimeConfiguration {
           "empty.partitions.info-via-events.enabled";
   public static final boolean TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED_DEFAULT = true;
 
-  @Private
   public static final String TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_ENABLED =
           TEZ_RUNTIME_PREFIX + "transfer.data-via-events.enabled";
-  @Private
   public static final boolean TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_ENABLED_DEFAULT = true;
 
-  @Private
   public static final String TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_MAX_SIZE =
           TEZ_RUNTIME_PREFIX + "transfer.data-via-events.max-size";
-  @Private
   public static final int TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_MAX_SIZE_DEFAULT = 2048;
 
-  @Private
   public static final String TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_SUPPORT_IN_MEM_FILE =
       TEZ_RUNTIME_PREFIX + "transfer.data-via-events.support.in-mem.file";
 
-  @Private
   public static final boolean TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_SUPPORT_IN_MEM_FILE_DEFAULT
       = true;
 
@@ -422,8 +393,6 @@ public class TezRuntimeConfiguration {
    * Used only for internal testing. Strictly not recommended to be used elsewhere. This
    * parameter could be changed/dropped later.
    */
-  @Unstable
-  @Private
   @ConfigurationProperty(type = "boolean")
   public static final String TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT = TEZ_RUNTIME_PREFIX
       + "cleanup.files.on.interrupt";
@@ -432,8 +401,6 @@ public class TezRuntimeConfiguration {
   // TODO TEZ-1233 - allow this property to be set per vertex
   // TODO TEZ-1231 - move these properties out since they are not relevant for Inputs / Outputs
 
-  @Unstable
-  @Private
   @ConfigurationProperty(type = "integer")
   public static final String TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS = TEZ_RUNTIME_PREFIX +
       "merge.progress.records";
@@ -464,9 +431,7 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_IFILE_READAHEAD_BYTES);
     tezRuntimeKeys.add(TEZ_RUNTIME_IO_FILE_BUFFER_SIZE);
     tezRuntimeKeys.add(TEZ_RUNTIME_IO_SORT_FACTOR);
-    tezRuntimeKeys.add(TEZ_RUNTIME_SORT_SPILL_PERCENT);
     tezRuntimeKeys.add(TEZ_RUNTIME_IO_SORT_MB);
-    tezRuntimeKeys.add(TEZ_RUNTIME_INDEX_CACHE_MEMORY_LIMIT_BYTES);
     tezRuntimeKeys.add(TEZ_RUNTIME_COMBINE_MIN_SPILLS);
     tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SORTER_SORT_THREADS);
     tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SORTER_MIN_BLOCK_SIZE_IN_MB);
@@ -496,7 +461,6 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_ENABLE_MEMTOMEM);
     tezRuntimeKeys.add(TEZ_RUNTIME_REPORT_PARTITION_STATS);
     tezRuntimeKeys.add(TEZ_RUNTIME_INPUT_POST_MERGE_BUFFER_PERCENT);
-    tezRuntimeKeys.add(TEZ_RUNTIME_GROUP_COMPARATOR_CLASS);
     tezRuntimeKeys.add(TEZ_RUNTIME_INTERNAL_SORTER_CLASS);
     tezRuntimeKeys.add(TEZ_RUNTIME_KEY_COMPARATOR_CLASS);
     tezRuntimeKeys.add(TEZ_RUNTIME_KEY_CLASS);
@@ -550,27 +514,22 @@ public class TezRuntimeConfiguration {
     unmodifiableOtherKeySet = Collections.unmodifiableSet(otherKeys);
   }
 
-  @Private
   public static Set<String> getRuntimeConfigKeySet() {
     return umnodifiableTezRuntimeKeySet;
   }
 
-  @Private
   public static Set<String> getRuntimeAdditionalConfigKeySet() {
     return unmodifiableOtherKeySet;
   }
 
-  @Private
   public static List<String> getAllowedPrefixes() {
     return allowedPrefixes;
   }
 
-  @Private
   public static Map<String, String> getTezRuntimeConfigDefaults() {
     return Collections.unmodifiableMap(tezRuntimeConfMap);
   }
 
-  @Private
   public static Map<String, String> getOtherConfigDefaults() {
     return Collections.unmodifiableMap(otherConfMap);
   }

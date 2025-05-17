@@ -51,7 +51,6 @@ import org.apache.tez.runtime.library.common.MemoryUpdateCallbackHandler;
 import org.apache.tez.runtime.library.common.sort.impl.ExternalSorter;
 import org.apache.tez.runtime.library.common.sort.impl.PipelinedSorter;
 import org.apache.tez.runtime.library.common.sort.impl.TezSpillRecord;
-import org.apache.tez.runtime.library.common.sort.impl.dflt.DefaultSorter;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 
 import org.apache.tez.common.Preconditions;
@@ -151,9 +150,6 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
         sorter = new PipelinedSorter(getContext(), conf, getNumPhysicalOutputs(),
             memoryUpdateCallbackHandler.getMemoryAssigned());
         usePipelinedSorter = true;
-      } else if (sorterImpl.equals(SorterImpl.LEGACY)) {
-        sorter = new DefaultSorter(getContext(), conf, getNumPhysicalOutputs(),
-            memoryUpdateCallbackHandler.getMemoryAssigned());
       } else {
         throw new UnsupportedOperationException("Unsupported sorter class specified in config"
             + ", propertyName=" + TezRuntimeConfiguration.TEZ_RUNTIME_SORTER_CLASS
@@ -245,10 +241,8 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_BYTES);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_IO_FILE_BUFFER_SIZE);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_FACTOR);
-    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_SORT_SPILL_PERCENT);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_REPORT_PARTITION_STATS);
-    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_INDEX_CACHE_MEMORY_LIMIT_BYTES);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_COMBINE_MIN_SPILLS);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_SORT_THREADS);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_MIN_BLOCK_SIZE_IN_MB);

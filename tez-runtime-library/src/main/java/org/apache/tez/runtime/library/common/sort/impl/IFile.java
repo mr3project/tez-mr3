@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
-import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -215,7 +214,6 @@ public class IFile {
       bout.reset();
     }
 
-
     @Override
     protected void writeKVPair(byte[] keyData, int keyPos, int keyLength,
         byte[] valueData, int valPos, int valueLength) throws IOException {
@@ -263,11 +261,6 @@ public class IFile {
         return ByteBuffer.wrap(cacheStream.getBuffer(), 0, cacheStream.size());
       }
       return null;
-    }
-
-    @VisibleForTesting
-    void setOutputPath(Path outputPath) {
-      this.outputPath = outputPath;
     }
 
     public Path getOutputPath() {
@@ -503,72 +496,6 @@ public class IFile {
     }
 
     /**
-     * Appends the value to previous key. Assumes that the caller has already done relevant checks
-     * for identical keys. Also, no validations are done in this method
-     *
-     * @param value
-     * @throws IOException
-     */
-    public void appendValue(Object value) throws IOException {
-      valueSerializer.serialize(value);
-      int valueLength = buffer.getLength();
-      writeValue(buffer.getData(), 0, valueLength);
-      buffer.reset();
-      ++numRecordsWritten;
-      prevKey = REPEAT_KEY;
-    }
-
-    /**
-     * Appends the value to previous key. Assumes that the caller has already done relevant checks
-     * for identical keys. Also, no validations are done in this method. It is caller's responsibility
-     * to pass non-negative key/value lengths. Otherwise,IndexOutOfBoundsException could be
-     * thrown at runtime.
-     *
-     * @param value
-     * @throws IOException
-     */
-    public void appendValue(DataInputBuffer value) throws IOException {
-      int valueLength = value.getLength() - value.getPosition();
-      assert(valueLength >= 0);
-      writeValue(value.getData(), value.getPosition(), valueLength);
-      buffer.reset();
-      ++numRecordsWritten;
-      prevKey = REPEAT_KEY;
-    }
-
-    /**
-     * Appends the value to previous key. Assumes that the caller has already done relevant checks
-     * for identical keys. Also, no validations are done in this method
-     *
-     * @param valuesItr
-     * @throws IOException
-     */
-    public <V> void appendValues(Iterator<V> valuesItr) throws IOException {
-      while(valuesItr.hasNext()) {
-        appendValue(valuesItr.next());
-      }
-    }
-
-    /**
-     * Append key and its associated set of values.
-     *
-     * @param key
-     * @param valuesItr
-     * @param <K>
-     * @param <V>
-     * @throws IOException
-     */
-    public <K, V> void appendKeyValues(K key, Iterator<V> valuesItr) throws IOException {
-      if (valuesItr.hasNext()) {
-        append(key, valuesItr.next()); //append first KV pair
-      }
-      //append the remaining values
-      while(valuesItr.hasNext()) {
-        appendValue(valuesItr.next());
-      }
-    }
-
-    /**
      * Send key/value to be appended to IFile. To represent same key as previous
      * one, send IFile.REPEAT_KEY as key parameter.  Should not call this method with
      * IFile.REPEAT_KEY as the first key. It is caller's responsibility to pass non-negative
@@ -635,7 +562,7 @@ public class IFile {
       }
     }
 
-    protected void writeRLE(DataOutputStream out) throws IOException {
+    private void writeRLE(DataOutputStream out) throws IOException {
       /**
        * To strike a balance between 2 use cases (lots of unique KV in stream
        * vs lots of identical KV in stream), we start off by writing KV pair.
@@ -662,17 +589,6 @@ public class IFile {
       }
     }
 
-    // Required for mark/reset
-    public DataOutputStream getOutputStream () {
-      return out;
-    }
-
-    // Required for mark/reset
-    public void updateCountersForExternalAppend(long length) {
-      ++numRecordsWritten;
-      decompressedBytesWritten += length;
-    }
-
     public long getRawLength() {
       return decompressedBytesWritten;
     }
@@ -692,9 +608,8 @@ public class IFile {
     public enum KeyState {NO_KEY, NEW_KEY, SAME_KEY}
 
     private static final int DEFAULT_BUFFER_SIZE = 128*1024;
-    @VisibleForTesting
-    // Not final for testing
-    protected static int MAX_BUFFER_SIZE
+
+    private static final int MAX_BUFFER_SIZE
             = Integer.MAX_VALUE - 8;  // The maximum array size is a little less than the
                                       // max integer value. Trying to create a larger array
                                       // will result in an OOM exception. The exact value
@@ -1132,10 +1047,6 @@ public class IFile {
 
     public void reset(int offset) {
       return;
-    }
-
-    public void disableChecksumValidation() {
-      checksumIn.disableChecksumValidation();
     }
   }
 
