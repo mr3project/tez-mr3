@@ -679,6 +679,7 @@ public class TezMerger {
       
       //create the MergeStreams from the sorted map created in the constructor
       //and dump the final output to a file
+      byte[] writeBuffer = IFile.allocateWriteBuffer();
       do {
         //get the factor for this pass of merge. We assume in-memory segments
         //are the first entries in the segment list and that the pass factor
@@ -798,7 +799,7 @@ public class TezMerger {
           Writer writer = new Writer(serializationContext.getKeySerialization(),
               serializationContext.getValSerialization(), fs, outputFile,
               serializationContext.getKeyClass(), serializationContext.getValueClass(), codec,
-              writesCounter, null);
+              writesCounter, null, writeBuffer);
 
           writeFile(this, writer, reporter, recordsBeforeProgress);
           writer.close();

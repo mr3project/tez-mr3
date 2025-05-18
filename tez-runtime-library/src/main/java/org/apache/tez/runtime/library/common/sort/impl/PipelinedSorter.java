@@ -125,7 +125,9 @@ public class PipelinedSorter extends ExternalSorter {
    */
   private final List<Event> finalEvents;
 
-  // TODO Set additional countesr - total bytes written, spills etc.
+  private final byte[] writeBuffer;
+
+  // TODO Set additional counters - total bytes written, spills etc.
 
   public PipelinedSorter(OutputContext outputContext, Configuration conf, int numOutputs,
       long initialMemoryAvailable) throws IOException {
@@ -242,6 +244,8 @@ public class PipelinedSorter extends ExternalSorter {
     deflater = TezCommonUtils.newBestCompressionDeflater();
 
     finalEvents = Lists.newLinkedList();
+
+    writeBuffer = IFile.allocateWriteBuffer();
   }
 
   ByteBuffer allocateSpace() {
@@ -335,8 +339,9 @@ public class PipelinedSorter extends ExternalSorter {
     }
     return bit;
   }
-  
-  public void sort() throws IOException {
+
+  // inside collect() synchronized
+  private void sort() throws IOException {
     SortSpan newSpan = span.next();
 
     if(newSpan == null) {
@@ -394,8 +399,7 @@ public class PipelinedSorter extends ExternalSorter {
   @Override
   public void write(Object key, Object value)
       throws IOException {
-    collect(
-        key, value, partitioner.getPartition(key, value, partitions));
+    collect(key, value, partitioner.getPartition(key, value, partitions));
   }
 
   /**
@@ -403,8 +407,7 @@ public class PipelinedSorter extends ExternalSorter {
    * When this method returns, kvindex must refer to sufficient unused
    * storage to store one METADATA.
    */
-  synchronized void collect(Object key, Object value, final int partition
-                                   ) throws IOException {
+  synchronized void collect(Object key, Object value, final int partition) throws IOException {
     if (key.getClass() != serializationContext.getKeyClass()) {
       throw new IOException("Type mismatch in key from map: expected "
                             + serializationContext.getKeyClass().getName() + ", received "
@@ -489,6 +492,7 @@ public class PipelinedSorter extends ExternalSorter {
 
   // it is guaranteed that when spillSingleRecord is called, there is
   // no merger spans queued in executor.
+  // inside collect() synchronized
   private void spillSingleRecord(final Object key, final Object value,
           int partition) throws IOException {
     final TezSpillRecord spillRec = new TezSpillRecord(partitions);
@@ -514,7 +518,7 @@ public class PipelinedSorter extends ExternalSorter {
           if (!sendEmptyPartitionDetails || (i == partition)) {
             writer = new Writer(serializationContext.getKeySerialization(),
                 serializationContext.getValSerialization(), out, serializationContext.getKeyClass(),
-                serializationContext.getValueClass(), codec, spilledRecordsCounter, null, false);
+                serializationContext.getValueClass(), codec, spilledRecordsCounter, null, false, writeBuffer);
           }
           // we need not check for combiner since its a single record
           if (i == partition) {
@@ -562,7 +566,8 @@ public class PipelinedSorter extends ExternalSorter {
     }
   }
 
-  public boolean spill(boolean ignoreEmptySpills) throws IOException {
+  // inside collect() synchronized, or in the final flush()
+  private boolean spill(boolean ignoreEmptySpills) throws IOException {
     FSDataOutputStream out = null;
     try {
       try {
@@ -601,7 +606,7 @@ public class PipelinedSorter extends ExternalSorter {
           writer = new Writer(serializationContext.getKeySerialization(),
               serializationContext.getValSerialization(), out, serializationContext.getKeyClass(),
               serializationContext.getValueClass(), codec, spilledRecordsCounter, null,
-              merger.needsRLE());
+              merger.needsRLE(), writeBuffer);
         }
         if (combiner == null) {
           while (kvIter.next()) {
@@ -787,8 +792,7 @@ public class PipelinedSorter extends ExternalSorter {
       for (int parts = 0; parts < partitions; parts++) {
         boolean shouldWrite = false;
         //create the segments to be merged
-        List<Segment> segmentList =
-            new ArrayList<Segment>(numSpills);
+        List<Segment> segmentList = new ArrayList<Segment>(numSpills);
         for (int i = 0; i < numSpills; i++) {
           Path spillFilename = spillFilePaths.get(i);
           TezIndexRecord indexRecord = indexCacheList.get(i).getIndex(parts);
@@ -824,7 +828,7 @@ public class PipelinedSorter extends ExternalSorter {
           Writer writer = new Writer(serializationContext.getKeySerialization(),
               serializationContext.getValSerialization(), finalOut,
               serializationContext.getKeyClass(), serializationContext.getValueClass(), codec,
-              spilledRecordsCounter, null, merger.needsRLE());
+              spilledRecordsCounter, null, merger.needsRLE(), writeBuffer);
           if (combiner == null || numSpills < minSpillsForCombine) {
             TezMerger.writeFile(kvIter, writer, progressable,
                 TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);

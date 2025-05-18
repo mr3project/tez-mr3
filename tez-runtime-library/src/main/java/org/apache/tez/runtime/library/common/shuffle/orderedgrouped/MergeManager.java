@@ -757,10 +757,10 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   private class InMemoryMerger extends MergeThread<MapOutput> {
 
     volatile InputAttemptIdentifier srcTaskIdentifier;
-
     volatile Path outputPath;
-
     volatile Path tmpDir;
+
+    private final byte[] writeBuffer;
 
     public InMemoryMerger(MergeManager manager) {
       super(manager, Integer.MAX_VALUE, exceptionReporter);
@@ -768,6 +768,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
           .cleanVertexName(inputContext.getSourceVertexName())
           + "_" + inputContext.getUniqueIdentifier()  + "]");
       setDaemon(true);
+      writeBuffer = IFile.allocateWriteBuffer();
     }
     
     @Override
@@ -808,7 +809,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
             new Writer(serializationContext.getKeySerialization(),
                 serializationContext.getValSerialization(), rfs, outputPath,
                 serializationContext.getKeyClass(), serializationContext.getValueClass(), codec,
-                null, null);
+                null, null, writeBuffer);
 
         TezRawKeyValueIterator rIter = null;
         LOG.info("Initiating in-memory merge with {} segments", noInMemorySegments);
@@ -874,12 +875,15 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     volatile Path outputPath;
     volatile Path tmpDir;
 
+    private final byte[] writeBuffer;
+
     public OnDiskMerger(MergeManager manager) {
       super(manager, ioSortFactor, exceptionReporter);
       setName("DiskToDiskMerger [" +  TezUtilsInternal
           .cleanVertexName(inputContext.getSourceVertexName())
           + "_" + inputContext.getUniqueIdentifier() + "]");
       setDaemon(true);
+      writeBuffer = IFile.allocateWriteBuffer();
     }
     
     @Override
@@ -942,7 +946,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       Writer writer = new Writer(serializationContext.getKeySerialization(),
           serializationContext.getValSerialization(), rfs, outputPath,
           serializationContext.getKeyClass(), serializationContext.getValueClass(), codec, null,
-          null);
+          null, writeBuffer);
       tmpDir = new Path(inputContext.getUniqueIdentifier());
       try {
         TezRawKeyValueIterator iter = TezMerger.merge(conf, rfs,
@@ -1102,9 +1106,10 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         final TezRawKeyValueIterator rIter = TezMerger.merge(job, fs, serContext,
             memDiskSegments, numMemDiskSegments, tmpDir, comparator, progressable,
             spilledRecordsCounter, null, additionalBytesRead, null, inputContext);
+        final byte[] writeBuffer = IFile.allocateWriteBuffer();
         final Writer writer = new Writer(serContext.getKeySerialization(),
             serContext.getValSerialization(), fs, outputPath, serContext.getKeyClass(),
-            serContext.getValueClass(), codec, null, null);
+            serContext.getValueClass(), codec, null, null, writeBuffer);
         try {
           TezMerger.writeFile(rIter, writer, progressable, TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
         } catch (IOException e) {
@@ -1222,7 +1227,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         comparator, progressable, spilledRecordsCounter, null,
         additionalBytesRead, null, inputContext);
   }
-
 
   private void logFinalMergeStart(List<MapOutput> inMemoryMapOutputs,
                                   List<FileChunk> onDiskMapOutputs) {
