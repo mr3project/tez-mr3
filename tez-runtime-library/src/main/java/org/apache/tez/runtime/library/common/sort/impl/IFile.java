@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.io.BoundedByteArrayOutputStream;
@@ -73,10 +74,19 @@ public class IFile {
 
   private static final int INT_SIZE = 4;
 
-  public static Decompressor returnThreadLocalDecompressor() {
-    Decompressor decompressor = decompressorHolder.get();
-    decompressorHolder.remove();
-    return decompressor;
+  public static final int WRITER_BUFFER_SIZE_DEFAULT = 1024 * 1024;   // 1MB
+
+  public static byte[] allocateWriteBuffer() {
+    return new byte[WRITER_BUFFER_SIZE_DEFAULT];
+  }
+
+  public static byte[] allocateWriteBufferSingle() {
+    return new byte[16];
+  }
+
+  public interface WriterAppend {
+    public void append(DataInputBuffer key, DataInputBuffer value) throws IOException;
+    public void close() throws IOException;
   }
 
   /**
@@ -191,7 +201,7 @@ public class IFile {
       LOG.info("Switching from mem stream to disk stream. File: " + outputPath);
       FSDataOutputStream newRawOut = fs.create(outputPath);
       this.rawOut = newRawOut;
-      this.ownOutputStream = true;
+      this.ownOutputStream = true;  // because of fs.create(outputPath)
 
       setupOutputStream(fileCodec);
 
@@ -266,7 +276,7 @@ public class IFile {
    * <code>IFile.Writer</code> to write out intermediate map-outputs.
    */
   @SuppressWarnings({"unchecked", "rawtypes"})
-  public static class Writer {
+  public static class Writer implements WriterAppend {
     // DataOutput: rawOut <-- checksumOut <-- compressedOut <-- out
 
     protected DataOutputStream out;
@@ -301,7 +311,6 @@ public class IFile {
     private final DataOutputBuffer previous = new DataOutputBuffer();
     protected Object prevKey = null;
     protected boolean headerWritten = false;
-    private boolean sameKey = false;
 
     final int RLE_MARKER_SIZE = INT_SIZE;
     final int V_END_MARKER_SIZE = INT_SIZE;
@@ -317,12 +326,6 @@ public class IFile {
       this(keySerialization, valSerialization, fs.create(file), keyClass, valueClass, codec,
            writesCounter, serializedBytesCounter, false);
       ownOutputStream = true;
-    }
-
-    protected Writer(TezCounter writesCounter, TezCounter serializedBytesCounter, boolean rle) {
-      writtenRecordsCounter = writesCounter;
-      serializedUncompressedBytes = serializedBytesCounter;
-      this.rle = rle;
     }
 
     public Writer(Serialization keySerialization, Serialization valSerialization, FSDataOutputStream outputStream,
@@ -447,7 +450,7 @@ public class IFile {
      */
     public void append(Object key, Object value) throws IOException {
       int keyLength = 0;
-      sameKey = (key == REPEAT_KEY);
+      boolean sameKey = (key == REPEAT_KEY);
       if (!sameKey) {
         keySerializer.serialize(key);
         keyLength = buffer.getLength();
@@ -473,7 +476,7 @@ public class IFile {
         writeValue(buffer.getData(), keyLength, valueLength);
       }
 
-      prevKey = (sameKey) ? REPEAT_KEY : key;
+      prevKey = sameKey ? REPEAT_KEY : key;
       // Reset
       buffer.reset();
       ++numRecordsWritten;
@@ -497,7 +500,7 @@ public class IFile {
       int valueLength = value.getLength() - value.getPosition();
       assert(valueLength >= 0);
 
-      sameKey = (key == REPEAT_KEY);
+      boolean sameKey = (key == REPEAT_KEY);
       if (!sameKey && rle) {
         sameKey = (keyLength != 0) && BufferUtils.compareEqual(previous, key);
       }

@@ -17,59 +17,78 @@
  */
 package org.apache.tez.runtime.library.common.shuffle.orderedgrouped;
 
+import java.io.DataOutputStream;
 import java.io.IOException;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.BoundedByteArrayOutputStream;
+import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.tez.common.io.NonSyncDataOutputStream;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.apache.tez.runtime.library.common.sort.impl.IFileOutputStream;
-import org.apache.tez.runtime.library.common.sort.impl.IFile.Writer;
 
-@InterfaceAudience.Private
-@InterfaceStability.Unstable
-public class InMemoryWriter extends Writer {
-  // TODO Verify and fix counters if required.
+public class InMemoryWriter implements IFile.WriterAppend {
 
+  // BoundedByteArrayOutputStream(array, 0, array.length) is protected and cannot be used directly
   private static class InMemoryBoundedByteArrayOutputStream extends BoundedByteArrayOutputStream {
     InMemoryBoundedByteArrayOutputStream(byte[] array) {
       super(array, 0, array.length);
     }
   }
 
+  private DataOutputStream out;
+
+  private Object prevKey = null;
+
+  // InMemoryWriter does not use another byte[] buffer, unlike IFile.Writer
   public InMemoryWriter(byte[] array) {
-    this(new InMemoryBoundedByteArrayOutputStream(array));
-  }
-
-  public InMemoryWriter(BoundedByteArrayOutputStream arrayStream) {
-    this(arrayStream, false);
-  }
-
-  public InMemoryWriter(BoundedByteArrayOutputStream arrayStream, boolean rle) {
-    super(null, null, rle);
+    BoundedByteArrayOutputStream arrayStream = new InMemoryBoundedByteArrayOutputStream(array);
     this.out = new NonSyncDataOutputStream(new IFileOutputStream(arrayStream));
   }
 
-  public void append(Object key, Object value) throws IOException {
-    throw new UnsupportedOperationException
-    ("InMemoryWriter.append(K key, V value");
+  public void append(DataInputBuffer key, DataInputBuffer value) throws IOException {
+      int keyLength = key.getLength() - key.getPosition();
+      int valueLength = value.getLength() - value.getPosition();
+
+      boolean sameKey = (key == IFile.REPEAT_KEY);
+
+      if (!sameKey) {
+          // Normal key-value pair
+          // Write V_END_MARKER if needed (if previous was a REPEAT_KEY)
+          if (prevKey == IFile.REPEAT_KEY) {
+              out.writeInt(IFile.V_END_MARKER);
+          }
+
+          long combined = ((long) keyLength << 32) | (valueLength & 0xFFFFFFFFL);
+          out.writeLong(combined);
+
+          out.write(key.getData(), key.getPosition(), keyLength);
+          out.write(value.getData(), value.getPosition(), valueLength);
+      } else {
+          // Repeated key
+          if (prevKey != IFile.REPEAT_KEY) {
+              // First repeated key, write RLE marker
+              out.writeInt(IFile.RLE_MARKER);
+          }
+
+          // Write just the value length and value
+          out.writeInt(valueLength);
+          out.write(value.getData(), value.getPosition(), valueLength);
+      }
+
+      prevKey = sameKey ? IFile.REPEAT_KEY : key;
   }
 
   public void close() throws IOException {
+      // Write V_END_MARKER if needed
+      if (prevKey == IFile.REPEAT_KEY) {
+          out.writeInt(IFile.V_END_MARKER);
+      }
 
-    // write V_END_MARKER as needed
-    writeValueMarker(out);
+      // Write EOF_MARKER for key/value length
+      long combined = ((long) IFile.EOF_MARKER << 32) | (IFile.EOF_MARKER & 0xFFFFFFFFL);
+      out.writeLong(combined);
 
-    // Write EOF_MARKER for key/value length
-    // out.writeInt(EOF_MARKER);
-    // out.writeInt(EOF_MARKER);
-    long combined = ((long) IFile.EOF_MARKER << 32) | (IFile.EOF_MARKER & 0xFFFFFFFFL);
-    out.writeLong(combined);
-
-    // Close the stream
-    out.close();
-    out = null;
+      out.close();
+      out = null;
   }
-
 }

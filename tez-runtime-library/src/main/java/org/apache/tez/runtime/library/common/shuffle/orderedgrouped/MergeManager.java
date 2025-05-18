@@ -715,7 +715,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
       int noInMemorySegments = inMemorySegments.size();
 
-      Writer writer = new InMemoryWriter(mergedMapOutputs.getMemory());
+      IFile.WriterAppend writer = new InMemoryWriter(mergedMapOutputs.getMemory());
 
       LOG.info("{}: Initiating Memory-to-Memory merge with {} segments of total-size: {}",
           inputContext.getSourceVertexName(), noInMemorySegments, mergeOutputSize);

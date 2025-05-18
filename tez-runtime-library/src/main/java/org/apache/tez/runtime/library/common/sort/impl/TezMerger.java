@@ -182,8 +182,7 @@ public class TezMerger {
                                              mergePhase, inputContext);
 }
 
-  public static <K extends Object, V extends Object>
-  void writeFile(TezRawKeyValueIterator records, Writer writer,
+  public static void writeFile(TezRawKeyValueIterator records, IFile.WriterAppend writer,
       Progressable progressable, long recordsBeforeProgress)
       throws IOException, InterruptedException {
     long recordCtr = 0;
