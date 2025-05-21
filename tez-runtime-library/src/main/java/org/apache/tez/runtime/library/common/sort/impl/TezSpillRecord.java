@@ -46,27 +46,12 @@ public class TezSpillRecord {
   private final LongBuffer entries;
 
   public TezSpillRecord(int numPartitions) {
-    buf = ByteBuffer.allocate(
-        numPartitions * Constants.MAP_OUTPUT_INDEX_RECORD_LENGTH);
+    buf = ByteBuffer.allocate(numPartitions * Constants.MAP_OUTPUT_INDEX_RECORD_LENGTH);
     entries = buf.asLongBuffer();
   }
 
-  public TezSpillRecord(Path indexFileName, Configuration conf) throws IOException {
-    this(indexFileName, FileSystem.getLocal(conf).getRaw());
-  }
-
-  public TezSpillRecord(Path indexFileName, FileSystem fs) throws IOException {
-    this(indexFileName, fs, null);
-  }
-
-  public TezSpillRecord(Path indexFileName, FileSystem fs, String expectedIndexOwner)
-    throws IOException {
-    this(indexFileName, fs, new PureJavaCrc32(), expectedIndexOwner);
-  }
-
-  public TezSpillRecord(Path indexFileName, FileSystem rfs, Checksum crc,
-                     String expectedIndexOwner)
-      throws IOException {
+  public TezSpillRecord(Path indexFileName, FileSystem rfs) throws IOException {
+    Checksum crc = new PureJavaCrc32();
 
     FileStatus fileStatus = rfs.getFileStatus(indexFileName);
     final long length = fileStatus.getLen();
@@ -75,15 +60,11 @@ public class TezSpillRecord {
       final int size = partitions * Constants.MAP_OUTPUT_INDEX_RECORD_LENGTH;
 
       buf = ByteBuffer.allocate(size);
-      if (crc != null) {
-        crc.reset();
-        CheckedInputStream chk = new CheckedInputStream(in, crc);
-        IOUtils.readFully(chk, buf.array(), 0, size);
-        if (chk.getChecksum().getValue() != in.readLong()) {
-          throw new ChecksumException("Checksum error reading spill index: " + indexFileName, -1);
-        }
-      } else {
-        IOUtils.readFully(in, buf.array(), 0, size);
+      crc.reset();
+      CheckedInputStream chk = new CheckedInputStream(in, crc);
+      IOUtils.readFully(chk, buf.array(), 0, size);
+      if (chk.getChecksum().getValue() != in.readLong()) {
+        throw new ChecksumException("Checksum error reading spill index: " + indexFileName, -1);
       }
       entries = buf.asLongBuffer();
     }
@@ -118,23 +99,15 @@ public class TezSpillRecord {
   /**
    * Write this spill record to the location provided.
    */
-  public void writeToFile(Path loc, Configuration job, FileSystem fs) throws IOException {
-    writeToFile(loc, job, fs, new PureJavaCrc32());
-  }
-
-  public void writeToFile(Path loc, Configuration job, FileSystem rfs, Checksum crc)
-      throws IOException {
+  public void writeToFile(Path loc, FileSystem rfs) throws IOException {
+    PureJavaCrc32 crc = new PureJavaCrc32();
     CheckedOutputStream chk = null;
     final FSDataOutputStream out = rfs.create(loc);
     try {
-      if (crc != null) {
-        crc.reset();
-        chk = new CheckedOutputStream(out, crc);
-        chk.write(buf.array());
-        out.writeLong(chk.getChecksum().getValue());
-      } else {
-        out.write(buf.array());
-      }
+      crc.reset();
+      chk = new CheckedOutputStream(out, crc);
+      chk.write(buf.array());
+      out.writeLong(chk.getChecksum().getValue());
     } finally {
       if (chk != null) {
         chk.close();
