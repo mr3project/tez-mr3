@@ -24,9 +24,6 @@ import java.util.List;
 
 import javax.annotation.Nullable;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.tez.common.counters.TezCounters;
@@ -37,7 +34,6 @@ import org.apache.tez.dag.api.UserPayload;
  * and Processor instances.
  * This interface is not supposed to be implemented by users
  */
-@Public
 public interface TaskContext extends DecompressorPool {
   /**
    * Get the {@link ApplicationId} for the running app
@@ -161,8 +157,6 @@ public interface TaskContext extends DecompressorPool {
    * @param exception an associated exception
    * @param message an associated diagnostic message
    */
-  @Private
-  @Unstable
   void killSelf(@Nullable Throwable exception, @Nullable String message);
 
   /**
@@ -267,4 +261,6 @@ public interface TaskContext extends DecompressorPool {
   public void setShuffleServer(Object shuffleServer);
   public Object getShuffleServer() throws IOException;
   public Object peekShuffleServer();
+
+  public IndexPathCache getIndexPathCache();
 }

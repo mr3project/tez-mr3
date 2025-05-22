@@ -24,7 +24,6 @@ import java.util.zip.CheckedInputStream;
 import java.util.zip.CheckedOutputStream;
 import java.util.zip.Checksum;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ChecksumException;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -70,6 +69,33 @@ public class TezSpillRecord {
     }
   }
 
+  public TezSpillRecord(ByteBuffer buf) {
+    this.buf = buf;
+    this.entries = buf.asLongBuffer();
+  }
+
+  public ByteBuffer getByteBuffer() {
+    return buf;
+  }
+
+  public boolean equalByteBuffer(ByteBuffer otherBuf) {
+      if (otherBuf == null) {
+          return false;
+      }
+      if (buf == otherBuf) {
+          return true;
+      }
+      if (buf.capacity() != otherBuf.capacity()) {
+          return false;
+      }
+      for (int i = 0; i < buf.capacity(); i++) {
+          if (buf.get(i) != otherBuf.get(i)) {
+              return false;
+          }
+      }
+      return true;
+  }
+
   /**
    * Return number of IndexRecord entries in this spill.
    */
@@ -82,8 +108,7 @@ public class TezSpillRecord {
    */
   public TezIndexRecord getIndex(int partition) {
     final int pos = partition * Constants.MAP_OUTPUT_INDEX_RECORD_LENGTH / 8;
-    return new TezIndexRecord(entries.get(pos), entries.get(pos + 1),
-                           entries.get(pos + 2));
+    return new TezIndexRecord(entries.get(pos), entries.get(pos + 1), entries.get(pos + 2));
   }
 
   /**

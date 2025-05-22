@@ -498,9 +498,8 @@ public class PipelinedSorter extends ExternalSorter {
     final TezSpillRecord spillRec = new TezSpillRecord(partitions);
     // getSpillFileForWrite with size -1 as the serialized size of KV pair is still unknown
     final Path filename = mapOutputFile.getSpillFileForWrite(numSpills, -1);
-    Path indexFilename =
-        mapOutputFile.getSpillIndexFileForWrite(numSpills, partitions
-            * MAP_OUTPUT_INDEX_RECORD_LENGTH);
+    Path indexFilename = mapOutputFile.getSpillIndexFileForWrite(
+        numSpills, partitions * MAP_OUTPUT_INDEX_RECORD_LENGTH);
     spillFilePaths.put(numSpills, filename);
     FSDataOutputStream out = rfs.create(filename, true, 4096);
     ensureSpillFilePermissions(filename, rfs);
@@ -536,9 +535,7 @@ public class PipelinedSorter extends ExternalSorter {
           }
           adjustSpillCounters(rawLength, partLength);
           // record offsets
-          final TezIndexRecord rec =
-              new TezIndexRecord(
-                  segmentStart, rawLength, partLength);
+          final TezIndexRecord rec = new TezIndexRecord(segmentStart, rawLength, partLength);
           spillRec.putIndex(rec, i);
           writer = null;
         } finally {
@@ -584,11 +581,9 @@ public class PipelinedSorter extends ExternalSorter {
       }
 
       // create spill file
-      final long size = capacity +
-          + (partitions * APPROX_HEADER_LENGTH);
+      final long size = capacity + + (partitions * APPROX_HEADER_LENGTH);
       final TezSpillRecord spillRec = new TezSpillRecord(partitions);
-      final Path filename =
-        mapOutputFile.getSpillFileForWrite(numSpills, size);
+      final Path filename = mapOutputFile.getSpillFileForWrite(numSpills, size);
       spillFilePaths.put(numSpills, filename);
       out = rfs.create(filename, true, 4096);
       ensureSpillFilePermissions(filename, rfs);
@@ -627,17 +622,15 @@ public class PipelinedSorter extends ExternalSorter {
         }
         adjustSpillCounters(rawLength, partLength);
         // record offsets
-        final TezIndexRecord rec =
-            new TezIndexRecord(segmentStart, rawLength, partLength);
+        final TezIndexRecord rec = new TezIndexRecord(segmentStart, rawLength, partLength);
         spillRec.putIndex(rec, i);
         if (!finalMergeEnabled && reportPartitionStats()) {
           partitionStats[i] += rawLength;
         }
       }
 
-      Path indexFilename =
-        mapOutputFile.getSpillIndexFileForWrite(numSpills, partitions
-            * MAP_OUTPUT_INDEX_RECORD_LENGTH);
+      Path indexFilename = mapOutputFile.getSpillIndexFileForWrite(
+          numSpills, partitions * MAP_OUTPUT_INDEX_RECORD_LENGTH);
       spillFileIndexPaths.put(numSpills, indexFilename);
       spillRec.writeToFile(indexFilename, localFs);
       //TODO: honor cache limits

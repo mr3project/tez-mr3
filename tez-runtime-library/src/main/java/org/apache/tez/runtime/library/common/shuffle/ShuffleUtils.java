@@ -277,8 +277,7 @@ public class ShuffleUtils {
       int spillId, boolean finalMergeEnabled, boolean isLastEvent, String pathComponent, String auxiliaryService, Deflater deflater,
       boolean compositeFetch)
       throws IOException {
-    DataMovementEventPayloadProto.Builder payloadBuilder = DataMovementEventPayloadProto
-        .newBuilder();
+    DataMovementEventPayloadProto.Builder payloadBuilder = DataMovementEventPayloadProto.newBuilder();
 
     boolean outputGenerated = true;
     if (sendEmptyPartitionDetails) {
