@@ -129,10 +129,23 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     }
 
     HostFetchResult hostFetchResult;
+
     // ignore ShuffleServer.localShufflePorts[] which is not initialized
     if (fetcherConfig.localDiskFetchEnabled &&
         host.equals(fetcherConfig.localHostName)) {
-      hostFetchResult = doLocalDiskFetch();
+      if (fetcherConfig.compositeFetch) {
+        // inspect 'first' to find the container where all inputs originate from
+        InputAttemptIdentifier first = pendingInputsSeq.getInputs().get(0);
+        boolean originateFromThisContainerWorker = first.getPathComponent().startsWith(
+            taskContext.getExecutionContext().getContainerId());
+        if (originateFromThisContainerWorker) {
+          hostFetchResult = doLocalDiskFetch();
+        } else {
+          hostFetchResult = doHttpFetch();
+        }
+      } else {
+        hostFetchResult = doLocalDiskFetch();
+      }
     } else {
       hostFetchResult = doHttpFetch();
     }
