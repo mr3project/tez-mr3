@@ -498,16 +498,16 @@ public class PipelinedSorter extends ExternalSorter {
           int partition) throws IOException {
     final TezSpillRecord spillRec = new TezSpillRecord(partitions);
     // getSpillFileForWrite with size -1 as the serialized size of KV pair is still unknown
-    final Path filename = mapOutputFile.getSpillFileForWrite(numSpills, -1);
+    final Path outputFilePath = mapOutputFile.getSpillFileForWrite(numSpills, -1);
     Path indexFilename = mapOutputFile.getSpillIndexFileForWrite(
         numSpills, partitions * MAP_OUTPUT_INDEX_RECORD_LENGTH);
-    spillFilePaths.put(numSpills, filename);
-    FSDataOutputStream out = rfs.create(filename, true, 4096);
-    ensureSpillFilePermissions(filename, rfs);
+    spillFilePaths.put(numSpills, outputFilePath);
+    FSDataOutputStream out = rfs.create(outputFilePath, true, 4096);
+    ensureSpillFilePermissions(outputFilePath, rfs);
 
     try {
       LOG.info("{}: Spilling to {}, indexFilename={}",
-          outputContext.getDestinationVertexName(), filename.toString(), indexFilename);
+          outputContext.getDestinationVertexName(), outputFilePath.toString(), indexFilename);
       for (int i = 0; i < partitions; ++i) {
         if (isThreadInterrupted()) {
           return;
@@ -548,11 +548,13 @@ public class PipelinedSorter extends ExternalSorter {
 
       spillFileIndexPaths.put(numSpills, indexFilename);
       spillRec.writeToFile(indexFilename, localFs);
+      ShuffleUtils.writeSpillInfoToIndexPathCache(
+          outputContext, compositeFetch, numSpills, outputFilePath, spillRec);
       //TODO: honor cache limits
       indexCacheList.add(spillRec);
       ++numSpills;
       if (!finalMergeEnabled) {
-          fileOutputByteCounter.increment(rfs.getFileStatus(filename).getLen());
+          fileOutputByteCounter.increment(rfs.getFileStatus(outputFilePath).getLen());
           //No final merge. Set the number of files offered via shuffle-handler
           numShuffleChunks.setValue(numSpills);
       }
@@ -634,13 +636,8 @@ public class PipelinedSorter extends ExternalSorter {
           numSpills, partitions * MAP_OUTPUT_INDEX_RECORD_LENGTH);
       spillFileIndexPaths.put(numSpills, indexFilename);
       spillRec.writeToFile(indexFilename, localFs);
-
-      // write to IndexPathCache, spillId = numSpills
-      IndexPathCache indexPathCache = outputContext.getIndexPathCache();
-      String pathComponent = ShuffleUtils.getUniqueIdentifierSpillId(outputContext, numSpills);
-      String mapId = ShuffleUtils.expandPathComponent(
-          outputContext, compositeFetch, pathComponent);
-      indexPathCache.add(mapId, spillFileName, spillRec.getByteBuffer());
+      ShuffleUtils.writeSpillInfoToIndexPathCache(
+          outputContext, compositeFetch, numSpills, spillFileName, spillRec);
 
       //TODO: honor cache limits
       indexCacheList.add(spillRec);
@@ -775,10 +772,8 @@ public class PipelinedSorter extends ExternalSorter {
         return;
       }
 
-      finalOutputFile =
-          mapOutputFile.getOutputFileForWrite(0); //TODO
-      finalIndexFile =
-          mapOutputFile.getOutputIndexFileForWrite(0); //TODO
+      finalOutputFile = mapOutputFile.getOutputFileForWrite(0);
+      finalIndexFile = mapOutputFile.getOutputIndexFileForWrite(0);
 
       if (isDebugEnabled) {
         LOG.debug(outputContext.getDestinationVertexName() + ": " +
@@ -858,6 +853,8 @@ public class PipelinedSorter extends ExternalSorter {
       fileOutputByteCounter.increment(rfs.getFileStatus(finalOutputFile).getLen());
 
       spillRec.writeToFile(finalIndexFile, localFs);
+      ShuffleUtils.writeToIndexPathCache(outputContext, compositeFetch, finalOutputFile, spillRec);
+
       finalOut.close();
       for (int i = 0; i < numSpills; i++) {
         Path indexFilename = spillFileIndexPaths.get(i);

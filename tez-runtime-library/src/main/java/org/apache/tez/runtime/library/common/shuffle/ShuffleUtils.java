@@ -43,10 +43,12 @@ import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.http.BaseHttpConnection;
 import org.apache.tez.http.HttpConnectionParams;
+import org.apache.tez.runtime.api.IndexPathCache;
 import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.api.events.DataMovementEvent;
 import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.TezRuntimeUtils;
+import org.apache.tez.runtime.library.common.writers.UnorderedPartitionedKVWriter;
 import org.apache.tez.runtime.library.utils.DATA_RANGE_IN_MB;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
@@ -655,6 +657,26 @@ public class ShuffleUtils {
 
   public static String getUniqueIdentifierSpillId(OutputContext outputContext, int spillId) {
     return outputContext.getUniqueIdentifier() + "_" + spillId;
+  }
+
+  public static void writeToIndexPathCache(OutputContext outputContext,
+                                           boolean compositeFetch,
+                                           Path outputFilePath,
+                                           TezSpillRecord spillRecord) {
+    IndexPathCache indexPathCache = outputContext.getIndexPathCache();
+    String pathComponent = outputContext.getUniqueIdentifier();
+    String mapId = ShuffleUtils.expandPathComponent(
+      outputContext, compositeFetch, pathComponent);
+    indexPathCache.add(mapId, outputFilePath, spillRecord.getByteBuffer());
+  }
+
+  public static void writeSpillInfoToIndexPathCache(
+      OutputContext outputContext, boolean compositeFetch,
+      int spillId, Path outputFilePath, TezSpillRecord spillRecord) {
+    IndexPathCache indexPathCache = outputContext.getIndexPathCache();
+    String pathComponent = ShuffleUtils.getUniqueIdentifierSpillId(outputContext, spillId);
+    String mapId = ShuffleUtils.expandPathComponent(outputContext, compositeFetch, pathComponent);
+    indexPathCache.add(mapId, outputFilePath, spillRecord.getByteBuffer());
   }
 
   public static String expandPathComponent(OutputContext context, boolean compositeFetch, String pathComponent) {
