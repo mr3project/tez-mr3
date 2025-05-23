@@ -412,7 +412,9 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       }
 
       InputAttemptIdentifier inputAttemptIdentifier = pendingInputsSeq.getInputs().get(index);
-      String pathComponent = inputAttemptIdentifier.getPathComponent();
+      String pathComponent = inputAttemptIdentifier.getPathComponent();   // already in expanded form
+      TezSpillRecord spillRecord = null;
+      Path inputFilePath = null;
 
       boolean hasFailures = false;  // set to true if errors occur inside the inner loop
       for (int k = 0; k < partitionCount; k++) {
@@ -422,9 +424,19 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
 
         FetchedInput fetchedInput = null;
         try {
-          // for missing files, this will throw an exception
-          TezIndexRecord idxRecord = getTezIndexRecord(pathComponent, reduceId);
-          fetchedInput = getLocalDiskFetchedInput(srcAttemptId, idxRecord);
+          // pathComponent == srcAttemptId.getPathComponent(), so we compute spillRecord and inputFilePath only once
+          if (spillRecord == null) {
+            spillRecord = ShuffleUtils.getTezSpillRecordWithoutIndexPath(
+                taskContext, pathComponent, fetcherConfig.compositeFetch,
+                shuffleManager.getDagIdentifier(), conf,
+                fetcherConfig.localDirAllocator, fetcherConfig.localFs);
+            inputFilePath = ShuffleUtils.getInputFilePath(
+              taskContext, srcAttemptId.getPathComponent(), fetcherConfig.compositeFetch,
+              shuffleManager.getDagIdentifier(), conf,
+              fetcherConfig.localDirAllocator);
+          }
+          TezIndexRecord idxRecord = spillRecord.getIndex(reduceId);
+          fetchedInput = getLocalDiskFetchedInput(srcAttemptId, idxRecord, inputFilePath);
           long endTime = System.currentTimeMillis();
           fetcherCallback.fetchSucceeded(shuffleManagerId, host, srcAttemptId, fetchedInput,
               idxRecord.getPartLength(), idxRecord.getRawLength(), (endTime - startTime));
@@ -473,11 +485,11 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
   }
 
   private LocalDiskFetchedInput getLocalDiskFetchedInput(
-      InputAttemptIdentifier srcAttemptId, TezIndexRecord idxRecord)
+      InputAttemptIdentifier srcAttemptId, TezIndexRecord idxRecord, Path inputFilePath)
       throws IOException {
     LocalDiskFetchedInput fetchedInput = new LocalDiskFetchedInput(idxRecord.getStartOffset(),
       idxRecord.getPartLength(), srcAttemptId,
-      getShuffleInputFileName(srcAttemptId.getPathComponent(), null),
+      inputFilePath,
       conf,
       new FetchedInputCallback() {
         @Override
@@ -499,30 +511,6 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     }
 
     return fetchedInput;
-  }
-
-  private TezIndexRecord getTezIndexRecord(String pathComponent, int partition) throws
-      IOException {
-    TezIndexRecord idxRecord;
-    Path indexFile = getShuffleInputFileName(pathComponent,
-        Constants.TEZ_RUNTIME_TASK_OUTPUT_INDEX_SUFFIX_STRING);
-
-    TezSpillRecord spillRecord = new TezSpillRecord(indexFile, fetcherConfig.localFs);
-    idxRecord = spillRecord.getIndex(partition);
-    return idxRecord;
-  }
-
-  private String getMapOutputFile(String pathComponent) {
-    return ShuffleUtils.adjustPathComponent(fetcherConfig.compositeFetch, shuffleManager.getDagIdentifier(), pathComponent) +
-      Path.SEPARATOR + Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING;
-  }
-
-  private Path getShuffleInputFileName(String pathComponent, String suffix)
-      throws IOException {
-    suffix = suffix != null ? suffix : "";
-
-    String pathFromLocalDir = getMapOutputFile(pathComponent) + suffix;
-    return fetcherConfig.localDirAllocator.getLocalPathToRead(pathFromLocalDir, conf);
   }
 
   static class HostFetchResult {
