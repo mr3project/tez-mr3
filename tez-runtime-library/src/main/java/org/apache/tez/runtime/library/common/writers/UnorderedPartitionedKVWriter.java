@@ -43,7 +43,6 @@ import java.util.zip.Deflater;
 
 import com.google.common.collect.Lists;
 import com.google.protobuf.UnsafeByteOperations;
-import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -508,7 +507,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     }
   }
 
-  private boolean scheduleSpill(boolean block) throws IOException {
+  private boolean scheduleSpill(boolean block) {
     if (filledBuffers.isEmpty()) {
       return false;
     }
@@ -531,8 +530,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       int spillNumber = numSpills.getAndIncrement();
 
       ListenableFuture<SpillResult> future = spillExecutor.submit(new SpillCallable(
-          new ArrayList<WrappedBuffer>(filledBuffers), codec, spilledRecordsCounter,
-          spillNumber));
+          new ArrayList<WrappedBuffer>(filledBuffers), codec, spilledRecordsCounter, spillNumber));
       filledBuffers.clear();
       Futures.addCallback(future, new SpillCallback(spillNumber));
       // Update once per buffer (instead of every record)
@@ -615,9 +613,11 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       if (spillPathDetails == null) {
         this.spillPathDetails = getSpillPathDetails(false, -1, spillNumber);
       }
+
       LOG.info("Writing spill {} to {}", spillNumber, spillPathDetails.outputFilePath.toString());
       FSDataOutputStream out = rfs.create(spillPathDetails.outputFilePath);
       ensureSpillFilePermissions(spillPathDetails.outputFilePath, rfs);
+
       TezSpillRecord spillRecord = new TezSpillRecord(numPartitions);
       DataInputBuffer key = new DataInputBuffer();
       DataInputBuffer val = new DataInputBuffer();
@@ -664,6 +664,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
       spillResult = new SpillResult(compressedLength, this.filledBuffers);
 
+      // spillPathDetails.spillIndex can be -1 if spillIndex was not used in pathComponent
       handleSpillIndex(spillPathDetails, spillRecord);
       LOG.info("{}: Finished spill {}", destNameTrimmed, spillPathDetails.spillIndex);
 
@@ -1042,23 +1043,25 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     Path outputFilePath = null;
     Path indexFilePath = null;
 
+    int finalSpillIndex;
     if (!pipelinedShuffle && isFinalMergeEnabled) {
       if (isFinalSpill) {
         outputFilePath = outputFileHandler.getOutputFileForWrite(spillSize);
         indexFilePath = outputFileHandler.getOutputIndexFileForWrite(indexFileSizeEstimate);
-
-        //Setting this for tests
         finalOutPath = outputFilePath;
         finalIndexPath = indexFilePath;
+        finalSpillIndex = -1;   // spill index was not used
       } else {
         outputFilePath = outputFileHandler.getSpillFileForWrite(spillNumber, spillSize);
+        finalSpillIndex = spillNumber;
       }
     } else {
       outputFilePath = outputFileHandler.getSpillFileForWrite(spillNumber, spillSize);
       indexFilePath  = outputFileHandler.getSpillIndexFileForWrite(spillNumber, indexFileSizeEstimate);
+      finalSpillIndex = spillNumber;
     }
 
-    return new SpillPathDetails(outputFilePath, indexFilePath, spillNumber);
+    return new SpillPathDetails(outputFilePath, indexFilePath, finalSpillIndex);
   }
 
   private void mergeAll() throws IOException {
@@ -1199,7 +1202,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     long size = sizePerBuffer - (currentBuffer.numRecords * META_SIZE) - currentBuffer.skipSize
         + numPartitions * APPROX_HEADER_LENGTH;
     SpillPathDetails spillPathDetails = getSpillPathDetails(false, size);
-    int spillIndex = spillPathDetails.spillIndex;
+    int spillIndex = spillPathDetails.spillIndex;   // valid spillIndex and never -1
+
     FSDataOutputStream out = null;
     long outSize = 0;
     try {
@@ -1245,10 +1249,11 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           }
         }
       }
+
+      // spillPathDetails.spillIndex is never -1
       handleSpillIndex(spillPathDetails, spillRecord);
 
-      mayBeSendEventsForSpill(emptyPartitions, sizePerPartition,
-          spillIndex, false);
+      mayBeSendEventsForSpill(emptyPartitions, sizePerPartition, spillIndex, false);
 
       LOG.info("{}: Finished writing large record of size {} to spill file {}", destNameTrimmed, outSize, spillIndex);
       if (LOG.isDebugEnabled()) {
@@ -1267,9 +1272,16 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       throws IOException {
     if (spillPathDetails.indexFilePath != null) {
       spillRecord.writeToFile(spillPathDetails.indexFilePath, localFs);
-      ShuffleUtils.writeSpillInfoToIndexPathCache(
-          outputContext, compositeFetch,
-          spillPathDetails.spillIndex, spillPathDetails.outputFilePath, spillRecord);
+      // must check if spillPathDetails.spillIndex == -1
+      if (spillPathDetails.spillIndex < 0) {
+        ShuffleUtils.writeToIndexPathCache(
+            outputContext, compositeFetch,
+            spillPathDetails.outputFilePath, spillRecord);
+      } else {
+        ShuffleUtils.writeSpillInfoToIndexPathCache(
+            outputContext, compositeFetch,
+            spillPathDetails.spillIndex, spillPathDetails.outputFilePath, spillRecord);
+      }
     } else {
       // add to cache
       SpillInfo spillInfo = new SpillInfo(spillRecord, spillPathDetails.outputFilePath);
@@ -1533,10 +1545,14 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     return shufflePorts;
   }
 
-  @InterfaceAudience.Private
   static class SpillPathDetails {
     final Path indexFilePath;
     final Path outputFilePath;
+
+    // spillIndex < 0: spillIndex should not be used in pathComponent, e.g.:
+    //   attempt_1742983838780_0226_4_08_000150_0_12618
+    // spillIndex >= 0: spillIndex should be used in pathComponent, e.g.:
+    //   attempt_1742983838780_0226_4_08_000150_0_12618_0
     final int spillIndex;
 
     SpillPathDetails(Path outputFilePath, Path indexFilePath, int spillIndex) {
