@@ -706,7 +706,7 @@ public class PipelinedSorter extends ExternalSorter {
       //safe to clean up
       buffers.clear();
 
-      if(indexCacheList.isEmpty()) {
+      if (indexCacheList.isEmpty()) {
         /*
          * If we do not have this check, and if the task gets killed in the middle, it can throw
          * NPE leading to distraction when debugging.
@@ -741,12 +741,13 @@ public class PipelinedSorter extends ExternalSorter {
 
       // In case final merge is required, the following code path is executed.
       if (numSpills == 1) {
-        // someday be able to pass this directly to shuffle
-        // without writing to disk
+        // TODO: someday be able to pass this directly to shuffle without writing to disk
+        //
         // Originally we rename the directory by removing the suffix _0, e.g.:
         //   .../attempt_1734148871257_0437_1_02_000001_0_10031_0/file.out
         //   -->
         //   .../attempt_1734148871257_0437_1_02_000001_0_10031/file.out
+        //
         // As a minor optimization, we skip renaming and use the existing output, e.g., ".../...10031_0/file.out".
         // OrderedPartitionedKVOutput.generateEvents() adjusts pathComponent by appending "_0" so that
         // downstream tasks can request ".../...10031_0/file.out" instead of ".../...10031/file.out".
@@ -760,7 +761,12 @@ public class PipelinedSorter extends ExternalSorter {
               ", finalOutputFile=" + finalOutputFile + ", "
               + "finalIndexFile=" + finalIndexFile);
         }
-        TezSpillRecord spillRecord = new TezSpillRecord(finalIndexFile, localFs);
+
+        String uniqueId = ShuffleUtils.getUniqueIdentifierSpillId(outputContext, 0);
+        String pathComponent = ShuffleUtils.expandPathComponent(outputContext, compositeFetch, uniqueId);
+        TezSpillRecord spillRecord = ShuffleUtils.getTezSpillRecord(
+            outputContext, pathComponent, finalIndexFile, localFs);
+
         if (reportPartitionStats()) {
           for (int i = 0; i < spillRecord.size(); i++) {
             partitionStats[i] += spillRecord.getIndex(i).getRawLength();
@@ -803,9 +809,8 @@ public class PipelinedSorter extends ExternalSorter {
           }
         }
 
-        int mergeFactor =
-            this.conf.getInt(TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_FACTOR,
-                TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_FACTOR_DEFAULT);
+        int mergeFactor = this.conf.getInt(TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_FACTOR,
+            TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_FACTOR_DEFAULT);
         // sort the segments only if there are intermediate merges
         boolean sortSegments = segmentList.size() > mergeFactor;
         //merge
@@ -841,8 +846,7 @@ public class PipelinedSorter extends ExternalSorter {
         outputBytesWithOverheadCounter.increment(rawLength);
 
         // record offsets
-        final TezIndexRecord rec =
-            new TezIndexRecord(segmentStart, rawLength, partLength);
+        final TezIndexRecord rec = new TezIndexRecord(segmentStart, rawLength, partLength);
         spillRec.putIndex(rec, parts);
         if (reportPartitionStats()) {
           partitionStats[parts] += rawLength;
