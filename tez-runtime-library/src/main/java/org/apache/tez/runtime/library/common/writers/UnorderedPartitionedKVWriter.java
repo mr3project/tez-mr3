@@ -809,9 +809,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
             IndexPathCache indexPathCache = outputContext.getIndexPathCache();
             String mapId = ShuffleUtils.expandPathComponent(
                 outputContext, compositeFetch, outputContext.getUniqueIdentifier());
-            String mapOutputFileName = finalOutPath.toString();
             ByteBuffer spillRecord = sr.getByteBuffer();
-            indexPathCache.add(mapId, mapOutputFileName, spillRecord);
+            indexPathCache.add(mapId, finalOutPath, spillRecord);
           }
           eventList.add(generateDMEvent(false, -1, false,
               outputContext.getUniqueIdentifier(), emptyPartitions));
