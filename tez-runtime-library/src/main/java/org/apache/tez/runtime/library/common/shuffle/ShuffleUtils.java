@@ -34,12 +34,15 @@ import java.util.zip.Deflater;
 import javax.annotation.Nullable;
 import javax.crypto.SecretKey;
 
+import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.tez.common.Preconditions;
 import com.google.protobuf.ByteString;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.DataOutputBuffer;
+import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.http.BaseHttpConnection;
 import org.apache.tez.http.HttpConnectionParams;
@@ -647,7 +650,7 @@ public class ShuffleUtils {
   }
 
   public static String adjustPathComponent(boolean compositeFetch, int dagIdentifier, String pathComponent) {
-    if(compositeFetch) {  // == isTezShuffleHandler
+    if (compositeFetch) {  // == isTezShuffleHandler
       // pathComponent includes ${containerId}/${vertexId}/ in its prefix
       return Constants.DAG_PREFIX + dagIdentifier + Path.SEPARATOR + pathComponent;
     } else {
@@ -686,6 +689,52 @@ public class ShuffleUtils {
       return containerId + Path.SEPARATOR + Constants.VERTEX_PREFIX + vertexId + Path.SEPARATOR + pathComponent;
     } else {
       return pathComponent;
+    }
+  }
+
+  public static TezSpillRecord getTezSpillRecord(
+      TaskContext taskContext,
+      String pathComponent,   // already in expanded form
+      Path finalIndexFile,
+      RawLocalFileSystem localFs) throws IOException {
+    IndexPathCache.MapOutputInfo mapOutputInfo = taskContext.getIndexPathCache().get(pathComponent);
+    if (mapOutputInfo != null) {
+      return new TezSpillRecord(mapOutputInfo.getSpillRecord());
+    } else {
+      return new TezSpillRecord(finalIndexFile, localFs);
+    }
+  }
+
+  public static TezSpillRecord getTezSpillRecordWithoutIndexPath(
+      TaskContext taskContext,
+      String pathComponent,   // already in expanded form
+      boolean compositeFetch, int dagId, Configuration conf,
+      LocalDirAllocator localDirAllocator,
+      RawLocalFileSystem localFs) throws IOException {
+    IndexPathCache.MapOutputInfo mapOutputInfo = taskContext.getIndexPathCache().get(pathComponent);
+    if (mapOutputInfo != null) {
+      return new TezSpillRecord(mapOutputInfo.getSpillRecord());
+    } else {
+      String indexFile = adjustPathComponent(compositeFetch, dagId, pathComponent) +
+        Path.SEPARATOR + Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING +
+        Constants.TEZ_RUNTIME_TASK_OUTPUT_INDEX_SUFFIX_STRING;
+      Path indexFilePath = localDirAllocator.getLocalPathToRead(indexFile, conf);
+      return new TezSpillRecord(indexFilePath, localFs);
+    }
+  }
+
+  public static Path getInputFilePath(
+      TaskContext taskContext,
+      String pathComponent,   // already in expanded form
+      boolean compositeFetch, int dagId, Configuration conf,
+      LocalDirAllocator localDirAllocator) throws IOException {
+    IndexPathCache.MapOutputInfo mapOutputInfo = taskContext.getIndexPathCache().get(pathComponent);
+    if (mapOutputInfo != null) {
+      return mapOutputInfo.getMapOutputFilePath();
+    } else {
+      String inputFile = adjustPathComponent(compositeFetch, dagId, pathComponent) +
+        Path.SEPARATOR + Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING;
+      return localDirAllocator.getLocalPathToRead(inputFile, conf);
     }
   }
 }
