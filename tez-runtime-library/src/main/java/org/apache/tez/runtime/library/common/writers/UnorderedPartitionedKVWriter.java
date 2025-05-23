@@ -586,9 +586,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     private final List<WrappedBuffer> filledBuffers;
     private final CompressionCodec codec;
     private final TezCounter numRecordsCounter;
-    private int spillIndex;
     private SpillPathDetails spillPathDetails;
-    private int spillNumber;
+    private final int spillNumber;
 
     public SpillCallable(List<WrappedBuffer> filledBuffers, CompressionCodec codec,
         TezCounter numRecordsCounter, SpillPathDetails spillPathDetails) {
@@ -615,7 +614,6 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       SpillResult spillResult = null;
       if (spillPathDetails == null) {
         this.spillPathDetails = getSpillPathDetails(false, -1, spillNumber);
-        this.spillIndex = spillPathDetails.spillIndex;
       }
       LOG.info("Writing spill {} to {}", spillNumber, spillPathDetails.outputFilePath.toString());
       FSDataOutputStream out = rfs.create(spillPathDetails.outputFilePath);
@@ -667,10 +665,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       spillResult = new SpillResult(compressedLength, this.filledBuffers);
 
       handleSpillIndex(spillPathDetails, spillRecord);
-      LOG.info("{}: Finished spill {}", destNameTrimmed, spillIndex);
+      LOG.info("{}: Finished spill {}", destNameTrimmed, spillPathDetails.spillIndex);
 
       if (LOG.isDebugEnabled()) {
-        LOG.debug(destNameTrimmed + ": " + "Spill=" + spillIndex + ", indexPath="
+        LOG.debug(destNameTrimmed + ": " + "Spill=" + spillPathDetails.spillIndex + ", indexPath="
             + spillPathDetails.indexFilePath + ", outputPath=" + spillPathDetails.outputFilePath);
       }
       return spillResult;
@@ -810,8 +808,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
             String pathComponent = outputContext.getUniqueIdentifier();
             String mapId = ShuffleUtils.expandPathComponent(
                 outputContext, compositeFetch, pathComponent);
-            ByteBuffer spillRecord = sr.getByteBuffer();
-            indexPathCache.add(mapId, finalOutPath, spillRecord);
+            indexPathCache.add(mapId, finalOutPath, sr.getByteBuffer());
           }
           eventList.add(generateDMEvent(false, -1, false,
               outputContext.getUniqueIdentifier(), emptyPartitions));
@@ -874,6 +871,15 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       cleanupCurrentBuffer();
       return events;
     }
+  }
+
+  private void writeSpillInfoToIndexPathCache(SpillPathDetails spillPathDetails,
+                                              TezSpillRecord spillRecord) {
+    IndexPathCache indexPathCache = outputContext.getIndexPathCache();
+    int spillId = spillPathDetails.spillIndex;
+    String pathComponent = ShuffleUtils.getUniqueIdentifierSpillId(outputContext, spillId);
+    String mapId = ShuffleUtils.expandPathComponent(outputContext, compositeFetch, pathComponent);
+    indexPathCache.add(mapId, spillPathDetails.outputFilePath, spillRecord.getByteBuffer());
   }
 
   private BitSet getEmptyPartitions(int[] recordsPerPartition) {
@@ -1274,10 +1280,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   private void handleSpillIndex(SpillPathDetails spillPathDetails, TezSpillRecord spillRecord)
       throws IOException {
     if (spillPathDetails.indexFilePath != null) {
-      //write the index record
       spillRecord.writeToFile(spillPathDetails.indexFilePath, localFs);
+      writeSpillInfoToIndexPathCache(spillPathDetails, spillRecord);
     } else {
-      //add to cache
+      // add to cache
       SpillInfo spillInfo = new SpillInfo(spillRecord, spillPathDetails.outputFilePath);
       spillInfoList.add(spillInfo);
       numAdditionalSpillsCounter.increment(1);

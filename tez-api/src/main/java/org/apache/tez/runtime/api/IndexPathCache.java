@@ -53,7 +53,7 @@ public class IndexPathCache {
   //   1. remove() is called by a single thread (the main ShuffleHandlerDaemonProcessor's handleEvents())
   //   2. any element removed here is never added again to cache[]
   //    because it corresponds to a TaskAttempt belonging to a DAG that is already finished.
-  public void remove(String mapIdPrefix) {
+  public int remove(String mapIdPrefix) {
     Iterator<Map.Entry<String, MapOutputInfo>> iterator = cache.entrySet().iterator();
     while (iterator.hasNext()) {
       Map.Entry<String, MapOutputInfo> entry = iterator.next();
@@ -61,6 +61,7 @@ public class IndexPathCache {
         iterator.remove();
       }
     }
+    return cache.size();
   }
 
   /**

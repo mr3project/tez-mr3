@@ -640,8 +640,7 @@ public class PipelinedSorter extends ExternalSorter {
       String pathComponent = ShuffleUtils.getUniqueIdentifierSpillId(outputContext, numSpills);
       String mapId = ShuffleUtils.expandPathComponent(
           outputContext, compositeFetch, pathComponent);
-      ByteBuffer spillRecord = spillRec.getByteBuffer();
-      indexPathCache.add(mapId, spillFileName, spillRecord);
+      indexPathCache.add(mapId, spillFileName, spillRec.getByteBuffer());
 
       //TODO: honor cache limits
       indexCacheList.add(spillRec);
