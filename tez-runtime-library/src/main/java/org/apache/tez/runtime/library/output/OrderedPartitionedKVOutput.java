@@ -214,12 +214,12 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
 
       // In PipelinedSorter.flush() skips renaming output directories if finalMergeEnabled == true && numSpills == 1.
       // Here we adjust pathComponent in accordance so that downstream tasks can request, e.g., ".../...10031_0/file.out".
-      String uniqueId = (usePipelinedSorter && sorter.getNumSpills() == 1) ?
+      String pathComponent = (usePipelinedSorter && sorter.getNumSpills() == 1) ?
           getContext().getUniqueIdentifier() + "_0" :   // use original output directory ".../...10031_0"
           getContext().getUniqueIdentifier();           // use renamed output directory ".../...10031"
-      String pathComponent = ShuffleUtils.expandPathComponent(getContext(), compositeFetch, uniqueId);
+      String pathComponentExpanded = ShuffleUtils.expandPathComponent(getContext(), compositeFetch, pathComponent);
       TezSpillRecord tezSpillRecord = ShuffleUtils.getTezSpillRecord(
-          getContext(), pathComponent, sorter.getFinalIndexFile(), localFs);
+          getContext(), pathComponentExpanded, sorter.getFinalIndexFile(), localFs);
 
       ShuffleUtils.generateEventOnSpill(eventList, finalMergeEnabled, isLastEvent,
           getContext(), 0, tezSpillRecord,
