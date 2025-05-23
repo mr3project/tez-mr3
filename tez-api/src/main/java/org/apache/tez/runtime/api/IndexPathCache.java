@@ -65,7 +65,7 @@ public class IndexPathCache {
         Iterator<Map.Entry<String, MapOutputInfo>> iterator = cache.entrySet().iterator();
         while (iterator.hasNext()) {
             Map.Entry<String, MapOutputInfo> entry = iterator.next();
-            if (entry.getKey().startsWith(mapIdPrefix)) {
+            if (entry.getKey().contains(mapIdPrefix)) {
                 iterator.remove();
             }
         }

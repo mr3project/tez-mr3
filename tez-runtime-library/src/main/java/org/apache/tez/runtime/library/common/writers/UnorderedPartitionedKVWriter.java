@@ -62,6 +62,7 @@ import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.common.io.NonSyncDataOutputStream;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.ExecutorServiceUserGroupInformation;
+import org.apache.tez.runtime.api.IndexPathCache;
 import org.apache.tez.runtime.api.TaskFailureType;
 import org.apache.tez.runtime.api.OutputContext;
 import org.apache.tez.runtime.api.events.CompositeDataMovementEvent;
@@ -79,7 +80,6 @@ import org.apache.tez.runtime.library.shuffle.impl.ShuffleUserPayloads.DataMovem
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.tez.common.Preconditions;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
@@ -109,13 +109,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
   private final String destNameTrimmed;
   private final long availableMemory;
-  @VisibleForTesting
   final WrappedBuffer[] buffers;
-  @VisibleForTesting
   final BlockingQueue<WrappedBuffer> availableBuffers;
   private final ByteArrayOutputStream baos;
   private final NonSyncDataOutputStream dos;
-  @VisibleForTesting
   WrappedBuffer currentBuffer;
   private final FileSystem rfs;
 
@@ -158,32 +155,22 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
    */
   protected final TezCounter outputLargeRecordsCounter;
 
-  @VisibleForTesting
   int numBuffers;
-  @VisibleForTesting
   int sizePerBuffer;
-  @VisibleForTesting
   int lastBufferSize;
-  @VisibleForTesting
   int numInitializedBuffers;
-  @VisibleForTesting
   int spillLimit;
 
   private Throwable spillException;
   private AtomicBoolean isShutdown = new AtomicBoolean(false);
-  @VisibleForTesting
   final AtomicInteger numSpills = new AtomicInteger(0);
   private final AtomicInteger pendingSpillCount = new AtomicInteger(0);
 
-  @VisibleForTesting
   Path finalIndexPath;
-  @VisibleForTesting
   Path finalOutPath;
 
   //for single partition cases (e.g UnorderedKVOutput)
-  @VisibleForTesting
   final IFile.Writer writer;
-  @VisibleForTesting
   final boolean skipBuffers;
 
   private final ReentrantLock spillLock = new ReentrantLock();
@@ -817,9 +804,17 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
             sr.putIndex(rec, 0);
             finalIndexPath = outputFileHandler.getOutputIndexFileForWrite(indexFileSizeEstimate);
             sr.writeToFile(finalIndexPath, localFs);
+
+            // write to IndexPathCache
+            IndexPathCache indexPathCache = outputContext.getIndexPathCache();
+            String mapId = ShuffleUtils.expandPathComponent(
+                outputContext, compositeFetch, outputContext.getUniqueIdentifier());
+            String mapOutputFileName = finalOutPath.toString();
+            ByteBuffer spillRecord = sr.getByteBuffer();
+            indexPathCache.add(mapId, mapOutputFileName, spillRecord);
           }
-          eventList.add(generateDMEvent(false, -1, false, outputContext
-                  .getUniqueIdentifier(), emptyPartitions));
+          eventList.add(generateDMEvent(false, -1, false,
+              outputContext.getUniqueIdentifier(), emptyPartitions));
 
           return eventList;
         }
@@ -1532,12 +1527,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     }
   }
 
-  @VisibleForTesting
   String getHost() {
     return outputContext.getExecutionContext().getHostName();
   }
 
-  @VisibleForTesting
   int[] getShufflePort() throws IOException {
     String auxiliaryService = conf.get(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
         TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT);
