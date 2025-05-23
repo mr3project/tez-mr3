@@ -35,6 +35,7 @@ import com.google.common.collect.Lists;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.tez.dag.api.TezConfiguration;
+import org.apache.tez.runtime.api.IndexPathCache;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -385,7 +386,7 @@ public class PipelinedSorter extends ExternalSorter {
   // if pipelined shuffle is enabled, this method is called to send events for every spill
   private void sendPipelinedShuffleEvents() throws IOException{
     List<Event> events = Lists.newLinkedList();
-    String pathComponent = (outputContext.getUniqueIdentifier() + "_" + (numSpills-1));
+    String pathComponent = ShuffleUtils.appendSpillIndex(outputContext, numSpills);
     ShuffleUtils.generateEventOnSpill(events, finalMergeEnabled, false,
         outputContext, (numSpills - 1), indexCacheList.get(numSpills - 1),
         partitions, sendEmptyPartitionDetails, pathComponent, partitionStats,
@@ -583,11 +584,11 @@ public class PipelinedSorter extends ExternalSorter {
       // create spill file
       final long size = capacity + + (partitions * APPROX_HEADER_LENGTH);
       final TezSpillRecord spillRec = new TezSpillRecord(partitions);
-      final Path filename = mapOutputFile.getSpillFileForWrite(numSpills, size);
-      spillFilePaths.put(numSpills, filename);
-      out = rfs.create(filename, true, 4096);
-      ensureSpillFilePermissions(filename, rfs);
-      LOG.info("{}: Spilling to {}", outputContext.getDestinationVertexName(), filename.toString());
+      final Path spillFileName = mapOutputFile.getSpillFileForWrite(numSpills, size);
+      spillFilePaths.put(numSpills, spillFileName);
+      out = rfs.create(spillFileName, true, 4096);
+      ensureSpillFilePermissions(spillFileName, rfs);
+      LOG.info("{}: Spilling to {}", outputContext.getDestinationVertexName(), spillFileName.toString());
       for (int i = 0; i < partitions; ++i) {
         if (isThreadInterrupted()) {
           return false;
@@ -633,11 +634,20 @@ public class PipelinedSorter extends ExternalSorter {
           numSpills, partitions * MAP_OUTPUT_INDEX_RECORD_LENGTH);
       spillFileIndexPaths.put(numSpills, indexFilename);
       spillRec.writeToFile(indexFilename, localFs);
+
+      // write to IndexPathCache, spillId = numSpills
+      IndexPathCache indexPathCache = outputContext.getIndexPathCache();
+      String pathComponent = ShuffleUtils.appendSpillIndex(outputContext, numSpills);
+      String mapId = ShuffleUtils.expandPathComponent(
+          outputContext, compositeFetch, pathComponent);
+      ByteBuffer spillRecord = spillRec.getByteBuffer();
+      indexPathCache.add(mapId, spillFileName, spillRecord);
+
       //TODO: honor cache limits
       indexCacheList.add(spillRec);
       ++numSpills;
       if (!finalMergeEnabled) {
-        fileOutputByteCounter.increment(rfs.getFileStatus(filename).getLen());
+        fileOutputByteCounter.increment(rfs.getFileStatus(spillFileName).getLen());
         //No final merge. Set the number of files offered via shuffle-handler
         numShuffleChunks.setValue(numSpills);
       }

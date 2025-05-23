@@ -314,7 +314,6 @@ public class ShuffleUtils {
         }
       }
 
-      //Path component is always 0 indexed
       payloadBuilder.setPathComponent(expandPathComponent(context, compositeFetch, pathComponent));
     }
 
@@ -652,6 +651,10 @@ public class ShuffleUtils {
     } else {
       return Constants.TEZ_RUNTIME_TASK_OUTPUT_DIR + Path.SEPARATOR + pathComponent;
     }
+  }
+
+  public static String appendSpillIndex(OutputContext outputContext, int numSpills) {
+    return outputContext.getUniqueIdentifier() + "_" + (numSpills-1);
   }
 
   public static String expandPathComponent(OutputContext context, boolean compositeFetch, String pathComponent) {
