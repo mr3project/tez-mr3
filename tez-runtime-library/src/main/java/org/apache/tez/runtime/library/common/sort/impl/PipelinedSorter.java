@@ -386,7 +386,7 @@ public class PipelinedSorter extends ExternalSorter {
   // if pipelined shuffle is enabled, this method is called to send events for every spill
   private void sendPipelinedShuffleEvents() throws IOException{
     List<Event> events = Lists.newLinkedList();
-    String pathComponent = ShuffleUtils.appendSpillIndex(outputContext, numSpills);
+    String pathComponent = ShuffleUtils.getUniqueIdentifierSpillId(outputContext, numSpills - 1);
     ShuffleUtils.generateEventOnSpill(events, finalMergeEnabled, false,
         outputContext, (numSpills - 1), indexCacheList.get(numSpills - 1),
         partitions, sendEmptyPartitionDetails, pathComponent, partitionStats,
@@ -637,7 +637,7 @@ public class PipelinedSorter extends ExternalSorter {
 
       // write to IndexPathCache, spillId = numSpills
       IndexPathCache indexPathCache = outputContext.getIndexPathCache();
-      String pathComponent = ShuffleUtils.appendSpillIndex(outputContext, numSpills);
+      String pathComponent = ShuffleUtils.getUniqueIdentifierSpillId(outputContext, numSpills);
       String mapId = ShuffleUtils.expandPathComponent(
           outputContext, compositeFetch, pathComponent);
       ByteBuffer spillRecord = spillRec.getByteBuffer();

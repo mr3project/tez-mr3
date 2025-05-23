@@ -653,8 +653,8 @@ public class ShuffleUtils {
     }
   }
 
-  public static String appendSpillIndex(OutputContext outputContext, int numSpills) {
-    return outputContext.getUniqueIdentifier() + "_" + (numSpills-1);
+  public static String getUniqueIdentifierSpillId(OutputContext outputContext, int spillId) {
+    return outputContext.getUniqueIdentifier() + "_" + spillId;
   }
 
   public static String expandPathComponent(OutputContext context, boolean compositeFetch, String pathComponent) {

@@ -807,8 +807,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
             // write to IndexPathCache
             IndexPathCache indexPathCache = outputContext.getIndexPathCache();
+            String pathComponent = outputContext.getUniqueIdentifier();
             String mapId = ShuffleUtils.expandPathComponent(
-                outputContext, compositeFetch, outputContext.getUniqueIdentifier());
+                outputContext, compositeFetch, pathComponent);
             ByteBuffer spillRecord = sr.getByteBuffer();
             indexPathCache.add(mapId, finalOutPath, spillRecord);
           }
