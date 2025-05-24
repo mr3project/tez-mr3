@@ -35,7 +35,6 @@ import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.FileSystem;
@@ -72,7 +71,9 @@ public abstract class ExternalSorter {
   private static final Logger LOG = LoggerFactory.getLogger(ExternalSorter.class);
 
   public List<Event> close() throws IOException {
-    spillFileIndexPaths.clear();
+    if (writeSpillRecord) {
+      spillFileIndexPaths.clear();
+    }
     spillFilePaths.clear();
     reportStatistics();
     return Collections.emptyList();
@@ -121,10 +122,15 @@ public abstract class ExternalSorter {
   protected final CompressionCodec codec;
 
   protected final Map<Integer, Path> spillFilePaths = Maps.newHashMap();
+  // update only if writeSpillRecord == true
   protected final Map<Integer, Path> spillFileIndexPaths = Maps.newHashMap();
 
   protected Path finalOutputFile;
+
+  // null if writeSpillRecord == false
   protected Path finalIndexFile;
+  protected boolean finalIndexComputed;   // true if final TezSpillRecord is effectively computed
+
   protected int numSpills;
 
   protected final boolean cleanup;
@@ -262,6 +268,8 @@ public abstract class ExternalSorter {
     this.writeSpillRecord = conf.getBoolean(
         TezConfiguration.TEZ_TASK_SHUFFLE_WRITE_SPILL_RECORD,
         TezConfiguration.TEZ_TASK_SHUFFLE_WRITE_SPILL_RECORD_DEFAULT);
+
+    finalIndexComputed = false;
   }
 
   /**
@@ -275,12 +283,15 @@ public abstract class ExternalSorter {
     }
   }
 
-  @Private
   public TezTaskOutput getMapOutput() {
     return mapOutputFile;
   }
 
-  @Private
+  public boolean getFinalIndexComputed() {
+    return finalIndexComputed;
+  }
+
+  // returns null if writeSpillRecord == false
   public Path getFinalIndexFile() {
     return finalIndexFile;
   }
@@ -355,10 +366,12 @@ public abstract class ExternalSorter {
       return;
     }
     cleanup(spillFilePaths);
-    cleanup(spillFileIndexPaths);
-    //TODO: What if when same volume rename happens (have to rely on job completion cleanup)
     cleanup(finalOutputFile);
-    cleanup(finalIndexFile);
+
+    if (writeSpillRecord) {
+      cleanup(spillFileIndexPaths);
+      cleanup(finalIndexFile);
+    }
   }
 
   protected synchronized void cleanup(Path path) {

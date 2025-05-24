@@ -50,6 +50,7 @@ public class TezSpillRecord {
   }
 
   public TezSpillRecord(Path indexFileName, FileSystem rfs) throws IOException {
+    assert indexFileName != null;   // writeSpillRecord should be false in UnorderedPartitionedKVWriter/PipelinedSorter
     Checksum crc = new PureJavaCrc32();
 
     FileStatus fileStatus = rfs.getFileStatus(indexFileName);

@@ -494,15 +494,12 @@ public class PipelinedSorter extends ExternalSorter {
     final TezSpillRecord spillRec = new TezSpillRecord(partitions);
     // getSpillFileForWrite with size -1 as the serialized size of KV pair is still unknown
     final Path outputFilePath = mapOutputFile.getSpillFileForWrite(numSpills, -1);
-    Path indexFilename = mapOutputFile.getSpillIndexFileForWrite(
-        numSpills, partitions * MAP_OUTPUT_INDEX_RECORD_LENGTH);
     spillFilePaths.put(numSpills, outputFilePath);
     FSDataOutputStream out = rfs.create(outputFilePath, true, 4096);
     ensureSpillFilePermissions(outputFilePath, rfs);
 
     try {
-      LOG.info("{}: Spilling to {}, indexFilename={}",
-          outputContext.getDestinationVertexName(), outputFilePath.toString(), indexFilename);
+      LOG.info("{}: Spilling single record to {}", outputContext.getDestinationVertexName(), outputFilePath.toString());
       for (int i = 0; i < partitions; ++i) {
         if (isThreadInterrupted()) {
           return;
@@ -541,12 +538,15 @@ public class PipelinedSorter extends ExternalSorter {
         }
       }
 
-      spillFileIndexPaths.put(numSpills, indexFilename);
       if (writeSpillRecord) {
+        Path indexFilename = mapOutputFile.getSpillIndexFileForWrite(
+            numSpills, partitions * MAP_OUTPUT_INDEX_RECORD_LENGTH);
+        spillFileIndexPaths.put(numSpills, indexFilename);
         spillRec.writeToFile(indexFilename, localFs);
       }
       ShuffleUtils.writeSpillInfoToIndexPathCache(
           outputContext, compositeFetch, numSpills, outputFilePath, spillRec);
+
       //TODO: honor cache limits
       indexCacheList.add(spillRec);
       ++numSpills;
@@ -629,10 +629,10 @@ public class PipelinedSorter extends ExternalSorter {
         }
       }
 
-      Path indexFilename = mapOutputFile.getSpillIndexFileForWrite(
-          numSpills, partitions * MAP_OUTPUT_INDEX_RECORD_LENGTH);
-      spillFileIndexPaths.put(numSpills, indexFilename);
       if (writeSpillRecord) {
+        Path indexFilename = mapOutputFile.getSpillIndexFileForWrite(
+            numSpills, partitions * MAP_OUTPUT_INDEX_RECORD_LENGTH);
+        spillFileIndexPaths.put(numSpills, indexFilename);
         spillRec.writeToFile(indexFilename, localFs);
       }
       ShuffleUtils.writeSpillInfoToIndexPathCache(
@@ -750,15 +750,15 @@ public class PipelinedSorter extends ExternalSorter {
         // As a minor optimization, we skip renaming and use the existing output, e.g., ".../...10031_0/file.out".
         // OrderedPartitionedKVOutput.generateEvents() adjusts pathComponent by appending "_0" so that
         // downstream tasks can request ".../...10031_0/file.out" instead of ".../...10031/file.out".
-        final Path filename = spillFilePaths.get(0);
-        final Path indexFilename = spillFileIndexPaths.get(0);
-        finalOutputFile = filename;
-        finalIndexFile = indexFilename;
+        finalOutputFile = spillFilePaths.get(0);
+        if (writeSpillRecord) {
+          finalIndexFile = spillFileIndexPaths.get(0);
+        }
+        finalIndexComputed = true;  // because final TezSpillRecord can be obtained
 
         if (isDebugEnabled) {
           LOG.debug(outputContext.getDestinationVertexName() + ": numSpills=" + numSpills +
-              ", finalOutputFile=" + finalOutputFile + ", "
-              + "finalIndexFile=" + finalIndexFile);
+              ", finalOutputFile=" + finalOutputFile + ", finalIndexFile=" + finalIndexFile);
         }
 
         String uniqueId = ShuffleUtils.getUniqueIdentifierSpillId(outputContext, 0);
@@ -773,19 +773,22 @@ public class PipelinedSorter extends ExternalSorter {
         }
         numShuffleChunks.setValue(numSpills);
         fileOutputByteCounter.increment(rfs.getFileStatus(finalOutputFile).getLen());
+
         // ??? why are events not being sent here?
         return;
       }
 
       finalOutputFile = mapOutputFile.getOutputFileForWrite(0);
-      finalIndexFile = mapOutputFile.getOutputIndexFileForWrite(0);
+      if (writeSpillRecord) {
+        finalIndexFile = mapOutputFile.getOutputIndexFileForWrite(0);
+      }
+      finalIndexComputed = true;  // because final TezSpillRecord can be obtained
 
       if (isDebugEnabled) {
-        LOG.debug(outputContext.getDestinationVertexName() + ": " +
-            "numSpills: " + numSpills + ", finalOutputFile:" + finalOutputFile + ", finalIndexFile:"
-                + finalIndexFile);
+        LOG.debug(outputContext.getDestinationVertexName() + ": numSpills: " + numSpills +
+            ", finalOutputFile:" + finalOutputFile + ", finalIndexFile:" + finalIndexFile);
       }
-      //The output stream for the final single output file
+      // the output stream for the final single output file
       FSDataOutputStream finalOut = rfs.create(finalOutputFile, true, 4096);
       ensureSpillFilePermissions(finalOutputFile, rfs);
 
@@ -859,17 +862,21 @@ public class PipelinedSorter extends ExternalSorter {
         spillRec.writeToFile(finalIndexFile, localFs);
       }
       ShuffleUtils.writeToIndexPathCache(outputContext, compositeFetch, finalOutputFile, spillRec);
-
       finalOut.close();
+
       for (int i = 0; i < numSpills; i++) {
-        Path indexFilename = spillFileIndexPaths.get(i);
         Path spillFilename = spillFilePaths.get(i);
-        rfs.delete(indexFilename, true);
         rfs.delete(spillFilename, true);
       }
-
-      spillFileIndexPaths.clear();
       spillFilePaths.clear();
+
+      if (writeSpillRecord) {
+        for (int i = 0; i < numSpills; i++) {
+          Path indexFilename = spillFileIndexPaths.get(i);
+          rfs.delete(indexFilename, true);
+        }
+        spillFileIndexPaths.clear();
+      }
     } catch(InterruptedException ie) {
       if (cleanup) {
         cleanup();

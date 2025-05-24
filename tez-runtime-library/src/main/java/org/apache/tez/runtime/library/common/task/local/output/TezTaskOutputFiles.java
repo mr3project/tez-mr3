@@ -165,8 +165,7 @@ public class TezTaskOutputFiles extends TezTaskOutput {
     Path attemptIndexOutput =
       new Path(getAttemptOutputDir(), Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING +
                                       Constants.TEZ_RUNTIME_TASK_OUTPUT_INDEX_SUFFIX_STRING);
-    return lDirAlloc.getLocalPathForWrite(attemptIndexOutput.toString(),
-        size, conf);
+    return lDirAlloc.getLocalPathForWrite(attemptIndexOutput.toString(), size, conf);
   }
 
   /**

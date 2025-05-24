@@ -61,7 +61,6 @@ import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.common.io.NonSyncDataOutputStream;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.ExecutorServiceUserGroupInformation;
-import org.apache.tez.runtime.api.IndexPathCache;
 import org.apache.tez.runtime.api.TaskFailureType;
 import org.apache.tez.runtime.api.OutputContext;
 import org.apache.tez.runtime.api.events.CompositeDataMovementEvent;
