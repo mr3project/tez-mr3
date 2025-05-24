@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.google.common.collect.Maps;
+import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.OutputStatisticsReporter;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
@@ -166,6 +167,7 @@ public abstract class ExternalSorter {
 
   // protected final boolean physicalHostFetch;  // TODO: currently unused
   protected final boolean compositeFetch;
+  protected final boolean writeSpillRecord;
 
   public ExternalSorter(OutputContext outputContext, Configuration conf, int numOutputs,
       long initialMemoryAvailable) throws IOException {
@@ -257,6 +259,9 @@ public abstract class ExternalSorter {
     //     TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH,
     //     TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_DEFAULT);
     this.compositeFetch = ShuffleUtils.isTezShuffleHandler(this.conf);
+    this.writeSpillRecord = conf.getBoolean(
+        TezConfiguration.TEZ_TASK_SHUFFLE_WRITE_SPILL_RECORD,
+        TezConfiguration.TEZ_TASK_SHUFFLE_WRITE_SPILL_RECORD_DEFAULT);
   }
 
   /**

@@ -29,13 +29,11 @@ import java.util.PriorityQueue;
 import java.util.concurrent.*;
 import java.util.zip.Deflater;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.tez.common.Preconditions;
 import com.google.common.collect.Lists;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.tez.dag.api.TezConfiguration;
-import org.apache.tez.runtime.api.IndexPathCache;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -109,9 +107,7 @@ public class PipelinedSorter extends ExternalSorter {
 
   private long currentAllocatableMemory;
   //Maintain a list of ByteBuffers
-  @VisibleForTesting
   final List<ByteBuffer> buffers;
-  @VisibleForTesting
   List<Integer> bufferUsage;
   final int maxNumberOfBlocks;
   private int bufferIndex = -1;
@@ -293,7 +289,6 @@ public class PipelinedSorter extends ExternalSorter {
     return space;
   }
 
-  @VisibleForTesting
   int computeBlockSize(long availableMem, long maxAllocatedMemory) {
     int maxBlockSize = 0;
     /**
@@ -547,7 +542,9 @@ public class PipelinedSorter extends ExternalSorter {
       }
 
       spillFileIndexPaths.put(numSpills, indexFilename);
-      spillRec.writeToFile(indexFilename, localFs);
+      if (writeSpillRecord) {
+        spillRec.writeToFile(indexFilename, localFs);
+      }
       ShuffleUtils.writeSpillInfoToIndexPathCache(
           outputContext, compositeFetch, numSpills, outputFilePath, spillRec);
       //TODO: honor cache limits
@@ -635,7 +632,9 @@ public class PipelinedSorter extends ExternalSorter {
       Path indexFilename = mapOutputFile.getSpillIndexFileForWrite(
           numSpills, partitions * MAP_OUTPUT_INDEX_RECORD_LENGTH);
       spillFileIndexPaths.put(numSpills, indexFilename);
-      spillRec.writeToFile(indexFilename, localFs);
+      if (writeSpillRecord) {
+        spillRec.writeToFile(indexFilename, localFs);
+      }
       ShuffleUtils.writeSpillInfoToIndexPathCache(
           outputContext, compositeFetch, numSpills, spillFileName, spillRec);
 
@@ -856,7 +855,9 @@ public class PipelinedSorter extends ExternalSorter {
       numShuffleChunks.setValue(1); //final merge has happened.
       fileOutputByteCounter.increment(rfs.getFileStatus(finalOutputFile).getLen());
 
-      spillRec.writeToFile(finalIndexFile, localFs);
+      if (writeSpillRecord) {
+        spillRec.writeToFile(finalIndexFile, localFs);
+      }
       ShuffleUtils.writeToIndexPathCache(outputContext, compositeFetch, finalOutputFile, spillRec);
 
       finalOut.close();
@@ -1378,7 +1379,6 @@ public class PipelinedSorter extends ExternalSorter {
   }
 
   @InterfaceAudience.Private
-  @VisibleForTesting
   public boolean needsRLE() {
     return merger.needsRLE();
   }

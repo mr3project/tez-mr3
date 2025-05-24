@@ -190,6 +190,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   private final boolean useCachedStream;
 
   private final boolean compositeFetch;
+  private final boolean writeSpillRecord;
 
   public UnorderedPartitionedKVWriter(OutputContext outputContext, Configuration conf,
       int numOutputs, long availableMemoryBytes) throws IOException {
@@ -200,9 +201,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     this.destNameTrimmed = TezUtilsInternal.cleanVertexName(outputContext.getDestinationVertexName());
     //Not checking for TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT as it might not add much value in
     // this case.  Add it later if needed.
-    boolean pipelinedShuffleConf = this.conf.getBoolean(TezRuntimeConfiguration
-        .TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED, TezRuntimeConfiguration
-        .TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT);
+    boolean pipelinedShuffleConf = this.conf.getBoolean(
+        TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED,
+        TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT);
     this.isFinalMergeEnabled = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT,
         TezRuntimeConfiguration.TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT_DEFAULT);
@@ -210,13 +211,13 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     this.finalEvents = Lists.newLinkedList();
 
     this.dataViaEventsEnabled = conf.getBoolean(
-            TezRuntimeConfiguration.TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_ENABLED,
-            TezRuntimeConfiguration.TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_ENABLED_DEFAULT);
+       TezRuntimeConfiguration.TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_ENABLED,
+       TezRuntimeConfiguration.TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_ENABLED_DEFAULT);
 
     // No max cap on size (intentional)
     this.dataViaEventsMaxSize = conf.getInt(
-            TezRuntimeConfiguration.TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_MAX_SIZE,
-            TezRuntimeConfiguration.TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_MAX_SIZE_DEFAULT);
+       TezRuntimeConfiguration.TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_MAX_SIZE,
+       TezRuntimeConfiguration.TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_MAX_SIZE_DEFAULT);
 
     boolean useCachedStreamConfig = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_SUPPORT_IN_MEM_FILE,
@@ -226,6 +227,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         && !pipelinedShuffle);
 
     this.compositeFetch = ShuffleUtils.isTezShuffleHandler(this.conf);
+    this.writeSpillRecord = conf.getBoolean(
+        TezConfiguration.TEZ_TASK_SHUFFLE_WRITE_SPILL_RECORD,
+        TezConfiguration.TEZ_TASK_SHUFFLE_WRITE_SPILL_RECORD_DEFAULT);
 
     if (availableMemoryBytes == 0) {
       Preconditions.checkArgument(((numPartitions == 1) && !pipelinedShuffle), "availableMemory "
@@ -802,7 +806,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
             TezSpillRecord sr = new TezSpillRecord(1);
             sr.putIndex(rec, 0);
             finalIndexPath = outputFileHandler.getOutputIndexFileForWrite(indexFileSizeEstimate);
-            sr.writeToFile(finalIndexPath, localFs);
+            if (writeSpillRecord) {
+              sr.writeToFile(finalIndexPath, localFs);
+            }
             ShuffleUtils.writeToIndexPathCache(outputContext, compositeFetch, finalOutPath, sr);
           }
           eventList.add(generateDMEvent(false, -1, false,
@@ -1156,7 +1162,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         deleteIntermediateSpills();
       }
     }
-    finalSpillRecord.writeToFile(finalIndexPath, localFs);
+    if (writeSpillRecord) {
+      finalSpillRecord.writeToFile(finalIndexPath, localFs);
+    }
     ShuffleUtils.writeToIndexPathCache(outputContext, compositeFetch, finalOutPath, finalSpillRecord);
     fileOutputBytesCounter.increment(indexFileSizeEstimate);
     LOG.info("{}: Finished final spill after merging : {} spills", destNameTrimmed, numSpills.get());
@@ -1271,7 +1279,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   private void handleSpillIndex(SpillPathDetails spillPathDetails, TezSpillRecord spillRecord)
       throws IOException {
     if (spillPathDetails.indexFilePath != null) {
-      spillRecord.writeToFile(spillPathDetails.indexFilePath, localFs);
+      if (writeSpillRecord) {
+        spillRecord.writeToFile(spillPathDetails.indexFilePath, localFs);
+      }
       // must check if spillPathDetails.spillIndex == -1
       if (spillPathDetails.spillIndex < 0) {
         ShuffleUtils.writeToIndexPathCache(

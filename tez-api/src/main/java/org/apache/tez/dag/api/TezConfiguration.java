@@ -27,14 +27,8 @@ import org.apache.tez.common.annotation.ConfigurationClass;
 import org.apache.tez.common.annotation.ConfigurationProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.records.LocalResource;
-
-import com.google.common.annotations.VisibleForTesting;
-
 
 /**
  * Defines the configurations for Tez. These configurations are typically specified in 
@@ -43,7 +37,6 @@ import com.google.common.annotations.VisibleForTesting;
  * @see <a href="../../../../../configs/TezConfiguration.html">Detailed Configuration Information</a>
  * @see <a href="../../../../../configs/tez-default-template.xml">XML-based Config Template</a>
  */
-@Public
 @ConfigurationClass(templateFileName = "tez-default-template.xml")
 public class TezConfiguration extends Configuration {
 
@@ -93,11 +86,8 @@ public class TezConfiguration extends Configuration {
     }
   }
 
-  @Private
   public static final String TEZ_PREFIX = "tez.";
-  @Private
   public static final String TEZ_AM_PREFIX = TEZ_PREFIX + "am.";
-  @Private
   public static final String TEZ_TASK_PREFIX = TEZ_PREFIX + "task.";
 
   /**
@@ -109,6 +99,10 @@ public class TezConfiguration extends Configuration {
       "shuffle.auxiliary-service.id";
   public static final String TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT =
       TezConstants.TEZ_SHUFFLE_HANDLER_SERVICE_ID;
+
+  public static final String TEZ_TASK_SHUFFLE_WRITE_SPILL_RECORD = TEZ_TASK_PREFIX +
+      "shuffle.write.spill.record";
+  public static final boolean TEZ_TASK_SHUFFLE_WRITE_SPILL_RECORD_DEFAULT = false;
 
   /**
    * String value. Specifies a directory where Tez can create temporary job artifacts.
@@ -173,7 +167,6 @@ public class TezConfiguration extends Configuration {
    * limit the amount of memory being used in the app master to store the
    * counters. Expert level setting.
    */
-  @Unstable
   @ConfigurationScope(Scope.AM)
   @ConfigurationProperty(type="integer")
   public static final String TEZ_COUNTERS_MAX = TEZ_PREFIX + "counters.max";
@@ -184,7 +177,6 @@ public class TezConfiguration extends Configuration {
    * limit the amount of memory being used in the app master to store the
    * counters. Expert level setting.
    */
-  @Unstable
   @ConfigurationScope(Scope.AM)
   @ConfigurationProperty(type="integer")
   public static final String TEZ_COUNTERS_MAX_GROUPS = TEZ_PREFIX + "counters.max.groups";
@@ -195,7 +187,6 @@ public class TezConfiguration extends Configuration {
    * limit the amount of memory being used in the app master to store the
    * counters. Expert level setting.
    */
-  @Unstable
   @ConfigurationScope(Scope.AM)
   @ConfigurationProperty(type="integer")
   public static final String TEZ_COUNTERS_COUNTER_NAME_MAX_LENGTH =
@@ -207,7 +198,6 @@ public class TezConfiguration extends Configuration {
    * limit the amount of memory being used in the app master to store the
    * counters. Expert level setting.
    */
-  @Unstable
   @ConfigurationScope(Scope.AM)
   @ConfigurationProperty(type="integer")
   public static final String TEZ_COUNTERS_GROUP_NAME_MAX_LENGTH =
@@ -307,25 +297,19 @@ public class TezConfiguration extends Configuration {
    * Whether to scale down memory requested by each component if the total
    * exceeds the available JVM memory
    */
-  @Private
-  @Unstable
   @ConfigurationScope(Scope.VERTEX)
   @ConfigurationProperty(type="boolean")
   public static final String TEZ_TASK_SCALE_MEMORY_ENABLED = TEZ_TASK_PREFIX
       + "scale.memory.enabled";
-  @Private
   public static final boolean TEZ_TASK_SCALE_MEMORY_ENABLED_DEFAULT = true;
 
   /**
    * The allocator to use for initial memory allocation
    */
-  @Private
-  @Unstable
   @ConfigurationScope(Scope.VERTEX)
   @ConfigurationProperty
   public static final String TEZ_TASK_SCALE_MEMORY_ALLOCATOR_CLASS = TEZ_TASK_PREFIX
       + "scale.memory.allocator.class";
-  @Private
   public static final String TEZ_TASK_SCALE_MEMORY_ALLOCATOR_CLASS_DEFAULT =
       "org.apache.tez.runtime.library.resources.WeightedScalingMemoryDistributor";
 
@@ -333,28 +317,21 @@ public class TezConfiguration extends Configuration {
    * The fraction of the JVM memory which will not be considered for allocation.
    * No defaults, since there are pre-existing defaults based on different scenarios.
    */
-  @Private
-  @Unstable
   @ConfigurationScope(Scope.VERTEX)
   @ConfigurationProperty(type="double")
   public static final String TEZ_TASK_SCALE_MEMORY_RESERVE_FRACTION = TEZ_TASK_PREFIX
       + "scale.memory.reserve-fraction";
-  @Private
   public static final double TEZ_TASK_SCALE_MEMORY_RESERVE_FRACTION_DEFAULT = 0.3d;
 
   /**
    * Fraction of available memory to reserve per input/output. This amount is
    * removed from the total available pool before allocation and is for factoring in overheads.
    */
-  @Private
-  @Unstable
   @ConfigurationScope(Scope.VERTEX)
   @ConfigurationProperty(type="float")
   public static final String TEZ_TASK_SCALE_MEMORY_ADDITIONAL_RESERVATION_FRACTION_PER_IO =
       TEZ_TASK_PREFIX + "scale.memory.additional-reservation.fraction.per-io";
 
-  @Private
-  @Unstable
   /**
    * Max cumulative total reservation for additional IOs.
    */
@@ -367,8 +344,6 @@ public class TezConfiguration extends Configuration {
    * e.g. PARTITIONED_UNSORTED_OUTPUT:0,UNSORTED_INPUT:1,UNSORTED_OUTPUT:0,SORTED_OUTPUT:2,
    * SORTED_MERGED_INPUT:3,PROCESSOR:1,OTHER:1
    */
-  @Private
-  @Unstable
   @ConfigurationScope(Scope.VERTEX)
   @ConfigurationProperty
   public static final String TEZ_TASK_SCALE_MEMORY_WEIGHTED_RATIOS =
@@ -431,7 +406,6 @@ public class TezConfiguration extends Configuration {
    * raw Tez application where classpath is propagated with application
    * via {@link LocalResource}s. This is mainly useful for developer/debugger scenarios.
    */
-  @Unstable
   @ConfigurationScope(Scope.AM)
   @ConfigurationProperty(type="boolean")
   public static final String TEZ_IGNORE_LIB_URIS = TEZ_PREFIX + "ignore.lib.uris";
@@ -544,7 +518,6 @@ public class TezConfiguration extends Configuration {
     }
   }
 
-  @VisibleForTesting
   static Set<String> getPropertySet() {
     return PropertyScope.keySet();
   }
@@ -553,7 +526,6 @@ public class TezConfiguration extends Configuration {
    * Long value.
    * Time to wait (in seconds) for apps to complete on MiniTezCluster shutdown.
    */
-  @Private
   @ConfigurationScope(Scope.TEST)
   @ConfigurationProperty(type="long")
   public static final String TEZ_TEST_MINI_CLUSTER_APP_WAIT_ON_SHUTDOWN_SECS =
