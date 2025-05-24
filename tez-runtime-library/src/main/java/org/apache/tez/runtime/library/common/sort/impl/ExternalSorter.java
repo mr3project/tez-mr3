@@ -265,9 +265,7 @@ public abstract class ExternalSorter {
     //     TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH,
     //     TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_DEFAULT);
     this.compositeFetch = ShuffleUtils.isTezShuffleHandler(this.conf);
-    this.writeSpillRecord = conf.getBoolean(
-        TezConfiguration.TEZ_TASK_SHUFFLE_WRITE_SPILL_RECORD,
-        TezConfiguration.TEZ_TASK_SHUFFLE_WRITE_SPILL_RECORD_DEFAULT);
+    this.writeSpillRecord = !compositeFetch;
 
     finalIndexComputed = false;
   }

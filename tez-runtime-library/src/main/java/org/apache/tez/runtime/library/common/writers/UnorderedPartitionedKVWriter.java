@@ -230,9 +230,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         && !pipelinedShuffle);
 
     this.compositeFetch = ShuffleUtils.isTezShuffleHandler(this.conf);
-    this.writeSpillRecord = conf.getBoolean(
-        TezConfiguration.TEZ_TASK_SHUFFLE_WRITE_SPILL_RECORD,
-        TezConfiguration.TEZ_TASK_SHUFFLE_WRITE_SPILL_RECORD_DEFAULT);
+    this.writeSpillRecord = !compositeFetch;
 
     if (availableMemoryBytes == 0) {
       Preconditions.checkArgument(((numPartitions == 1) && !pipelinedShuffle), "availableMemory "

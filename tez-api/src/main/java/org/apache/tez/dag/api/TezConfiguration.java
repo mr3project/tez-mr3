@@ -100,10 +100,6 @@ public class TezConfiguration extends Configuration {
   public static final String TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT =
       TezConstants.TEZ_SHUFFLE_HANDLER_SERVICE_ID;
 
-  public static final String TEZ_TASK_SHUFFLE_WRITE_SPILL_RECORD = TEZ_TASK_PREFIX +
-      "shuffle.write.spill.record";
-  public static final boolean TEZ_TASK_SHUFFLE_WRITE_SPILL_RECORD_DEFAULT = false;
-
   /**
    * String value. Specifies a directory where Tez can create temporary job artifacts.
    */
