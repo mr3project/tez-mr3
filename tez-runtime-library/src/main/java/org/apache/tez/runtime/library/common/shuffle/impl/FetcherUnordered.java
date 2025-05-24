@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.SocketTimeoutException;
 import java.net.URL;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -426,14 +427,12 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         try {
           // pathComponent == srcAttemptId.getPathComponent(), so we compute spillRecord and inputFilePath only once
           if (spillRecord == null) {
-            spillRecord = ShuffleUtils.getTezSpillRecordWithoutIndexPath(
+            AbstractMap.SimpleEntry<TezSpillRecord, Path> pair = ShuffleUtils.getTezSpillRecordInputFilePath(
                 taskContext, pathComponent, fetcherConfig.compositeFetch,
                 shuffleManager.getDagIdentifier(), conf,
                 fetcherConfig.localDirAllocator, fetcherConfig.localFs);
-            inputFilePath = ShuffleUtils.getInputFilePath(
-              taskContext, srcAttemptId.getPathComponent(), fetcherConfig.compositeFetch,
-              shuffleManager.getDagIdentifier(), conf,
-              fetcherConfig.localDirAllocator);
+            spillRecord = pair.getKey();
+            inputFilePath = pair.getValue();
           }
           TezIndexRecord idxRecord = spillRecord.getIndex(reduceId);
           fetchedInput = getLocalDiskFetchedInput(srcAttemptId, idxRecord, inputFilePath);

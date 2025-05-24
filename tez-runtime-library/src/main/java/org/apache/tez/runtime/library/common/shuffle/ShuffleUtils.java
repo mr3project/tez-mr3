@@ -25,6 +25,7 @@ import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.ByteBuffer;
+import java.util.AbstractMap;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.List;
@@ -704,8 +705,7 @@ public class ShuffleUtils {
       return new TezSpillRecord(finalIndexFile, localFs);
     }
   }
-
-  public static TezSpillRecord getTezSpillRecordWithoutIndexPath(
+  public static AbstractMap.SimpleEntry<TezSpillRecord, Path> getTezSpillRecordInputFilePath(
       TaskContext taskContext,
       String pathComponent,   // already in expanded form
       boolean compositeFetch, int dagId, Configuration conf,
@@ -713,28 +713,17 @@ public class ShuffleUtils {
       RawLocalFileSystem localFs) throws IOException {
     IndexPathCache.MapOutputInfo mapOutputInfo = taskContext.getIndexPathCache().get(pathComponent);
     if (mapOutputInfo != null) {
-      return new TezSpillRecord(mapOutputInfo.getSpillRecord());
-    } else {
-      String indexFile = adjustPathComponent(compositeFetch, dagId, pathComponent) +
-        Path.SEPARATOR + Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING +
-        Constants.TEZ_RUNTIME_TASK_OUTPUT_INDEX_SUFFIX_STRING;
-      Path indexFilePath = localDirAllocator.getLocalPathToRead(indexFile, conf);
-      return new TezSpillRecord(indexFilePath, localFs);
-    }
-  }
-
-  public static Path getInputFilePath(
-      TaskContext taskContext,
-      String pathComponent,   // already in expanded form
-      boolean compositeFetch, int dagId, Configuration conf,
-      LocalDirAllocator localDirAllocator) throws IOException {
-    IndexPathCache.MapOutputInfo mapOutputInfo = taskContext.getIndexPathCache().get(pathComponent);
-    if (mapOutputInfo != null) {
-      return mapOutputInfo.getMapOutputFilePath();
+      return new AbstractMap.SimpleEntry<>(
+          new TezSpillRecord(mapOutputInfo.getSpillRecord()),
+          mapOutputInfo.getMapOutputFilePath());
     } else {
       String inputFile = adjustPathComponent(compositeFetch, dagId, pathComponent) +
         Path.SEPARATOR + Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING;
-      return localDirAllocator.getLocalPathToRead(inputFile, conf);
+      String indexFile = inputFile + Constants.TEZ_RUNTIME_TASK_OUTPUT_INDEX_SUFFIX_STRING;
+      Path indexFilePath = localDirAllocator.getLocalPathToRead(indexFile, conf);
+      return new AbstractMap.SimpleEntry<>(
+          new TezSpillRecord(indexFilePath, localFs),
+          localDirAllocator.getLocalPathToRead(inputFile, conf));
     }
   }
 }
