@@ -88,6 +88,8 @@ import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ByteString;
 
+import javax.annotation.Nullable;
+
 import static org.apache.tez.runtime.library.common.sort.impl.TezSpillRecord.ensureSpillFilePermissions;
 
 public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWriter {
@@ -165,8 +167,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   final AtomicInteger numSpills = new AtomicInteger(0);
   private final AtomicInteger pendingSpillCount = new AtomicInteger(0);
 
-  Path finalIndexPath;
-  Path finalOutPath;
+  // null if writeSpillRecord == false
+  private Path finalIndexPath;
+
+  private Path finalOutPath;
 
   //for single partition cases (e.g UnorderedKVOutput)
   final IFile.Writer writer;
@@ -805,8 +809,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
             TezIndexRecord rec = new TezIndexRecord(0, rawLen, compLen);
             TezSpillRecord sr = new TezSpillRecord(1);
             sr.putIndex(rec, 0);
-            finalIndexPath = outputFileHandler.getOutputIndexFileForWrite(indexFileSizeEstimate);
             if (writeSpillRecord) {
+              finalIndexPath = outputFileHandler.getOutputIndexFileForWrite(indexFileSizeEstimate);
               sr.writeToFile(finalIndexPath, localFs);
             }
             ShuffleUtils.writeToIndexPathCache(outputContext, compositeFetch, finalOutPath, sr);
@@ -1050,12 +1054,16 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     Path indexFilePath = null;
 
     int finalSpillIndex;
+    boolean indexComputed = false;   // true if TezSpillRecord is effectively computed (i.e., indexFilePath set)
     if (!pipelinedShuffle && isFinalMergeEnabled) {
       if (isFinalSpill) {
         outputFilePath = outputFileHandler.getOutputFileForWrite(spillSize);
-        indexFilePath = outputFileHandler.getOutputIndexFileForWrite(indexFileSizeEstimate);
         finalOutPath = outputFilePath;
-        finalIndexPath = indexFilePath;
+        if (writeSpillRecord) {
+          indexFilePath = outputFileHandler.getOutputIndexFileForWrite(indexFileSizeEstimate);
+          finalIndexPath = indexFilePath;
+        }
+        indexComputed = true;   // because indexFilePath is set (ignoring writeSpillRecord)
         finalSpillIndex = -1;   // spill index was not used
       } else {
         outputFilePath = outputFileHandler.getSpillFileForWrite(spillNumber, spillSize);
@@ -1063,11 +1071,14 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       }
     } else {
       outputFilePath = outputFileHandler.getSpillFileForWrite(spillNumber, spillSize);
-      indexFilePath  = outputFileHandler.getSpillIndexFileForWrite(spillNumber, indexFileSizeEstimate);
+      if (writeSpillRecord) {
+        indexFilePath = outputFileHandler.getSpillIndexFileForWrite(spillNumber, indexFileSizeEstimate);
+      }
+      indexComputed = true;   // because indexFilePath is set (ignoring writeSpillRecord)
       finalSpillIndex = spillNumber;
     }
 
-    return new SpillPathDetails(outputFilePath, indexFilePath, finalSpillIndex);
+    return new SpillPathDetails(outputFilePath, indexFilePath, finalSpillIndex, indexComputed);
   }
 
   private void mergeAll() throws IOException {
@@ -1080,7 +1091,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     }
 
     SpillPathDetails spillPathDetails = getSpillPathDetails(true, expectedSize);
-    finalIndexPath = spillPathDetails.indexFilePath;
+    // if !writeSpillRecord, then spillPathDetails.indexFilePath == null
+    if (writeSpillRecord) {
+      finalIndexPath = spillPathDetails.indexFilePath;
+    }
     finalOutPath = spillPathDetails.outputFilePath;
 
     TezSpillRecord finalSpillRecord = new TezSpillRecord(numPartitions);
@@ -1278,7 +1292,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
   private void handleSpillIndex(SpillPathDetails spillPathDetails, TezSpillRecord spillRecord)
       throws IOException {
-    if (spillPathDetails.indexFilePath != null) {
+    if (spillPathDetails.indexComputed) {
       if (writeSpillRecord) {
         spillRecord.writeToFile(spillPathDetails.indexFilePath, localFs);
       }
@@ -1556,8 +1570,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   }
 
   static class SpillPathDetails {
-    final Path indexFilePath;
+    final Path indexFilePath;   // null if writeSpillRecord == false
     final Path outputFilePath;
+    final boolean indexComputed;
 
     // spillIndex < 0: spillIndex should not be used in pathComponent, e.g.:
     //   attempt_1742983838780_0226_4_08_000150_0_12618
@@ -1565,10 +1580,12 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     //   attempt_1742983838780_0226_4_08_000150_0_12618_0
     final int spillIndex;
 
-    SpillPathDetails(Path outputFilePath, Path indexFilePath, int spillIndex) {
+    SpillPathDetails(Path outputFilePath, @Nullable Path indexFilePath, int spillIndex,
+                     boolean indexComputed) {
       this.outputFilePath = outputFilePath;
       this.indexFilePath = indexFilePath;
       this.spillIndex = spillIndex;
+      this.indexComputed = indexComputed;
     }
   }
 }
