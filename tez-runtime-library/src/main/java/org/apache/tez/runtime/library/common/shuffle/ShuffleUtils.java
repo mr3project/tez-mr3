@@ -667,20 +667,23 @@ public class ShuffleUtils {
                                            boolean compositeFetch,
                                            Path outputFilePath,
                                            TezSpillRecord spillRecord) {
-    IndexPathCache indexPathCache = outputContext.getIndexPathCache();
-    String pathComponent = outputContext.getUniqueIdentifier();
-    String mapId = ShuffleUtils.expandPathComponent(
-      outputContext, compositeFetch, pathComponent);
-    indexPathCache.add(mapId, outputFilePath, spillRecord.getByteBuffer());
+    if (compositeFetch) {
+      IndexPathCache indexPathCache = outputContext.getIndexPathCache();
+      String pathComponent = outputContext.getUniqueIdentifier();
+      String mapId = ShuffleUtils.expandPathComponent(outputContext, compositeFetch, pathComponent);
+      indexPathCache.add(mapId, outputFilePath, spillRecord.getByteBuffer());
+    }
   }
 
   public static void writeSpillInfoToIndexPathCache(
       OutputContext outputContext, boolean compositeFetch,
       int spillId, Path outputFilePath, TezSpillRecord spillRecord) {
-    IndexPathCache indexPathCache = outputContext.getIndexPathCache();
-    String pathComponent = ShuffleUtils.getUniqueIdentifierSpillId(outputContext, spillId);
-    String mapId = ShuffleUtils.expandPathComponent(outputContext, compositeFetch, pathComponent);
-    indexPathCache.add(mapId, outputFilePath, spillRecord.getByteBuffer());
+    if (compositeFetch) {
+      IndexPathCache indexPathCache = outputContext.getIndexPathCache();
+      String pathComponent = ShuffleUtils.getUniqueIdentifierSpillId(outputContext, spillId);
+      String mapId = ShuffleUtils.expandPathComponent(outputContext, compositeFetch, pathComponent);
+      indexPathCache.add(mapId, outputFilePath, spillRecord.getByteBuffer());
+    }
   }
 
   public static String expandPathComponent(OutputContext context, boolean compositeFetch, String pathComponent) {
