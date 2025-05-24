@@ -201,7 +201,7 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
 
   protected Map<InputAttemptIdentifier, InputHost.PartitionRange> buildInputMapFromIndex(int pendingInputsIndex) {
     Map<InputAttemptIdentifier, InputHost.PartitionRange> inputsMap = new HashMap<>();
-    for (int i = pendingInputsIndex; i <  numInputs; i++) {
+    for (int i = pendingInputsIndex; i < numInputs; i++) {
       inputsMap.put(pendingInputsSeq.getInputs().get(i), pendingInputsSeq.getPartitionRange());
     }
     return inputsMap;

@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.TaskContext;
@@ -129,24 +130,26 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       codecHolder.set(newCodec);
     }
 
-    HostFetchResult hostFetchResult;
-
     // ignore ShuffleServer.localShufflePorts[] which is not initialized
+    boolean useLocalDiskFetch;
     if (fetcherConfig.localDiskFetchEnabled &&
         host.equals(fetcherConfig.localHostName)) {
       if (fetcherConfig.compositeFetch) {
         // inspect 'first' to find the container where all inputs originate from
         InputAttemptIdentifier first = pendingInputsSeq.getInputs().get(0);
-        boolean originateFromThisContainerWorker = first.getPathComponent().startsWith(
+        // true if inputs originate from the current ContainerWorker
+        useLocalDiskFetch = first.getPathComponent().startsWith(
             taskContext.getExecutionContext().getContainerId());
-        if (originateFromThisContainerWorker) {
-          hostFetchResult = doLocalDiskFetch();
-        } else {
-          hostFetchResult = doHttpFetch();
-        }
       } else {
-        hostFetchResult = doLocalDiskFetch();
+        useLocalDiskFetch = true;
       }
+    } else {
+      useLocalDiskFetch = false;
+    }
+
+    HostFetchResult hostFetchResult;
+    if (useLocalDiskFetch) {
+      hostFetchResult = doLocalDiskFetch();
     } else {
       hostFetchResult = doHttpFetch();
     }
@@ -414,7 +417,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
 
       InputAttemptIdentifier inputAttemptIdentifier = pendingInputsSeq.getInputs().get(index);
       String pathComponent = inputAttemptIdentifier.getPathComponent();   // already in expanded form
-      TezSpillRecord spillRecord = null;
+      TezSpillRecord spillRecord = null;  // specific to each inputAttemptIdentifier/pathComponent
       Path inputFilePath = null;
 
       boolean hasFailures = false;  // set to true if errors occur inside the inner loop
@@ -434,11 +437,13 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
             spillRecord = pair.getKey();
             inputFilePath = pair.getValue();
           }
-          TezIndexRecord idxRecord = spillRecord.getIndex(reduceId);
-          fetchedInput = getLocalDiskFetchedInput(srcAttemptId, idxRecord, inputFilePath);
+          TezIndexRecord indexRecord = spillRecord.getIndex(reduceId);
+          // TODO: continue if !indexRecord.hasData()
+
+          fetchedInput = getLocalDiskFetchedInput(srcAttemptId, indexRecord, inputFilePath);
           long endTime = System.currentTimeMillis();
           fetcherCallback.fetchSucceeded(shuffleManagerId, host, srcAttemptId, fetchedInput,
-              idxRecord.getPartLength(), idxRecord.getRawLength(), (endTime - startTime));
+              indexRecord.getPartLength(), indexRecord.getRawLength(), (endTime - startTime));
         } catch (IOException | InternalError e) {
           hasFailures = true;
           cleanupFetchedInput(fetchedInput);
@@ -484,12 +489,10 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
   }
 
   private LocalDiskFetchedInput getLocalDiskFetchedInput(
-      InputAttemptIdentifier srcAttemptId, TezIndexRecord idxRecord, Path inputFilePath)
-      throws IOException {
-    LocalDiskFetchedInput fetchedInput = new LocalDiskFetchedInput(idxRecord.getStartOffset(),
-      idxRecord.getPartLength(), srcAttemptId,
-      inputFilePath,
-      conf,
+      InputAttemptIdentifier srcAttemptId, TezIndexRecord indexRecord, Path inputFilePath) {
+    LocalDiskFetchedInput fetchedInput = new LocalDiskFetchedInput(
+      indexRecord.getStartOffset(), indexRecord.getPartLength(),
+      srcAttemptId, inputFilePath, fetcherConfig.localFs,
       new FetchedInputCallback() {
         @Override
         public void fetchComplete(FetchedInput fetchedInput) {
@@ -505,7 +508,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       });
     if (isDebugEnabled) {
       LOG.debug("fetcher" + " about to shuffle output of srcAttempt (direct disk)" + srcAttemptId
-        + " decomp: " + idxRecord.getRawLength() + " len: " + idxRecord.getPartLength()
+        + " decomp: " + indexRecord.getRawLength() + " len: " + indexRecord.getPartLength()
         + " to " + fetchedInput.getType());
     }
 

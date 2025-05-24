@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.SocketTimeoutException;
 import java.net.URL;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -31,12 +32,9 @@ import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.runtime.api.TaskContext;
-import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.shuffle.FetchResult;
 import org.apache.tez.runtime.library.common.shuffle.Fetcher;
@@ -187,13 +185,27 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
   }
 
   private Map<InputAttemptIdentifier, InputHost.PartitionRange> fetchNext() throws InterruptedException {
+    boolean useLocalDiskFetch;
+    if (fetcherConfig.localDiskFetchOrderedEnabled &&
+        host.equals(fetcherConfig.localHostName)) {
+      if (fetcherConfig.compositeFetch) {
+        // inspect 'first' to find the container where all inputs originate from
+        InputAttemptIdentifier first = pendingInputsSeq.getInputs().get(0);
+        // true if inputs originate from the current ContainerWorker
+        useLocalDiskFetch = first.getPathComponent().startsWith(
+            taskContext.getExecutionContext().getContainerId());
+      } else {
+        useLocalDiskFetch = true;
+      }
+    } else {
+      useLocalDiskFetch = false;
+    }
+
     List<InputAttemptIdentifier> failedFetches = null;
     Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs = null;
-    boolean useLocalDiskFetch =
-      fetcherConfig.localDiskFetchOrderedEnabled && host.equals(fetcherConfig.localHostName);
+
     try {
       fetcherCallback.waitForMergeManager(shuffleSchedulerId);
-
       if (useLocalDiskFetch) {
         failedFetches = setupLocalDiskFetch();
       } else {
@@ -655,7 +667,9 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       }
 
       InputAttemptIdentifier inputAttemptIdentifier = pendingInputsSeq.getInputs().get(index);
-      String pathComponent = inputAttemptIdentifier.getPathComponent();
+      String pathComponent = inputAttemptIdentifier.getPathComponent();   // already in expanded form
+      TezSpillRecord spillRecord = null;  // specific to each inputAttemptIdentifier/pathComponent
+      Path inputFilePath = null;
 
       MapOutput mapOutput = null;
       boolean hasFailures = false;
@@ -666,12 +680,22 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
 
         try {
           long startTime = System.currentTimeMillis();
-          Path filename = getShuffleInputFileName(pathComponent, "");
-          TezIndexRecord indexRecord = getIndexRecord(pathComponent, reduceId);
-          if(!indexRecord.hasData()) {
+
+          // pathComponent == srcAttemptId.getPathComponent(), so we compute spillRecord and inputFilePath only once
+          if (spillRecord == null) {
+            AbstractMap.SimpleEntry<TezSpillRecord, Path> pair = ShuffleUtils.getTezSpillRecordInputFilePath(
+                taskContext, pathComponent, fetcherConfig.compositeFetch,
+                shuffleScheduler.getDagIdentifier(), conf,
+                fetcherConfig.localDirAllocator, fetcherConfig.localFs);
+            spillRecord = pair.getKey();
+            inputFilePath = pair.getValue();
+          }
+          TezIndexRecord indexRecord = spillRecord.getIndex(reduceId);
+          if (!indexRecord.hasData()) {
             continue;
           }
-          mapOutput = getMapOutputForDirectDiskFetch(srcAttemptId, filename, indexRecord);
+
+          mapOutput = getMapOutputForDirectDiskFetch(srcAttemptId, inputFilePath, indexRecord);
           long endTime = System.currentTimeMillis();
           fetcherCallback.fetchSucceeded(shuffleSchedulerId, host, srcAttemptId, mapOutput,
               indexRecord.getPartLength(), indexRecord.getRawLength(), (endTime - startTime));
@@ -722,23 +746,6 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         }
       }
     }
-  }
-
-  //TODO: Refactor following to make use of methods from TezTaskOutputFiles to be consistent.
-  private Path getShuffleInputFileName(String pathComponent, String suffix) throws IOException {
-    LocalDirAllocator localDirAllocator = new LocalDirAllocator(TezRuntimeFrameworkConfigs.LOCAL_DIRS);
-    String pathFromLocalDir =
-        ShuffleUtils.adjustPathComponent(fetcherConfig.compositeFetch, dagId, pathComponent) +
-            Path.SEPARATOR + Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING + suffix;
-
-    return localDirAllocator.getLocalPathToRead(pathFromLocalDir, conf);
-  }
-
-  private TezIndexRecord getIndexRecord(String pathComponent, int partitionId) throws IOException {
-    Path indexFile = getShuffleInputFileName(pathComponent,
-        Constants.TEZ_RUNTIME_TASK_OUTPUT_INDEX_SUFFIX_STRING);
-    TezSpillRecord spillRecord = new TezSpillRecord(indexFile, fetcherConfig.localFs);
-    return spillRecord.getIndex(partitionId);
   }
 
   private MapOutput getMapOutputForDirectDiskFetch(InputAttemptIdentifier srcAttemptId, Path filename,
