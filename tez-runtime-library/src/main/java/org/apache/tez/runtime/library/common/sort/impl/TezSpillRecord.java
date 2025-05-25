@@ -49,6 +49,11 @@ public class TezSpillRecord {
     entries = buf.asLongBuffer();
   }
 
+  public TezSpillRecord(Path indexFileName, FileSystem fs, String expectedIndexOwner)
+    throws IOException {
+    this(indexFileName, fs);
+  }
+
   public TezSpillRecord(Path indexFileName, FileSystem rfs) throws IOException {
     assert indexFileName != null;   // writeSpillRecord should be false in UnorderedPartitionedKVWriter/PipelinedSorter
     Checksum crc = new PureJavaCrc32();
