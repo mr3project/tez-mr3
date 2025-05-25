@@ -123,7 +123,7 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
       }
       // Check if we can find free memory in the current ContainerWorker.
       long currentFreeMemory = Runtime.getRuntime().freeMemory();
-      if (currentFreeMemory < maxAvailableTaskMemory){
+      if (currentFreeMemory < maxAvailableTaskMemory) {
         // this ContainerWorker is busy serving Tasks, so do not borrow
         // TODO: introduce a factor for maxAvailableTaskMemory (e.g. 0.5)
         LOG.info("Creating DiskFetchedInput: {}, {} < maxAvailableTaskMemory", actualSize, currentFreeMemory);

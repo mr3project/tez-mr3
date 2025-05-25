@@ -76,6 +76,7 @@ public class IFile {
 
   private static final int INT_SIZE = 4;
 
+  // Cf. see TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_MAX_SIZE
   public static final int WRITER_BUFFER_SIZE_DEFAULT = 4 * 1024;
 
   public static byte[] allocateWriteBuffer() {
