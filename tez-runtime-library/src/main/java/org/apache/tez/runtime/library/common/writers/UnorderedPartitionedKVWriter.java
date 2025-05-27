@@ -24,6 +24,7 @@ import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collections;
 import java.util.List;
@@ -450,11 +451,12 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
     // Meta-data updates
     int metaIndex = metaStart / INT_SIZE;
-    int indexNext = currentBuffer.partitionPositions[partition];
 
     currentBuffer.metaBuffer.put(metaIndex + INDEX_KEYLEN, (valStart - (metaStart + META_SIZE)));
     currentBuffer.metaBuffer.put(metaIndex + INDEX_VALLEN, (currentBuffer.nextPosition - valStart));
-    currentBuffer.metaBuffer.put(metaIndex + INDEX_NEXT, indexNext);
+    // This new record is currently the end of its partition's list in this buffer.
+    currentBuffer.metaBuffer.put(metaIndex + INDEX_NEXT, WrappedBuffer.PARTITION_ABSENT_POSITION);
+
     currentBuffer.skipSize += metaSkip; // For size estimation
     // Update stats on number of records
     localOutputRecordBytesCounter += (currentBuffer.nextPosition - (metaStart + META_SIZE));
@@ -463,12 +465,22 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     if (localOutputRecordBytesCounter % NOTIFY_THRESHOLD == 0) {
       updateTezCountersAndNotify();
     }
-    currentBuffer.partitionPositions[partition] = metaStart;
-    currentBuffer.recordsPerPartition[partition]++;
-    currentBuffer.sizePerPartition[partition] +=
-        currentBuffer.nextPosition - (metaStart + META_SIZE);
-    currentBuffer.numRecords++;
 
+    int currentPartitionTailOffset = currentBuffer.partitionTails[partition];
+    if (currentPartitionTailOffset != WrappedBuffer.PARTITION_ABSENT_POSITION) {
+      // If there was a previous tail for this partition, link it to this new record.
+      int previousTailMetaIndexInInts = currentPartitionTailOffset / INT_SIZE;
+      currentBuffer.metaBuffer.put(previousTailMetaIndexInInts + INDEX_NEXT, metaStart);
+    } else {
+      // This is the first record for this partition in this buffer.
+      currentBuffer.partitionHeads[partition] = metaStart;
+    }
+    // This new record becomes the new tail for this partition in this buffer.
+    currentBuffer.partitionTails[partition] = metaStart;
+
+    currentBuffer.recordsPerPartition[partition]++;
+    currentBuffer.sizePerPartition[partition] += currentBuffer.nextPosition - (metaStart + META_SIZE);
+    currentBuffer.numRecords++;
   }
 
   private void updateTezCountersAndNotify() {
@@ -481,7 +493,6 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   }
 
   private void setupNextBuffer() throws IOException {
-
     if (currentBuffer.numRecords == 0) {
       currentBuffer.reset();
     } else {
@@ -631,14 +642,14 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           long segmentStart = out.getPos();
           long numRecords = 0;
           for (WrappedBuffer buffer : filledBuffers) {
-            if (buffer.partitionPositions[i] == WrappedBuffer.PARTITION_ABSENT_POSITION) {
+            if (buffer.partitionHeads[i] == WrappedBuffer.PARTITION_ABSENT_POSITION) {
               // Skip empty partition.
               continue;
             }
             if (writer == null) {
               writer = new Writer(keySerialization, valSerialization, out, keyClass, valClass, codec, null, null, false, writeBuffer);
             }
-            numRecords += writePartition(buffer.partitionPositions[i], buffer, writer, key, val);
+            numRecords += writePartition(buffer.partitionHeads[i], buffer, writer, key, val);
           }
           if (writer != null) {
             if (numRecordsCounter != null) {
@@ -1118,9 +1129,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         writer = new Writer(keySerialization, valSerialization, out, keyClass, valClass, codec, null, null, false, writeBuffer);
         try {
           if (currentBuffer.nextPosition != 0
-              && currentBuffer.partitionPositions[i] != WrappedBuffer.PARTITION_ABSENT_POSITION) {
+              && currentBuffer.partitionHeads[i] != WrappedBuffer.PARTITION_ABSENT_POSITION) {
             // Write current buffer.
-            writePartition(currentBuffer.partitionPositions[i], currentBuffer, writer, keyBuffer,
+            writePartition(currentBuffer.partitionHeads[i], currentBuffer, writer, keyBuffer,
                 valBuffer);
           }
           synchronized (spillInfoList) {
@@ -1318,7 +1329,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       write(scratch, 0, 1);
     }
 
-    public void write(byte[] b, int off, int len) throws IOException {
+    public void write(byte[] b, int off, int len) {
       if (currentBuffer.full) {
           /* no longer do anything until reset */
       } else if (len > currentBuffer.availableSize) {
@@ -1335,46 +1346,45 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
     private static final int PARTITION_ABSENT_POSITION = -1;
 
-    private final int[] partitionPositions;
+    // FIFO pointers for each partition
+    private final int[] partitionHeads;   // Points to the first record of a partition
+    private final int[] partitionTails;   // Points to the last record of a partition
     private final int[] recordsPerPartition;
     // uncompressed size for each partition
     private final long[] sizePerPartition;
-    private final int numPartitions;
-    private final int size;
 
+    private final int size;
     private byte[] buffer;
     private IntBuffer metaBuffer;
+    private int availableSize;
 
     private int numRecords = 0;
     private int skipSize = 0;
-
     private int nextPosition = 0;
-    private int availableSize;
     private boolean full = false;
 
     WrappedBuffer(int numPartitions, int size) {
-      this.partitionPositions = new int[numPartitions];
+      this.partitionHeads = new int[numPartitions];
+      this.partitionTails = new int[numPartitions];
       this.recordsPerPartition = new int[numPartitions];
       this.sizePerPartition = new long[numPartitions];
-      this.numPartitions = numPartitions;
-      for (int i = 0; i < numPartitions; i++) {
-        this.partitionPositions[i] = PARTITION_ABSENT_POSITION;
-        this.recordsPerPartition[i] = 0;
-        this.sizePerPartition[i] = 0;
-      }
+      Arrays.fill(this.partitionHeads, PARTITION_ABSENT_POSITION);
+      Arrays.fill(this.partitionTails, PARTITION_ABSENT_POSITION);
+      Arrays.fill(this.recordsPerPartition, 0);
+      Arrays.fill(this.sizePerPartition, 0L);
+
       size = size - (size % INT_SIZE);
       this.size = size;
       this.buffer = new byte[size];
       this.metaBuffer = ByteBuffer.wrap(buffer).order(ByteOrder.nativeOrder()).asIntBuffer();
-      availableSize = size;
+      this.availableSize = size;
     }
 
     void reset() {
-      for (int i = 0; i < numPartitions; i++) {
-        this.partitionPositions[i] = PARTITION_ABSENT_POSITION;
-        this.recordsPerPartition[i] = 0;
-        this.sizePerPartition[i] = 0;
-      }
+      Arrays.fill(partitionHeads, PARTITION_ABSENT_POSITION);
+      Arrays.fill(partitionTails, PARTITION_ABSENT_POSITION);
+      Arrays.fill(recordsPerPartition, 0);
+      Arrays.fill(sizePerPartition, 0L);
       numRecords = 0;
       nextPosition = 0;
       skipSize = 0;
