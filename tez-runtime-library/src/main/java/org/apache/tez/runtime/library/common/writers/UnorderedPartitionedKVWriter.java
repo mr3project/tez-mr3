@@ -109,33 +109,65 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   // buffer and the main path instead of having multiple arrays.
 
   private final String destNameTrimmed;
+  private final boolean isFinalMergeEnabled;
+  private final boolean pipelinedShuffle;
+  // To store events when final merge is disabled
+  private final List<Event> finalEvents;
+
+  private boolean dataViaEventsEnabled;
+  private int dataViaEventsMaxSize;
+  private final boolean useCachedStream;
+  private final boolean compositeFetch;
+  private final boolean writeSpillRecord;
+
   private final long availableMemory;
-  final WrappedBuffer[] buffers;
-  final BlockingQueue<WrappedBuffer> availableBuffers;
+
+  private final FileSystem rfs;
+
+  // for single partition cases
+  private final IFile.Writer writer;
+  private final boolean skipBuffers;
+
+  private int numBuffers;
+  private int sizePerBuffer;
+  private int lastBufferSize;
+  private int spillLimit;
+
+  private final BlockingQueue<WrappedBuffer> availableBuffers;
+  private final WrappedBuffer[] buffers;
+  private int numInitializedBuffers;
+  private WrappedBuffer currentBuffer;
   private final ByteArrayOutputStream baos;
   private final NonSyncDataOutputStream dos;
-  WrappedBuffer currentBuffer;
-  private final FileSystem rfs;
 
   private final List<SpillInfo> spillInfoList = Collections
       .synchronizedList(new ArrayList<SpillInfo>());
 
+  private final Semaphore availableSlots;
   private final ListeningExecutorService spillExecutor;
 
   private final int[] numRecordsPerPartition;
-  private long localOutputRecordBytesCounter;
-  private long localOutputBytesWithOverheadCounter;
-  private long localOutputRecordsCounter;
+  // How partition stats should be reported.
+  final ReportPartitionStats reportPartitionStats;
+  private final long[] sizePerPartition;
+
+  /**
+   * Represents final number of records written (spills are not counted)
+   */
+  protected final TezCounter outputLargeRecordsCounter;
+
+  private final long indexFileSizeEstimate;
+
+  private long localOutputRecordBytesCounter = 0;
+  private long localOutputBytesWithOverheadCounter = 0;
+  private long localOutputRecordsCounter = 0;
   // notify after x records
   private static final int NOTIFY_THRESHOLD = 1000;
+
   // uncompressed size for each partition
-  private final long[] sizePerPartition;
   private volatile long spilledSize = 0;
-  private boolean dataViaEventsEnabled;
-  private int dataViaEventsMaxSize;
 
   static final ThreadLocal<Deflater> deflater = new ThreadLocal<Deflater>() {
-
     @Override
     public Deflater initialValue() {
       return TezCommonUtils.newBestCompressionDeflater();
@@ -149,52 +181,18 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     }
   };
 
-  private final Semaphore availableSlots;
-
-  /**
-   * Represents final number of records written (spills are not counted)
-   */
-  protected final TezCounter outputLargeRecordsCounter;
-
-  int numBuffers;
-  int sizePerBuffer;
-  int lastBufferSize;
-  int numInitializedBuffers;
-  int spillLimit;
-
   private Throwable spillException;
-  private AtomicBoolean isShutdown = new AtomicBoolean(false);
-  final AtomicInteger numSpills = new AtomicInteger(0);
+  private final AtomicBoolean isShutdown = new AtomicBoolean(false);
+  private final AtomicInteger numSpills = new AtomicInteger(0);
   private final AtomicInteger pendingSpillCount = new AtomicInteger(0);
-
-  // null if writeSpillRecord == false
-  private Path finalIndexPath;
-
-  private Path finalOutPath;
-
-  // for single partition cases (e.g UnorderedKVOutput)
-  final IFile.Writer writer;
-  final boolean skipBuffers;
-
   private final ReentrantLock spillLock = new ReentrantLock();
   private final Condition spillInProgress = spillLock.newCondition();
 
-  private final boolean pipelinedShuffle;
-  private final boolean isFinalMergeEnabled;
-  // To store events when final merge is disabled
-  private final List<Event> finalEvents;
-  // How partition stats should be reported.
-  final ReportPartitionStats reportPartitionStats;
+  private final List<WrappedBuffer> filledBuffers = new ArrayList<>();
 
-  private final long indexFileSizeEstimate;
-
-  private List<WrappedBuffer> filledBuffers = new ArrayList<>();
-
-  // When enabled, uses in-mem ifile writer
-  private final boolean useCachedStream;
-
-  private final boolean compositeFetch;
-  private final boolean writeSpillRecord;
+  // null if writeSpillRecord == false
+  private Path finalIndexPath;
+  private Path finalOutPath;
 
   public UnorderedPartitionedKVWriter(OutputContext outputContext, Configuration conf,
       int numOutputs, long availableMemoryBytes) throws IOException {
@@ -215,16 +213,13 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     this.dataViaEventsEnabled = conf.getBoolean(
        TezRuntimeConfiguration.TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_ENABLED,
        TezRuntimeConfiguration.TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_ENABLED_DEFAULT);
-
     // No max cap on size (intentional)
     this.dataViaEventsMaxSize = conf.getInt(
        TezRuntimeConfiguration.TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_MAX_SIZE,
        TezRuntimeConfiguration.TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_MAX_SIZE_DEFAULT);
-
     boolean useCachedStreamConfig = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_SUPPORT_IN_MEM_FILE,
         TezRuntimeConfiguration.TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_SUPPORT_IN_MEM_FILE_DEFAULT);
-
     this.useCachedStream = useCachedStreamConfig &&
         (this.dataViaEventsEnabled && (numPartitions == 1) && !pipelinedShuffle);
 
@@ -242,55 +237,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     // Ideally, should be significantly larger.
     availableMemory = availableMemoryBytes;
 
-    // Allow unit tests to control the buffer sizes.
-    int maxSingleBufferSizeBytes = conf.getInt(
-        TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_OUTPUT_MAX_PER_BUFFER_SIZE_BYTES,
-        Integer.MAX_VALUE);
-    computeNumBuffersAndSize(maxSingleBufferSizeBytes);
-
-    availableBuffers = new LinkedBlockingQueue<WrappedBuffer>();
-    buffers = new WrappedBuffer[numBuffers];
-    // Set up only the first buffer to start with.
-    buffers[0] = new WrappedBuffer(numOutputs, sizePerBuffer);
-    numInitializedBuffers = 1;
-    if (LOG.isDebugEnabled()) {
-      LOG.debug(destNameTrimmed + ": " + "Initializing Buffer #" +
-          numInitializedBuffers + " with size=" + sizePerBuffer);
-    }
-    currentBuffer = buffers[0];
-    baos = new ByteArrayOutputStream();
-    dos = new NonSyncDataOutputStream(baos);
-    keySerializer.open(dos);
-    valSerializer.open(dos);
     rfs = ((LocalFileSystem) FileSystem.getLocal(this.conf)).getRaw();
-
-    int maxThreads = Math.max(2, numBuffers/2);
-    // TODO: Make use of TezSharedExecutor later
-    ExecutorService executor = new ThreadPoolExecutor(1, maxThreads,
-        60L, TimeUnit.SECONDS,
-        new SynchronousQueue<Runnable>(),
-        new ThreadFactoryBuilder()
-            .setDaemon(true)
-            .setNameFormat("UnorderedOutSpiller {" + TezUtilsInternal.cleanVertexName(
-                    outputContext.getDestinationVertexName()) + "} #%d")
-            .build()
-    );
-    // to restrict submission of more tasks than threads (e.g numBuffers > numThreads)
-    // This is maxThreads - 1, to avoid race between callback thread releasing semaphore and the
-    // thread calling tryAcquire.
-    availableSlots = new Semaphore(maxThreads - 1, true);
-    spillExecutor = MoreExecutors.listeningDecorator(executor);
-    numRecordsPerPartition = new int[numPartitions];
-    reportPartitionStats = ReportPartitionStats.fromString(
-        conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_REPORT_PARTITION_STATS,
-        TezRuntimeConfiguration.TEZ_RUNTIME_REPORT_PARTITION_STATS_DEFAULT));
-    sizePerPartition = (reportPartitionStats.isEnabled()) ?
-        new long[numPartitions] : null;
-
-    outputLargeRecordsCounter = outputContext.getCounters().findCounter(
-        TaskCounter.OUTPUT_LARGE_RECORDS);
-
-    indexFileSizeEstimate = numPartitions * Constants.MAP_OUTPUT_INDEX_RECORD_LENGTH;
 
     if (numPartitions == 1 && !pipelinedShuffle) {
       // special case, where in only one partition is available.
@@ -312,12 +259,61 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       skipBuffers = false;
       writer = null;
     }
+
+    // Allow unit tests to control the buffer sizes.
+    int maxSingleBufferSizeBytes = conf.getInt(
+        TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_OUTPUT_MAX_PER_BUFFER_SIZE_BYTES,
+        Integer.MAX_VALUE);
+    computeNumBuffersAndSize(maxSingleBufferSizeBytes);
+
+    availableBuffers = new LinkedBlockingQueue<WrappedBuffer>();
+    buffers = new WrappedBuffer[numBuffers];
+    // Set up only the first buffer to start with.
+    buffers[0] = new WrappedBuffer(numOutputs, sizePerBuffer);
+    numInitializedBuffers = 1;
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(destNameTrimmed + ": " + "Initializing Buffer #" +
+          numInitializedBuffers + " with size=" + sizePerBuffer);
+    }
+    currentBuffer = buffers[0];
+    baos = new ByteArrayOutputStream();
+    dos = new NonSyncDataOutputStream(baos);
+    keySerializer.open(dos);
+    valSerializer.open(dos);
+
+    int maxThreads = Math.max(2, numBuffers/2);
+    // TODO: Make use of TezSharedExecutor later
+    ExecutorService executor = new ThreadPoolExecutor(1, maxThreads,
+        60L, TimeUnit.SECONDS,
+        new SynchronousQueue<Runnable>(),
+        new ThreadFactoryBuilder()
+            .setDaemon(true)
+            .setNameFormat("UnorderedOutSpiller {" + TezUtilsInternal.cleanVertexName(
+                    outputContext.getDestinationVertexName()) + "} #%d")
+            .build()
+    );
+    // to restrict submission of more tasks than threads (e.g numBuffers > numThreads)
+    // This is maxThreads - 1, to avoid race between callback thread releasing semaphore and the
+    // thread calling tryAcquire.
+    availableSlots = new Semaphore(maxThreads - 1, true);
+    spillExecutor = MoreExecutors.listeningDecorator(executor);
+
+    numRecordsPerPartition = new int[numPartitions];
+    reportPartitionStats = ReportPartitionStats.fromString(conf.get(
+        TezRuntimeConfiguration.TEZ_RUNTIME_REPORT_PARTITION_STATS,
+        TezRuntimeConfiguration.TEZ_RUNTIME_REPORT_PARTITION_STATS_DEFAULT));
+    sizePerPartition = (reportPartitionStats.isEnabled()) ? new long[numPartitions] : null;
+
+    outputLargeRecordsCounter = outputContext.getCounters().findCounter(
+        TaskCounter.OUTPUT_LARGE_RECORDS);
+
+    indexFileSizeEstimate = numPartitions * Constants.MAP_OUTPUT_INDEX_RECORD_LENGTH;
+
     LOG.info("{}: numBuffers={}, sizePerBuffer={}, numPartitions={}",
         destNameTrimmed, numBuffers, sizePerBuffer, numPartitions);
     if (LOG.isDebugEnabled()) {
       LOG.debug("skippBuffers=" + skipBuffers
           + ", availableMemory=" + availableMemory
-          + ", maxSingleBufferSizeBytes=" + maxSingleBufferSizeBytes
           + ", pipelinedShuffle=" + pipelinedShuffle
           + ", isFinalMergeEnabled=" + isFinalMergeEnabled
           + ", numPartitions=" + numPartitions);
