@@ -133,18 +133,19 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   private int lastBufferSize;
   private int spillLimit;
 
-  private final BlockingQueue<WrappedBuffer> availableBuffers;
-  private final WrappedBuffer[] buffers;
-  private int numInitializedBuffers;
-  private WrappedBuffer currentBuffer;
   private final ByteArrayOutputStream baos;
   private final NonSyncDataOutputStream dos;
+
+  private BlockingQueue<WrappedBuffer> availableBuffers;
+  private WrappedBuffer[] buffers;
+  private int numInitializedBuffers;
+  private WrappedBuffer currentBuffer;
 
   private final List<SpillInfo> spillInfoList = Collections
       .synchronizedList(new ArrayList<SpillInfo>());
 
-  private final Semaphore availableSlots;
-  private final ListeningExecutorService spillExecutor;
+  private Semaphore availableSlots;
+  private ListeningExecutorService spillExecutor;
 
   private final int[] numRecordsPerPartition;
   // How partition stats should be reported.
@@ -260,43 +261,46 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       writer = null;
     }
 
-    // Allow unit tests to control the buffer sizes.
-    int maxSingleBufferSizeBytes = conf.getInt(
-        TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_OUTPUT_MAX_PER_BUFFER_SIZE_BYTES,
-        Integer.MAX_VALUE);
-    computeNumBuffersAndSize(maxSingleBufferSizeBytes);
-
-    availableBuffers = new LinkedBlockingQueue<WrappedBuffer>();
-    buffers = new WrappedBuffer[numBuffers];
-    // Set up only the first buffer to start with.
-    buffers[0] = new WrappedBuffer(numOutputs, sizePerBuffer);
-    numInitializedBuffers = 1;
-    if (LOG.isDebugEnabled()) {
-      LOG.debug(destNameTrimmed + ": " + "Initializing Buffer #" +
-          numInitializedBuffers + " with size=" + sizePerBuffer);
-    }
-    currentBuffer = buffers[0];
     baos = new ByteArrayOutputStream();
     dos = new NonSyncDataOutputStream(baos);
     keySerializer.open(dos);
     valSerializer.open(dos);
 
-    int maxThreads = Math.max(2, numBuffers/2);
-    // TODO: Make use of TezSharedExecutor later
-    ExecutorService executor = new ThreadPoolExecutor(1, maxThreads,
-        60L, TimeUnit.SECONDS,
-        new SynchronousQueue<Runnable>(),
-        new ThreadFactoryBuilder()
-            .setDaemon(true)
-            .setNameFormat("UnorderedOutSpiller {" + TezUtilsInternal.cleanVertexName(
-                    outputContext.getDestinationVertexName()) + "} #%d")
-            .build()
-    );
-    // to restrict submission of more tasks than threads (e.g numBuffers > numThreads)
-    // This is maxThreads - 1, to avoid race between callback thread releasing semaphore and the
-    // thread calling tryAcquire.
-    availableSlots = new Semaphore(maxThreads - 1, true);
-    spillExecutor = MoreExecutors.listeningDecorator(executor);
+    if (!skipBuffers) {
+      // Allow unit tests to control the buffer sizes.
+      int maxSingleBufferSizeBytes = conf.getInt(
+          TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_OUTPUT_MAX_PER_BUFFER_SIZE_BYTES,
+          Integer.MAX_VALUE);
+      computeNumBuffersAndSize(maxSingleBufferSizeBytes);
+
+      availableBuffers = new LinkedBlockingQueue<WrappedBuffer>();
+      buffers = new WrappedBuffer[numBuffers];
+      // Set up only the first buffer to start with.
+      buffers[0] = new WrappedBuffer(numOutputs, sizePerBuffer);
+      numInitializedBuffers = 1;
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(destNameTrimmed + ": " + "Initializing Buffer #" +
+            numInitializedBuffers + " with size=" + sizePerBuffer);
+      }
+      currentBuffer = buffers[0];
+
+      int maxThreads = Math.max(2, numBuffers/2);
+      // TODO: Make use of TezSharedExecutor later
+      ExecutorService executor = new ThreadPoolExecutor(1, maxThreads,
+          60L, TimeUnit.SECONDS,
+          new SynchronousQueue<Runnable>(),
+          new ThreadFactoryBuilder()
+              .setDaemon(true)
+              .setNameFormat("UnorderedOutSpiller {" + TezUtilsInternal.cleanVertexName(
+                      outputContext.getDestinationVertexName()) + "} #%d")
+              .build()
+      );
+      // to restrict submission of more tasks than threads (e.g numBuffers > numThreads)
+      // This is maxThreads - 1, to avoid race between callback thread releasing semaphore and the
+      // thread calling tryAcquire.
+      availableSlots = new Semaphore(maxThreads - 1, true);
+      spillExecutor = MoreExecutors.listeningDecorator(executor);
+    }
 
     numRecordsPerPartition = new int[numPartitions];
     reportPartitionStats = ReportPartitionStats.fromString(conf.get(
