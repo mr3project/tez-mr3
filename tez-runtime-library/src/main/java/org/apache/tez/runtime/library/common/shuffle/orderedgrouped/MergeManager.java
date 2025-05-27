@@ -589,7 +589,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
             "TotalInMemFetchStats: count={}, totalSize={}, min={}, max={}, avg={}",
             statsInMemTotal.count, statsInMemTotal.size,
             statsInMemTotal.minSize, statsInMemTotal.maxSize,
-            (statsInMemTotal.size / (float) statsInMemTotal.size));
+            (statsInMemTotal.size / (float) statsInMemTotal.count));
       }
 
       // Don't attempt a final merge if close is invoked as a result of a previous

@@ -27,16 +27,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
-
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.tez.runtime.api.TaskFailureType;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalDirAllocator;
@@ -66,8 +61,6 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
  * Usage: Create instance, setInitialMemoryAllocated(long), run()
  *
  */
-@InterfaceAudience.Private
-@InterfaceStability.Unstable
 public class Shuffle implements ExceptionReporter {
 
   private static final Logger LOG = LoggerFactory.getLogger(Shuffle.class);
@@ -75,9 +68,7 @@ public class Shuffle implements ExceptionReporter {
   private final InputContext inputContext;
 
   private final ShuffleInputEventHandlerOrderedGrouped eventHandler;
-  @VisibleForTesting
   final ShuffleScheduler shuffleScheduler;
-  @VisibleForTesting
   final MergeManager merger;
 
   private final AtomicReference<Throwable> throwable = new AtomicReference<Throwable>();
@@ -121,11 +112,8 @@ public class Shuffle implements ExceptionReporter {
     LocalDirAllocator localDirAllocator =
         new LocalDirAllocator(TezRuntimeFrameworkConfigs.LOCAL_DIRS);
 
-    // TODO TEZ Get rid of Map / Reduce references.
-    TezCounter spilledRecordsCounter =
-        inputContext.getCounters().findCounter(TaskCounter.SPILLED_RECORDS);
-    TezCounter mergedMapOutputsCounter =
-        inputContext.getCounters().findCounter(TaskCounter.MERGED_MAP_OUTPUTS);
+    TezCounter spilledRecordsCounter = inputContext.getCounters().findCounter(TaskCounter.SPILLED_RECORDS);
+    TezCounter mergedMapOutputsCounter = inputContext.getCounters().findCounter(TaskCounter.MERGED_MAP_OUTPUTS);
 
     LOG.info("{}: Shuffle assigned with {} inputs, codec: {} , ifileReadAhead: {}",
         srcNameTrimmed, numInputs, codec == null ? "None" : codec.getClass().getName(), ifileReadAhead);
@@ -365,7 +353,6 @@ public class Shuffle implements ExceptionReporter {
 
   // the caller should not hold synchronized(ShuffleScheduler.this) because cleanupShuffleSchedulerIgnoreErrors()
   // may call ShuffleScheduler.close(), which may call Referee.join() while Referee is waiting for ShuffleScheduler.this.
-  @Private
   @Override
   public synchronized void reportException(Throwable t) {
     // RunShuffleCallable onFailure deals with ignoring errors on shutdown.
@@ -380,7 +367,6 @@ public class Shuffle implements ExceptionReporter {
     }
   }
 
-  @Private
   @Override
   public void killSelf(Exception exception, String message) {
     synchronized (this) {
@@ -403,7 +389,6 @@ public class Shuffle implements ExceptionReporter {
     }
   }
 
-  @Private
   public static long getInitialMemoryRequirement(Configuration conf, long maxAvailableTaskMemory) {
     return MergeManager.getInitialMemoryRequirement(conf, maxAvailableTaskMemory);
   }

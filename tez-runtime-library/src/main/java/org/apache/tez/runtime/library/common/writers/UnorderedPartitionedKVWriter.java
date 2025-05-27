@@ -202,8 +202,6 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     Preconditions.checkArgument(availableMemoryBytes >= 0, "availableMemory should be >= 0 bytes");
 
     this.destNameTrimmed = TezUtilsInternal.cleanVertexName(outputContext.getDestinationVertexName());
-    //Not checking for TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT as it might not add much value in
-    // this case.  Add it later if needed.
     boolean pipelinedShuffleConf = this.conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED,
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT);
@@ -272,8 +270,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         new SynchronousQueue<Runnable>(),
         new ThreadFactoryBuilder()
             .setDaemon(true)
-            .setNameFormat(
-                "UnorderedOutSpiller {" + TezUtilsInternal.cleanVertexName(
+            .setNameFormat("UnorderedOutSpiller {" + TezUtilsInternal.cleanVertexName(
                     outputContext.getDestinationVertexName()) + "} #%d")
             .build()
     );

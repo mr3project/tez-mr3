@@ -177,8 +177,7 @@ public class TezRuntimeConfiguration {
    */
   @ConfigurationProperty(type = "integer")
   public static final String TEZ_RUNTIME_UNORDERED_OUTPUT_MAX_PER_BUFFER_SIZE_BYTES =
-      TEZ_RUNTIME_PREFIX +
-          "unordered.output.max-per-buffer.size-bytes";
+      TEZ_RUNTIME_PREFIX + "unordered.output.max-per-buffer.size-bytes";
 
   /**
    * Specifies a partitioner class, which is used in Tez Runtime components
