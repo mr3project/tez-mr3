@@ -23,8 +23,6 @@ import java.io.IOException;
 import org.apache.tez.common.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
@@ -38,8 +36,6 @@ import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
  * This class is used by Inputs and Outputs in tez-runtime-library to identify the directories
  * that they need to write to / read from for intermediate files.
  */
-@InterfaceAudience.Private
-@InterfaceStability.Unstable
 public class TezTaskOutputFiles extends TezTaskOutput {
 
   private final String outputDir;
@@ -73,9 +69,7 @@ public class TezTaskOutputFiles extends TezTaskOutput {
    */
   private Path getAttemptOutputDir() {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("getAttemptOutputDir: "
-          + this.outputDir + "/"
-          + uniqueId);
+      LOG.debug("getAttemptOutputDir: " + this.outputDir + "/" + uniqueId);
     }
     String dagPath = getDagOutputDir(this.outputDir);
     return new Path(dagPath, uniqueId);

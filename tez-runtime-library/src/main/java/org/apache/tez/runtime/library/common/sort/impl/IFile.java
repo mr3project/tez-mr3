@@ -282,7 +282,7 @@ public class IFile {
    */
   @SuppressWarnings({"unchecked", "rawtypes"})
   public static class Writer implements WriterAppend {
-    // DataOutput: rawOut <-- checksumOut <-- compressedOut <-- out
+    // DataOutput: rawOut <-- checksumOut <-- compressedOut <-- out <-- [writeBuffer]
 
     protected DataOutputStream out;
     private long start = 0;
@@ -323,6 +323,8 @@ public class IFile {
     // de-dup keys or not
     protected final boolean rle;
 
+    // We use writeBuffer[] to reduce the number of writes to 'out' and thus
+    // to reduce the number of writes to 'compressedOut'.
     private final byte[] writeBuffer;
     private final int writeBufferLength;        // must be larger than 8 (# of bytes in long)
     private final ByteBuffer writeByteBuffer;

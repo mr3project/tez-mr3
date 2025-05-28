@@ -20,8 +20,6 @@ package org.apache.tez.runtime.library.common.task.local.output;
 
 import java.io.IOException;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.tez.runtime.library.common.Constants;
@@ -33,8 +31,6 @@ import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
  * This class is used by Inputs and Outputs in tez-runtime-library to identify the directories
  * that they need to write to / read from for intermediate files.
  */
-@InterfaceAudience.Private
-@InterfaceStability.Unstable
 public abstract class TezTaskOutput {
 
   protected final Configuration conf;

@@ -20,7 +20,6 @@ package org.apache.tez.mapreduce.partition;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.util.ReflectionUtils;
@@ -34,7 +33,6 @@ import org.apache.tez.runtime.library.common.ConfigUtils;
  * with Map Reduce partitioners. 
  */
 @SuppressWarnings({ "rawtypes", "unchecked" })
-@Public
 public class MRPartitioner implements org.apache.tez.runtime.library.api.Partitioner {
 
   static final Logger LOG = LoggerFactory.getLogger(MRPartitioner.class);
