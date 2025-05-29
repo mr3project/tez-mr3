@@ -188,15 +188,11 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     boolean useLocalDiskFetch;
     if (fetcherConfig.localDiskFetchOrderedEnabled &&
         host.equals(fetcherConfig.localHostName)) {
-      if (fetcherConfig.compositeFetch) {
-        // inspect 'first' to find the container where all inputs originate from
-        InputAttemptIdentifier first = pendingInputsSeq.getInputs().get(0);
-        // true if inputs originate from the current ContainerWorker
-        useLocalDiskFetch = first.getPathComponent().startsWith(
-            taskContext.getExecutionContext().getContainerId());
-      } else {
-        useLocalDiskFetch = true;
-      }
+      // inspect 'first' to find the container where all inputs originate from
+      InputAttemptIdentifier first = pendingInputsSeq.getInputs().get(0);
+      // true if inputs originate from the current ContainerWorker
+      useLocalDiskFetch = first.getPathComponent().startsWith(
+          taskContext.getExecutionContext().getContainerId());
     } else {
       useLocalDiskFetch = false;
     }
@@ -460,10 +456,8 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       long startTime = System.currentTimeMillis();
       int partitionCount = 1;
 
-      if (fetcherConfig.compositeFetch) {
-        // Multiple partitions are fetched
-        partitionCount = input.readInt();
-      }
+      // Multiple partitions are fetched
+      partitionCount = input.readInt();
       ArrayList<MapOutputStat> mapOutputStats = new ArrayList<>(partitionCount);
       for (int mapOutputIndex = 0; mapOutputIndex < partitionCount; mapOutputIndex++) {
         MapOutputStat mapOutputStat = null;
@@ -684,9 +678,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
           // pathComponent == srcAttemptId.getPathComponent(), so we compute spillRecord and inputFilePath only once
           if (spillRecord == null) {
             AbstractMap.SimpleEntry<TezSpillRecord, Path> pair = ShuffleUtils.getTezSpillRecordInputFilePath(
-                taskContext, pathComponent, fetcherConfig.compositeFetch,
-                shuffleScheduler.getDagIdentifier(), conf,
-                fetcherConfig.localDirAllocator, fetcherConfig.localFs);
+                taskContext, pathComponent);
             spillRecord = pair.getKey();
             inputFilePath = pair.getValue();
           }

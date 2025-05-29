@@ -279,9 +279,8 @@ public class ShuffleUtils {
    */
   static ByteBuffer generateDMEPayload(boolean sendEmptyPartitionDetails,
       int numPhysicalOutputs, TezSpillRecord spillRecord, OutputContext context,
-      int spillId, boolean finalMergeEnabled, boolean isLastEvent, String pathComponent, String auxiliaryService, Deflater deflater,
-      boolean compositeFetch)
-      throws IOException {
+      int spillId, boolean finalMergeEnabled, boolean isLastEvent, String pathComponent, String auxiliaryService,
+      Deflater deflater) throws IOException {
     DataMovementEventPayloadProto.Builder payloadBuilder = DataMovementEventPayloadProto.newBuilder();
 
     boolean outputGenerated = true;
@@ -319,7 +318,7 @@ public class ShuffleUtils {
         }
       }
 
-      payloadBuilder.setPathComponent(expandPathComponent(context, compositeFetch, pathComponent));
+      payloadBuilder.setPathComponent(expandPathComponent(context, pathComponent));
     }
 
     if (!finalMergeEnabled) {
@@ -425,8 +424,7 @@ public class ShuffleUtils {
   public static void generateEventOnSpill(List<Event> eventList, boolean finalMergeEnabled,
       boolean isLastEvent, OutputContext context, int spillId, TezSpillRecord spillRecord,
       int numPhysicalOutputs, boolean sendEmptyPartitionDetails, String pathComponent,
-      @Nullable long[] partitionStats, boolean reportDetailedPartitionStats, String auxiliaryService, Deflater deflater,
-      boolean compositeFetch)
+      @Nullable long[] partitionStats, boolean reportDetailedPartitionStats, String auxiliaryService, Deflater deflater)
       throws IOException {
     Preconditions.checkArgument(eventList != null, "EventList can't be null");
 
@@ -443,8 +441,7 @@ public class ShuffleUtils {
 
     ByteBuffer payload = generateDMEPayload(sendEmptyPartitionDetails, numPhysicalOutputs,
         spillRecord, context, spillId,
-        finalMergeEnabled, isLastEvent, pathComponent, auxiliaryService, deflater,
-        compositeFetch);
+        finalMergeEnabled, isLastEvent, pathComponent, auxiliaryService, deflater);
 
     if (finalMergeEnabled || isLastEvent) {
       VertexManagerEvent vmEvent = generateVMEvent(context, partitionStats,
@@ -638,24 +635,9 @@ public class ShuffleUtils {
     return TezRuntimeUtils.getHttpConnectionParams(conf);
   }
 
-  public static boolean isTezShuffleHandler(Configuration config) {
-    return config.get(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
-        TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT).
-        contains("tez");
-  }
-
   public static String getTezShuffleHandlerServiceId(Configuration conf) {
     return conf.get(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
           TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT);
-  }
-
-  public static String adjustPathComponent(boolean compositeFetch, int dagIdentifier, String pathComponent) {
-    if (compositeFetch) {  // == isTezShuffleHandler
-      // pathComponent includes ${containerId}/${vertexId}/ in its prefix
-      return Constants.DAG_PREFIX + dagIdentifier + Path.SEPARATOR + pathComponent;
-    } else {
-      return Constants.TEZ_RUNTIME_TASK_OUTPUT_DIR + Path.SEPARATOR + pathComponent;
-    }
   }
 
   public static String getUniqueIdentifierSpillId(OutputContext outputContext, int spillId) {
@@ -664,73 +646,47 @@ public class ShuffleUtils {
 
   // spillId is not included in pathComponent
   public static void writeToIndexPathCache(OutputContext outputContext,
-                                           boolean compositeFetch,
                                            Path outputFilePath,
                                            TezSpillRecord spillRecord) {
-    if (compositeFetch) {
-      IndexPathCache indexPathCache = outputContext.getIndexPathCache();
-      String pathComponent = outputContext.getUniqueIdentifier();
-      String mapId = ShuffleUtils.expandPathComponent(outputContext, compositeFetch, pathComponent);
-      indexPathCache.add(mapId, outputFilePath, spillRecord.getByteBuffer());
-    }
+    IndexPathCache indexPathCache = outputContext.getIndexPathCache();
+    String pathComponent = outputContext.getUniqueIdentifier();
+    String mapId = ShuffleUtils.expandPathComponent(outputContext, pathComponent);
+    indexPathCache.add(mapId, outputFilePath, spillRecord.getByteBuffer());
   }
 
   // spillId is appended to pathComponent
   public static void writeSpillInfoToIndexPathCache(
       OutputContext outputContext,
-      boolean compositeFetch,
       int spillId,
       Path outputFilePath,
       TezSpillRecord spillRecord) {
-    if (compositeFetch) {
-      IndexPathCache indexPathCache = outputContext.getIndexPathCache();
-      String pathComponent = ShuffleUtils.getUniqueIdentifierSpillId(outputContext, spillId);
-      String mapId = ShuffleUtils.expandPathComponent(outputContext, compositeFetch, pathComponent);
-      indexPathCache.add(mapId, outputFilePath, spillRecord.getByteBuffer());
-    }
+    IndexPathCache indexPathCache = outputContext.getIndexPathCache();
+    String pathComponent = ShuffleUtils.getUniqueIdentifierSpillId(outputContext, spillId);
+    String mapId = ShuffleUtils.expandPathComponent(outputContext, pathComponent);
+    indexPathCache.add(mapId, outputFilePath, spillRecord.getByteBuffer());
   }
 
-  public static String expandPathComponent(OutputContext context, boolean compositeFetch, String pathComponent) {
-    if (compositeFetch) {
-      String containerId = context.getExecutionContext().getContainerId();
-      int vertexId = context.getTaskVertexIndex();
-      return containerId + Path.SEPARATOR + Constants.VERTEX_PREFIX + vertexId + Path.SEPARATOR + pathComponent;
-    } else {
-      return pathComponent;
-    }
+  public static String expandPathComponent(OutputContext context, String pathComponent) {
+    String containerId = context.getExecutionContext().getContainerId();
+    int vertexId = context.getTaskVertexIndex();
+    return containerId + Path.SEPARATOR + Constants.VERTEX_PREFIX + vertexId + Path.SEPARATOR + pathComponent;
   }
 
   public static TezSpillRecord getTezSpillRecord(
       TaskContext taskContext,
-      String pathComponent,   // already in expanded form
-      Path finalIndexFile,
-      RawLocalFileSystem localFs) throws IOException {
+      String pathComponent) {   // already in expanded form
     IndexPathCache.MapOutputInfo mapOutputInfo = taskContext.getIndexPathCache().get(pathComponent);
-    if (mapOutputInfo != null) {
-      return new TezSpillRecord(mapOutputInfo.getSpillRecord());
-    } else {
-      return new TezSpillRecord(finalIndexFile, localFs);
-    }
+    assert mapOutputInfo != null;
+    return new TezSpillRecord(mapOutputInfo.getSpillRecord());
   }
+
   public static AbstractMap.SimpleEntry<TezSpillRecord, Path> getTezSpillRecordInputFilePath(
       TaskContext taskContext,
-      String pathComponent,   // already in expanded form
-      boolean compositeFetch, int dagId, Configuration conf,
-      LocalDirAllocator localDirAllocator,
-      RawLocalFileSystem localFs) throws IOException {
+      String pathComponent) {   // already in expanded form
     IndexPathCache.MapOutputInfo mapOutputInfo = taskContext.getIndexPathCache().get(pathComponent);
-    if (mapOutputInfo != null) {
-      return new AbstractMap.SimpleEntry<>(
-          new TezSpillRecord(mapOutputInfo.getSpillRecord()),
-          mapOutputInfo.getMapOutputFilePath());
-    } else {
-      String inputFile = adjustPathComponent(compositeFetch, dagId, pathComponent) +
-        Path.SEPARATOR + Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING;
-      String indexFile = inputFile + Constants.TEZ_RUNTIME_TASK_OUTPUT_INDEX_SUFFIX_STRING;
-      Path indexFilePath = localDirAllocator.getLocalPathToRead(indexFile, conf);
-      return new AbstractMap.SimpleEntry<>(
-          new TezSpillRecord(indexFilePath, localFs),
-          localDirAllocator.getLocalPathToRead(inputFile, conf));
-    }
+    assert mapOutputInfo != null;
+    return new AbstractMap.SimpleEntry<>(
+        new TezSpillRecord(mapOutputInfo.getSpillRecord()),
+        mapOutputInfo.getMapOutputFilePath());
   }
 }

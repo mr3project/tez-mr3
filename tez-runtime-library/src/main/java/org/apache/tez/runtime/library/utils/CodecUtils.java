@@ -70,8 +70,7 @@ public final class CodecUtils {
         ifileReadAhead ? conf.getInt(TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_BYTES,
             TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_BYTES_DEFAULT) : 0;
 
-    String auxiliaryService = conf.get(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
-        TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT);
+    String auxiliaryService = ShuffleUtils.getTezShuffleHandlerServiceId(conf);
     SecretKey shuffleSecret = ShuffleUtils.getJobTokenSecretFromTokenBytes(
         taskContext.getServiceConsumerMetaData(auxiliaryService));
     JobTokenSecretManager jobTokenSecretMgr = new JobTokenSecretManager(shuffleSecret);
@@ -90,7 +89,6 @@ public final class CodecUtils {
     boolean verifyDiskChecksum = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_VERIFY_DISK_CHECKSUM,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_VERIFY_DISK_CHECKSUM_DEFAULT);
-    boolean compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
     boolean connectionFailAllInput = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_CONNECTION_FAIL_ALL_INPUT,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_CONNECTION_FAIL_ALL_INPUT_DEFAULT);
@@ -117,7 +115,6 @@ public final class CodecUtils {
         localDiskFetchEnabled,
         localDiskFetchOrderedEnabled,
         verifyDiskChecksum,
-        compositeFetch,
         connectionFailAllInput,
         speculativeExecutionWaitMillis,
         stuckFetcherThresholdMillis,

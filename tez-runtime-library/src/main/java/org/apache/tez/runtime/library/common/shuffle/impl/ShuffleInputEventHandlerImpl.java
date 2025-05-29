@@ -64,7 +64,6 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
   private final boolean ifileReadAhead;
   private final int ifileReadAheadLength;
   private final InputContext inputContext;
-  private final boolean compositeFetch;
   private final Inflater inflater;
 
   private final AtomicInteger nextToLogEventCount = new AtomicInteger(1);
@@ -77,14 +76,13 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
   public ShuffleInputEventHandlerImpl(InputContext inputContext,
                                       ShuffleManager shuffleManager,
                                       FetchedInputAllocator inputAllocator, CompressionCodec codec,
-                                      boolean ifileReadAhead, int ifileReadAheadLength, boolean compositeFetch) {
+                                      boolean ifileReadAhead, int ifileReadAheadLength) {
     this.inputContext = inputContext;
     this.shuffleManager = shuffleManager;
     this.inputAllocator = inputAllocator;
     this.codec = codec;
     this.ifileReadAhead = ifileReadAhead;
     this.ifileReadAheadLength = ifileReadAheadLength;
-    this.compositeFetch = compositeFetch;
     this.inflater = TezCommonUtils.newInflater();
 
     int taskIndex = inputContext.getTaskIndex();
@@ -137,15 +135,8 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
           throw new TezUncheckedException("Unable to set the empty partition to succeeded", e);
         }
       }
-      if (compositeFetch) {
-        numDmeEvents.addAndGet(crdme.getCount());
-        processCompositeRoutedDataMovementEvent(crdme, shufflePayload, emptyPartitionsBitSet);
-      } else {
-        for (int offset = 0; offset < crdme.getCount(); offset++) {
-          numDmeEvents.incrementAndGet();
-          processDataMovementEvent(crdme.expand(offset), shufflePayload, emptyPartitionsBitSet);
-        }
-      }
+      numDmeEvents.addAndGet(crdme.getCount());
+      processCompositeRoutedDataMovementEvent(crdme, shufflePayload, emptyPartitionsBitSet);
     } else if (event instanceof InputFailedEvent) {
       numObsoletionEvents.incrementAndGet();
       processInputFailedEvent((InputFailedEvent) event);

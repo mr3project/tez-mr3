@@ -70,9 +70,6 @@ public abstract class ExternalSorter {
   private static final Logger LOG = LoggerFactory.getLogger(ExternalSorter.class);
 
   public List<Event> close() throws IOException {
-    if (writeSpillRecord) {
-      spillFileIndexPaths.clear();
-    }
     spillFilePaths.clear();
     reportStatistics();
     return Collections.emptyList();
@@ -121,13 +118,9 @@ public abstract class ExternalSorter {
   protected final CompressionCodec codec;
 
   protected final Map<Integer, Path> spillFilePaths = Maps.newHashMap();
-  // update only if writeSpillRecord == true
-  protected final Map<Integer, Path> spillFileIndexPaths = Maps.newHashMap();
 
   protected Path finalOutputFile;
 
-  // null if writeSpillRecord == false
-  protected Path finalIndexFile;
   protected boolean finalIndexComputed;   // true if final TezSpillRecord is effectively computed
 
   protected int numSpills;
@@ -171,8 +164,6 @@ public abstract class ExternalSorter {
   final ReportPartitionStats reportPartitionStats;
 
   // protected final boolean physicalHostFetch;  // TODO: currently unused
-  protected final boolean compositeFetch;
-  protected final boolean writeSpillRecord;
 
   public ExternalSorter(OutputContext outputContext, Configuration conf, int numOutputs,
       long initialMemoryAvailable) throws IOException {
@@ -263,10 +254,6 @@ public abstract class ExternalSorter {
     // this.physicalHostFetch = conf.getBoolean(
     //     TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH,
     //     TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_DEFAULT);
-    this.compositeFetch = ShuffleUtils.isTezShuffleHandler(this.conf);
-    this.writeSpillRecord = !compositeFetch;
-
-    finalIndexComputed = false;
   }
 
   /**
@@ -285,16 +272,7 @@ public abstract class ExternalSorter {
   }
 
   public boolean getFinalIndexComputed() {
-    return finalIndexComputed;
-  }
-
-  // returns null if writeSpillRecord == false
-  public Path getFinalIndexFile() {
-    return finalIndexFile;
-  }
-
-  public Path getFinalOutputFile() {
-    return finalOutputFile;
+    return false;
   }
 
   protected void runCombineProcessor(TezRawKeyValueIterator kvIter,
@@ -364,11 +342,6 @@ public abstract class ExternalSorter {
     }
     cleanup(spillFilePaths);
     cleanup(finalOutputFile);
-
-    if (writeSpillRecord) {
-      cleanup(spillFileIndexPaths);
-      cleanup(finalIndexFile);
-    }
   }
 
   protected synchronized void cleanup(Path path) {

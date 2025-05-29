@@ -96,7 +96,6 @@ public class ShuffleServer implements FetcherCallback {
     public final boolean localDiskFetchEnabled;
     public final boolean localDiskFetchOrderedEnabled;
     public final boolean verifyDiskChecksum;
-    public final boolean compositeFetch;
     public final boolean connectionFailAllInput;
     public final long speculativeExecutionWaitMillis;
     public final int stuckFetcherThresholdMillis;
@@ -114,7 +113,6 @@ public class ShuffleServer implements FetcherCallback {
         boolean localDiskFetchEnabled,
         boolean localDiskFetchOrderedEnabled,
         boolean verifyDiskChecksum,
-        boolean compositeFetch,
         boolean connectionFailAllInput,
         long speculativeExecutionWaitMillis,
         int stuckFetcherThresholdMillis,
@@ -130,7 +128,6 @@ public class ShuffleServer implements FetcherCallback {
       this.localDiskFetchEnabled = localDiskFetchEnabled;
       this.localDiskFetchOrderedEnabled = localDiskFetchOrderedEnabled;
       this.verifyDiskChecksum = verifyDiskChecksum;
-      this.compositeFetch = compositeFetch;
       this.connectionFailAllInput = connectionFailAllInput;
       this.speculativeExecutionWaitMillis = speculativeExecutionWaitMillis;
       this.stuckFetcherThresholdMillis = stuckFetcherThresholdMillis;
@@ -271,8 +268,7 @@ public class ShuffleServer implements FetcherCallback {
     this.fetcherConfig = CodecUtils.constructFetcherConfig(conf, taskContext);
 
     if (taskContext.useShuffleHandlerProcessOnK8s()) {
-      String auxiliaryService = conf.get(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
-          TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT);
+      String auxiliaryService = ShuffleUtils.getTezShuffleHandlerServiceId(conf);
       ByteBuffer shuffleMetadata = taskContext.getServiceProviderMetaData(auxiliaryService);
       this.localShufflePorts = ShuffleUtils.deserializeShuffleProviderMetaData(shuffleMetadata);
     } else {

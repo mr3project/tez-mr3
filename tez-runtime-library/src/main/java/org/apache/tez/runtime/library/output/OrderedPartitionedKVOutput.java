@@ -104,8 +104,6 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
         TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED,
         TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED_DEFAULT);
 
-    this.compositeFetch = ShuffleUtils.isTezShuffleHandler(this.conf);
-
     return Collections.emptyList();
   }
 
@@ -204,8 +202,7 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
     List<Event> eventList = Lists.newLinkedList();
     if (finalMergeEnabled && !pipelinedShuffle) {
       boolean isLastEvent = true;
-      String auxiliaryService = conf.get(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
-          TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT);
+      String auxiliaryService = ShuffleUtils.getTezShuffleHandlerServiceId(conf);
       if (!sorter.getFinalIndexComputed()) {
         // return an empty list because TezSpillRecord() throws NPE
         // this occurs when PipelinedSorter threads gets interrupted and LogicalOutput.close() is closed
@@ -217,15 +214,13 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
       String pathComponent = (usePipelinedSorter && sorter.getNumSpills() == 1) ?
           getContext().getUniqueIdentifier() + "_0" :   // use original output directory ".../...10031_0"
           getContext().getUniqueIdentifier();           // use renamed output directory ".../...10031"
-      String pathComponentExpanded = ShuffleUtils.expandPathComponent(getContext(), compositeFetch, pathComponent);
-      TezSpillRecord tezSpillRecord = ShuffleUtils.getTezSpillRecord(
-          getContext(), pathComponentExpanded, sorter.getFinalIndexFile(), localFs);
+      String pathComponentExpanded = ShuffleUtils.expandPathComponent(getContext(), pathComponent);
+      TezSpillRecord tezSpillRecord = ShuffleUtils.getTezSpillRecord(getContext(), pathComponentExpanded);
 
       ShuffleUtils.generateEventOnSpill(eventList, finalMergeEnabled, isLastEvent,
           getContext(), 0, tezSpillRecord,
           getNumPhysicalOutputs(), sendEmptyPartitionDetails, pathComponent,
-          sorter.getPartitionStats(), sorter.reportDetailedPartitionStats(), auxiliaryService, deflater,
-          compositeFetch);
+          sorter.getPartitionStats(), sorter.reportDetailedPartitionStats(), auxiliaryService, deflater);
     }
     return eventList;
   }
@@ -267,7 +262,6 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
     confKeys.add(TezConfiguration.TEZ_COUNTERS_MAX_GROUPS);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_SORTER_CLASS);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT);
-    confKeys.add(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID);
   }
 
   // TODO Maybe add helper methods to extract keys

@@ -166,8 +166,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         inputContext.getUniqueIdentifier(),
         inputContext.getDagIdentifier(),
         inputContext.getExecutionContext().getContainerId(),
-        inputContext.getTaskVertexIndex(),
-        ShuffleUtils.isTezShuffleHandler(conf));
+        inputContext.getTaskVertexIndex());
 
     this.localFS = localFS;
     this.rfs = ((LocalFileSystem)localFS).getRaw();

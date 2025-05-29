@@ -134,15 +134,11 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     boolean useLocalDiskFetch;
     if (fetcherConfig.localDiskFetchEnabled &&
         host.equals(fetcherConfig.localHostName)) {
-      if (fetcherConfig.compositeFetch) {
-        // inspect 'first' to find the container where all inputs originate from
-        InputAttemptIdentifier first = pendingInputsSeq.getInputs().get(0);
-        // true if inputs originate from the current ContainerWorker
-        useLocalDiskFetch = first.getPathComponent().startsWith(
-            taskContext.getExecutionContext().getContainerId());
-      } else {
-        useLocalDiskFetch = true;
-      }
+      // inspect 'first' to find the container where all inputs originate from
+      InputAttemptIdentifier first = pendingInputsSeq.getInputs().get(0);
+      // true if inputs originate from the current ContainerWorker
+      useLocalDiskFetch = first.getPathComponent().startsWith(
+          taskContext.getExecutionContext().getContainerId());
     } else {
       useLocalDiskFetch = false;
     }
@@ -431,9 +427,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
           // pathComponent == srcAttemptId.getPathComponent(), so we compute spillRecord and inputFilePath only once
           if (spillRecord == null) {
             AbstractMap.SimpleEntry<TezSpillRecord, Path> pair = ShuffleUtils.getTezSpillRecordInputFilePath(
-                taskContext, pathComponent, fetcherConfig.compositeFetch,
-                shuffleManager.getDagIdentifier(), conf,
-                fetcherConfig.localDirAllocator, fetcherConfig.localFs);
+                taskContext, pathComponent);
             spillRecord = pair.getKey();
             inputFilePath = pair.getValue();
           }
@@ -592,10 +586,8 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       int partitionCount = 1;
 
       // read the first part - partitionCount
-      if (fetcherConfig.compositeFetch) {
-        // multiple partitions are fetched
-        partitionCount = input.readInt();
-      }
+      // multiple partitions are fetched
+      partitionCount = input.readInt();
 
       // read the second part - ShuffleHeader[]
       ArrayList<MapOutputStat> mapOutputStats = new ArrayList<>(partitionCount);
