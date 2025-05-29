@@ -25,6 +25,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.io.BoundedByteArrayOutputStream;
@@ -92,6 +93,66 @@ public class IFile {
     public void close() throws IOException;
   }
 
+  private static final int checksumSize = IFileOutputStream.getCheckSumSize();
+
+  /**
+   * For basic cache size checks: header + checksum + EOF marker
+   *
+   * @return size of the base cache needed
+   */
+  static int getBaseCacheSize() {
+    return (HEADER.length + checksumSize + (2 * INT_SIZE));
+  }
+
+  public static class InMemoryIFileWriter extends Writer {
+
+    // DataOutput: rawOut == MultiByteArrayOutputStream <-- checksumOut <-- compressedOut <-- out <-- [writeBuffer]
+    // rawOut bytes[] == [ 'T''I''F''flags' ] [ compressed( records + EOF_MARKER ) ] [ checksum trailer ]
+
+    // For lazy creation of file
+    private final FileSystem fs;
+    private final TezTaskOutput taskOutput;
+    private Path outputPath;
+
+    private final MultiByteArrayOutputStream cacheStream;
+
+    public InMemoryIFileWriter(Serialization<?> keySerialization,
+                               Serialization<?> valSerialization,
+                               FileSystem fs,
+                               TezTaskOutput taskOutput,
+                               Class<?> keyClass,
+                               Class<?> valueClass,
+                               CompressionCodec codec,
+                               TezCounter writesCounter,
+                               TezCounter serializedBytesCounter,
+                               boolean rle,
+                               byte[] writeBuffer,
+                               int cacheSize) throws IOException {
+      super(keySerialization, valSerialization,
+          new FSDataOutputStream(createUnboundedBuffer(cacheSize), null),
+          keyClass, valueClass, codec,
+          writesCounter, serializedBytesCounter,
+          rle,
+          writeBuffer);
+      this.fs = fs;
+      this.taskOutput = taskOutput;
+      this.cacheStream = (MultiByteArrayOutputStream) this.rawOut.getWrappedStream();
+    }
+
+    public long totalBytes() {
+      return cacheStream.size();
+    }
+
+    public List<ByteBuffer> getByteBuffers() {
+      return cacheStream.getData();
+    }
+
+    public static MultiByteArrayOutputStream createUnboundedBuffer(int size) {
+      int resize = Math.max(getBaseCacheSize(), size);
+      return new MultiByteArrayOutputStream(resize);
+    }
+  }
+
   /**
    * IFileWriter which stores data in memory for specified limit, beyond
    * which it falls back to file based writer. It creates files lazily on
@@ -109,18 +170,16 @@ public class IFile {
    */
   public static class FileBackedInMemIFileWriter extends Writer {
 
-    private FileSystem fs;
+    private final FileSystem fs;
     private boolean bufferFull;
 
     // For lazy creation of file
-    private TezTaskOutput taskOutput;
+    private final TezTaskOutput taskOutput;
     private int totalSize;
 
     private Path outputPath;
-    private CompressionCodec fileCodec;
-    private BoundedByteArrayOutputStream cacheStream;
-
-    private static final int checksumSize = IFileOutputStream.getCheckSumSize();
+    private final CompressionCodec fileCodec;
+    private final BoundedByteArrayOutputStream cacheStream;
 
     /**
      * Note that we do not allow compression in in-mem stream.
@@ -153,15 +212,6 @@ public class IFile {
       this.fileCodec = codec;
     }
 
-    /**
-     * For basic cache size checks: header + checksum + EOF marker
-     *
-     * @return size of the base cache needed
-     */
-    static int getBaseCacheSize() {
-      return (HEADER.length + checksumSize + (2 * INT_SIZE));
-    }
-
     boolean shouldWriteToDisk() {
       return totalSize >= cacheStream.getLimit();
     }
@@ -191,7 +241,7 @@ public class IFile {
      */
     private void resetToFileBasedWriter() throws IOException {
       // Close out stream, so that data checksums are written.
-      // Buf contents = HEADER + real data + CHECKSUM
+      // Buf contents = HEADER + (uncompressed) real data + CHECKSUM
       flushWriteBuffer();
       this.out.close();
 
