@@ -109,11 +109,6 @@ public class IFile {
     // DataOutput: rawOut == MultiByteArrayOutputStream <-- checksumOut <-- compressedOut <-- out <-- [writeBuffer]
     // rawOut bytes[] == [ 'T''I''F''flags' ] [ compressed( records + EOF_MARKER ) ] [ checksum trailer ]
 
-    // For lazy creation of file
-    private final FileSystem fs;
-    private final TezTaskOutput taskOutput;
-    private Path outputPath;
-
     private final MultiByteArrayOutputStream cacheStream;
 
     public InMemoryIFileWriter(Serialization<?> keySerialization,
@@ -127,15 +122,16 @@ public class IFile {
                                TezCounter serializedBytesCounter,
                                boolean rle,
                                byte[] writeBuffer,
-                               int cacheSize) throws IOException {
+                               int cacheSize,
+                               int maxNumBuffers
+                               ) throws IOException {
       super(keySerialization, valSerialization,
-          new FSDataOutputStream(createUnboundedBuffer(cacheSize), null),
+          new FSDataOutputStream(
+              createUnboundedBuffer(cacheSize, maxNumBuffers, fs, taskOutput), null),
           keyClass, valueClass, codec,
           writesCounter, serializedBytesCounter,
           rle,
           writeBuffer);
-      this.fs = fs;
-      this.taskOutput = taskOutput;
       this.cacheStream = (MultiByteArrayOutputStream) this.rawOut.getWrappedStream();
     }
 
@@ -143,13 +139,13 @@ public class IFile {
       return cacheStream.size();
     }
 
-    public List<ByteBuffer> getByteBuffers() {
-      return cacheStream.getData();
-    }
-
-    public static MultiByteArrayOutputStream createUnboundedBuffer(int size) {
+    public static MultiByteArrayOutputStream createUnboundedBuffer(
+        int size,
+        int maxNumBuffers,
+        FileSystem fs,
+        TezTaskOutput taskOutput) throws IOException {
       int resize = Math.max(getBaseCacheSize(), size);
-      return new MultiByteArrayOutputStream(resize);
+      return new MultiByteArrayOutputStream(resize, maxNumBuffers, fs, taskOutput);
     }
   }
 
