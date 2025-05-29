@@ -536,7 +536,7 @@ public class PipelinedSorter extends ExternalSorter {
         }
       }
 
-      ShuffleUtils.writeSpillInfoToIndexPathCache(outputContext, numSpills, outputFilePath, spillRec);
+      ShuffleUtils.writeSpillInfoToIndexPathCache(outputContext, numSpills, outputFilePath, spillRec, null);
 
       //TODO: honor cache limits
       indexCacheList.add(spillRec);
@@ -620,7 +620,7 @@ public class PipelinedSorter extends ExternalSorter {
         }
       }
 
-      ShuffleUtils.writeSpillInfoToIndexPathCache(outputContext, numSpills, spillFileName, spillRec);
+      ShuffleUtils.writeSpillInfoToIndexPathCache(outputContext, numSpills, spillFileName, spillRec, null);
 
       //TODO: honor cache limits
       indexCacheList.add(spillRec);
@@ -834,7 +834,7 @@ public class PipelinedSorter extends ExternalSorter {
       numShuffleChunks.setValue(1); //final merge has happened.
       fileOutputByteCounter.increment(rfs.getFileStatus(finalOutputFile).getLen());
 
-      ShuffleUtils.writeToIndexPathCache(outputContext, finalOutputFile, spillRec);
+      ShuffleUtils.writeToIndexPathCache(outputContext, finalOutputFile, spillRec, null);
       finalOut.close();
 
       for (int i = 0; i < numSpills; i++) {

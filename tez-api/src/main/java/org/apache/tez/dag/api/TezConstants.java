@@ -18,12 +18,9 @@
 
 package org.apache.tez.dag.api;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-
 /**
  * Specifies all constant values in Tez
  */
-@Private
 public class TezConstants {
 
   /*
@@ -31,12 +28,8 @@ public class TezConstants {
    * These are the same as MR which allows Tez to run in secure
    * mode without configuring service ACLs
    */
-  public static final String   
-  TEZ_AM_SECURITY_SERVICE_AUTHORIZATION_TASK_UMBILICAL =
-      "security.job.task.protocol.acl";
-  public static final String   
-  TEZ_AM_SECURITY_SERVICE_AUTHORIZATION_CLIENT =
-      "security.job.client.protocol.acl";
+  public static final String TEZ_AM_SECURITY_SERVICE_AUTHORIZATION_TASK_UMBILICAL = "security.job.task.protocol.acl";
+  public static final String TEZ_AM_SECURITY_SERVICE_AUTHORIZATION_CLIENT = "security.job.client.protocol.acl";
 
   /*
    * Logger properties

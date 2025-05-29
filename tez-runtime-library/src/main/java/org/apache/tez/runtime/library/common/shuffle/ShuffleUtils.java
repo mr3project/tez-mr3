@@ -46,6 +46,7 @@ import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.http.BaseHttpConnection;
 import org.apache.tez.http.HttpConnectionParams;
+import org.apache.tez.runtime.api.ConcurrentByteCache;
 import org.apache.tez.runtime.api.IndexPathCache;
 import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.api.events.DataMovementEvent;
@@ -646,24 +647,40 @@ public class ShuffleUtils {
 
   // spillId is not included in pathComponent
   public static void writeToIndexPathCache(OutputContext outputContext,
-                                           Path outputFilePath,
-                                           TezSpillRecord spillRecord) {
-    IndexPathCache indexPathCache = outputContext.getIndexPathCache();
+                                           @Nullable Path outputFilePath,
+                                           TezSpillRecord spillRecord,
+                                           @Nullable MultiByteArrayOutputStream outputStream) {
+    assert !(outputFilePath == null && outputStream == null);
     String pathComponent = outputContext.getUniqueIdentifier();
     String mapId = ShuffleUtils.expandPathComponent(outputContext, pathComponent);
+
+    IndexPathCache indexPathCache = outputContext.getIndexPathCache();
     indexPathCache.add(mapId, outputFilePath, spillRecord.getByteBuffer());
+
+    if (outputStream != null) {
+      ConcurrentByteCache concurrentByteCache = outputContext.getConcurrentByteCache();
+      concurrentByteCache.add(mapId, outputStream);
+    }
   }
 
   // spillId is appended to pathComponent
   public static void writeSpillInfoToIndexPathCache(
       OutputContext outputContext,
       int spillId,
-      Path outputFilePath,
-      TezSpillRecord spillRecord) {
-    IndexPathCache indexPathCache = outputContext.getIndexPathCache();
+      @Nullable Path outputFilePath,
+      TezSpillRecord spillRecord,
+      @Nullable MultiByteArrayOutputStream outputStream) {
+    assert !(outputFilePath == null && outputStream == null);
     String pathComponent = ShuffleUtils.getUniqueIdentifierSpillId(outputContext, spillId);
     String mapId = ShuffleUtils.expandPathComponent(outputContext, pathComponent);
+
+    IndexPathCache indexPathCache = outputContext.getIndexPathCache();
     indexPathCache.add(mapId, outputFilePath, spillRecord.getByteBuffer());
+
+    if (outputStream != null) {
+      ConcurrentByteCache concurrentByteCache = outputContext.getConcurrentByteCache();
+      concurrentByteCache.add(mapId, outputStream);
+    }
   }
 
   public static String expandPathComponent(OutputContext context, String pathComponent) {

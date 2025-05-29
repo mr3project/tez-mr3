@@ -4,7 +4,6 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.function.Predicate;
 import java.util.Iterator;
 
 public class ConcurrentByteCache {
@@ -37,19 +36,7 @@ public class ConcurrentByteCache {
     return cacheMap.get(key);
   }
 
-  /**
-   * Removes the specified number of oldest (least recently added) entries
-   * from the cache. This method processes entries from the head of the
-   * insertion order queue. If a key from the queue is no longer in the
-   * cache map (e.g., removed by predicate), it's simply removed from the
-   * queue. Otherwise, the entry is removed from both the map and the queue.
-   *
-   * This method is called by the single remover thread.
-   *
-   * @param count The number of oldest entries to process from the queue.
-   * @return The number of entries actually removed from the cache map.
-   */
-  public int removeOldestEntries(int count) {
+  public int flushOldestEntries(int count) {
     if (count <= 0) {
       return 0;
     }
@@ -59,10 +46,7 @@ public class ConcurrentByteCache {
       if (oldestKey == null) {
         break; // Queue is empty, no more entries to remove
       }
-      // Remove the entry from the main cache map.
-      // If the key was already removed by 'removeEntriesByKeyPredicate',
-      // cacheMap.remove() will return null.
-      MultiByteArrayOutputStream output = cacheMap.remove(oldestKey);
+      MultiByteArrayOutputStream output = cacheMap.get(oldestKey);  // do not remove
       if (output != null) {
         output.writeBuffersToDisk();
         removedCount++;
@@ -71,15 +55,7 @@ public class ConcurrentByteCache {
     return removedCount;
   }
 
-  /**
-   * Removes the oldest entries from the cache—one by one from insertionOrderQueue—
-   * until the cumulative size of removed byte[] arrays is >= byteThreshold.
-   * Stale keys (those no longer in cacheMap) are skipped automatically.
-   *
-   * @param byteThreshold the minimum total number of bytes to remove
-   * @return the number of entries actually removed
-   */
-  public int removeOldestEntriesByteSize(long byteThreshold) {
+  public int flushOldestEntriesByteSize(long byteThreshold) {
     if (byteThreshold <= 0) {
       return 0;
     }
@@ -95,8 +71,7 @@ public class ConcurrentByteCache {
         break;
       }
 
-      // Attempt to remove from map; if null, it was already gone (stale), so skip
-      MultiByteArrayOutputStream output = cacheMap.remove(oldestKey);
+      MultiByteArrayOutputStream output = cacheMap.get(oldestKey);  // do not remove
       if (output != null) {
         output.writeBuffersToDisk();
         freedBytes += output.bufferSize();
@@ -108,27 +83,23 @@ public class ConcurrentByteCache {
   }
 
   /**
-   * Removes all entries from the cache whose keys match the given predicate.
    * This method is called by the single remover thread.
    * Keys removed from the cache map are not immediately removed from the
    * insertion order queue by this method due to performance reasons; they
-   * become "stale" entries in the queue until processed by
-   * {@link #removeOldestEntries(int)} or {@link #trimStaleKeysFromQueueHead()}.
-   *
-   * @param keyPredicate The predicate to test keys against.
-   * @return The number of entries removed from the cache map.
+   * become "stale" entries in the queue.
    */
-  public int removeEntriesByKeyPredicate(Predicate<String> keyPredicate) {
-    int removedCount = 0;
-    Iterator<String> keyIterator = cacheMap.keySet().iterator();
-    while (keyIterator.hasNext()) {
-      String key = keyIterator.next();
-      if (keyPredicate.test(key)) {
-        keyIterator.remove(); // Removes the entry from cacheMap
-        removedCount++;
+  public int removeEntriesByPrefix(String mapIdPrefix) {
+    Iterator<Map.Entry<String, MultiByteArrayOutputStream>> iterator = cacheMap.entrySet().iterator();
+    while (iterator.hasNext()) {
+      Map.Entry<String, MultiByteArrayOutputStream> kv = iterator.next();
+      String key = kv.getKey();
+      if (key.contains(mapIdPrefix)) {
+        MultiByteArrayOutputStream value = kv.getValue();
+        value.clean();
+        iterator.remove(); // Removes the entry from cacheMap
       }
     }
-    return removedCount;
+    return cacheMap.size();
   }
 
   /**
@@ -181,14 +152,11 @@ public class ConcurrentByteCache {
 
   /**
    * Clears all entries from the cache map and the insertion order queue.
-   * Primarily for testing or complete reset scenarios.
    */
   public void clear() {
     cacheMap.clear();
     insertionOrderQueue.clear();
   }
-
-  // --- Methods for testing or advanced control by the remover thread (optional) ---
 
   /**
    * Peeks at the head of the insertion order queue without removing it.

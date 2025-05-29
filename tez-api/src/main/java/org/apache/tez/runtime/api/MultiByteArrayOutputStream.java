@@ -274,4 +274,10 @@ public class MultiByteArrayOutputStream extends OutputStream {
     // 3) Nothing left on disk
     return ch.writeAndFlush(Unpooled.EMPTY_BUFFER);
   }
+
+  public void clean() {
+    buffers = null;
+    currentBuffer = null;
+    // TODO: delete fileOut (???)
+  }
 }

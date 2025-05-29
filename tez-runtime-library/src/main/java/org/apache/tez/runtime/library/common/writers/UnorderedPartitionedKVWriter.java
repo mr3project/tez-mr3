@@ -189,8 +189,6 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
   private final List<WrappedBuffer> filledBuffers = new ArrayList<>();
 
-  // null if writeSpillRecord == false
-  private Path finalIndexPath;
   private Path finalOutPath;
 
   public UnorderedPartitionedKVWriter(OutputContext outputContext, Configuration conf,
@@ -807,7 +805,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
             TezIndexRecord rec = new TezIndexRecord(0, rawLen, compLen);
             TezSpillRecord sr = new TezSpillRecord(1);
             sr.putIndex(rec, 0);
-            ShuffleUtils.writeToIndexPathCache(outputContext, finalOutPath, sr);
+            ShuffleUtils.writeToIndexPathCache(outputContext, finalOutPath, sr, null);
           }
           eventList.add(generateDMEvent(false, -1, false,
               outputContext.getUniqueIdentifier(), emptyPartitions));
@@ -1159,7 +1157,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         deleteIntermediateSpills();
       }
     }
-    ShuffleUtils.writeToIndexPathCache(outputContext, finalOutPath, finalSpillRecord);
+    ShuffleUtils.writeToIndexPathCache(outputContext, finalOutPath, finalSpillRecord, null);
     fileOutputBytesCounter.increment(indexFileSizeEstimate);
     LOG.info("{}: Finished final spill after merging : {} spills", destNameTrimmed, numSpills.get());
   }
@@ -1274,11 +1272,11 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       if (spillPathDetails.spillIndex < 0) {
         ShuffleUtils.writeToIndexPathCache(
             outputContext,
-            spillPathDetails.outputFilePath, spillRecord);
+            spillPathDetails.outputFilePath, spillRecord, null);
       } else {
         ShuffleUtils.writeSpillInfoToIndexPathCache(
             outputContext,
-            spillPathDetails.spillIndex, spillPathDetails.outputFilePath, spillRecord);
+            spillPathDetails.spillIndex, spillPathDetails.outputFilePath, spillRecord, null);
       }
     } else {
       // add to spillInfoList[]

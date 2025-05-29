@@ -263,4 +263,5 @@ public interface TaskContext extends DecompressorPool {
   public Object peekShuffleServer();
 
   public IndexPathCache getIndexPathCache();
+  public ConcurrentByteCache getConcurrentByteCache();
 }
