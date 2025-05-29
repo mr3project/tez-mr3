@@ -9,7 +9,7 @@ import java.util.Iterator;
 
 public class ConcurrentByteCache {
 
-  private final Map<String, byte[]> cacheMap;
+  private final Map<String, MultiByteArrayOutputStream> cacheMap;
   private final Queue<String> insertionOrderQueue; // Tracks keys by insertion order
 
   public ConcurrentByteCache() {
@@ -21,11 +21,8 @@ public class ConcurrentByteCache {
    * Adds a new entry to the cache.
    * This method is called by writer threads. It's assumed that keys are unique
    * and never added twice, so no check for pre-existing keys is performed.
-   *
-   * @param key  The unique String key.
-   * @param data The byte[] array data.
    */
-  public void add(String key, byte[] data) {
+  public void add(String key, MultiByteArrayOutputStream data) {
     // Store the data in the main map
     cacheMap.put(key, data);
     // Add the key to the queue to maintain insertion order
@@ -35,11 +32,8 @@ public class ConcurrentByteCache {
   /**
    * Retrieves an entry from the cache.
    * This method is called by reader threads.
-   *
-   * @param key The String key.
-   * @return The byte[] array data, or null if the key is not found.
    */
-  public byte[] get(String key) {
+  public MultiByteArrayOutputStream get(String key) {
     return cacheMap.get(key);
   }
 
@@ -59,7 +53,7 @@ public class ConcurrentByteCache {
     if (count <= 0) {
       return 0;
     }
-    int actuallyRemovedCount = 0;
+    int removedCount = 0;
     for (int i = 0; i < count; i++) {
       String oldestKey = insertionOrderQueue.poll(); // Retrieves and removes the head of the queue
       if (oldestKey == null) {
@@ -68,11 +62,13 @@ public class ConcurrentByteCache {
       // Remove the entry from the main cache map.
       // If the key was already removed by 'removeEntriesByKeyPredicate',
       // cacheMap.remove() will return null.
-      if (cacheMap.remove(oldestKey) != null) {
-        actuallyRemovedCount++;
+      MultiByteArrayOutputStream output = cacheMap.remove(oldestKey);
+      if (output != null) {
+        output.writeBuffersToDisk();
+        removedCount++;
       }
     }
-    return actuallyRemovedCount;
+    return removedCount;
   }
 
   /**
@@ -100,13 +96,12 @@ public class ConcurrentByteCache {
       }
 
       // Attempt to remove from map; if null, it was already gone (stale), so skip
-      byte[] data = cacheMap.remove(oldestKey);
-      if (data == null) {
-        continue;
+      MultiByteArrayOutputStream output = cacheMap.remove(oldestKey);
+      if (output != null) {
+        output.writeBuffersToDisk();
+        freedBytes += output.bufferSize();
+        removedCount++;
       }
-
-      freedBytes += data.length;
-      removedCount++;
     }
 
     return removedCount;

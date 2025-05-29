@@ -3,7 +3,7 @@
  * All rights reserved.
  */
 
-package org.apache.tez.runtime.library.common.sort.impl;
+package org.apache.tez.runtime.api;
 
 import java.io.FileDescriptor;
 import java.io.IOException;

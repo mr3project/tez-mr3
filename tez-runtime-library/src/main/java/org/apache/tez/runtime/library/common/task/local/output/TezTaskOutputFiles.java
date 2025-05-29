@@ -21,6 +21,7 @@ package org.apache.tez.runtime.library.common.task.local.output;
 import java.io.IOException;
 
 import org.apache.tez.common.Preconditions;
+import org.apache.tez.runtime.api.TezTaskOutput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -28,7 +29,6 @@ import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.runtime.library.common.Constants;
-import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 
 /**
  * Manipulate the working area for the transient store for components in tez-runtime-library
@@ -36,22 +36,40 @@ import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
  * This class is used by Inputs and Outputs in tez-runtime-library to identify the directories
  * that they need to write to / read from for intermediate files.
  */
-public class TezTaskOutputFiles extends TezTaskOutput {
-
-  private final String outputDir;
-
-  public TezTaskOutputFiles(Configuration conf, String uniqueId, int dagID,
-                            String containerId, int vertexId) {
-    super(conf, uniqueId, dagID, containerId);
-    this.outputDir =
-      ShuffleUtils.isTezShuffleHandler(conf) ? Constants.VERTEX_PREFIX + vertexId : Constants.TEZ_RUNTIME_TASK_OUTPUT_DIR;
-  }
+public class TezTaskOutputFiles implements TezTaskOutput {
 
   private static final Logger LOG = LoggerFactory.getLogger(TezTaskOutputFiles.class);
 
   private static final String SPILL_FILE_DIR_PATTERN = "%s_%d";
-
   private static final String SPILL_FILE_PATTERN = "%s_src_%d_spill_%d.out";
+
+  private final Configuration conf;
+  private final String uniqueId;
+  private final String outputDir;
+  private final String dagId;   // = dag_${dagId}/${containerId}/
+  private final boolean isTezShuffleHandler;
+
+  /**
+   * @param conf     the configuration from which local-dirs will be picked up
+   * @param uniqueId a unique identifier for the specific input / output. This is expected to be
+   *                 unique for all the Inputs / Outputs within a container - i.e. even if the
+   *                 container is used for multiple tasks, this id should be unique for inputs /
+   *                 outputs spanning across tasks. This is also expected to be unique across all
+   *                 tasks for a vertex.
+   * @param dagID    DAG identifier for the specific job
+   */
+  public TezTaskOutputFiles(Configuration conf, String uniqueId, int dagID,
+                            String containerId, int vertexId,
+                            boolean isTezShuffleHandler) {
+    this.conf = conf;
+    this.uniqueId = uniqueId;
+    this.outputDir = isTezShuffleHandler ?
+        Constants.VERTEX_PREFIX + vertexId : Constants.TEZ_RUNTIME_TASK_OUTPUT_DIR;
+    this.dagId = isTezShuffleHandler ?
+        Constants.DAG_PREFIX + dagID + Path.SEPARATOR + containerId + Path.SEPARATOR :
+        Constants.DAG_PREFIX + dagID + Path.SEPARATOR;
+    this.isTezShuffleHandler = isTezShuffleHandler;
+  }
 
   /*
   Under YARN, this defaults to one or more of the local directories, along with the appId in the path.
@@ -273,6 +291,6 @@ public class TezTaskOutputFiles extends TezTaskOutput {
   }
 
   public String getDagOutputDir(String child) {
-    return ShuffleUtils.isTezShuffleHandler(conf) ? dagId.concat(child) : child;
+    return isTezShuffleHandler ? dagId.concat(child) : child;
   }
 }

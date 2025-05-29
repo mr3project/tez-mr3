@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 
 import com.google.common.collect.Maps;
-import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.OutputStatisticsReporter;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
@@ -61,7 +60,7 @@ import org.apache.tez.runtime.library.common.combine.Combiner;
 import org.apache.tez.runtime.library.common.serializer.SerializationContext;
 import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.ShuffleHeader;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Writer;
-import org.apache.tez.runtime.library.common.task.local.output.TezTaskOutput;
+import org.apache.tez.runtime.api.TezTaskOutput;
 import org.apache.tez.runtime.library.utils.CodecUtils;
 import org.apache.tez.common.Preconditions;
 

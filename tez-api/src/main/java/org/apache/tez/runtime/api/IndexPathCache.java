@@ -7,6 +7,8 @@ import java.util.Map;
 
 import org.apache.hadoop.fs.Path;
 
+import javax.annotation.Nullable;
+
 /**
  * Cache for storing mappings between map IDs and their corresponding
  * map output file names and ByteBuffer instances.

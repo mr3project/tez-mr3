@@ -1,4 +1,4 @@
-package org.apache.tez.runtime.library.common.sort.impl;
+package org.apache.tez.runtime.api;
 
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
@@ -8,7 +8,6 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.ReadaheadPool;
-import org.apache.tez.runtime.library.common.task.local.output.TezTaskOutput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,7 +31,7 @@ public class MultiByteArrayOutputStream extends OutputStream {
   private final int cacheSize;
   private final int maxNumBuffers;
 
-  private final List<byte[]> buffers = new ArrayList<>();
+  private List<byte[]> buffers = new ArrayList<>();
   private byte[] currentBuffer;
   private int posInBuf = 0;
   private long totalBytes = 0;
@@ -144,6 +143,17 @@ public class MultiByteArrayOutputStream extends OutputStream {
     return totalBytes;
   }
 
+  public long bufferSize() {
+    return bufferBytes;
+  }
+
+  public void writeBuffersToDisk() {
+    // TODO
+    buffers = null;
+    currentBuffer = null;
+    // do not update bufferBytes
+  }
+
   @Override
   public void flush() throws IOException {
     if (fileOut != null) {
@@ -167,6 +177,7 @@ public class MultiByteArrayOutputStream extends OutputStream {
     assert outputPath == null;
     outputPath = taskOutput.getOutputFileForWrite();
     fileOut = fs.create(outputPath);
+    // bufferBytes is never updated again
   }
 
   // write data to Channel ch atomically

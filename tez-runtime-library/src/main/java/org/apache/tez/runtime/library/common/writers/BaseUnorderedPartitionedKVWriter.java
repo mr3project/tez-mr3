@@ -41,7 +41,7 @@ import org.apache.tez.runtime.library.api.Partitioner;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.ConfigUtils;
 import org.apache.tez.runtime.library.common.TezRuntimeUtils;
-import org.apache.tez.runtime.library.common.task.local.output.TezTaskOutput;
+import org.apache.tez.runtime.api.TezTaskOutput;
 import org.apache.tez.runtime.library.utils.CodecUtils;
 
 @SuppressWarnings("rawtypes")

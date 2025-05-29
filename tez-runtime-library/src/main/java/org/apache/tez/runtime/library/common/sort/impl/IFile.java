@@ -29,8 +29,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.io.BoundedByteArrayOutputStream;
 import org.apache.tez.runtime.api.DecompressorPool;
+import org.apache.tez.runtime.api.MultiByteArrayOutputStream;
 import org.apache.tez.runtime.api.TaskContext;
-import org.apache.tez.runtime.library.common.task.local.output.TezTaskOutput;
+import org.apache.tez.runtime.api.TezTaskOutput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -303,7 +304,9 @@ public class IFile {
     private IFileOutputStream checksumOut;
 
     protected FSDataOutputStream rawOut;
-    protected boolean ownOutputStream = false;  // true iff this Writer created rawOut
+    // true iff this Writer created rawOut or owns rawOut
+    // if true, close() closes rawOut.
+    protected boolean ownOutputStream = false;
 
     private final AtomicBoolean closed = new AtomicBoolean(false);
 

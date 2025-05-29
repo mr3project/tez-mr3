@@ -20,6 +20,7 @@ package org.apache.tez.runtime.library.common.shuffle.impl;
 
 import java.io.IOException;
 
+import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -67,7 +68,8 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
                                      String containerId, int vertexId) {
     this.srcNameTrimmed = srcNameTrimmed;
     this.conf = conf;    
-    this.fileNameAllocator = new TezTaskOutputFiles(conf, uniqueIdentifier, dagID, containerId, vertexId);
+    this.fileNameAllocator = new TezTaskOutputFiles(conf, uniqueIdentifier, dagID, containerId, vertexId,
+        ShuffleUtils.isTezShuffleHandler(conf));
 
     this.maxAvailableTaskMemory = maxTaskAvailableMemory;
     this.memoryLimit = memoryAssigned;
