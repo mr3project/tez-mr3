@@ -25,7 +25,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.io.BoundedByteArrayOutputStream;
@@ -104,49 +103,13 @@ public class IFile {
     return (HEADER.length + checksumSize + (2 * INT_SIZE));
   }
 
-  public static class InMemoryIFileWriter extends Writer {
-
-    // DataOutput: rawOut == MultiByteArrayOutputStream <-- checksumOut <-- compressedOut <-- out <-- [writeBuffer]
-    // rawOut bytes[] == [ 'T''I''F''flags' ] [ compressed( records + EOF_MARKER ) ] [ checksum trailer ]
-
-    private final MultiByteArrayOutputStream cacheStream;
-
-    public InMemoryIFileWriter(Serialization<?> keySerialization,
-                               Serialization<?> valSerialization,
-                               FileSystem fs,
-                               TezTaskOutput taskOutput,
-                               Class<?> keyClass,
-                               Class<?> valueClass,
-                               CompressionCodec codec,
-                               TezCounter writesCounter,
-                               TezCounter serializedBytesCounter,
-                               boolean rle,
-                               byte[] writeBuffer,
-                               int cacheSize,
-                               int maxNumBuffers
-                               ) throws IOException {
-      super(keySerialization, valSerialization,
-          new FSDataOutputStream(
-              createUnboundedBuffer(cacheSize, maxNumBuffers, fs, taskOutput), null),
-          keyClass, valueClass, codec,
-          writesCounter, serializedBytesCounter,
-          rle,
-          writeBuffer);
-      this.cacheStream = (MultiByteArrayOutputStream) this.rawOut.getWrappedStream();
-    }
-
-    public long totalBytes() {
-      return cacheStream.size();
-    }
-
-    public static MultiByteArrayOutputStream createUnboundedBuffer(
-        int size,
-        int maxNumBuffers,
-        FileSystem fs,
-        TezTaskOutput taskOutput) throws IOException {
-      int resize = Math.max(getBaseCacheSize(), size);
-      return new MultiByteArrayOutputStream(resize, maxNumBuffers, fs, taskOutput);
-    }
+  public static MultiByteArrayOutputStream createUnboundedBuffer(
+      int size,
+      int maxNumBuffers,
+      FileSystem fs,
+      TezTaskOutput taskOutput) throws IOException {
+    int resize = Math.max(getBaseCacheSize(), size);
+    return new MultiByteArrayOutputStream(resize, maxNumBuffers, fs, taskOutput);
   }
 
   /**
