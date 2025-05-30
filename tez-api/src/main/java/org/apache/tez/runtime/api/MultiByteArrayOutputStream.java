@@ -16,7 +16,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -188,9 +187,6 @@ public class MultiByteArrayOutputStream extends OutputStream {
     final long start = rangeOffset;
     final long end   = rangeOffset + rangePartLength;
 
-    File spillFile = null;
-    RandomAccessFile raf = null;
-
     List<byte[]> buffersFinal;
     int posInBufFinal;
     long bufferBytesFinal;
@@ -198,17 +194,6 @@ public class MultiByteArrayOutputStream extends OutputStream {
       buffersFinal = buffers;
       posInBufFinal = posInBuf;
       bufferBytesFinal = bufferBytes;
-    }
-
-    // open outputPath here for writing atomically
-    if (end > bufferBytesFinal) {
-      try {
-        spillFile = new File(outputPath.toUri().getPath());
-        raf = new RandomAccessFile(spillFile, "r");
-      } catch (FileNotFoundException e) {
-        LOG.error(outputPath + " not found");
-        return null;
-      }
     }
 
     // 1) In-memory buffers
@@ -232,7 +217,7 @@ public class MultiByteArrayOutputStream extends OutputStream {
         int lengthToWrite = (int)(overlapEnd   - overlapStart);
         assert lengthToWrite > 0;
 
-        ch.write(ByteBuffer.wrap(buffersFinal.get(i), offsetInBuf, lengthToWrite));
+        ch.write(Unpooled.wrappedBuffer(buffersFinal.get(i), offsetInBuf, lengthToWrite));
       }
 
       bufBase += bufLen;
@@ -241,28 +226,48 @@ public class MultiByteArrayOutputStream extends OutputStream {
     // 2) Spill file, if any bytes remain in [start,end)
     if (end > bufBase) {
       assert bufBase == bufferBytesFinal;
-      assert spillFile != null;
-      assert raf != null;
 
-      long fileOffset  = Math.max(0, start - bufBase);
-      long filePartLen = end - Math.max(start, bufBase);
+      File spillFile = null;
+      RandomAccessFile raf = null;
+      try {
+        spillFile = new File(outputPath.toUri().getPath());
+        raf = new RandomAccessFile(spillFile, "r");
 
-      ChannelFuture writeFuture;
-      if (ch.pipeline().get(SslHandler.class) == null) {
-        FadvisedFileRegion region = new FadvisedFileRegion(
-            raf, fileOffset, filePartLen,
-            manageOsCache, readaheadLength, readaheadPool,
-            spillFile.getAbsolutePath(),
-            shuffleBufferSize, shuffleTransferToAllowed);
-        writeFuture = ch.writeAndFlush(region);
-      } else {
-        FadvisedChunkedFile chunk = new FadvisedChunkedFile(
-            raf, fileOffset, filePartLen, sslFileBufferSize,
-            manageOsCache, readaheadLength, readaheadPool,
-            spillFile.getAbsolutePath());
-        writeFuture = ch.writeAndFlush(chunk);
+        long fileOffset  = Math.max(0, start - bufBase);
+        long filePartLen = end - Math.max(start, bufBase);
+
+        ChannelFuture writeFuture;
+        if (ch.pipeline().get(SslHandler.class) == null) {
+          FadvisedFileRegion region = new FadvisedFileRegion(
+              raf, fileOffset, filePartLen,
+              manageOsCache, readaheadLength, readaheadPool,
+              spillFile.getAbsolutePath(),
+              shuffleBufferSize, shuffleTransferToAllowed);
+          writeFuture = ch.writeAndFlush(region);
+        } else {
+          FadvisedChunkedFile chunk = new FadvisedChunkedFile(
+              raf, fileOffset, filePartLen, sslFileBufferSize,
+              manageOsCache, readaheadLength, readaheadPool,
+              spillFile.getAbsolutePath());
+          writeFuture = ch.writeAndFlush(chunk);
+        }
+
+        final RandomAccessFile rafFinal = raf;
+        writeFuture.addListener(future -> {
+          try {
+            rafFinal.close();
+          } catch (IOException ignored) { }
+        });
+        raf = null;   // the listener is responsible for closing raf.
+        return writeFuture;
+      } finally {
+        // if accessing raf fails, we close it here
+        if (raf != null) {
+          try {
+            raf.close();
+          } catch (IOException ignored) { }
+        }
       }
-      return writeFuture;
     }
 
     // 3) Nothing left on disk
