@@ -26,7 +26,7 @@ public class MultiByteArrayOutputStream extends OutputStream {
 
   private static final Logger LOG = LoggerFactory.getLogger(MultiByteArrayOutputStream.class);
 
-  public static final int CACHE_SIZE_UNORDERED_WRITER = 4 * 1024 * 1024;
+  public static final int CACHE_SIZE_WRITER = 4 * 1024 * 1024;
   public static final int NUM_BUFFERS_LIMIT = 256;
 
   // return 0 if we should not use MultiByteArrayOutputStream

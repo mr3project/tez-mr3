@@ -120,6 +120,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
   private final long availableMemory;
 
+  private final long freeMemoryThreshold;
   private final boolean useFreeMemoryWriterOutput;  // use availableMemory as threshold
 
   private final FileSystem rfs;
@@ -224,13 +225,14 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     }
 
     // Ideally, should be significantly larger.
-    availableMemory = availableMemoryBytes;
+    this.availableMemory = availableMemoryBytes;
 
+    this.freeMemoryThreshold = outputContext.getTotalMemoryAvailableToTask();
     this.useFreeMemoryWriterOutput = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT,
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT_DEFAULT);
 
-    rfs = ((LocalFileSystem) FileSystem.getLocal(this.conf)).getRaw();
+    this.rfs = ((LocalFileSystem) FileSystem.getLocal(this.conf)).getRaw();
 
     if (numPartitions == 1 && !pipelinedShuffle) {
       // special case, where in only one partition is available.
@@ -620,10 +622,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       int maxNumBuffers = 0;
       if (useFreeMemoryWriterOutput) {
         maxNumBuffers = MultiByteArrayOutputStream.getMaxNumBuffers(
-            MultiByteArrayOutputStream.CACHE_SIZE_UNORDERED_WRITER, availableMemory);
+            MultiByteArrayOutputStream.CACHE_SIZE_WRITER, freeMemoryThreshold);
         if (maxNumBuffers > 0) {
           byteArrayOutput = new MultiByteArrayOutputStream(
-              MultiByteArrayOutputStream.CACHE_SIZE_UNORDERED_WRITER, maxNumBuffers,
+              MultiByteArrayOutputStream.CACHE_SIZE_WRITER, maxNumBuffers,
               rfs, spillPathDetails.outputFilePath);
         }
       }

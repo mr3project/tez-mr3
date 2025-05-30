@@ -187,7 +187,7 @@ public abstract class ExternalSorter {
           initialMemoryAvailable + ", in MB=" + ((initialMemoryAvailable >> 20)));
     }
     int assignedMb = (int) (initialMemoryAvailable >> 20);
-    //Let the overflow checks happen in appropriate sorter impls
+    // Let the overflow checks happen in appropriate sorter impls
     this.availableMemoryMb = assignedMb;
 
     // sorter
@@ -275,8 +275,8 @@ public abstract class ExternalSorter {
     return false;
   }
 
-  protected void runCombineProcessor(TezRawKeyValueIterator kvIter,
-      Writer writer) throws IOException {
+  protected void runCombineProcessor(
+      TezRawKeyValueIterator kvIter, Writer writer) throws IOException {
     try {
       combiner.combine(kvIter, writer);
     } catch (InterruptedException e) {
