@@ -12,7 +12,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
@@ -26,6 +25,20 @@ import java.util.List;
 public class MultiByteArrayOutputStream extends OutputStream {
 
   private static final Logger LOG = LoggerFactory.getLogger(MultiByteArrayOutputStream.class);
+
+  public static final int CACHE_SIZE_UNORDERED_WRITER = 4 * 1024 * 1024;
+  public static final int NUM_BUFFERS_LIMIT = 256;
+
+  // return 0 if we should not use MultiByteArrayOutputStream
+  // return 1+ if we can use MultiByteArrayOutputStream
+  public static int getMaxNumBuffers(int cacheSize, long freeMemoryThreshold) {
+    long currentFreeMemory = Runtime.getRuntime().freeMemory();
+    if (currentFreeMemory < freeMemoryThreshold) {
+      return 0;
+    } else {
+      return (int)Math.min(NUM_BUFFERS_LIMIT,  currentFreeMemory / cacheSize);
+    }
+  }
 
   private final int cacheSize;
   private final int maxNumBuffers;
@@ -157,7 +170,8 @@ public class MultiByteArrayOutputStream extends OutputStream {
   // after calling close(), no more writes should be made
   @Override
   synchronized public void close() throws IOException {
-    LOG.info("Closing: totalBytes={}, bufferBytes={}", totalBytes, bufferBytes);
+    LOG.info("Closing: totalBytes={}, bufferBytes={}, outputPath={}", totalBytes, bufferBytes, outputPath);
+    // TODO: move the last buffer to a smaller buffer if it is small
     if (fileOut != null) {
       fileOut.close();
     }
@@ -281,15 +295,7 @@ public class MultiByteArrayOutputStream extends OutputStream {
     // do not delete fileOut because it will be deleted after the source DAG or Vertex is finished
   }
 
-  /*
-  public void writeBuffersToDisk() {
-    buffers = null;
-    currentBuffer = null;
-    // do not update bufferBytes
+  synchronized public long getTotalBytes() {
+    return totalBytes;
   }
-
-  public long bufferSize() {
-    return bufferBytes;
-  }
-   */
 }

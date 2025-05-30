@@ -619,10 +619,11 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       MultiByteArrayOutputStream byteArrayOutput = null;
       int maxNumBuffers = 0;
       if (useFreeMemoryWriterOutput) {
-        maxNumBuffers = ShuffleUtils.getMaxNumBuffers(ShuffleUtils.CACHE_SIZE_UNORDERED_WRITER, availableMemory);
+        maxNumBuffers = MultiByteArrayOutputStream.getMaxNumBuffers(
+            MultiByteArrayOutputStream.CACHE_SIZE_UNORDERED_WRITER, availableMemory);
         if (maxNumBuffers > 0) {
           byteArrayOutput = new MultiByteArrayOutputStream(
-              ShuffleUtils.CACHE_SIZE_UNORDERED_WRITER, maxNumBuffers,
+              MultiByteArrayOutputStream.CACHE_SIZE_UNORDERED_WRITER, maxNumBuffers,
               rfs, spillPathDetails.outputFilePath);
         }
       }
@@ -698,9 +699,6 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       handleSpillIndex(spillPathDetails, spillRecord, byteArrayOutput);
       LOG.info("{}: Finished spill {}", destNameTrimmed, spillPathDetails.spillIndex);
 
-      if (LOG.isDebugEnabled()) {
-        LOG.debug(destNameTrimmed + ": " + "Spill=" + spillPathDetails.spillIndex + ", outputPath=" + spillPathDetails.outputFilePath);
-      }
       return spillResult;
     }
   }

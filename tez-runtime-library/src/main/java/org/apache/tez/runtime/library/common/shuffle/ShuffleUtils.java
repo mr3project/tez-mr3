@@ -661,6 +661,7 @@ public class ShuffleUtils {
     if (byteArrayOutput != null) {
       ConcurrentByteCache concurrentByteCache = outputContext.getConcurrentByteCache();
       concurrentByteCache.add(mapId, byteArrayOutput);
+      LOG.info("writeToIndexPathCache: mapId={}, totalBytes={}", mapId, byteArrayOutput.getTotalBytes());
     }
   }
 
@@ -682,6 +683,7 @@ public class ShuffleUtils {
     if (byteArrayOutput != null) {
       ConcurrentByteCache concurrentByteCache = outputContext.getConcurrentByteCache();
       concurrentByteCache.add(mapId, byteArrayOutput);
+      LOG.info("writeSpillInfoToIndexPathCache: mapId={}, totalBytes={}", mapId, byteArrayOutput.getTotalBytes());
     }
   }
 
@@ -707,19 +709,5 @@ public class ShuffleUtils {
     return new AbstractMap.SimpleEntry<>(
         new TezSpillRecord(mapOutputInfo.getSpillRecord()),
         mapOutputInfo.getMapOutputFilePath());
-  }
-
-  public static final int CACHE_SIZE_UNORDERED_WRITER = 4 * 1024 * 1024;
-  public static final int NUM_BUFFERS_LIMIT = 256;  // equivalent to 1GB
-
-  // return 0 if we should not use MultiByteArrayOutputStream
-  // return 1+ if we can use MultiByteArrayOutputStream
-  public static int getMaxNumBuffers(int cacheSize, long freeMemoryThreshold) {
-    long currentFreeMemory = Runtime.getRuntime().freeMemory();
-    if (currentFreeMemory < freeMemoryThreshold) {
-      return 0;
-    } else {
-      return (int)Math.min(NUM_BUFFERS_LIMIT,  currentFreeMemory / cacheSize);
-    }
   }
 }
