@@ -431,7 +431,7 @@ public class IFile {
 
       flushWriteBuffer();   // Ensure all buffered data is written to 'out'
 
-      // Close the underlying stream iff we own it...
+      // Close the underlying stream iff we own it
       if (ownOutputStream) {
         out.close();
       } else {

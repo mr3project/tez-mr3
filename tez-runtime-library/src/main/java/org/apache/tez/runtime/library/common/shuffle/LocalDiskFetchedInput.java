@@ -25,7 +25,6 @@ import java.io.OutputStream;
 import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.tez.common.Preconditions;
 import org.apache.commons.io.input.BoundedInputStream;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;

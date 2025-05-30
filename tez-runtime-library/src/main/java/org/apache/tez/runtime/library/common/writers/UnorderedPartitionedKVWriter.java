@@ -627,69 +627,69 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         }
       }
 
-      FSDataOutputStream fsOutput;
-      if (byteArrayOutput == null) {
-        fsOutput = rfs.create(spillPathDetails.outputFilePath);
-      } else {
-        fsOutput = new FSDataOutputStream(byteArrayOutput, null);
-      }
-      ensureSpillFilePermissions(spillPathDetails.outputFilePath, rfs);
-
-      LOG.info("Writing spill {} to {} (# of in-memory buffers = {})",
-          spillNumber, spillPathDetails.outputFilePath.toString(), maxNumBuffers);
-
-      TezSpillRecord spillRecord = new TezSpillRecord(numPartitions);
-      DataInputBuffer key = new DataInputBuffer();
-      DataInputBuffer val = new DataInputBuffer();
+      FSDataOutputStream fsOutput = null;
       long compressedLength = 0;
-      byte[] writeBuffer = IFile.allocateWriteBuffer();
-      for (int i = 0; i < numPartitions; i++) {
-        IFile.Writer writer = null;
-        try {
-          long segmentStart = fsOutput.getPos();
-          long numRecords = 0;
-          for (WrappedBuffer buffer : filledBuffers) {
-            if (buffer.partitionHeads[i] == WrappedBuffer.PARTITION_ABSENT_POSITION) {
-              // Skip empty partition.
-              continue;
-            }
-            if (writer == null) {
-              // all Writer instances share the same FSDataOutputStream out
-              writer = new Writer(
-                  keySerialization, valSerialization, fsOutput,
-                  keyClass, valClass, codec, null, null, false,
-                  writeBuffer);
-            }
-            numRecords += writePartition(buffer.partitionHeads[i], buffer, writer, key, val);
-          }
-          if (writer != null) {
-            if (numRecordsCounter != null) {
-              // TezCounter is not thread-safe; Since numRecordsCounter would be updated from
-              // multiple threads, it is good to synchronize it when incrementing it for correctness.
-              synchronized (numRecordsCounter) {
-                numRecordsCounter.increment(numRecords);
+      TezSpillRecord spillRecord = new TezSpillRecord(numPartitions);
+      try {
+        if (byteArrayOutput == null) {
+          fsOutput = rfs.create(spillPathDetails.outputFilePath);
+        } else {
+          fsOutput = new FSDataOutputStream(byteArrayOutput, null);
+        }
+        ensureSpillFilePermissions(spillPathDetails.outputFilePath, rfs);
+
+        LOG.info("Writing spill {} to {} (# of in-memory buffers = {})",
+            spillNumber, spillPathDetails.outputFilePath.toString(), maxNumBuffers);
+
+        DataInputBuffer key = new DataInputBuffer();
+        DataInputBuffer val = new DataInputBuffer();
+        byte[] writeBuffer = IFile.allocateWriteBuffer();
+        for (int i = 0; i < numPartitions; i++) {
+          IFile.Writer writer = null;
+          try {
+            long segmentStart = fsOutput.getPos();
+            long numRecords = 0;
+            for (WrappedBuffer buffer : filledBuffers) {
+              if (buffer.partitionHeads[i] == WrappedBuffer.PARTITION_ABSENT_POSITION) {
+                // Skip empty partition.
+                continue;
               }
+              if (writer == null) {
+                // all Writer instances share the same FSDataOutputStream out
+                writer = new Writer(
+                    keySerialization, valSerialization, fsOutput,
+                    keyClass, valClass, codec, null, null, false,
+                    writeBuffer);
+              }
+              numRecords += writePartition(buffer.partitionHeads[i], buffer, writer, key, val);
             }
-            writer.close();
-            compressedLength += writer.getCompressedLength();
-            TezIndexRecord indexRecord = new TezIndexRecord(segmentStart, writer.getRawLength(),
-                writer.getCompressedLength());
-            spillRecord.putIndex(indexRecord, i);
-            writer = null;
-          }
-        } finally {
-          if (writer != null) {
-            writer.close();
+            if (writer != null) {
+              if (numRecordsCounter != null) {
+                // TezCounter is not thread-safe; Since numRecordsCounter would be updated from
+                // multiple threads, it is good to synchronize it when incrementing it for correctness.
+                synchronized (numRecordsCounter) {
+                  numRecordsCounter.increment(numRecords);
+                }
+              }
+              writer.close();   // write does not own fsOutput, so fsOutput.close() is not called
+              compressedLength += writer.getCompressedLength();
+              TezIndexRecord indexRecord = new TezIndexRecord(segmentStart, writer.getRawLength(),
+                  writer.getCompressedLength());
+              spillRecord.putIndex(indexRecord, i);
+              writer = null;
+            }
+          } finally {
+            if (writer != null) {
+              writer.close();
+            }
           }
         }
-      }
-      key.close();
-      val.close();
-
-      // call for the case where fsOutput is created with byteArrayOutput
-      // TODO: why not call fsOutput.close()
-      if (byteArrayOutput != null) {
-        byteArrayOutput.close();
+        key.close();
+        val.close();
+      } finally {
+        if (fsOutput != null) {
+          fsOutput.close();
+        }
       }
 
       spillResult = new SpillResult(compressedLength, this.filledBuffers);
