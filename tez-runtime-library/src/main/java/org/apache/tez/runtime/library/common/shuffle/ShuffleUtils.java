@@ -717,9 +717,9 @@ public class ShuffleUtils {
   public static int getMaxNumBuffers(int cacheSize, long freeMemoryThreshold) {
     long currentFreeMemory = Runtime.getRuntime().freeMemory();
     if (currentFreeMemory < freeMemoryThreshold) {
-      return (int)Math.min(NUM_BUFFERS_LIMIT,  currentFreeMemory / cacheSize);
-    } else {
       return 0;
+    } else {
+      return (int)Math.min(NUM_BUFFERS_LIMIT,  currentFreeMemory / cacheSize);
     }
   }
 }
