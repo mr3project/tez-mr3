@@ -321,23 +321,22 @@ public class TezRuntimeConfiguration {
 
   // TODO Move this key to MapReduce
   @ConfigurationProperty
-  public static final String TEZ_RUNTIME_KEY_SECONDARY_COMPARATOR_CLASS =
-      TEZ_RUNTIME_PREFIX + "key.secondary.comparator.class";
+  public static final String TEZ_RUNTIME_KEY_SECONDARY_COMPARATOR_CLASS = TEZ_RUNTIME_PREFIX +
+      "key.secondary.comparator.class";
 
   @ConfigurationProperty(type = "boolean")
-  public static final String TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED =
-      TEZ_RUNTIME_PREFIX +
-          "empty.partitions.info-via-events.enabled";
+  public static final String TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED = TEZ_RUNTIME_PREFIX +
+      "empty.partitions.info-via-events.enabled";
   public static final boolean TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED_DEFAULT = true;
 
-  public static final String TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_ENABLED =
-          TEZ_RUNTIME_PREFIX + "transfer.data-via-events.enabled";
+  public static final String TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_ENABLED = TEZ_RUNTIME_PREFIX +
+      "transfer.data-via-events.enabled";
   public static final boolean TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_ENABLED_DEFAULT = true;
 
   // FileBackedInMemIFileWriter.cacheSize == TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_MAX_SIZE
   // so we should have IFile.WRITER_BUFFER_SIZE_DEFAULT > TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_MAX_SIZE
-  public static final String TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_MAX_SIZE =
-          TEZ_RUNTIME_PREFIX + "transfer.data-via-events.max-size";
+  public static final String TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_MAX_SIZE = TEZ_RUNTIME_PREFIX +
+      "transfer.data-via-events.max-size";
   public static final int TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_MAX_SIZE_DEFAULT = 2048;
 
   /**
@@ -345,13 +344,15 @@ public class TezRuntimeConfiguration {
    * only for unordered fetch
    */
   @ConfigurationProperty(type = "boolean")
-  public static final String TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH = TEZ_RUNTIME_PREFIX + "optimize.local.fetch";
+  public static final String TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH = TEZ_RUNTIME_PREFIX +
+      "optimize.local.fetch";
   public static final boolean TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_DEFAULT = true;
 
   // for ordered fetched
   // set to false when tez.runtime.shuffle.memory-to-memory.enable=true
   @ConfigurationProperty(type = "boolean")
-  public static final String TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_ORDERED = TEZ_RUNTIME_PREFIX + "optimize.local.fetch.ordered";
+  public static final String TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_ORDERED = TEZ_RUNTIME_PREFIX +
+      "optimize.local.fetch.ordered";
   public static final boolean TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_ORDERED_DEFAULT = true;
 
   /**
@@ -362,8 +363,8 @@ public class TezRuntimeConfiguration {
    * Speculative execution needs to be turned off when using this parameter. //TODO: TEZ-2132
    */
   @ConfigurationProperty(type = "boolean")
-  public static final String TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED =
-      TEZ_RUNTIME_PREFIX + "pipelined-shuffle.enabled";
+  public static final String TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED = TEZ_RUNTIME_PREFIX +
+      "pipelined-shuffle.enabled";
   public static final boolean TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT = false;
 
   /**
@@ -371,8 +372,8 @@ public class TezRuntimeConfiguration {
    * Speculative execution needs to be turned off when disabling this parameter. //TODO: TEZ-2132
    */
   @ConfigurationProperty(type = "boolean")
-  public static final String TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT =
-      TEZ_RUNTIME_PREFIX + "enable.final-merge.in.output";
+  public static final String TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT = TEZ_RUNTIME_PREFIX +
+      "enable.final-merge.in.output";
   public static final boolean TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT_DEFAULT = true;
 
   /**
@@ -380,8 +381,8 @@ public class TezRuntimeConfiguration {
    * parameter could be changed/dropped later.
    */
   @ConfigurationProperty(type = "boolean")
-  public static final String TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT = TEZ_RUNTIME_PREFIX
-      + "cleanup.files.on.interrupt";
+  public static final String TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT = TEZ_RUNTIME_PREFIX +
+      "cleanup.files.on.interrupt";
   public static final boolean TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT_DEFAULT = false;
 
   // TODO TEZ-1233 - allow this property to be set per vertex
@@ -411,6 +412,11 @@ public class TezRuntimeConfiguration {
   public static final String TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_RELEASE_MILLIS = TEZ_RUNTIME_PREFIX +
       "shuffle.stuck.fetcher.release.millis";
   public static final int TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_RELEASE_MILLIS_DEFAULT = 15 * 1000;
+
+  @ConfigurationProperty(type = "boolean")
+  public static final String TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT = TEZ_RUNTIME_PREFIX +
+      "use.free.memory.writer.output";
+  public static final boolean TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT_DEFAULT = false;
 
   static {
     tezRuntimeKeys.add(TEZ_RUNTIME_IFILE_READAHEAD);
@@ -467,6 +473,7 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_SPECULATIVE_FETCH_WAIT_MILLIS);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_THRESHOLD_MILLIS);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_RELEASE_MILLIS);
+    tezRuntimeKeys.add(TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT);
 
     // Do not keep defaultConf as a static member because it holds a reference to ClassLoader
     // of the Thread that is active at the time of loading this class. The active Thread usually

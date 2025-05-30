@@ -506,9 +506,12 @@ public class PipelinedSorter extends ExternalSorter {
         try {
           long segmentStart = out.getPos();
           if (!sendEmptyPartitionDetails || (i == partition)) {
-            writer = new Writer(serializationContext.getKeySerialization(),
-                serializationContext.getValSerialization(), out, serializationContext.getKeyClass(),
-                serializationContext.getValueClass(), codec, spilledRecordsCounter, null, false, writeBuffer);
+            writer = new Writer(
+                serializationContext.getKeySerialization(), serializationContext.getValSerialization(),
+                out,
+                serializationContext.getKeyClass(), serializationContext.getValueClass(),
+                codec, spilledRecordsCounter, null, false,
+                writeBuffer);
           }
           // we need not check for combiner since its a single record
           if (i == partition) {
@@ -589,10 +592,12 @@ public class PipelinedSorter extends ExternalSorter {
         Writer writer = null;
         boolean hasNext = kvIter.hasNext();
         if (hasNext || !sendEmptyPartitionDetails) {
-          writer = new Writer(serializationContext.getKeySerialization(),
-              serializationContext.getValSerialization(), out, serializationContext.getKeyClass(),
-              serializationContext.getValueClass(), codec, spilledRecordsCounter, null,
-              merger.needsRLE(), writeBuffer);
+          writer = new Writer(
+              serializationContext.getKeySerialization(), serializationContext.getValSerialization(),
+              out,
+              serializationContext.getKeyClass(), serializationContext.getValueClass(),
+              codec, spilledRecordsCounter, null, merger.needsRLE(),
+              writeBuffer);
         }
         if (combiner == null) {
           while (kvIter.next()) {
@@ -695,8 +700,7 @@ public class PipelinedSorter extends ExternalSorter {
          * NPE leading to distraction when debugging.
          */
         if (isDebugEnabled) {
-          LOG.debug(outputContext.getDestinationVertexName()
-              + ": Index list is empty... returning");
+          LOG.debug(outputContext.getDestinationVertexName() + ": Index list is empty... returning");
         }
         return;
       }
@@ -805,10 +809,12 @@ public class PipelinedSorter extends ExternalSorter {
         long rawLength = 0;
         long partLength = 0;
         if (shouldWrite) {
-          Writer writer = new Writer(serializationContext.getKeySerialization(),
-              serializationContext.getValSerialization(), finalOut,
-              serializationContext.getKeyClass(), serializationContext.getValueClass(), codec,
-              spilledRecordsCounter, null, merger.needsRLE(), writeBuffer);
+          Writer writer = new Writer(
+              serializationContext.getKeySerialization(), serializationContext.getValSerialization(),
+              finalOut,
+              serializationContext.getKeyClass(), serializationContext.getValueClass(),
+              codec, spilledRecordsCounter, null, merger.needsRLE(),
+              writeBuffer);
           if (combiner == null || numSpills < minSpillsForCombine) {
             TezMerger.writeFile(kvIter, writer, progressable,
                 TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);

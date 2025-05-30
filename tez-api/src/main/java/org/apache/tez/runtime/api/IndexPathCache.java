@@ -7,6 +7,8 @@ import java.util.Map;
 
 import org.apache.hadoop.fs.Path;
 
+import javax.annotation.Nullable;
+
 /**
  * Cache for storing mappings between map IDs and their corresponding
  * map output file names and ByteBuffer instances.
@@ -17,10 +19,10 @@ public class IndexPathCache {
    * Inner class to represent a pair of mapOutputFileName and ByteBuffer
    */
   public static class MapOutputInfo {
-    private final Path mapOutputFilePath;
+    private final Path mapOutputFilePath;   // null if data is not written directly to local disk
     private final ByteBuffer spillRecord;
 
-    public MapOutputInfo(Path mapOutputFilePath, ByteBuffer spillRecord) {
+    public MapOutputInfo(@Nullable Path mapOutputFilePath, ByteBuffer spillRecord) {
       this.mapOutputFilePath = mapOutputFilePath;
       this.spillRecord = spillRecord;
     }
@@ -40,7 +42,7 @@ public class IndexPathCache {
     this.cache = new ConcurrentHashMap<>();
   }
 
-  public void add(String mapId, Path mapOutputFilePath, ByteBuffer spillRecord) {
+  public void add(String mapId, @Nullable Path mapOutputFilePath, ByteBuffer spillRecord) {
     cache.put(mapId, new MapOutputInfo(mapOutputFilePath, spillRecord));
   }
 
@@ -49,10 +51,11 @@ public class IndexPathCache {
    *
    * @param mapIdPrefix the prefix to match against map IDs
    */
+  // called from ShuffleHandlerDaemonProcessor thread
   // synchronized is unnecessary for two reasons:
   //   1. remove() is called by a single thread (the main ShuffleHandlerDaemonProcessor's handleEvents())
   //   2. any element removed here is never added again to cache[]
-  //    because it corresponds to a TaskAttempt belonging to a DAG that is already finished.
+  //      because it corresponds to a TaskAttempt belonging to a DAG that is already finished.
   public int remove(String mapIdPrefix) {
     Iterator<Map.Entry<String, MapOutputInfo>> iterator = cache.entrySet().iterator();
     while (iterator.hasNext()) {

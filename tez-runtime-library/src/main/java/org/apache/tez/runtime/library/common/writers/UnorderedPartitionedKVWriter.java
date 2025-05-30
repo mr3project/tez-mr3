@@ -58,10 +58,10 @@ import org.apache.tez.common.TezCommonUtils;
 import org.apache.tez.common.TezUtilsInternal;
 import org.apache.tez.common.counters.TaskCounter;
 import org.apache.tez.common.counters.TezCounter;
-import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.common.io.NonSyncDataOutputStream;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.ExecutorServiceUserGroupInformation;
+import org.apache.tez.runtime.api.MultiByteArrayOutputStream;
 import org.apache.tez.runtime.api.TaskFailureType;
 import org.apache.tez.runtime.api.OutputContext;
 import org.apache.tez.runtime.api.events.CompositeDataMovementEvent;
@@ -119,6 +119,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   private final boolean useCachedStream;
 
   private final long availableMemory;
+
+  private final boolean useFreeMemoryWriterOutput;  // use availableMemory as threshold
 
   private final FileSystem rfs;
 
@@ -217,15 +219,16 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     this.useCachedStream = this.dataViaEventsEnabled && (numPartitions == 1) && !pipelinedShuffle;
 
     if (availableMemoryBytes == 0) {
-      Preconditions.checkArgument(((numPartitions == 1) && !pipelinedShuffle), "availableMemory "
-          + "can be set to 0 only when numPartitions=1 and " + TezRuntimeConfiguration
-          .TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED + " is disabled. current numPartitions=" +
-          numPartitions + ", " + TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED + "="
-          + pipelinedShuffle);
+      Preconditions.checkArgument(((numPartitions == 1) && !pipelinedShuffle),
+        "availableMemory can be set to 0 only when numPartitions=1 and pipeline shuffle disabled");
     }
 
     // Ideally, should be significantly larger.
     availableMemory = availableMemoryBytes;
+
+    this.useFreeMemoryWriterOutput = conf.getBoolean(
+        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT,
+        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT_DEFAULT);
 
     rfs = ((LocalFileSystem) FileSystem.getLocal(this.conf)).getRaw();
 
@@ -274,14 +277,12 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       currentBuffer = buffers[0];
 
       int maxThreads = Math.max(2, numBuffers/2);
-      // TODO: Make use of TezSharedExecutor later
       ExecutorService executor = new ThreadPoolExecutor(1, maxThreads,
           60L, TimeUnit.SECONDS,
           new SynchronousQueue<Runnable>(),
           new ThreadFactoryBuilder()
               .setDaemon(true)
-              .setNameFormat("UnorderedOutSpiller {" + TezUtilsInternal.cleanVertexName(
-                      outputContext.getDestinationVertexName()) + "} #%d")
+              .setNameFormat("UnorderedOutSpiller {" + outputContext.getDestinationVertexName() + "} #%d")
               .build()
       );
       // to restrict submission of more tasks than threads (e.g numBuffers > numThreads)
@@ -615,9 +616,27 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         this.spillPathDetails = getSpillPathDetails(false, -1, spillNumber);
       }
 
-      LOG.info("Writing spill {} to {}", spillNumber, spillPathDetails.outputFilePath.toString());
-      FSDataOutputStream out = rfs.create(spillPathDetails.outputFilePath);
+      MultiByteArrayOutputStream byteArrayOutput = null;
+      int maxNumBuffers = 0;
+      if (useFreeMemoryWriterOutput) {
+        maxNumBuffers = ShuffleUtils.getMaxNumBuffers(ShuffleUtils.CACHE_SIZE_UNORDERED_WRITER, availableMemory);
+        if (maxNumBuffers > 0) {
+          byteArrayOutput = new MultiByteArrayOutputStream(
+              ShuffleUtils.CACHE_SIZE_UNORDERED_WRITER, maxNumBuffers,
+              rfs, spillPathDetails.outputFilePath);
+        }
+      }
+
+      FSDataOutputStream fsOutput;
+      if (byteArrayOutput == null) {
+        fsOutput = rfs.create(spillPathDetails.outputFilePath);
+      } else {
+        fsOutput = new FSDataOutputStream(byteArrayOutput, null);
+      }
       ensureSpillFilePermissions(spillPathDetails.outputFilePath, rfs);
+
+      LOG.info("Writing spill {} to {} (# of in-memory buffers = {})",
+          spillNumber, spillPathDetails.outputFilePath.toString(), maxNumBuffers);
 
       TezSpillRecord spillRecord = new TezSpillRecord(numPartitions);
       DataInputBuffer key = new DataInputBuffer();
@@ -627,7 +646,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       for (int i = 0; i < numPartitions; i++) {
         IFile.Writer writer = null;
         try {
-          long segmentStart = out.getPos();
+          long segmentStart = fsOutput.getPos();
           long numRecords = 0;
           for (WrappedBuffer buffer : filledBuffers) {
             if (buffer.partitionHeads[i] == WrappedBuffer.PARTITION_ABSENT_POSITION) {
@@ -635,13 +654,17 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
               continue;
             }
             if (writer == null) {
-              writer = new Writer(keySerialization, valSerialization, out, keyClass, valClass, codec, null, null, false, writeBuffer);
+              // all Writer instances share the same FSDataOutputStream out
+              writer = new Writer(
+                  keySerialization, valSerialization, fsOutput,
+                  keyClass, valClass, codec, null, null, false,
+                  writeBuffer);
             }
             numRecords += writePartition(buffer.partitionHeads[i], buffer, writer, key, val);
           }
           if (writer != null) {
             if (numRecordsCounter != null) {
-              // TezCounter is not threadsafe; Since numRecordsCounter would be updated from
+              // TezCounter is not thread-safe; Since numRecordsCounter would be updated from
               // multiple threads, it is good to synchronize it when incrementing it for correctness.
               synchronized (numRecordsCounter) {
                 numRecordsCounter.increment(numRecords);
@@ -663,10 +686,16 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       key.close();
       val.close();
 
+      // call for the case where fsOutput is created with byteArrayOutput
+      // TODO: why not call fsOutput.close()
+      if (byteArrayOutput != null) {
+        byteArrayOutput.close();
+      }
+
       spillResult = new SpillResult(compressedLength, this.filledBuffers);
 
       // spillPathDetails.spillIndex can be -1 if spillIndex was not used in pathComponent
-      handleSpillIndex(spillPathDetails, spillRecord);
+      handleSpillIndex(spillPathDetails, spillRecord, byteArrayOutput);
       LOG.info("{}: Finished spill {}", destNameTrimmed, spillPathDetails.spillIndex);
 
       if (LOG.isDebugEnabled()) {
@@ -993,8 +1022,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
       //setup output file and index file
       SpillPathDetails spillPathDetails = getSpillPathDetails(true, -1);
-      SpillCallable spillCallable = new SpillCallable(filledBuffers,
-          codec, null, spillPathDetails);
+      SpillCallable spillCallable = new SpillCallable(filledBuffers, codec, null, spillPathDetails);
       try {
         SpillResult spillResult = spillCallable.call();
 
@@ -1096,7 +1124,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           continue;
         }
         // inside close()
-        writer = new Writer(keySerialization, valSerialization, out, keyClass, valClass, codec, null, null, false, writeBuffer);
+        writer = new Writer(
+            keySerialization, valSerialization, out, keyClass, valClass,
+            codec, null, null, false,
+            writeBuffer );
         try {
           if (currentBuffer.nextPosition != 0
               && currentBuffer.partitionHeads[i] != WrappedBuffer.PARTITION_ABSENT_POSITION) {
@@ -1153,7 +1184,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     }
     ShuffleUtils.writeToIndexPathCache(outputContext, finalOutPath, finalSpillRecord, null);
     fileOutputBytesCounter.increment(indexFileSizeEstimate);
-    LOG.info("{}: Finished final spill after merging : {} spills", destNameTrimmed, numSpills.get());
+    LOG.info("{}: Finished final spill after merging: {} spills", destNameTrimmed, numSpills.get());
   }
 
   private void deleteIntermediateSpills() {
@@ -1245,7 +1276,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       }
 
       // spillPathDetails.spillIndex is never -1
-      handleSpillIndex(spillPathDetails, spillRecord);
+      handleSpillIndex(spillPathDetails, spillRecord, null);
 
       mayBeSendEventsForSpill(emptyPartitions, sizePerPartition, spillIndex, false);
 
@@ -1260,17 +1291,20 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     }
   }
 
-  private void handleSpillIndex(SpillPathDetails spillPathDetails, TezSpillRecord spillRecord) {
+  private void handleSpillIndex(
+      SpillPathDetails spillPathDetails, TezSpillRecord spillRecord,
+      @Nullable MultiByteArrayOutputStream byteArrayOutput) {
     if (spillPathDetails.indexComputed) {
+      // only one of outputFilePath and byteArrayOutput is non-null
+      Path outputFilePath = byteArrayOutput == null ? spillPathDetails.outputFilePath : null;
+
       // must check if spillPathDetails.spillIndex == -1
       if (spillPathDetails.spillIndex < 0) {
-        ShuffleUtils.writeToIndexPathCache(
-            outputContext,
-            spillPathDetails.outputFilePath, spillRecord, null);
+        ShuffleUtils.writeToIndexPathCache(outputContext,
+            outputFilePath, spillRecord, byteArrayOutput);
       } else {
-        ShuffleUtils.writeSpillInfoToIndexPathCache(
-            outputContext,
-            spillPathDetails.spillIndex, spillPathDetails.outputFilePath, spillRecord, null);
+        ShuffleUtils.writeSpillInfoToIndexPathCache(outputContext,
+            spillPathDetails.spillIndex, outputFilePath, spillRecord, byteArrayOutput);
       }
     } else {
       // add to spillInfoList[]

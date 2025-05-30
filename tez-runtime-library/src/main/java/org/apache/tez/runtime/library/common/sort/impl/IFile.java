@@ -104,15 +104,6 @@ public class IFile {
     return (HEADER.length + checksumSize + (2 * INT_SIZE));
   }
 
-  public static MultiByteArrayOutputStream createUnboundedBuffer(
-      int size,
-      int maxNumBuffers,
-      FileSystem fs,
-      TezTaskOutput taskOutput) throws IOException {
-    int resize = Math.max(getBaseCacheSize(), size);
-    return new MultiByteArrayOutputStream(resize, maxNumBuffers, fs, taskOutput);
-  }
-
   /**
    * IFileWriter which stores data in memory for specified limit, beyond
    * which it falls back to file based writer. It creates files lazily on
@@ -161,7 +152,8 @@ public class IFile {
         Serialization<?> valSerialization, FileSystem fs, TezTaskOutput taskOutput,
         Class<?> keyClass, Class<?> valueClass, CompressionCodec codec, TezCounter writesCounter,
         TezCounter serializedBytesCounter, int cacheSize, byte[] writeBuffer) throws IOException {
-      super(keySerialization, valSerialization, new FSDataOutputStream(createBoundedBuffer(cacheSize), null),
+      super(keySerialization, valSerialization,
+          new FSDataOutputStream(createBoundedBuffer(cacheSize), null),
           keyClass, valueClass, null,
           writesCounter, serializedBytesCounter, false, writeBuffer);
       this.fs = fs;
@@ -304,7 +296,7 @@ public class IFile {
     private IFileOutputStream checksumOut;
 
     protected FSDataOutputStream rawOut;
-    // true iff this Writer created rawOut or owns rawOut
+    // true iff this Writer created and owns rawOut
     // if true, close() closes rawOut.
     protected boolean ownOutputStream = false;
 
@@ -342,7 +334,8 @@ public class IFile {
     private final ByteBuffer writeByteBuffer;
     private int writeOffset;
 
-    public Writer(Serialization keySerialization, Serialization valSerialization, FileSystem fs, Path file,
+    public Writer(Serialization keySerialization, Serialization valSerialization,
+                  FileSystem fs, Path file,
                   Class keyClass, Class valueClass,
                   CompressionCodec codec,
                   TezCounter writesCounter,
@@ -353,10 +346,12 @@ public class IFile {
       ownOutputStream = true;   // because of fs.create(file)
     }
 
-    public Writer(Serialization keySerialization, Serialization valSerialization, FSDataOutputStream outputStream,
+    public Writer(Serialization keySerialization, Serialization valSerialization,
+                  FSDataOutputStream outputStream,
                   Class keyClass, Class valueClass,
                   CompressionCodec codec, TezCounter writesCounter, TezCounter serializedBytesCounter,
-                  boolean rle, byte[] writeBuffer) throws IOException {
+                  boolean rle,
+                  byte[] writeBuffer) throws IOException {
       this.rawOut = outputStream;
       this.writtenRecordsCounter = writesCounter;
       this.serializedUncompressedBytes = serializedBytesCounter;

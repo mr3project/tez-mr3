@@ -33,14 +33,14 @@ public class MultiByteArrayOutputStream extends OutputStream {
 
   private List<byte[]> buffers = new ArrayList<>();
   private byte[] currentBuffer;
+
   private int posInBuf = 0;
   private long totalBytes = 0;
   private long bufferBytes = 0;
 
   // spill fields
   private final FileSystem fs;
-  private final TezTaskOutput taskOutput;
-  private Path outputPath;
+  private final Path outputPath;
   private FSDataOutputStream fileOut;
 
   /**
@@ -51,30 +51,29 @@ public class MultiByteArrayOutputStream extends OutputStream {
       int cacheSize,
       int maxNumBuffers,
       FileSystem fs,
-      TezTaskOutput taskOutput) throws IOException {
+      Path outputPath) throws IOException {
     if (cacheSize <= 0) {
       throw new IllegalArgumentException("cacheSize must be positive");
     }
     this.cacheSize = cacheSize;
     this.maxNumBuffers = maxNumBuffers;
     this.fs = fs;
-    this.taskOutput = taskOutput;
+    this.outputPath = outputPath;
 
     // if no buffers allowed, immediately create an empty spill file
     if (this.maxNumBuffers == 0) {
-      this.outputPath = taskOutput.getOutputFileForWrite();
       this.fileOut = fs.create(outputPath);
     } else {
       // prepare first in-memory buffer
       this.currentBuffer = new byte[cacheSize];
       buffers.add(currentBuffer);
-      this.outputPath = null;
+      this.fileOut = null;
     }
   }
 
   @Override
   public void write(int b) throws IOException {
-    if (outputPath != null) {
+    if (fileOut != null) {
       // spilled: write straight to file
       fileOut.write(b);
     } else if (posInBuf < cacheSize) {
@@ -104,7 +103,7 @@ public class MultiByteArrayOutputStream extends OutputStream {
     int remaining = len;
     int inputPos = off;
     while (remaining > 0) {
-      if (outputPath != null) {
+      if (fileOut != null) {
         // after spill: write all remaining to file
         fileOut.write(b, inputPos, remaining);
         totalBytes += remaining;
@@ -137,21 +136,15 @@ public class MultiByteArrayOutputStream extends OutputStream {
   }
 
   /**
-   * @return total number of bytes written (may exceed Integer.MAX_VALUE)
+   * Create the spill file (if needed) and switch future writes to it.
    */
-  public long size() {
-    return totalBytes;
-  }
-
-  public long bufferSize() {
-    return bufferBytes;
-  }
-
-  public void writeBuffersToDisk() {
-    // TODO
-    buffers = null;
-    currentBuffer = null;
-    // do not update bufferBytes
+  private void spillIfNeeded() throws IOException {
+    assert maxNumBuffers > 0;
+    assert posInBuf == cacheSize;
+    assert fileOut == null;
+    LOG.info("Creating fileOut: {}", outputPath);
+    fileOut = fs.create(outputPath);
+    // bufferBytes is never updated again
   }
 
   @Override
@@ -161,28 +154,21 @@ public class MultiByteArrayOutputStream extends OutputStream {
     }
   }
 
+  // 1. called by LogicalOutput threads after filling the contents of this buffer
+  // after calling close(), no more writes should be made
   @Override
-  public void close() throws IOException {
+  synchronized public void close() throws IOException {
+    LOG.info("Closing: totalBytes={}, bufferBytes={}", totalBytes, bufferBytes);
     if (fileOut != null) {
       fileOut.close();
     }
   }
 
-  /**
-   * Create the spill file (if needed) and switch future writes to it.
-   */
-  private void spillIfNeeded() throws IOException {
-    assert maxNumBuffers > 0;
-    assert posInBuf == cacheSize;
-    assert outputPath == null;
-    outputPath = taskOutput.getOutputFileForWrite();
-    fileOut = fs.create(outputPath);
-    // bufferBytes is never updated again
-  }
-
   // write data to Channel ch atomically
   // no data is written if outputPath cannot be accessed
   // return null if the write operation fails
+  // 2. called from ShuffleHandler threads
+  // do not use synchronized to allow concurrent access
   public ChannelFuture writeData(
       long rangeOffset,
       long rangePartLength,
@@ -205,9 +191,17 @@ public class MultiByteArrayOutputStream extends OutputStream {
     File spillFile = null;
     RandomAccessFile raf = null;
 
+    List<byte[]> buffersFinal;
+    int posInBufFinal;
+    long bufferBytesFinal;
+    synchronized (this) {
+      buffersFinal = buffers;
+      posInBufFinal = posInBuf;
+      bufferBytesFinal = bufferBytes;
+    }
+
     // open outputPath here for writing atomically
-    if (end > bufferBytes) {
-      assert outputPath != null;  // the caller must ensure this invariant
+    if (end > bufferBytesFinal) {
       try {
         spillFile = new File(outputPath.toUri().getPath());
         raf = new RandomAccessFile(spillFile, "r");
@@ -219,8 +213,8 @@ public class MultiByteArrayOutputStream extends OutputStream {
 
     // 1) In-memory buffers
     long bufBase = 0;
-    for (int i = 0; i < buffers.size(); i++) {
-      int bufLen = (i < buffers.size() - 1) ? cacheSize : posInBuf;
+    for (int i = 0; i < buffersFinal.size(); i++) {
+      int bufLen = (i < buffersFinal.size() - 1) ? cacheSize : posInBufFinal;
       long bufStart = bufBase;
       long bufEnd   = bufBase + bufLen;
       // this buffer occupies: [bufStart, bufEnd)
@@ -238,7 +232,7 @@ public class MultiByteArrayOutputStream extends OutputStream {
         int lengthToWrite = (int)(overlapEnd   - overlapStart);
         assert lengthToWrite > 0;
 
-        ch.write(ByteBuffer.wrap(buffers.get(i), offsetInBuf, lengthToWrite));
+        ch.write(ByteBuffer.wrap(buffersFinal.get(i), offsetInBuf, lengthToWrite));
       }
 
       bufBase += bufLen;
@@ -246,7 +240,7 @@ public class MultiByteArrayOutputStream extends OutputStream {
 
     // 2) Spill file, if any bytes remain in [start,end)
     if (end > bufBase) {
-      assert bufBase == bufferBytes;
+      assert bufBase == bufferBytesFinal;
       assert spillFile != null;
       assert raf != null;
 
@@ -275,9 +269,22 @@ public class MultiByteArrayOutputStream extends OutputStream {
     return ch.writeAndFlush(Unpooled.EMPTY_BUFFER);
   }
 
-  public void clean() {
+  // 3. called from ShuffleHandlerDaemonProcessor thread
+  synchronized public void clean() {
     buffers = null;
     currentBuffer = null;
-    // TODO: delete fileOut (???)
+    // do not delete fileOut because it will be deleted after the source DAG or Vertex is finished
   }
+
+  /*
+  public void writeBuffersToDisk() {
+    buffers = null;
+    currentBuffer = null;
+    // do not update bufferBytes
+  }
+
+  public long bufferSize() {
+    return bufferBytes;
+  }
+   */
 }

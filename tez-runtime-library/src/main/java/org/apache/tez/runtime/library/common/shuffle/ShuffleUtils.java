@@ -35,9 +35,8 @@ import java.util.zip.Deflater;
 import javax.annotation.Nullable;
 import javax.crypto.SecretKey;
 
-import org.apache.hadoop.fs.LocalDirAllocator;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.tez.common.Preconditions;
 import com.google.protobuf.ByteString;
 
@@ -49,6 +48,7 @@ import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.ConcurrentByteCache;
 import org.apache.tez.runtime.api.IndexPathCache;
 import org.apache.tez.runtime.api.TaskContext;
+import org.apache.tez.runtime.api.TezTaskOutput;
 import org.apache.tez.runtime.api.events.DataMovementEvent;
 import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.TezRuntimeUtils;
@@ -646,40 +646,42 @@ public class ShuffleUtils {
   }
 
   // spillId is not included in pathComponent
+  // only one of outputFilePath and byteArrayOutput is valid, and specifies the location of the output
   public static void writeToIndexPathCache(OutputContext outputContext,
                                            @Nullable Path outputFilePath,
                                            TezSpillRecord spillRecord,
-                                           @Nullable MultiByteArrayOutputStream outputStream) {
-    assert !(outputFilePath == null && outputStream == null);
+                                           @Nullable MultiByteArrayOutputStream byteArrayOutput) {
+    assert !(outputFilePath != null && byteArrayOutput != null);
     String pathComponent = outputContext.getUniqueIdentifier();
     String mapId = ShuffleUtils.expandPathComponent(outputContext, pathComponent);
 
     IndexPathCache indexPathCache = outputContext.getIndexPathCache();
     indexPathCache.add(mapId, outputFilePath, spillRecord.getByteBuffer());
 
-    if (outputStream != null) {
+    if (byteArrayOutput != null) {
       ConcurrentByteCache concurrentByteCache = outputContext.getConcurrentByteCache();
-      concurrentByteCache.add(mapId, outputStream);
+      concurrentByteCache.add(mapId, byteArrayOutput);
     }
   }
 
   // spillId is appended to pathComponent
+  // only one of outputFilePath and byteArrayOutput is valid, and specifies the location of the output
   public static void writeSpillInfoToIndexPathCache(
       OutputContext outputContext,
       int spillId,
       @Nullable Path outputFilePath,
       TezSpillRecord spillRecord,
-      @Nullable MultiByteArrayOutputStream outputStream) {
-    assert !(outputFilePath == null && outputStream == null);
+      @Nullable MultiByteArrayOutputStream byteArrayOutput) {
+    assert !(outputFilePath != null && byteArrayOutput != null);
     String pathComponent = ShuffleUtils.getUniqueIdentifierSpillId(outputContext, spillId);
     String mapId = ShuffleUtils.expandPathComponent(outputContext, pathComponent);
 
     IndexPathCache indexPathCache = outputContext.getIndexPathCache();
     indexPathCache.add(mapId, outputFilePath, spillRecord.getByteBuffer());
 
-    if (outputStream != null) {
+    if (byteArrayOutput != null) {
       ConcurrentByteCache concurrentByteCache = outputContext.getConcurrentByteCache();
-      concurrentByteCache.add(mapId, outputStream);
+      concurrentByteCache.add(mapId, byteArrayOutput);
     }
   }
 
@@ -705,5 +707,19 @@ public class ShuffleUtils {
     return new AbstractMap.SimpleEntry<>(
         new TezSpillRecord(mapOutputInfo.getSpillRecord()),
         mapOutputInfo.getMapOutputFilePath());
+  }
+
+  public static final int CACHE_SIZE_UNORDERED_WRITER = 4 * 1024 * 1024;
+  public static final int NUM_BUFFERS_LIMIT = 256;  // equivalent to 1GB
+
+  // return 0 if we should not use MultiByteArrayOutputStream
+  // return 1+ if we can use MultiByteArrayOutputStream
+  public static int getMaxNumBuffers(int cacheSize, long freeMemoryThreshold) {
+    long currentFreeMemory = Runtime.getRuntime().freeMemory();
+    if (currentFreeMemory < freeMemoryThreshold) {
+      return (int)Math.min(NUM_BUFFERS_LIMIT,  currentFreeMemory / cacheSize);
+    } else {
+      return 0;
+    }
   }
 }

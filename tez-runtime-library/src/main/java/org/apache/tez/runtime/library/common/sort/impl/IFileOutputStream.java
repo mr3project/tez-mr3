@@ -85,7 +85,7 @@ public class IFileOutputStream extends FilterOutputStream {
     finished = true;
     sum.update(buffer, 0, offset);
     sum.writeValue(barray, 0, false);
-    out.write (barray, 0, sum.getChecksumSize());
+    out.write(barray, 0, sum.getChecksumSize());
     out.flush();
   }
 
