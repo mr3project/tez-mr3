@@ -42,7 +42,6 @@ import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.combine.Combiner;
 import org.apache.tez.runtime.library.common.serializer.SerializationContext;
-import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Writer;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger;
@@ -137,6 +136,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   private final SerializationContext serializationContext;
 
   private final boolean useFreeMemoryFetchedInput;
+  private final long freeMemoryThreshold;
 
   /**
    * Construct the MergeManager. Must call start before it becomes usable.
@@ -286,6 +286,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     this.useFreeMemoryFetchedInput = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT,
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT_DEFAULT);
+    this.freeMemoryThreshold = inputContext.getTotalMemoryAvailableToTask();
+    // TODO: introduce a factor for freeMemoryThreshold (e.g. 0.5)
   }
 
   void setupParentThread(Thread shuffleSchedulerThread) {
@@ -421,9 +423,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         }
         // Check if we can find free memory in the current ContainerWorker
         long currentFreeMemory = Runtime.getRuntime().freeMemory();
-        if (currentFreeMemory < inputContext.getTotalMemoryAvailableToTask()){
+        if (currentFreeMemory < freeMemoryThreshold){
           // this ContainerWorker is busy serving Tasks, so do not borrow
-          // TODO: introduce a factor for maxAvailableTaskMemory (e.g. 0.5). Cf. SimpleFetchedInputAllocator
           return stallShuffle;
         }
         if (LOG.isDebugEnabled()) {

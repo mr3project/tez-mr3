@@ -114,8 +114,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   // To store events when final merge is disabled
   private final List<Event> finalEvents;
 
-  private boolean dataViaEventsEnabled;
-  private int dataViaEventsMaxSize;
+  private final boolean dataViaEventsEnabled;
+  private final int dataViaEventsMaxSize;
   private final boolean useCachedStream;
 
   private final long availableMemory;
@@ -214,11 +214,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     this.dataViaEventsMaxSize = conf.getInt(
        TezRuntimeConfiguration.TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_MAX_SIZE,
        TezRuntimeConfiguration.TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_MAX_SIZE_DEFAULT);
-    boolean useCachedStreamConfig = conf.getBoolean(
-        TezRuntimeConfiguration.TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_SUPPORT_IN_MEM_FILE,
-        TezRuntimeConfiguration.TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_SUPPORT_IN_MEM_FILE_DEFAULT);
-    this.useCachedStream = useCachedStreamConfig &&
-        (this.dataViaEventsEnabled && (numPartitions == 1) && !pipelinedShuffle);
+    this.useCachedStream = this.dataViaEventsEnabled && (numPartitions == 1) && !pipelinedShuffle;
 
     if (availableMemoryBytes == 0) {
       Preconditions.checkArgument(((numPartitions == 1) && !pipelinedShuffle), "availableMemory "
@@ -309,15 +305,14 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     LOG.info("{}: numBuffers={}, sizePerBuffer={}, numPartitions={}",
         destNameTrimmed, numBuffers, sizePerBuffer, numPartitions);
     if (LOG.isDebugEnabled()) {
-      LOG.debug("skippBuffers=" + skipBuffers
+      LOG.debug("skipBuffers=" + skipBuffers
           + ", availableMemory=" + availableMemory
           + ", pipelinedShuffle=" + pipelinedShuffle
           + ", isFinalMergeEnabled=" + isFinalMergeEnabled
-          + ", numPartitions=" + numPartitions);
-      LOG.debug("reportPartitionStats=" + reportPartitionStats
+          + ", numPartitions=" + numPartitions
+          + ", reportPartitionStats=" + reportPartitionStats
           + ", dataViaEventsEnabled=" + dataViaEventsEnabled
           + ", dataViaEventsMaxSize=" + dataViaEventsMaxSize
-          + ", useCachedStreamConfig=" + useCachedStreamConfig
           + ", useCachedStream=" + useCachedStream);
     }
   }
@@ -710,8 +705,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   }
 
   private boolean canSendDataOverDME() throws IOException {
-    if (dataViaEventsEnabled
-        && this.useCachedStream   // == dataViaEventsEnabled && (numPartitions == 1) && !pipelinedShuffle
+    if (this.useCachedStream   // == dataViaEventsEnabled && (numPartitions == 1) && !pipelinedShuffle
         && this.finalOutPath == null) {
 
       // It is possible that in-mem writer spilled over to disk. Need to use

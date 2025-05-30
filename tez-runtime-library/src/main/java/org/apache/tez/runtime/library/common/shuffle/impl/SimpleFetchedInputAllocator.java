@@ -59,6 +59,7 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
   private volatile long usedMemory = 0;
 
   private final boolean useFreeMemoryFetchedInput;
+  private final long freeMemoryThreshold;
 
   public SimpleFetchedInputAllocator(String srcNameTrimmed,
                                      String uniqueIdentifier, int dagID,
@@ -88,6 +89,8 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
     this.useFreeMemoryFetchedInput = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT,
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT_DEFAULT);
+    this.freeMemoryThreshold = maxTaskAvailableMemory;
+    // TODO: introduce a factor for freeMemoryThreshold (e.g. 0.5)
 
     LOG.info("{}: memoryLimit={}, maxSingleMemoryShuffle={}",
         srcNameTrimmed, this.memoryLimit, this.maxSingleMemoryShuffle);
@@ -124,9 +127,8 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
       }
       // Check if we can find free memory in the current ContainerWorker.
       long currentFreeMemory = Runtime.getRuntime().freeMemory();
-      if (currentFreeMemory < maxAvailableTaskMemory) {
+      if (currentFreeMemory < freeMemoryThreshold) {
         // this ContainerWorker is busy serving Tasks, so do not borrow
-        // TODO: introduce a factor for maxAvailableTaskMemory (e.g. 0.5)
         LOG.info("Creating DiskFetchedInput: {}, {} < maxAvailableTaskMemory", actualSize, currentFreeMemory);
         return new DiskFetchedInput(compressedSize,
             inputAttemptIdentifier, this, conf,
