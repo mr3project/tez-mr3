@@ -619,14 +619,11 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       }
 
       MultiByteArrayOutputStream byteArrayOutput = null;
-      int maxNumBuffers = 0;
+      boolean canUseBuffers = false;
       if (useFreeMemoryWriterOutput) {
-        maxNumBuffers = MultiByteArrayOutputStream.getMaxNumBuffers(
-            MultiByteArrayOutputStream.CACHE_SIZE_WRITER, freeMemoryThreshold);
-        if (maxNumBuffers > 0) {
-          byteArrayOutput = new MultiByteArrayOutputStream(
-              MultiByteArrayOutputStream.CACHE_SIZE_WRITER, maxNumBuffers,
-              rfs, spillPathDetails.outputFilePath);
+        canUseBuffers = MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold);
+        if (canUseBuffers) {
+          byteArrayOutput = new MultiByteArrayOutputStream(rfs, spillPathDetails.outputFilePath);
         }
       }
 
@@ -641,8 +638,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         }
         ensureSpillFilePermissions(spillPathDetails.outputFilePath, rfs);
 
-        LOG.info("Writing spill {} to {} (# of in-memory buffers = {})",
-            spillNumber, spillPathDetails.outputFilePath.toString(), maxNumBuffers);
+        LOG.info("Writing spill {} to {} (use in-memory buffers = {})",
+            spillNumber, spillPathDetails.outputFilePath.toString(), canUseBuffers);
 
         DataInputBuffer key = new DataInputBuffer();
         DataInputBuffer val = new DataInputBuffer();

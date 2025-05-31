@@ -787,8 +787,7 @@ public class TezMerger {
                                 ChecksumFileSystem.getApproxChkSumLength(
                                 s.getLength());
           }
-          Path tmpFilename =
-            new Path(tmpDir, "intermediate").suffix("." + passNo);
+          Path tmpFilename = new Path(tmpDir, "intermediate").suffix("." + passNo);
 
           Path outputFile =  lDirAlloc.getLocalPathForWrite(
                                               tmpFilename.toString(),

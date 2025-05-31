@@ -585,14 +585,11 @@ public class PipelinedSorter extends ExternalSorter {
     spillFilePaths.put(numSpills, spillFileName);
 
     MultiByteArrayOutputStream byteArrayOutput = null;
-    int maxNumBuffers = 0;
+    boolean canUseBuffers = false;
     if (useFreeMemoryWriterOutput) {
-      maxNumBuffers = MultiByteArrayOutputStream.getMaxNumBuffers(
-          MultiByteArrayOutputStream.CACHE_SIZE_WRITER, freeMemoryThreshold);
-      if (maxNumBuffers > 0) {
-        byteArrayOutput = new MultiByteArrayOutputStream(
-            MultiByteArrayOutputStream.CACHE_SIZE_WRITER, maxNumBuffers,
-            rfs, spillFileName);
+      canUseBuffers = MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold);
+      if (canUseBuffers) {
+        byteArrayOutput = new MultiByteArrayOutputStream(rfs, spillFileName);
       }
     }
 
@@ -605,7 +602,7 @@ public class PipelinedSorter extends ExternalSorter {
       }
       ensureSpillFilePermissions(spillFileName, rfs);
 
-      LOG.info("Spilling to {} (# of in-memory buffers = {})", spillFileName.toString(), maxNumBuffers);
+      LOG.info("Spilling to {} (use in-memory buffers = {})", spillFileName.toString(), canUseBuffers);
 
       for (int i = 0; i < partitions; ++i) {
         if (isThreadInterrupted()) {

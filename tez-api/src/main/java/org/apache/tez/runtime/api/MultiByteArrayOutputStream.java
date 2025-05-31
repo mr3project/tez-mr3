@@ -26,62 +26,43 @@ public class MultiByteArrayOutputStream extends OutputStream {
 
   private static final Logger LOG = LoggerFactory.getLogger(MultiByteArrayOutputStream.class);
 
-  public static final int CACHE_SIZE_WRITER = 4 * 1024 * 1024;
-  public static final int NUM_BUFFERS_LIMIT = 256;
-  public static final int BUFFER_RELOCATE_SIZE = 1 * 1024 * 1024;
+  // buffer size = 0KB -> 1KB -> 10KB -> 100KB -> 1MB -> 4MB -> 4MB
+  private static final int MIN_CACHE_SIZE_WRITER = 1 * 1024;
+  private static final int MAX_CACHE_SIZE_WRITER = 4 * 1024 * 1024;
+  private static final int CACHE_SIZE_MULTIPLE = 10;
+  private static final int MAX_NUM_BUFFERS = 256;
 
-  // return 0 if we should not use MultiByteArrayOutputStream
-  // return 1+ if we can use MultiByteArrayOutputStream
-  public static int getMaxNumBuffers(int cacheSize, long freeMemoryThreshold) {
+  public static boolean canUseFreeMemoryBuffers(long freeMemoryThreshold) {
     long currentFreeMemory = Runtime.getRuntime().freeMemory();
-    if (currentFreeMemory < freeMemoryThreshold) {
-      return 0;
-    } else {
-      return (int)Math.min(NUM_BUFFERS_LIMIT,  currentFreeMemory / cacheSize);
-    }
+    return currentFreeMemory > freeMemoryThreshold;
   }
 
-  private final int cacheSize;
-  private final int maxNumBuffers;
+  private int cacheSize;
+  private byte[] currentBuffer;
+  private int posInBuf;
 
   private List<byte[]> buffers = new ArrayList<>();
-  private byte[] currentBuffer;
 
-  private int posInBuf = 0;
   private long totalBytes = 0;
   private long bufferBytes = 0;
 
   // spill fields
   private final FileSystem fs;
   private final Path outputPath;
-  private FSDataOutputStream fileOut;
+  private FSDataOutputStream fileOut;   // set when creating a spill file
 
-  /**
-   * @param cacheSize size of each internal byte[] buffer; must be > 0
-   * @param maxNumBuffers max number of in-memory buffers before spilling (0 => always spill)
-   */
   public MultiByteArrayOutputStream(
-      int cacheSize,
-      int maxNumBuffers,
       FileSystem fs,
-      Path outputPath) throws IOException {
-    if (cacheSize <= 0) {
-      throw new IllegalArgumentException("cacheSize must be positive");
-    }
-    this.cacheSize = cacheSize;
-    this.maxNumBuffers = maxNumBuffers;
+      Path outputPath) {
+    // start with an empty byte[] buffer because no data might be written
+    this.cacheSize = 0;   // set to the size of currentBuffer
+    this.currentBuffer = null;
+    this.posInBuf = 0;
+    // posInBuf == cacheSize if currentBuffer is full, so currentBuffer is initially considered full
+
     this.fs = fs;
     this.outputPath = outputPath;
-
-    // if no buffers allowed, immediately create an empty spill file
-    if (this.maxNumBuffers == 0) {
-      this.fileOut = fs.create(outputPath);
-    } else {
-      // prepare first in-memory buffer
-      this.currentBuffer = new byte[cacheSize];
-      buffers.add(currentBuffer);
-      this.fileOut = null;
-    }
+    this.fileOut = null;
   }
 
   @Override
@@ -93,16 +74,13 @@ public class MultiByteArrayOutputStream extends OutputStream {
       // in-memory buffer has space
       currentBuffer[posInBuf++] = (byte) b;
       bufferBytes++;
-    } else if (buffers.size() < maxNumBuffers) {
-      // allocate a new buffer and write there
-      currentBuffer = new byte[cacheSize];
-      buffers.add(currentBuffer);
-      posInBuf = 0;
+    } else if (buffers.size() < MAX_NUM_BUFFERS) {
+      allocateNewBuffer();
       currentBuffer[posInBuf++] = (byte) b;
       bufferBytes++;
     } else {
       // hit buffer limit: spill future writes
-      spillIfNeeded();
+      spillToFile();
       fileOut.write(b);
     }
     totalBytes++;
@@ -136,23 +114,32 @@ public class MultiByteArrayOutputStream extends OutputStream {
         }
       }
       // remaining > 0;
-      if (buffers.size() < maxNumBuffers) {
-        // allocate new in-memory buffer
-        currentBuffer = new byte[cacheSize];
-        buffers.add(currentBuffer);
-        posInBuf = 0;
+      if (buffers.size() < MAX_NUM_BUFFERS) {
+        allocateNewBuffer();
       } else {
         // spill future writes
-        spillIfNeeded();
+        spillToFile();
       }
     }
+  }
+
+  // allocate a new buffer
+  private void allocateNewBuffer() {
+    assert posInBuf == cacheSize;
+    if (cacheSize == 0) {
+      cacheSize = MIN_CACHE_SIZE_WRITER;
+    } else {
+      cacheSize = Math.min(cacheSize * CACHE_SIZE_MULTIPLE, MAX_CACHE_SIZE_WRITER);
+    }
+    currentBuffer = new byte[cacheSize];
+    buffers.add(currentBuffer);
+    posInBuf = 0;
   }
 
   /**
    * Create the spill file (if needed) and switch future writes to it.
    */
-  private void spillIfNeeded() throws IOException {
-    assert maxNumBuffers > 0;
+  private void spillToFile() throws IOException {
     assert posInBuf == cacheSize;
     assert fileOut == null;
     LOG.info("Creating fileOut: {}", outputPath);
@@ -172,7 +159,6 @@ public class MultiByteArrayOutputStream extends OutputStream {
   @Override
   synchronized public void close() throws IOException {
     LOG.info("Closing: totalBytes={}, bufferBytes={}, outputPath={}", totalBytes, bufferBytes, outputPath);
-    // TODO: move the last buffer to a smaller buffer if it is small
     if (fileOut != null) {
       fileOut.close();
     }
@@ -214,7 +200,8 @@ public class MultiByteArrayOutputStream extends OutputStream {
     // 1) In-memory buffers
     long bufBase = 0;
     for (int i = 0; i < buffersFinal.size(); i++) {
-      int bufLen = (i < buffersFinal.size() - 1) ? cacheSize : posInBufFinal;
+      byte[] bufferElement = buffersFinal.get(i);
+      int bufLen = (i < buffersFinal.size() - 1) ? bufferElement.length : posInBufFinal;
       long bufStart = bufBase;
       long bufEnd   = bufBase + bufLen;
       // this buffer occupies: [bufStart, bufEnd)
@@ -232,7 +219,7 @@ public class MultiByteArrayOutputStream extends OutputStream {
         int lengthToWrite = (int)(overlapEnd   - overlapStart);
         assert lengthToWrite > 0;
 
-        ch.write(Unpooled.wrappedBuffer(buffersFinal.get(i), offsetInBuf, lengthToWrite));
+        ch.write(Unpooled.wrappedBuffer(bufferElement, offsetInBuf, lengthToWrite));
       }
 
       bufBase += bufLen;
