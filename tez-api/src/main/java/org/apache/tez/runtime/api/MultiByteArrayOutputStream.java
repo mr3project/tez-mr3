@@ -28,6 +28,7 @@ public class MultiByteArrayOutputStream extends OutputStream {
 
   public static final int CACHE_SIZE_WRITER = 4 * 1024 * 1024;
   public static final int NUM_BUFFERS_LIMIT = 256;
+  public static final int BUFFER_RELOCATE_SIZE = 1 * 1024 * 1024;
 
   // return 0 if we should not use MultiByteArrayOutputStream
   // return 1+ if we can use MultiByteArrayOutputStream

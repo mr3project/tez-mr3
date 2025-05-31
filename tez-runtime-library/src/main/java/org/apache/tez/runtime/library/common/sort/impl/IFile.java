@@ -29,7 +29,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.io.BoundedByteArrayOutputStream;
 import org.apache.tez.runtime.api.DecompressorPool;
-import org.apache.tez.runtime.api.MultiByteArrayOutputStream;
 import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.api.TezTaskOutput;
 import org.slf4j.Logger;

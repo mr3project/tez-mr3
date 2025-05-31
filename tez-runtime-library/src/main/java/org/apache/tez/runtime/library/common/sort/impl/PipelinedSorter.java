@@ -163,9 +163,9 @@ public class PipelinedSorter extends ExternalSorter {
         .append(outputContext.getDestinationVertexName());
     partitionBits = bitcount(partitions)+1;
 
-    boolean confPipelinedShuffle = this.conf.getBoolean(TezRuntimeConfiguration
-        .TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED, TezRuntimeConfiguration
-        .TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT);
+    boolean confPipelinedShuffle = this.conf.getBoolean(
+        TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED,
+        TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT);
 
     pipelinedShuffle = !finalMergeEnabled && confPipelinedShuffle;
     auxiliaryService = ShuffleUtils.getTezShuffleHandlerServiceId(conf);

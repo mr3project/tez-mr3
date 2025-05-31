@@ -20,11 +20,9 @@ package org.apache.hadoop.io;
 
 import java.util.Objects;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.fs.Path;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 
-@Private
 public class FileChunk implements Comparable<FileChunk> {
 
   private final long offset;
