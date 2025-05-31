@@ -665,8 +665,10 @@ public class PipelinedSorter extends ExternalSorter {
     indexCacheList.add(spillRec);
     ++numSpills;
     if (!finalMergeEnabled) {
-      fileOutputByteCounter.increment(rfs.getFileStatus(spillFileName).getLen());
-      //No final merge. Set the number of files offered via shuffle-handler
+      if (byteArrayOutput == null) {
+        fileOutputByteCounter.increment(rfs.getFileStatus(spillFileName).getLen());
+      }
+      // No final merge. Set the number of files offered via shuffle-handler
       numShuffleChunks.setValue(numSpills);
     }
     return true;
