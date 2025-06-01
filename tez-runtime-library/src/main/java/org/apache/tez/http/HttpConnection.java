@@ -258,6 +258,9 @@ public class HttpConnection extends BaseHttpConnection {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Closing input on " + logIdentifier);
         }
+        // input.close() can block even on a stalled connection (for several 10s of seconds).
+        // Ex. ShuffleServer.unregister() --> Fetcher.shutdown() --> Fetcher???.cleanupCurrentConnection() --> here
+        // This call sequence can block because the fetcher is likely stalled
         input.close();
         input = null;
       }

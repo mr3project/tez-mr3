@@ -248,6 +248,8 @@ public class ShuffleServer implements FetcherCallback {
   private final int STUCK_FETCHER_THRESHOLD_MILLIS;
   private final int STUCK_FETCHER_RELEASE_MILLIS;
 
+  private final ExecutorService shutdownExecutor;
+
   private static final int MAX_SPECULATIVE_FETCH_ATTEMPTS = 3;
   private static final int LAUNCH_LOOP_WAIT_PERIOD_MILLIS = 1000;
   private static final int CHECK_STUCK_FETCHER_PERIOD_MILLIS = 250;
@@ -305,6 +307,8 @@ public class ShuffleServer implements FetcherCallback {
 
     this.STUCK_FETCHER_THRESHOLD_MILLIS = fetcherConfig.stuckFetcherThresholdMillis;
     this.STUCK_FETCHER_RELEASE_MILLIS = fetcherConfig.stuckFetcherReleaseMillis;
+
+    this.shutdownExecutor = Executors.newSingleThreadExecutor();
 
     LOG.info("{} Configuration: numFetchers={}, maxTaskOutputAtOnce={}, FetcherConfig={}, rangesScheme={}, maxNumInputHosts={}",
         serverName, numFetchers, maxTaskOutputAtOnce, fetcherConfig, rangesScheme, maxNumInputHosts);
@@ -615,7 +619,11 @@ public class ShuffleServer implements FetcherCallback {
       if (fetcher.useSingleShuffleClientId(shuffleClientId)) {
         LOG.warn("Shutting down running Fetcher for ShuffleClient {}: {}",
             shuffleClientId, fetcher.getReportStatus());
-        fetcher.shutdown(true);   // true because this fetcher is likely stuck
+        // fetcher.shutdown() can block for a long time (see HttpConnection.cleanup()).
+        // Since a RuntimeTask can complete only after unregister() returns, we call it in a separate thread.
+        shutdownExecutor.submit(() -> {
+          fetcher.shutdown(true);   // true because this fetcher is likely stalled
+        });
       }
     });
 
