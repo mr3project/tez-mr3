@@ -577,8 +577,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       inMemoryMerger.close();
       onDiskMerger.close();
 
-      List<MapOutput> memory =
-          new ArrayList<MapOutput>(inMemoryMergedMapOutputs);
+      List<MapOutput> memory = new ArrayList<MapOutput>(inMemoryMergedMapOutputs);
       inMemoryMergedMapOutputs.clear();
       memory.addAll(inMemoryMapOutputs);
       inMemoryMapOutputs.clear();
@@ -600,7 +599,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
           TezRawKeyValueIterator kvIter = finalMerge(conf, rfs, memory, disk);
           return kvIter;
         } catch (InterruptedException e) {
-          //Cleanup the disk segments
+          // Clean up the disk segments
           if (cleanup) {
             cleanup(localFS, disk);
             cleanup(localFS, onDiskMapOutputs);
@@ -824,7 +823,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         if (null == combiner) {
           TezMerger.writeFile(rIter, writer, progressable, TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
         } else {
-          // TODO Counters for Combine
           runCombineProcessor(rIter, writer);
         }
         writer.close();
@@ -952,8 +950,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
             mergedMapOutputsCounter, null, inputContext);
 
         // TODO Maybe differentiate between data written because of Merges and
-        // the finalMerge (i.e. final mem available may be different from
-        // initial merge mem)
+        // the finalMerge (i.e. final mem available may be different from initial merge mem)
         TezMerger.writeFile(iter, writer, progressable, TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
         writer.close();
         additionalBytesWritten.increment(writer.getCompressedLength());

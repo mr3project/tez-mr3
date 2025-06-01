@@ -197,6 +197,15 @@ public class MultiByteArrayOutputStream extends OutputStream {
       bufferBytesFinal = bufferBytes;
     }
 
+    // buffers[] can be null in rare cases where speculative fetchers are created, e.g.,
+    //   1. A fetcher gets stuck while writing the header, while holding a reference to MultiByteArrayOutputStream.
+    //   2. A speculative fetcher is created and the task is completed, and later clean() is called.
+    //   3. Later the original fetcher resumes and find 'buffers == null'.
+    if (buffersFinal == null) {
+      LOG.error("Cleaned while writing: outputPath={}", outputPath);
+      return null;
+    }
+
     // 1) In-memory buffers
     long bufBase = 0;
     for (int i = 0; i < buffersFinal.size(); i++) {
@@ -278,6 +287,7 @@ public class MultiByteArrayOutputStream extends OutputStream {
 
   // 3. called from ShuffleHandlerDaemonProcessor thread
   synchronized public void clean() {
+    LOG.info("Cleaning: outputPath={}", outputPath);
     buffers = null;
     currentBuffer = null;
     // do not delete fileOut because it will be deleted after the source DAG or Vertex is finished
