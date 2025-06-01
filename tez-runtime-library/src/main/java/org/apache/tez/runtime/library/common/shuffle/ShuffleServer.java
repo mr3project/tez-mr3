@@ -615,7 +615,7 @@ public class ShuffleServer implements FetcherCallback {
       if (fetcher.useSingleShuffleClientId(shuffleClientId)) {
         LOG.warn("Shutting down running Fetcher for ShuffleClient {}: {}",
             shuffleClientId, fetcher.getReportStatus());
-        fetcher.shutdown();
+        fetcher.shutdown(true);   // true because this fetcher is likely stuck
       }
     });
 
@@ -693,7 +693,7 @@ public class ShuffleServer implements FetcherCallback {
     if (!isShutdown.getAndSet(true)) {
       wakeupLoop();
       // add()/remove() can be called while traversing (which is okay because DaemonTask is stopping)
-      runningFetchers.forEach(fetcher -> { fetcher.shutdown(); });
+      runningFetchers.forEach(fetcher -> { fetcher.shutdown(true); });
 
       if (this.fetcherExecutor != null && !this.fetcherExecutor.isShutdown()) {
         this.fetcherExecutor.shutdownNow();   // interrupt all running fetchers
@@ -745,7 +745,7 @@ public class ShuffleServer implements FetcherCallback {
 
     @Override
     public void onSuccess(FetchResult result) {
-      fetcher.shutdown();
+      fetcher.shutdown(false);  // disconnect = false to reuse HTTPConnection
       if (isShutdown.get()) {
         if (isDebugEnabled) {
           LOG.debug("Already shutdown. Ignoring event from fetcher");
@@ -783,7 +783,7 @@ public class ShuffleServer implements FetcherCallback {
     @Override
     public void onFailure(Throwable t) {
       // Unsuccessful - the fetcher may not have shutdown correctly. Try shutting it down.
-      fetcher.shutdown();
+      fetcher.shutdown(true);   // disconnect = true and do not reuse HTTPConnection
       if (isShutdown.get()) {
         if (isDebugEnabled) {
           LOG.debug("Already shutdown. Ignoring error from fetcher: ", t);

@@ -173,14 +173,15 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     }
   }
 
-  public void shutdown() {
+  // called from ShuffleServer or at the end of call()
+  public void shutdown(boolean disconnect) {
     if (!stopped) {
       if (isDebugEnabled) {
         LOG.debug("Fetcher stopped for host " + host);
       }
       stopped = true;
       // An interrupt will come in while shutting down the thread.
-      cleanupCurrentConnection(false);  // false to reuse connection by default
+      cleanupCurrentConnection(disconnect);
     }
   }
 
@@ -218,7 +219,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       }
       if (!useLocalDiskFetch) {
         // This is a minor optimization that cleans up the current connection.
-        // shutdown() will call cleanupCurrentConnection(false) again, but will have no effect.
+        // shutdown() will call cleanupCurrentConnection() again, but will have no effect.
         cleanupCurrentConnection(false);  // false to reuse connection
       }
     }
@@ -239,8 +240,8 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs = setupConnection(0);
     if (pendingInputs != null) {  // stopped or failure
       if (stopped) {
-        // perhaps cleanupCurrentConnection(false) was already called in shutdown()
-        cleanupCurrentConnection(true);   // true because stopped in the middle
+        // perhaps cleanupCurrentConnection() was already called in shutdown()
+        cleanupCurrentConnection(false);  // disconnect = false because we can reuse HTTPConnection
         return null;
       }
       return pendingInputs;
@@ -265,7 +266,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         }
         index++;
       } catch (FetcherReadTimeoutException e) {
-        cleanupCurrentConnection(true);   // true because of error
+        cleanupCurrentConnection(true);   // disconnect = true because of error
         if (stopped) {
           // perhaps cleanupCurrentConnection(false) was already called in shutdown(),
           // but we just called cleanupCurrentConnection(true) anyway
@@ -279,8 +280,8 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputsNew = setupConnection(index);
         if (pendingInputsNew != null) {   // stopped or failure
           if (stopped) {
-            // perhaps cleanupCurrentConnection(false) was already called in shutdown()
-            cleanupCurrentConnection(true);   // true because stopped in the middle
+            // perhaps cleanupCurrentConnection() was already called in shutdown()
+            cleanupCurrentConnection(false);  // disconnect = false because we can reuse HTTPConnection
             if (isDebugEnabled) {
               LOG.debug("Not reporting connection re-establishment failure since fetcher is stopped");
             }
@@ -306,8 +307,8 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
             LOG.debug("Ignoring copyMapOutput failures for tasks: " + Arrays.toString(failedInputs) +
               " since Fetcher has been stopped");
           }
-          // perhaps cleanupCurrentConnection(false) was already called in shutdown()
-          cleanupCurrentConnection(false);   // TODO: true because stopped in the middle (???)
+          // perhaps cleanupCurrentConnection() was already called in shutdown()
+          cleanupCurrentConnection(false);  // disconnect = false because we can reuse HTTPConnection
           return null;
         } else {
           LOG.warn("copyMapOutput failed for tasks: " + Arrays.toString(failedInputs));

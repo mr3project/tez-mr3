@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.TaskContext;
@@ -55,7 +54,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.tez.dag.api.TezUncheckedException;
-import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.ShuffleHeader;  // TODO: relocate
 import org.apache.tez.runtime.library.common.sort.impl.TezIndexRecord;
@@ -244,8 +242,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     }
 
     if (isShutDown.get()) {
-      cleanupCurrentConnection(false);  // TODO: true because stopped in the middle (???)
-      // Cf. cleanupCurrentConnection(false) has no effect in practice because it was called in shutdown()
+      cleanupCurrentConnection(false);  // disconnect = false because we can reuse HTTPConnection
 
       if (isDebugEnabled) {
         LOG.debug("Detected fetcher has been shutdown after connection establishment. Returning");
@@ -302,8 +299,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
 
     // Handle any shutdown which may have been invoked.
     if (isShutDown.get()) {
-      cleanupCurrentConnection(false);  // TODO: true because stopped in the middle (???)
-      // Cf. cleanupCurrentConnection(false) has no effect in practice because it was called in shutdown()
+      cleanupCurrentConnection(false);  // disconnect = false because we can reuse HTTPConnection
 
       if (isDebugEnabled) {
         LOG.debug("Detected fetcher has been shutdown after opening stream. Returning");
@@ -323,7 +319,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       InputAttemptIdentifier inputAttemptIdentifier = pendingInputsSeq.getInputs().get(index);
 
       if (isShutDown.get()) {
-        cleanupCurrentConnection(true);   // true because stopped in the middle
+        cleanupCurrentConnection(false);  // disconnect = false because we can reuse HTTPConnection
         if (isDebugEnabled) {
           LOG.debug("Fetcher already shutdown. Aborting queued fetches for " + (numInputs - index) + " inputs");
         }
@@ -347,7 +343,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         index++;
       } catch (FetcherReadTimeoutException e) {
         // failed to read inputAttemptIdentifier at index, and retry
-        cleanupCurrentConnection(true);   // true because of error
+        cleanupCurrentConnection(true);   // disconnect = true because of error
         if (isShutDown.get()) {
           // perhaps cleanupCurrentConnection(false) was already called in shutdown(),
           // but we just called cleanupCurrentConnection(true) anyway
@@ -531,12 +527,12 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
   }
 
   // called from ShuffleServer or at the end of call()
-  public void shutdown() {
+  public void shutdown(boolean disconnect) {
     if (!isShutDown.getAndSet(true)) {
       if (isDebugEnabled) {
         LOG.debug("Shutting down fetcher for host: " + host);
       }
-      cleanupCurrentConnection(false);  // false to reuse connection by default
+      cleanupCurrentConnection(disconnect);
     }
   }
 

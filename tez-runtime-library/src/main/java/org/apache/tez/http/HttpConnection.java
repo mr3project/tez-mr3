@@ -261,7 +261,9 @@ public class HttpConnection extends BaseHttpConnection {
         input.close();
         input = null;
       }
-      if (connection != null && httpConnParams.isKeepAlive() && connectionSucceeed) {
+      // if disconnect == true, we call connection.disconnect() immediately after,
+      // so there is no need to call readErrorStream() which is blocking.
+      if (connection != null && !disconnect && httpConnParams.isKeepAlive() && connectionSucceeed) {
         // Refer:
         // http://docs.oracle.com/javase/6/docs/technotes/guides/net/http-keepalive.html
         readErrorStream(connection.getErrorStream());
@@ -295,9 +297,11 @@ public class HttpConnection extends BaseHttpConnection {
       DataOutputBuffer errorBuffer = new DataOutputBuffer();
       IOUtils.copyBytes(errorStream, errorBuffer, 4096);
       IOUtils.closeStream(errorBuffer);
-      IOUtils.closeStream(errorStream);
     } catch (IOException ioe) {
-      // ignore
+      LOG.error("Reading error stream fails", ioe);
+      // ignore ioe
+    } finally {
+      IOUtils.closeStream(errorStream);
     }
   }
 }
