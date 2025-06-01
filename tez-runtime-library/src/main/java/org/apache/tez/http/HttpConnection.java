@@ -258,10 +258,15 @@ public class HttpConnection extends BaseHttpConnection {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Closing input on " + logIdentifier);
         }
+        // input.close() can block even on a stalled connection (for several 10s of seconds).
+        // Ex. ShuffleServer.unregister() --> Fetcher.shutdown() --> Fetcher???.cleanupCurrentConnection() --> here
+        // This call sequence can block because the fetcher is likely stalled
         input.close();
         input = null;
       }
-      if (connection != null && httpConnParams.isKeepAlive() && connectionSucceeed) {
+      // if disconnect == true, we call connection.disconnect() immediately after,
+      // so there is no need to call readErrorStream() which is blocking.
+      if (connection != null && !disconnect && httpConnParams.isKeepAlive() && connectionSucceeed) {
         // Refer:
         // http://docs.oracle.com/javase/6/docs/technotes/guides/net/http-keepalive.html
         readErrorStream(connection.getErrorStream());
@@ -295,9 +300,11 @@ public class HttpConnection extends BaseHttpConnection {
       DataOutputBuffer errorBuffer = new DataOutputBuffer();
       IOUtils.copyBytes(errorStream, errorBuffer, 4096);
       IOUtils.closeStream(errorBuffer);
-      IOUtils.closeStream(errorStream);
     } catch (IOException ioe) {
-      // ignore
+      LOG.error("Reading error stream fails", ioe);
+      // ignore ioe
+    } finally {
+      IOUtils.closeStream(errorStream);
     }
   }
 }

@@ -142,7 +142,7 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
   abstract public ShuffleClient<T> getShuffleClient();
   abstract public boolean useSingleShuffleClientId(Long shuffleClientId);
   abstract public String getFetcherIdentifier();
-  abstract public void shutdown();
+  abstract public void shutdown(boolean disconnect);
   abstract public FetchResult call() throws Exception;
   abstract public Fetcher<T> createClone();
 
