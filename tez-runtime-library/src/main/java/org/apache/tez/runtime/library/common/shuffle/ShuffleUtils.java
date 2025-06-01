@@ -125,9 +125,10 @@ public class ShuffleUtils {
       // finished reading shuffleData.length bytes from identifier
     } catch (InternalError | Exception e) {
       // Close the streams
-      LOG.info("Failed to read data to memory for {}. len={}, decomp={}. ExceptionMessage={} for {}",
-          identifier, compressedLength, decompressedLength, e.getMessage(),
-          taskContext.getUniqueIdentifier());
+      // taskContext.getUniqueIdentifier() == ShuffleServerDaemonTaskAttempt, so no need to print it.
+      // Fetcher was likely stalled and disconnected, e.g., after speculative Fetchers are created.
+      LOG.info("Failed to read data to memory for {}. len={}, decomp={}. ExceptionMessage={}",
+          identifier, compressedLength, decompressedLength, e.getMessage());
       ioCleanup(input);
       if (e instanceof InternalError) {
         // The codec for lz0,lz4,snappy,bz2,etc. throw java.lang.InternalError
@@ -171,6 +172,7 @@ public class ShuffleUtils {
       output.close();
     } catch (IOException ioe) {
       // Close the streams
+      // Fetcher was likely stalled and disconnected, e.g., after speculative Fetchers are created.
       LOG.info("Failed to read data to disk for {}. len={}, decomp={}. ExceptionMessage={}",
           identifier, compressedLength, decompressedLength, ioe.getMessage());
       ioCleanup(input, output);
