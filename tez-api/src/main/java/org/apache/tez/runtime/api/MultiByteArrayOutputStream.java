@@ -26,11 +26,12 @@ public class MultiByteArrayOutputStream extends OutputStream {
 
   private static final Logger LOG = LoggerFactory.getLogger(MultiByteArrayOutputStream.class);
 
-  // buffer size = 0KB -> 1KB -> 10KB -> 100KB -> 1MB -> 4MB -> 4MB
-  private static final int MIN_CACHE_SIZE_WRITER = 1 * 1024;
+  // buffer size = 0KB -> 16KB -> 128KB -> 1MB -> 4MB -> 4MB -> ...
+  // Cf. gla2025.5.26.pptx
+  private static final int MIN_CACHE_SIZE_WRITER = 16 * 1024;   // set to 128 * 1024 to start at 128KB
   private static final int MAX_CACHE_SIZE_WRITER = 4 * 1024 * 1024;
-  private static final int CACHE_SIZE_MULTIPLE = 10;
-  private static final int MAX_NUM_BUFFERS = 256;
+  private static final int CACHE_SIZE_MULTIPLE = 8;
+  private static final int MAX_NUM_BUFFERS = 64;
 
   public static boolean canUseFreeMemoryBuffers(long freeMemoryThreshold) {
     long currentFreeMemory = Runtime.getRuntime().freeMemory();
