@@ -35,7 +35,6 @@ import java.util.zip.Deflater;
 import javax.annotation.Nullable;
 import javax.crypto.SecretKey;
 
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.tez.common.Preconditions;
 import com.google.protobuf.ByteString;
@@ -48,7 +47,6 @@ import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.ConcurrentByteCache;
 import org.apache.tez.runtime.api.IndexPathCache;
 import org.apache.tez.runtime.api.TaskContext;
-import org.apache.tez.runtime.api.TezTaskOutput;
 import org.apache.tez.runtime.api.events.DataMovementEvent;
 import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.TezRuntimeUtils;
@@ -649,10 +647,11 @@ public class ShuffleUtils {
 
   // spillId is not included in pathComponent
   // only one of outputFilePath and byteArrayOutput is valid, and specifies the location of the output
-  public static void writeToIndexPathCache(OutputContext outputContext,
-                                           @Nullable Path outputFilePath,
-                                           TezSpillRecord spillRecord,
-                                           @Nullable MultiByteArrayOutputStream byteArrayOutput) {
+  public static void writeToIndexPathCacheAndByteCache(
+      OutputContext outputContext,
+      @Nullable Path outputFilePath,
+      TezSpillRecord spillRecord,
+      @Nullable MultiByteArrayOutputStream byteArrayOutput) {
     assert !(outputFilePath != null && byteArrayOutput != null);
     String pathComponent = outputContext.getUniqueIdentifier();
     String mapId = ShuffleUtils.expandPathComponent(outputContext, pathComponent);
@@ -663,13 +662,13 @@ public class ShuffleUtils {
     if (byteArrayOutput != null) {
       ConcurrentByteCache concurrentByteCache = outputContext.getConcurrentByteCache();
       concurrentByteCache.add(mapId, byteArrayOutput);
-      LOG.info("writeToIndexPathCache: mapId={}, totalBytes={}", mapId, byteArrayOutput.getTotalBytes());
+      LOG.info("Write to IndexPathCache and ByteCache: mapId={}, totalBytes={}", mapId, byteArrayOutput.getTotalBytes());
     }
   }
 
   // spillId is appended to pathComponent
   // only one of outputFilePath and byteArrayOutput is valid, and specifies the location of the output
-  public static void writeSpillInfoToIndexPathCache(
+  public static void writeSpillInfoToIndexPathCacheAndByteCache(
       OutputContext outputContext,
       int spillId,
       @Nullable Path outputFilePath,
@@ -685,7 +684,7 @@ public class ShuffleUtils {
     if (byteArrayOutput != null) {
       ConcurrentByteCache concurrentByteCache = outputContext.getConcurrentByteCache();
       concurrentByteCache.add(mapId, byteArrayOutput);
-      LOG.info("writeSpillInfoToIndexPathCache: mapId={}, totalBytes={}", mapId, byteArrayOutput.getTotalBytes());
+      LOG.info("Write SpillInfo to IndexPathCache and ByteCache: mapId={}, totalBytes={}", mapId, byteArrayOutput.getTotalBytes());
     }
   }
 
