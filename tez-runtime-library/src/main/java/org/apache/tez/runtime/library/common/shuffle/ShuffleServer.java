@@ -28,7 +28,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.tez.common.security.JobTokenSecretManager;
-import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.TaskContext;
@@ -96,6 +95,7 @@ public class ShuffleServer implements FetcherCallback {
     public final boolean localDiskFetchEnabled;
     public final boolean localDiskFetchOrderedEnabled;
     public final boolean verifyDiskChecksum;
+    public final boolean compositeFetch;
     public final boolean connectionFailAllInput;
     public final long speculativeExecutionWaitMillis;
     public final int stuckFetcherThresholdMillis;
@@ -113,6 +113,7 @@ public class ShuffleServer implements FetcherCallback {
         boolean localDiskFetchEnabled,
         boolean localDiskFetchOrderedEnabled,
         boolean verifyDiskChecksum,
+        boolean compositeFetch,
         boolean connectionFailAllInput,
         long speculativeExecutionWaitMillis,
         int stuckFetcherThresholdMillis,
@@ -128,6 +129,7 @@ public class ShuffleServer implements FetcherCallback {
       this.localDiskFetchEnabled = localDiskFetchEnabled;
       this.localDiskFetchOrderedEnabled = localDiskFetchOrderedEnabled;
       this.verifyDiskChecksum = verifyDiskChecksum;
+      this.compositeFetch = compositeFetch;
       this.connectionFailAllInput = connectionFailAllInput;
       this.speculativeExecutionWaitMillis = speculativeExecutionWaitMillis;
       this.stuckFetcherThresholdMillis = stuckFetcherThresholdMillis;

@@ -41,7 +41,6 @@ import org.apache.hadoop.io.compress.SnappyCodec;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.security.JobTokenSecretManager;
-import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
@@ -89,6 +88,7 @@ public final class CodecUtils {
     boolean verifyDiskChecksum = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_VERIFY_DISK_CHECKSUM,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_VERIFY_DISK_CHECKSUM_DEFAULT);
+    boolean compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
     boolean connectionFailAllInput = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_CONNECTION_FAIL_ALL_INPUT,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_CONNECTION_FAIL_ALL_INPUT_DEFAULT);
@@ -115,6 +115,7 @@ public final class CodecUtils {
         localDiskFetchEnabled,
         localDiskFetchOrderedEnabled,
         verifyDiskChecksum,
+        compositeFetch,
         connectionFailAllInput,
         speculativeExecutionWaitMillis,
         stuckFetcherThresholdMillis,

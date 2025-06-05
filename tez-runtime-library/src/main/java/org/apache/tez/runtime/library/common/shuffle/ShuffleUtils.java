@@ -36,10 +36,12 @@ import javax.annotation.Nullable;
 import javax.crypto.SecretKey;
 
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.tez.common.Preconditions;
 import com.google.protobuf.ByteString;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.http.BaseHttpConnection;
@@ -280,8 +282,9 @@ public class ShuffleUtils {
    */
   static ByteBuffer generateDMEPayload(boolean sendEmptyPartitionDetails,
       int numPhysicalOutputs, TezSpillRecord spillRecord, OutputContext context,
-      int spillId, boolean finalMergeEnabled, boolean isLastEvent, String pathComponent, String auxiliaryService,
-      Deflater deflater) throws IOException {
+      int spillId, boolean finalMergeEnabled, boolean isLastEvent, String pathComponent, String auxiliaryService, Deflater deflater,
+      boolean compositeFetch)
+      throws IOException {
     DataMovementEventPayloadProto.Builder payloadBuilder = DataMovementEventPayloadProto.newBuilder();
 
     boolean outputGenerated = true;
@@ -319,7 +322,7 @@ public class ShuffleUtils {
         }
       }
 
-      payloadBuilder.setPathComponent(expandPathComponent(context, pathComponent));
+      payloadBuilder.setPathComponent(expandPathComponent(context, compositeFetch, pathComponent));
     }
 
     if (!finalMergeEnabled) {
@@ -425,7 +428,8 @@ public class ShuffleUtils {
   public static void generateEventOnSpill(List<Event> eventList, boolean finalMergeEnabled,
       boolean isLastEvent, OutputContext context, int spillId, TezSpillRecord spillRecord,
       int numPhysicalOutputs, boolean sendEmptyPartitionDetails, String pathComponent,
-      @Nullable long[] partitionStats, boolean reportDetailedPartitionStats, String auxiliaryService, Deflater deflater)
+      @Nullable long[] partitionStats, boolean reportDetailedPartitionStats, String auxiliaryService, Deflater deflater,
+      boolean compositeFetch)
       throws IOException {
     Preconditions.checkArgument(eventList != null, "EventList can't be null");
 
@@ -442,7 +446,8 @@ public class ShuffleUtils {
 
     ByteBuffer payload = generateDMEPayload(sendEmptyPartitionDetails, numPhysicalOutputs,
         spillRecord, context, spillId,
-        finalMergeEnabled, isLastEvent, pathComponent, auxiliaryService, deflater);
+        finalMergeEnabled, isLastEvent, pathComponent, auxiliaryService, deflater,
+        compositeFetch);
 
     if (finalMergeEnabled || isLastEvent) {
       VertexManagerEvent vmEvent = generateVMEvent(context, partitionStats,
@@ -636,9 +641,24 @@ public class ShuffleUtils {
     return TezRuntimeUtils.getHttpConnectionParams(conf);
   }
 
+  public static boolean isTezShuffleHandler(Configuration config) {
+    return config.get(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
+        TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT).
+        contains("tez");
+  }
+
   public static String getTezShuffleHandlerServiceId(Configuration conf) {
     return conf.get(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
           TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT);
+  }
+
+  public static String adjustPathComponent(boolean compositeFetch, int dagIdentifier, String pathComponent) {
+    if (compositeFetch) {  // == isTezShuffleHandler
+      // pathComponent includes ${containerId}/${vertexId}/ in its prefix
+      return Constants.DAG_PREFIX + dagIdentifier + Path.SEPARATOR + pathComponent;
+    } else {
+      return Constants.TEZ_RUNTIME_TASK_OUTPUT_DIR + Path.SEPARATOR + pathComponent;
+    }
   }
 
   public static String getUniqueIdentifierSpillId(OutputContext outputContext, int spillId) {
@@ -647,6 +667,7 @@ public class ShuffleUtils {
 
   // spillId is not included in pathComponent
   // only one of outputFilePath and byteArrayOutput is valid, and specifies the location of the output
+  // should be called only when using hadoop_shuffle (i.e., compositeFetch == true)
   public static void writeToIndexPathCacheAndByteCache(
       OutputContext outputContext,
       @Nullable Path outputFilePath,
@@ -654,7 +675,7 @@ public class ShuffleUtils {
       @Nullable MultiByteArrayOutputStream byteArrayOutput) {
     assert !(outputFilePath != null && byteArrayOutput != null);
     String pathComponent = outputContext.getUniqueIdentifier();
-    String mapId = ShuffleUtils.expandPathComponent(outputContext, pathComponent);
+    String mapId = ShuffleUtils.expandPathComponent(outputContext, true, pathComponent);
 
     IndexPathCache indexPathCache = outputContext.getIndexPathCache();
     indexPathCache.add(mapId, outputFilePath, spillRecord.getByteBuffer());
@@ -668,6 +689,7 @@ public class ShuffleUtils {
 
   // spillId is appended to pathComponent
   // only one of outputFilePath and byteArrayOutput is valid, and specifies the location of the output
+  // should be called only when using hadoop_shuffle (i.e., compositeFetch == true)
   public static void writeSpillInfoToIndexPathCacheAndByteCache(
       OutputContext outputContext,
       int spillId,
@@ -676,7 +698,7 @@ public class ShuffleUtils {
       @Nullable MultiByteArrayOutputStream byteArrayOutput) {
     assert !(outputFilePath != null && byteArrayOutput != null);
     String pathComponent = ShuffleUtils.getUniqueIdentifierSpillId(outputContext, spillId);
-    String mapId = ShuffleUtils.expandPathComponent(outputContext, pathComponent);
+    String mapId = ShuffleUtils.expandPathComponent(outputContext, true, pathComponent);
 
     IndexPathCache indexPathCache = outputContext.getIndexPathCache();
     indexPathCache.add(mapId, outputFilePath, spillRecord.getByteBuffer());
@@ -688,27 +710,49 @@ public class ShuffleUtils {
     }
   }
 
-  public static String expandPathComponent(OutputContext context, String pathComponent) {
-    String containerId = context.getExecutionContext().getContainerId();
-    int vertexId = context.getTaskVertexIndex();
-    return containerId + Path.SEPARATOR + Constants.VERTEX_PREFIX + vertexId + Path.SEPARATOR + pathComponent;
+  public static String expandPathComponent(OutputContext context, boolean compositeFetch, String pathComponent) {
+    if (compositeFetch) {
+      String containerId = context.getExecutionContext().getContainerId();
+      int vertexId = context.getTaskVertexIndex();
+      return containerId + Path.SEPARATOR + Constants.VERTEX_PREFIX + vertexId + Path.SEPARATOR + pathComponent;
+    } else {
+      return pathComponent;
+    }
   }
 
   public static TezSpillRecord getTezSpillRecord(
       TaskContext taskContext,
-      String pathComponent) {   // already in expanded form
+      String pathComponent,   // already in expanded form
+      Path finalIndexFile,
+      RawLocalFileSystem localFs) throws IOException {
     IndexPathCache.MapOutputInfo mapOutputInfo = taskContext.getIndexPathCache().get(pathComponent);
-    assert mapOutputInfo != null;
-    return new TezSpillRecord(mapOutputInfo.getSpillRecord());
+    if (mapOutputInfo != null) {
+      return new TezSpillRecord(mapOutputInfo.getSpillRecord());
+    } else {
+      // We may have to read back TezSpillRecord written on disk, e.g.,
+      // in order to retrieve partition statistics that are not yet reported.
+      return new TezSpillRecord(finalIndexFile, localFs);
+    }
   }
 
   public static AbstractMap.SimpleEntry<TezSpillRecord, Path> getTezSpillRecordInputFilePath(
       TaskContext taskContext,
-      String pathComponent) {   // already in expanded form
+      String pathComponent,   // already in expanded form
+      boolean compositeFetch, int dagId, Configuration conf,
+      LocalDirAllocator localDirAllocator,
+      RawLocalFileSystem localFs) throws IOException {
     IndexPathCache.MapOutputInfo mapOutputInfo = taskContext.getIndexPathCache().get(pathComponent);
-    assert mapOutputInfo != null;
-    return new AbstractMap.SimpleEntry<>(
-        new TezSpillRecord(mapOutputInfo.getSpillRecord()),
-        mapOutputInfo.getMapOutputFilePath());
+    if (mapOutputInfo != null) {
+      return new AbstractMap.SimpleEntry<>(
+          new TezSpillRecord(mapOutputInfo.getSpillRecord()), mapOutputInfo.getMapOutputFilePath());
+    } else {
+      String inputFile = adjustPathComponent(compositeFetch, dagId, pathComponent) +
+        Path.SEPARATOR + Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING;
+      String indexFile = inputFile + Constants.TEZ_RUNTIME_TASK_OUTPUT_INDEX_SUFFIX_STRING;
+      Path indexFilePath = localDirAllocator.getLocalPathToRead(indexFile, conf);
+      return new AbstractMap.SimpleEntry<>(
+          new TezSpillRecord(indexFilePath, localFs),
+          localDirAllocator.getLocalPathToRead(inputFile, conf));
+    }
   }
 }

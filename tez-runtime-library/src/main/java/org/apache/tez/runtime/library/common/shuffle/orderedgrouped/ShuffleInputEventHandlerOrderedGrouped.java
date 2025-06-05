@@ -50,6 +50,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
 
   private final ShuffleScheduler shuffleScheduler;
   private final InputContext inputContext;
+  private final boolean compositeFetch;
   private final Inflater inflater;
 
   private final AtomicInteger nextToLogEventCount = new AtomicInteger(1);
@@ -60,9 +61,11 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
   private final int portIndex;
 
   public ShuffleInputEventHandlerOrderedGrouped(InputContext inputContext,
-      ShuffleScheduler shuffleScheduler) {
+      ShuffleScheduler shuffleScheduler,
+      boolean compositeFetch) {
     this.inputContext = inputContext;
     this.shuffleScheduler = shuffleScheduler;
+    this.compositeFetch = compositeFetch;
     this.inflater = TezCommonUtils.newInflater();
 
     int taskIndex = inputContext.getTaskIndex();
@@ -126,8 +129,15 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
           throw new TezUncheckedException("Unable to set the empty partition to succeeded", e);
         }
       }
-      numDmeEvents.addAndGet(crdme.getCount());
-      processCompositeRoutedDataMovementEvent(crdme, shufflePayload, emptyPartitionsBitSet);
+      if (compositeFetch) {
+        numDmeEvents.addAndGet(crdme.getCount());
+        processCompositeRoutedDataMovementEvent(crdme, shufflePayload, emptyPartitionsBitSet);
+      } else {
+        for (int offset = 0; offset < crdme.getCount(); offset++) {
+          numDmeEvents.incrementAndGet();
+          processDataMovementEvent(crdme.expand(offset), shufflePayload, emptyPartitionsBitSet);
+        }
+      }
     } else if (event instanceof InputFailedEvent) {
       numObsoletionEvents.incrementAndGet();
       processTaskFailedEvent((InputFailedEvent) event);

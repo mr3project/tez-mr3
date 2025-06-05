@@ -389,7 +389,8 @@ public class PipelinedSorter extends ExternalSorter {
     ShuffleUtils.generateEventOnSpill(events, finalMergeEnabled, false,
         outputContext, (numSpills - 1), indexCacheList.get(numSpills - 1),
         partitions, sendEmptyPartitionDetails, pathComponent, partitionStats,
-        reportDetailedPartitionStats(), auxiliaryService, deflater);
+        reportDetailedPartitionStats(), auxiliaryService, deflater,
+        compositeFetch);
     outputContext.sendEvents(events);
     LOG.info("{}: Added spill event for spill (final update=false), spillId={}",
         outputContext.getDestinationVertexName(), (numSpills - 1));
@@ -544,6 +545,12 @@ public class PipelinedSorter extends ExternalSorter {
         }
       }
 
+      if (writeSpillRecord) {
+        Path indexFilename = mapOutputFile.getSpillIndexFileForWrite(
+            numSpills, partitions * MAP_OUTPUT_INDEX_RECORD_LENGTH);
+        spillFileIndexPaths.put(numSpills, indexFilename);
+        spillRec.writeToFile(indexFilename, localFs);
+      }
       ShuffleUtils.writeSpillInfoToIndexPathCacheAndByteCache(outputContext, numSpills, outputFilePath, spillRec, null);
 
       //TODO: honor cache limits
@@ -653,9 +660,15 @@ public class PipelinedSorter extends ExternalSorter {
       }
     }
 
+    if (writeSpillRecord) {
+      Path indexFilename = mapOutputFile.getSpillIndexFileForWrite(
+          numSpills, partitions * MAP_OUTPUT_INDEX_RECORD_LENGTH);
+      spillFileIndexPaths.put(numSpills, indexFilename);
+      spillRec.writeToFile(indexFilename, localFs);
+    }
     Path outputFilePath = byteArrayOutput == null ? spillFileName : null;
     ShuffleUtils.writeSpillInfoToIndexPathCacheAndByteCache(
-        outputContext, numSpills, outputFilePath, spillRec, byteArrayOutput);
+      outputContext, numSpills, outputFilePath, spillRec, byteArrayOutput);
     LOG.info("{}: Finished spill {}", outputContext.getDestinationVertexName(), numSpills);
 
     // TODO: honor cache limits
@@ -744,7 +757,8 @@ public class PipelinedSorter extends ExternalSorter {
           ShuffleUtils.generateEventOnSpill(finalEvents, finalMergeEnabled, isLastEvent,
               outputContext, i, indexCacheList.get(i), partitions,
               sendEmptyPartitionDetails, pathComponent, partitionStats,
-              reportDetailedPartitionStats(), auxiliaryService, deflater);
+              reportDetailedPartitionStats(), auxiliaryService, deflater,
+              compositeFetch);
           LOG.info("{}: Adding spill event for spill (final update={}), spillId={}",
               outputContext.getDestinationVertexName(), isLastEvent, i);
         }
@@ -766,16 +780,21 @@ public class PipelinedSorter extends ExternalSorter {
         // OrderedPartitionedKVOutput.generateEvents() adjusts pathComponent by appending "_0" so that
         // downstream tasks can request ".../...10031_0/file.out" instead of ".../...10031/file.out".
         finalOutputFile = spillFilePaths.get(0);
+        if (writeSpillRecord) {
+          finalIndexFile = spillFileIndexPaths.get(0);
+        }
         finalIndexComputed = true;  // because final TezSpillRecord can be obtained
 
         if (isDebugEnabled) {
           LOG.debug(outputContext.getDestinationVertexName() + ": numSpills=" + numSpills +
-              ", finalOutputFile=" + finalOutputFile);
+              ", finalOutputFile=" + finalOutputFile + ", finalIndexFile=" + finalIndexFile);
         }
 
         String uniqueId = ShuffleUtils.getUniqueIdentifierSpillId(outputContext, 0);
-        String pathComponent = ShuffleUtils.expandPathComponent(outputContext, uniqueId);
-        TezSpillRecord spillRecord = ShuffleUtils.getTezSpillRecord(outputContext, pathComponent);
+        String pathComponent = ShuffleUtils.expandPathComponent(outputContext, compositeFetch, uniqueId);
+        // read back TezSpillRecord (which might be on local disk)
+        TezSpillRecord spillRecord = ShuffleUtils.getTezSpillRecord(
+            outputContext, pathComponent, finalIndexFile, localFs);
 
         if (reportPartitionStats()) {
           for (int i = 0; i < spillRecord.size(); i++) {
@@ -785,16 +804,19 @@ public class PipelinedSorter extends ExternalSorter {
         numShuffleChunks.setValue(numSpills);
         fileOutputByteCounter.increment(rfs.getFileStatus(finalOutputFile).getLen());
 
-        // ??? why are events not being sent here?
+        // TODO: why are events not being sent here???
         return;
       }
 
       finalOutputFile = mapOutputFile.getOutputFileForWrite(0);
+      if (writeSpillRecord) {
+        finalIndexFile = mapOutputFile.getOutputIndexFileForWrite(0);
+      }
       finalIndexComputed = true;  // because final TezSpillRecord can be obtained
 
       if (isDebugEnabled) {
         LOG.debug(outputContext.getDestinationVertexName() + ": numSpills: " + numSpills +
-            ", finalOutputFile:" + finalOutputFile);
+            ", finalOutputFile:" + finalOutputFile + ", finalIndexFile:" + finalIndexFile);
       }
 
       // the output stream for the final single output file
@@ -870,7 +892,11 @@ public class PipelinedSorter extends ExternalSorter {
       numShuffleChunks.setValue(1); //final merge has happened.
       fileOutputByteCounter.increment(rfs.getFileStatus(finalOutputFile).getLen());
 
-      ShuffleUtils.writeToIndexPathCacheAndByteCache(outputContext, finalOutputFile, spillRec, null);
+      if (writeSpillRecord) {
+        spillRec.writeToFile(finalIndexFile, localFs);
+      } else {
+        ShuffleUtils.writeToIndexPathCacheAndByteCache(outputContext, finalOutputFile, spillRec, null);
+      }
       finalOut.close();
 
       for (int i = 0; i < numSpills; i++) {
@@ -878,6 +904,14 @@ public class PipelinedSorter extends ExternalSorter {
         rfs.delete(spillFilename, true);
       }
       spillFilePaths.clear();
+
+      if (writeSpillRecord) {
+        for (int i = 0; i < numSpills; i++) {
+          Path indexFilename = spillFileIndexPaths.get(i);
+          rfs.delete(indexFilename, true);
+        }
+        spillFileIndexPaths.clear();
+      }
     } catch(InterruptedException ie) {
       if (cleanup) {
         cleanup();

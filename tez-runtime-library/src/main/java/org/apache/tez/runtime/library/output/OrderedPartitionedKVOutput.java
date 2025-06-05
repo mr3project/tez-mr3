@@ -27,14 +27,11 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.Deflater;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 
 import org.apache.tez.runtime.library.conf.OrderedPartitionedKVOutputConfig.SorterImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.RawLocalFileSystem;
@@ -60,7 +57,6 @@ import org.apache.tez.common.Preconditions;
  * key/value pairs written to it. It also partitions the output based on a
  * {@link Partitioner}
  */
-@Public
 public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
 
   private static final Logger LOG = LoggerFactory.getLogger(OrderedPartitionedKVOutput.class);
@@ -73,10 +69,8 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
   private final AtomicBoolean isStarted = new AtomicBoolean(false);
   private final Deflater deflater;
 
-  @VisibleForTesting
   boolean pipelinedShuffle;
   private boolean sendEmptyPartitionDetails;
-  @VisibleForTesting
   boolean finalMergeEnabled;
 
   private boolean compositeFetch;
@@ -103,6 +97,8 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
     sendEmptyPartitionDetails = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED,
         TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED_DEFAULT);
+
+    this.compositeFetch = ShuffleUtils.isTezShuffleHandler(this.conf);
 
     return Collections.emptyList();
   }
@@ -201,8 +197,6 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
   private List<Event> generateEvents() throws IOException {
     List<Event> eventList = Lists.newLinkedList();
     if (finalMergeEnabled && !pipelinedShuffle) {
-      boolean isLastEvent = true;
-      String auxiliaryService = ShuffleUtils.getTezShuffleHandlerServiceId(conf);
       if (!sorter.getFinalIndexComputed()) {
         // return an empty list because TezSpillRecord() throws NPE
         // this occurs when PipelinedSorter threads gets interrupted and LogicalOutput.close() is closed
@@ -214,13 +208,17 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
       String pathComponent = (usePipelinedSorter && sorter.getNumSpills() == 1) ?
           getContext().getUniqueIdentifier() + "_0" :   // use original output directory ".../...10031_0"
           getContext().getUniqueIdentifier();           // use renamed output directory ".../...10031"
-      String pathComponentExpanded = ShuffleUtils.expandPathComponent(getContext(), pathComponent);
-      TezSpillRecord tezSpillRecord = ShuffleUtils.getTezSpillRecord(getContext(), pathComponentExpanded);
+      String pathComponentExpanded = ShuffleUtils.expandPathComponent(getContext(), compositeFetch, pathComponent);
+      TezSpillRecord tezSpillRecord = ShuffleUtils.getTezSpillRecord(
+          getContext(), pathComponentExpanded, sorter.getFinalIndexFile(), localFs);
 
+      boolean isLastEvent = true;
+      String auxiliaryService = ShuffleUtils.getTezShuffleHandlerServiceId(conf);
       ShuffleUtils.generateEventOnSpill(eventList, finalMergeEnabled, isLastEvent,
           getContext(), 0, tezSpillRecord,
           getNumPhysicalOutputs(), sendEmptyPartitionDetails, pathComponent,
-          sorter.getPartitionStats(), sorter.reportDetailedPartitionStats(), auxiliaryService, deflater);
+          sorter.getPartitionStats(), sorter.reportDetailedPartitionStats(), auxiliaryService, deflater,
+          compositeFetch);
     }
     return eventList;
   }
@@ -230,7 +228,6 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
     ShuffleUtils.generateEventsForNonStartedOutput(eventList, getNumPhysicalOutputs(), getContext(), true, true, deflater);
     return eventList;
   }
-
 
   private static final Set<String> confKeys = new HashSet<String>();
 
@@ -263,12 +260,9 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_SORTER_CLASS);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT);
+    confKeys.add(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID);
   }
 
-  // TODO Maybe add helper methods to extract keys
-  // TODO Maybe add constants or an Enum to access the keys
-
-  @InterfaceAudience.Private
   public static Set<String> getConfigurationKeySet() {
     return Collections.unmodifiableSet(confKeys);
   }

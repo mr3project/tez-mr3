@@ -113,6 +113,7 @@ public class UnorderedKVInput extends AbstractLogicalInput {
       Configuration codecConf = ShuffleServer.getCodecConf(getContext().peekShuffleServer(), conf);
       CompressionCodec codec = CodecUtils.getCodec(codecConf);
 
+      boolean compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
       boolean ifileReadAhead = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD,
           TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_DEFAULT);
       int ifileReadAheadLength = 0;
@@ -136,7 +137,7 @@ public class UnorderedKVInput extends AbstractLogicalInput {
       this.shuffleManager = new ShuffleManager(inputContext, conf, getNumPhysicalInputs(), inputManager, srcNameTrimmed);
 
       this.inputEventHandler = new ShuffleInputEventHandlerImpl(inputContext, shuffleManager,
-          inputManager, codec, ifileReadAhead, ifileReadAheadLength);
+          inputManager, codec, ifileReadAhead, ifileReadAheadLength, compositeFetch);
 
       ////// End of Initial configuration
 
@@ -261,11 +262,9 @@ public class UnorderedKVInput extends AbstractLogicalInput {
     confKeys.add(TezConfiguration.TEZ_COUNTERS_COUNTER_NAME_MAX_LENGTH);
     confKeys.add(TezConfiguration.TEZ_COUNTERS_MAX_GROUPS);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT);
+    confKeys.add(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT);
   }
-
-  // TODO Maybe add helper methods to extract keys
-  // TODO Maybe add constants or an Enum to access the keys
 
   public static Set<String> getConfigurationKeySet() {
     return Collections.unmodifiableSet(confKeys);

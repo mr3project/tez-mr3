@@ -47,6 +47,7 @@ public class TezTaskOutputFiles implements TezTaskOutput {
   private final String uniqueId;
   private final String outputDir;
   private final String dagId;   // = dag_${dagId}/${containerId}/
+  private final boolean isTezShuffleHandler;
 
   /**
    * @param conf     the configuration from which local-dirs will be picked up
@@ -58,11 +59,16 @@ public class TezTaskOutputFiles implements TezTaskOutput {
    * @param dagID    DAG identifier for the specific job
    */
   public TezTaskOutputFiles(Configuration conf, String uniqueId, int dagID,
-                            String containerId, int vertexId) {
+                            String containerId, int vertexId,
+                            boolean isTezShuffleHandler) {
     this.conf = conf;
     this.uniqueId = uniqueId;
-    this.outputDir = Constants.VERTEX_PREFIX + vertexId;
-    this.dagId = Constants.DAG_PREFIX + dagID + Path.SEPARATOR + containerId + Path.SEPARATOR;
+    this.outputDir = isTezShuffleHandler ?
+        Constants.VERTEX_PREFIX + vertexId : Constants.TEZ_RUNTIME_TASK_OUTPUT_DIR;
+    this.dagId = isTezShuffleHandler ?
+        Constants.DAG_PREFIX + dagID + Path.SEPARATOR + containerId + Path.SEPARATOR :
+        Constants.DAG_PREFIX + dagID + Path.SEPARATOR;
+    this.isTezShuffleHandler = isTezShuffleHandler;
   }
 
   /*
@@ -285,6 +291,6 @@ public class TezTaskOutputFiles implements TezTaskOutput {
   }
 
   public String getDagOutputDir(String child) {
-    return dagId.concat(child);
+    return isTezShuffleHandler ? dagId.concat(child) : child;
   }
 }

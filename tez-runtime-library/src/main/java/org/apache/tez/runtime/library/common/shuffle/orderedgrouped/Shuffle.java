@@ -146,7 +146,8 @@ public class Shuffle implements ExceptionReporter {
     this.mergePhaseTime = inputContext.getCounters().findCounter(TaskCounter.MERGE_PHASE_TIME);
     this.shufflePhaseTime = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_PHASE_TIME);
 
-    eventHandler= new ShuffleInputEventHandlerOrderedGrouped(inputContext, shuffleScheduler);
+    eventHandler= new ShuffleInputEventHandlerOrderedGrouped(
+        inputContext, shuffleScheduler, ShuffleUtils.isTezShuffleHandler(conf));
 
     ExecutorService rawExecutor = Executors.newFixedThreadPool(1, new ThreadFactoryBuilder()
         .setDaemon(true)

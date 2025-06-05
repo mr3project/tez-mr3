@@ -28,11 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.tez.common.TezUtils;
 import org.apache.tez.common.TezCommonUtils;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.counters.TaskCounter;
@@ -48,19 +44,15 @@ import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.MemoryUpdateCallbackHandler;
 import org.apache.tez.runtime.library.common.writers.UnorderedPartitionedKVWriter;
 
-import com.google.common.annotations.VisibleForTesting;
-
 /**
  * {@link UnorderedKVOutput} is a {@link LogicalOutput} that writes key
  * value data without applying any ordering or grouping constraints. This can be
  * used to write raw key value data as is.
  */
-@Public
 public class UnorderedKVOutput extends AbstractLogicalOutput {
 
   private static final Logger LOG = LoggerFactory.getLogger(UnorderedKVOutput.class);
 
-  @VisibleForTesting
   UnorderedPartitionedKVWriter kvWriter;
   
   private Configuration conf;
@@ -147,8 +139,6 @@ public class UnorderedKVOutput extends AbstractLogicalOutput {
     return returnEvents;
   }
 
-  @VisibleForTesting
-  @Private
   String getHost() {
     return getContext().getExecutionContext().getHostName();
   }
@@ -176,17 +166,13 @@ public class UnorderedKVOutput extends AbstractLogicalOutput {
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_REPORT_PARTITION_STATS);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT);
+    confKeys.add(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID);
   }
 
-  // TODO Maybe add helper methods to extract keys
-  // TODO Maybe add constants or an Enum to access the keys
-
-  @InterfaceAudience.Private
   public static Set<String> getConfigurationKeySet() {
     return Collections.unmodifiableSet(confKeys);
   }
 
-  @Private
   public static class CustomPartitioner implements Partitioner {
 
     @Override
