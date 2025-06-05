@@ -24,6 +24,7 @@ import java.util.List;
 
 import org.apache.hadoop.io.serializer.Serialization;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
+import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -62,6 +63,8 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
   protected final Serialization valSerialization;
   protected final int numPartitions;
   protected final CompressionCodec codec;
+
+  protected final boolean compositeFetch;
   protected final TezTaskOutput outputFileHandler;
   
   protected final boolean ifileReadAhead;
@@ -168,7 +171,10 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-    outputFileHandler = TezRuntimeUtils.instantiateTaskOutputManager(conf, outputContext);
+
+    this.compositeFetch = ShuffleUtils.isTezShuffleHandler(this.conf);
+    this.outputFileHandler = TezRuntimeUtils.instantiateTaskOutputManager(
+        this.conf, outputContext, this.compositeFetch);
   }
 
   @Override
@@ -178,7 +184,7 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
   public void write(Object key, Iterable<Object> values) throws IOException {
     //TODO: UnorderedPartitionedKVWriter should override this method later.
     Iterator<Object> it = values.iterator();
-    while(it.hasNext()) {
+    while (it.hasNext()) {
       write(key, it.next());
     }
   }

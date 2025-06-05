@@ -22,8 +22,6 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 @Private
 public class Constants {
 
-  // TODO NEWTEZ Check which of these constants are expecting specific pieces of information which are being removed - like taskAttemptId
-  
   public static final String TEZ = "tez";
   public static final String DAG_PREFIX = "dag_";
   public static final String VERTEX_PREFIX = "vertex_";
@@ -51,8 +49,4 @@ public class Constants {
       "%s/task_%d.out"; 
 
   public static final String TEZ_RUNTIME_TASK_OUTPUT_DIR = "output";
-  
-  public static final String TEZ_RUNTIME_TASK_OUTPUT_MANAGER = 
-      "tez.runtime.task.local.output.manager";
-
 }

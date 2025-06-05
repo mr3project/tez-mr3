@@ -117,7 +117,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   private final boolean dataViaEventsEnabled;
   private final int dataViaEventsMaxSize;
   private final boolean useCachedStream;
-  private final boolean compositeFetch;
+
   private final boolean writeSpillRecord;
 
   private final long availableMemory;
@@ -222,8 +222,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
        TezRuntimeConfiguration.TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_MAX_SIZE_DEFAULT);
     this.useCachedStream = this.dataViaEventsEnabled && (numPartitions == 1) && !pipelinedShuffle;
 
-    this.compositeFetch = ShuffleUtils.isTezShuffleHandler(this.conf);
-    this.writeSpillRecord = !compositeFetch;
+    this.writeSpillRecord = !this.compositeFetch;
 
     if (availableMemoryBytes == 0) {
       Preconditions.checkArgument(((numPartitions == 1) && !pipelinedShuffle),

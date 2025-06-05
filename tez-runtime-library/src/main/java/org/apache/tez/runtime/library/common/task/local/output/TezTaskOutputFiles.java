@@ -21,13 +21,13 @@ package org.apache.tez.runtime.library.common.task.local.output;
 import java.io.IOException;
 
 import org.apache.tez.common.Preconditions;
+import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.runtime.api.TezTaskOutput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
-import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.runtime.library.common.Constants;
 
 /**
@@ -47,7 +47,14 @@ public class TezTaskOutputFiles implements TezTaskOutput {
   private final String uniqueId;
   private final String outputDir;
   private final String dagId;   // = dag_${dagId}/${containerId}/
-  private final boolean isTezShuffleHandler;
+  private final boolean isCompositeFetch;
+
+  /*
+  Under YARN, this defaults to one or more of the local directories, along with the appId in the path.
+  Note: The containerId is not part of this.
+  ${yarnLocalDir}/usercache/${user}/appcache/${applicationId}. (Referred to as ${appDir} later in the docs
+   */
+  private final LocalDirAllocator lDirAlloc = new LocalDirAllocator(TezRuntimeFrameworkConfigs.LOCAL_DIRS);;
 
   /**
    * @param conf     the configuration from which local-dirs will be picked up
@@ -60,24 +67,16 @@ public class TezTaskOutputFiles implements TezTaskOutput {
    */
   public TezTaskOutputFiles(Configuration conf, String uniqueId, int dagID,
                             String containerId, int vertexId,
-                            boolean isTezShuffleHandler) {
+                            boolean isCompositeFetch) {
     this.conf = conf;
     this.uniqueId = uniqueId;
-    this.outputDir = isTezShuffleHandler ?
+    this.outputDir = isCompositeFetch ?
         Constants.VERTEX_PREFIX + vertexId : Constants.TEZ_RUNTIME_TASK_OUTPUT_DIR;
-    this.dagId = isTezShuffleHandler ?
+    this.dagId = isCompositeFetch ?
         Constants.DAG_PREFIX + dagID + Path.SEPARATOR + containerId + Path.SEPARATOR :
         Constants.DAG_PREFIX + dagID + Path.SEPARATOR;
-    this.isTezShuffleHandler = isTezShuffleHandler;
+    this.isCompositeFetch = isCompositeFetch;
   }
-
-  /*
-  Under YARN, this defaults to one or more of the local directories, along with the appId in the path.
-  Note: The containerId is not part of this.
-  ${yarnLocalDir}/usercache/${user}/appcache/${applicationId}. (Referred to as ${appDir} later in the docs
-   */
-  private final LocalDirAllocator lDirAlloc =
-    new LocalDirAllocator(TezRuntimeFrameworkConfigs.LOCAL_DIRS);
 
   /*
    * if service_id = mapreduce_shuffle  then "${appDir}/output/${uniqueId}"
@@ -200,8 +199,8 @@ public class TezTaskOutputFiles implements TezTaskOutput {
   @Override
   public Path getOutputIndexFileForWriteInVolume(Path existing) {
     //Get hold attempt directory (${appDir}/output/)
-    Preconditions.checkArgument(existing.getParent().getParent() != null, "Parent directory's "
-        + "parent can not be null");
+    Preconditions.checkArgument(existing.getParent().getParent() != null,
+      "Parent directory's parent can not be null");
     Path attemptDir = new Path(existing.getParent().getParent(), uniqueId);
     return new Path(attemptDir, Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING
         + Constants.TEZ_RUNTIME_TASK_OUTPUT_INDEX_SUFFIX_STRING);
@@ -291,6 +290,6 @@ public class TezTaskOutputFiles implements TezTaskOutput {
   }
 
   public String getDagOutputDir(String child) {
-    return isTezShuffleHandler ? dagId.concat(child) : child;
+    return isCompositeFetch ? dagId.concat(child) : child;
   }
 }

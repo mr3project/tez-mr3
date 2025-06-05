@@ -102,7 +102,6 @@ public abstract class ExternalSorter {
   protected final Configuration conf;
   protected final RawLocalFileSystem localFs;
   protected final FileSystem rfs;
-  protected final TezTaskOutput mapOutputFile;
   protected final int partitions;
   protected final RawComparator comparator;
 
@@ -123,6 +122,10 @@ public abstract class ExternalSorter {
   protected final Map<Integer, Path> spillFilePaths = Maps.newHashMap();
   // update only if writeSpillRecord == true
   protected final Map<Integer, Path> spillFileIndexPaths = Maps.newHashMap();
+
+  // protected final boolean physicalHostFetch;  // TODO: currently unused
+  protected final boolean compositeFetch;
+  protected final TezTaskOutput mapOutputFile;
 
   protected Path finalOutputFile;
 
@@ -170,8 +173,6 @@ public abstract class ExternalSorter {
   // How partition stats should be reported.
   final ReportPartitionStats reportPartitionStats;
 
-  // protected final boolean physicalHostFetch;  // TODO: currently unused
-  protected final boolean compositeFetch;
   protected final boolean writeSpillRecord;
 
   public ExternalSorter(OutputContext outputContext, Configuration conf, int numOutputs,
@@ -245,8 +246,12 @@ public abstract class ExternalSorter {
       this.ifileReadAheadLength = 0;
     }
 
-    // Task outputs
-    mapOutputFile = TezRuntimeUtils.instantiateTaskOutputManager(conf, outputContext);
+    // this.physicalHostFetch = conf.getBoolean(
+    //     TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH,
+    //     TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_DEFAULT);
+    this.compositeFetch = ShuffleUtils.isTezShuffleHandler(this.conf);
+    this.mapOutputFile = TezRuntimeUtils.instantiateTaskOutputManager(
+        this.conf, outputContext, this.compositeFetch);
 
     this.conf.setInt(TezRuntimeFrameworkConfigs.TEZ_RUNTIME_NUM_EXPECTED_PARTITIONS, this.partitions);
     this.partitioner = TezRuntimeUtils.instantiatePartitioner(this.conf);
@@ -260,10 +265,6 @@ public abstract class ExternalSorter {
         TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED,
         TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED_DEFAULT);
 
-    // this.physicalHostFetch = conf.getBoolean(
-    //     TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH,
-    //     TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_DEFAULT);
-    this.compositeFetch = ShuffleUtils.isTezShuffleHandler(this.conf);
     this.writeSpillRecord = !compositeFetch;
 
     finalIndexComputed = false;
