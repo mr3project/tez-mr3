@@ -788,8 +788,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       LOG.error(destNameTrimmed + ": Error during spill, throwing");
       // Assuming close will be called on the same thread as the write
       cleanup();
-      currentBuffer.cleanup();
-      currentBuffer = null;
+      cleanupCurrentBuffer();
       if (spillException instanceof IOException) {
         throw (IOException) spillException;
       } else {
@@ -818,7 +817,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
               sizePerPartition[0] = rawLen;
             }
           }
-          cleanupCurrentBuffer();
+          // no need to call cleanupCurrentBuffer() because skipBuffers == true
 
           if (outputRecordsCounter.getValue() > 0) {
             outputBytesWithOverheadCounter.increment(rawLen);
@@ -881,7 +880,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           //all events to be sent out are in finalEvents.
           eventList.addAll(finalEvents);
         }
-        cleanupCurrentBuffer();
+        cleanupCurrentBuffer();   // skipBuffers == false
         return eventList;
       }
 
@@ -984,8 +983,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   }
 
   private void cleanupCurrentBuffer() {
-    currentBuffer.cleanup();
-    currentBuffer = null;
+    if (!skipBuffers) {
+      currentBuffer.cleanup();
+      currentBuffer = null;
+    }
   }
 
   private void cleanup() {
