@@ -585,7 +585,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     long compressedLength = 0;
     try {
       long startTime = System.currentTimeMillis();
-      int partitionCount = 1;
+      int partitionCount = 1;   // single partition only when using Hadoop shuffle service
 
       // read the first part - partitionCount
       if (fetcherConfig.compositeFetch) {
@@ -603,7 +603,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
 
         // build srcAttemptId and MapOutputStat
         try {
-          ShuffleHeader header = new ShuffleHeader();
+          ShuffleHeader header = new ShuffleHeader(fetcherConfig.compositeFetch);
           header.readFields(input);
           pathComponent = header.getMapId();
           if (!pathComponent.startsWith(InputAttemptIdentifier.PATH_PREFIX_MR3) && !pathComponent.startsWith(InputAttemptIdentifier.PATH_PREFIX)) {

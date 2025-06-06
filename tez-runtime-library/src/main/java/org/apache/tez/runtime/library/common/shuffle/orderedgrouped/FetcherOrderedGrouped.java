@@ -459,7 +459,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     long compressedLength = 0;
     try {
       long startTime = System.currentTimeMillis();
-      int partitionCount = 1;
+      int partitionCount = 1;   // single partition only when using Hadoop shuffle service
 
       if (fetcherConfig.compositeFetch) {
         // Multiple partitions are fetched
@@ -470,7 +470,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         MapOutputStat mapOutputStat = null;
         try {
           // Read the shuffle header
-          ShuffleHeader header = new ShuffleHeader();
+          ShuffleHeader header = new ShuffleHeader(fetcherConfig.compositeFetch);
           // TODO Review: Multiple header reads in case of status WAIT ?
           header.readFields(input);
           if (!header.mapId.startsWith(InputAttemptIdentifier.PATH_PREFIX_MR3) && !header.mapId.startsWith(InputAttemptIdentifier.PATH_PREFIX)) {
