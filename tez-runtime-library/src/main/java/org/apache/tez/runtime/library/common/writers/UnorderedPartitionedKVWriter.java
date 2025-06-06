@@ -992,13 +992,15 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     if (spillExecutor != null) {
       spillExecutor.shutdownNow();
     }
-    for (int i = 0; i < buffers.length; i++) {
-      if (buffers[i] != null && buffers[i] != currentBuffer) {
-        buffers[i].cleanup();
-        buffers[i] = null;
+    if (!skipBuffers) {
+      for (int i = 0; i < buffers.length; i++) {
+        if (buffers[i] != null && buffers[i] != currentBuffer) {
+          buffers[i].cleanup();
+          buffers[i] = null;
+        }
       }
+      availableBuffers.clear();
     }
-    availableBuffers.clear();
   }
 
   // inside close()
