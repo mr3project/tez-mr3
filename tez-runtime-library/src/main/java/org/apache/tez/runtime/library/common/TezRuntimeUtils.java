@@ -179,7 +179,8 @@ public class TezRuntimeUtils {
     return new URL(sb.toString());
   }
 
-  public static HttpConnectionParams getHttpConnectionParams(Configuration conf) {
+  public static HttpConnectionParams getHttpConnectionParams(
+      Configuration conf, boolean compositeFetch) {
     int connectionTimeout =
         conf.getInt(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_CONNECT_TIMEOUT,
             TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_STALLED_COPY_TIMEOUT_DEFAULT);
@@ -223,7 +224,8 @@ public class TezRuntimeUtils {
       }
     }
 
-    boolean skipVerifyRequest = conf.getBoolean(
+    // skipVerifyRequest is false if compositeFetch == false, i.e, when using mapreduce_shuffle
+    boolean skipVerifyRequest = compositeFetch && conf.getBoolean(
         SecureShuffleUtils.SHUFFLE_SKIP_VERIFY_REQUEST, SecureShuffleUtils.SHUFFLE_SKIP_VERIFY_REQUEST_DEFAULT);
 
     return new HttpConnectionParams(keepAlive,

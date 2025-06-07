@@ -128,7 +128,6 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       codecHolder.set(newCodec);
     }
 
-    // ignore ShuffleServer.localShufflePorts[] which is not initialized
     boolean useLocalDiskFetch;
     if (fetcherConfig.localDiskFetchEnabled &&
         host.equals(fetcherConfig.localHostName)) {

@@ -76,7 +76,9 @@ public final class CodecUtils {
 
     Configuration codecConf = CodecUtils.reduceConfForCodec(conf);
 
-    HttpConnectionParams httpConnectionParams = ShuffleUtils.getHttpConnectionParams(conf);
+    boolean compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
+
+    HttpConnectionParams httpConnectionParams = ShuffleUtils.getHttpConnectionParams(conf, compositeFetch);
     RawLocalFileSystem localFs = (RawLocalFileSystem) FileSystem.getLocal(conf).getRaw();
     LocalDirAllocator localDirAllocator = new LocalDirAllocator(TezRuntimeFrameworkConfigs.LOCAL_DIRS);
     String localHostName = taskContext.getExecutionContext().getHostName();
@@ -88,7 +90,6 @@ public final class CodecUtils {
     boolean verifyDiskChecksum = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_VERIFY_DISK_CHECKSUM,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_VERIFY_DISK_CHECKSUM_DEFAULT);
-    boolean compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
     boolean connectionFailAllInput = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_CONNECTION_FAIL_ALL_INPUT,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_CONNECTION_FAIL_ALL_INPUT_DEFAULT);

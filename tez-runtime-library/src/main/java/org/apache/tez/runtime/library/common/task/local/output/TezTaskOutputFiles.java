@@ -198,7 +198,7 @@ public class TezTaskOutputFiles implements TezTaskOutput {
    */
   @Override
   public Path getOutputIndexFileForWriteInVolume(Path existing) {
-    //Get hold attempt directory (${appDir}/output/)
+    // Get hold attempt directory (${appDir}/output/)
     Preconditions.checkArgument(existing.getParent().getParent() != null,
       "Parent directory's parent can not be null");
     Path attemptDir = new Path(existing.getParent().getParent(), uniqueId);

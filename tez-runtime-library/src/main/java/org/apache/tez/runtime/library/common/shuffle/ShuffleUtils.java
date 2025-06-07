@@ -634,8 +634,9 @@ public class ShuffleUtils {
    * @param conf
    * @return HttpConnectionParams
    */
-  public static HttpConnectionParams getHttpConnectionParams(Configuration conf) {
-    return TezRuntimeUtils.getHttpConnectionParams(conf);
+  public static HttpConnectionParams getHttpConnectionParams(
+      Configuration conf, boolean compositeFetch) {
+    return TezRuntimeUtils.getHttpConnectionParams(conf, compositeFetch);
   }
 
   public static boolean isTezShuffleHandler(Configuration config) {
