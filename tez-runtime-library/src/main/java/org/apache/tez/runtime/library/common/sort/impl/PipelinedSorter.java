@@ -103,6 +103,7 @@ public class PipelinedSorter extends ExternalSorter {
     new ArrayList<TezSpillRecord>();
 
   private final boolean pipelinedShuffle;
+  private final boolean finalMergeEnabled;
 
   private long currentAllocatableMemory;
   //Maintain a list of ByteBuffers
@@ -163,12 +164,16 @@ public class PipelinedSorter extends ExternalSorter {
         .append(outputContext.getDestinationVertexName());
     partitionBits = bitcount(partitions)+1;
 
-    boolean confPipelinedShuffle = this.conf.getBoolean(
+    pipelinedShuffle = this.conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED,
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT);
+    // set finalMergeEnabled = !pipelinedShuffleConf unless set explicitly in tez-site.xml
+    finalMergeEnabled = conf.getBoolean(
+        TezRuntimeConfiguration.TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT,
+        !pipelinedShuffle);
 
-    pipelinedShuffle = !finalMergeEnabled && confPipelinedShuffle;
     auxiliaryService = ShuffleUtils.getTezShuffleHandlerServiceId(conf);
+
     // sanity checks
     final long sortmb = this.availableMemoryMb;
 

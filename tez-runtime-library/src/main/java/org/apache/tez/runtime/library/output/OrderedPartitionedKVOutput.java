@@ -70,8 +70,8 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
   private final Deflater deflater;
 
   boolean pipelinedShuffle;
-  private boolean sendEmptyPartitionDetails;
   boolean finalMergeEnabled;
+  private boolean sendEmptyPartitionDetails;
 
   private boolean compositeFetch;
 
@@ -119,13 +119,13 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
             + ", validValues=" + Arrays.asList(SorterImpl.values()));
       }
 
+      pipelinedShuffle = conf.getBoolean(
+          TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED,
+          TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT);
+      // set finalMergeEnabled = !pipelinedShuffleConf unless set explicitly in tez-site.xml
       finalMergeEnabled = conf.getBoolean(
           TezRuntimeConfiguration.TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT,
-          TezRuntimeConfiguration.TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT_DEFAULT);
-
-      pipelinedShuffle = this.conf.getBoolean(TezRuntimeConfiguration
-          .TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED, TezRuntimeConfiguration
-          .TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT);
+          !pipelinedShuffle);
 
       if (pipelinedShuffle) {
         if (finalMergeEnabled) {

@@ -204,13 +204,13 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     Preconditions.checkArgument(availableMemoryBytes >= 0, "availableMemory should be >= 0 bytes");
 
     this.destNameTrimmed = TezUtilsInternal.cleanVertexName(outputContext.getDestinationVertexName());
-    boolean pipelinedShuffleConf = this.conf.getBoolean(
+    this.pipelinedShuffle = this.conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED,
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT);
+    // set isFinalMergeEnabled = !pipelinedShuffleConf unless set explicitly in tez-site.xml
     this.isFinalMergeEnabled = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT,
-        TezRuntimeConfiguration.TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT_DEFAULT);
-    this.pipelinedShuffle = pipelinedShuffleConf && !isFinalMergeEnabled;
+        !this.pipelinedShuffle);
     this.finalEvents = Lists.newLinkedList();
 
     this.dataViaEventsEnabled = conf.getBoolean(

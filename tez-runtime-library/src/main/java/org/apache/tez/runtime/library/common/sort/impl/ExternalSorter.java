@@ -140,7 +140,6 @@ public abstract class ExternalSorter {
   protected OutputStatisticsReporter statsReporter;
   // uncompressed size for each partition
   protected final long[] partitionStats;
-  protected final boolean finalMergeEnabled;
   protected final boolean sendEmptyPartitionDetails;
 
   // Counters
@@ -258,9 +257,6 @@ public abstract class ExternalSorter {
     this.combiner = TezRuntimeUtils.instantiateCombiner(this.conf, outputContext);
 
     this.statsReporter = outputContext.getStatisticsReporter();
-    this.finalMergeEnabled = conf.getBoolean(
-        TezRuntimeConfiguration.TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT,
-        TezRuntimeConfiguration.TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT_DEFAULT);
     this.sendEmptyPartitionDetails = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED,
         TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED_DEFAULT);
