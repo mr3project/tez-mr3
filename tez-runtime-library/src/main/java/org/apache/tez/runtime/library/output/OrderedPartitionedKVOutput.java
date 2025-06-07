@@ -85,7 +85,7 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
     this.conf = getContext().getConfigurationFromUserPayload(true);
     this.localFs = (RawLocalFileSystem) FileSystem.getLocal(conf).getRaw();
 
-    // Initializing this parametr in this conf since it is used in multiple
+    // Initializing this parameter in this conf since it is used in multiple
     // places (wherever LocalDirAllocator is used) - TezTaskOutputFiles,
     // TezMerger, etc.
     this.conf.setStrings(TezRuntimeFrameworkConfigs.LOCAL_DIRS, getContext().getWorkDirs());

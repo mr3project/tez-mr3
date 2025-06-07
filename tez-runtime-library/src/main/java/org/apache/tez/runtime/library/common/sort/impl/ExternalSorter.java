@@ -266,17 +266,6 @@ public abstract class ExternalSorter {
     finalIndexComputed = false;
   }
 
-  /**
-   * Exception indicating that the allocated sort buffer is insufficient to hold
-   * the current record.
-   */
-  @SuppressWarnings("serial")
-  public static class MapBufferTooSmallException extends IOException {
-    public MapBufferTooSmallException(String s) {
-      super(s);
-    }
-  }
-
   public TezTaskOutput getMapOutput() {
     return mapOutputFile;
   }

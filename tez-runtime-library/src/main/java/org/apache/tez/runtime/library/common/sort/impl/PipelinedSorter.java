@@ -99,8 +99,7 @@ public class PipelinedSorter extends ExternalSorter {
   private final SpanMerger merger; 
   private final ExecutorService sortmaster;
 
-  private final ArrayList<TezSpillRecord> indexCacheList =
-    new ArrayList<TezSpillRecord>();
+  private final ArrayList<TezSpillRecord> indexCacheList = new ArrayList<TezSpillRecord>();
 
   private final boolean pipelinedShuffle;
   private final boolean finalMergeEnabled;
@@ -174,12 +173,6 @@ public class PipelinedSorter extends ExternalSorter {
 
     auxiliaryService = ShuffleUtils.getTezShuffleHandlerServiceId(conf);
 
-    // sanity checks
-    final long sortmb = this.availableMemoryMb;
-
-    // buffers and accounting
-    long maxMemLimit = sortmb << 20;
-
     initialSetupLogLine.append(", UsingHashComparator=");
     // k/v serialization
     if (comparator instanceof ProxyComparator) {
@@ -192,10 +185,13 @@ public class PipelinedSorter extends ExternalSorter {
 
     LOG.info(initialSetupLogLine.toString());
 
+    // buffers and accounting
+    long maxMemLimit = this.availableMemoryMb << 20;
+
     long totalCapacityWithoutMeta = 0;
     long availableMem = maxMemLimit;
     int numBlocks = 0;
-    while(availableMem > 0) {
+    while (availableMem > 0) {
       long size = Math.min(availableMem, computeBlockSize(availableMem, maxMemLimit));
       int sizeWithoutMeta = (int) ((size) - (size % METASIZE));
       totalCapacityWithoutMeta += sizeWithoutMeta;
@@ -208,13 +204,13 @@ public class PipelinedSorter extends ExternalSorter {
 
     buffers = Lists.newArrayListWithCapacity(maxNumberOfBlocks);
     bufferUsage = Lists.newArrayListWithCapacity(maxNumberOfBlocks);
-    allocateSpace(); //Allocate the first block
+    allocateSpace();  // Allocate the first block
     if (!lazyAllocateMem) {
       // LOG.info("Pre allocating rest of memory buffers upfront");
       while (allocateSpace() != null);
     }
 
-    Preconditions.checkState(buffers.size() > 0, "At least one buffer needs to be present");
+    Preconditions.checkState(!buffers.isEmpty(), "At least one buffer needs to be present");
     if (isDebugEnabled) {
       initialSetupLogLine.append("#blocks=").append(maxNumberOfBlocks);
       initialSetupLogLine.append(", maxMemUsage=").append(maxMemLimit);
@@ -225,7 +221,6 @@ public class PipelinedSorter extends ExternalSorter {
       initialSetupLogLine.append(", finalMergeEnabled=").append(finalMergeEnabled);
       initialSetupLogLine.append(", pipelinedShuffle=").append(pipelinedShuffle);
       initialSetupLogLine.append(", sendEmptyPartitions=").append(sendEmptyPartitionDetails);
-      initialSetupLogLine.append(", ").append(TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB).append("=").append(sortmb);
       LOG.debug(initialSetupLogLine.toString());
     }
 
