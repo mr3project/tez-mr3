@@ -288,6 +288,7 @@ public class TezRuntimeConfiguration {
   public static final String TEZ_RUNTIME_SHUFFLE_MEMTOMEM_SEGMENTS = TEZ_RUNTIME_PREFIX +
       "shuffle.memory-to-memory.segments";
 
+  // do not change the default value because local mode assumes 'false'.
   @ConfigurationProperty(type = "boolean")
   public static final String TEZ_RUNTIME_SHUFFLE_ENABLE_MEMTOMEM = TEZ_RUNTIME_PREFIX +
       "shuffle.memory-to-memory.enable";
@@ -343,13 +344,15 @@ public class TezRuntimeConfiguration {
    * If the shuffle input is on the local host bypass the http fetch and access the files directly
    * only for unordered fetch
    */
+  // do not change the default value because local mode assumes 'true'.
   @ConfigurationProperty(type = "boolean")
   public static final String TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH = TEZ_RUNTIME_PREFIX +
       "optimize.local.fetch";
   public static final boolean TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_DEFAULT = true;
 
   // for ordered fetched
-  // set to false when tez.runtime.shuffle.memory-to-memory.enable=true
+  // set to false when tez.runtime.shuffle.memory-to-memory.enable=true.
+  // do not change the default value because local mode assumes 'true'.
   @ConfigurationProperty(type = "boolean")
   public static final String TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_ORDERED = TEZ_RUNTIME_PREFIX +
       "optimize.local.fetch.ordered";
