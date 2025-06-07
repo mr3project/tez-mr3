@@ -550,8 +550,9 @@ public class PipelinedSorter extends ExternalSorter {
             numSpills, partitions * MAP_OUTPUT_INDEX_RECORD_LENGTH);
         spillFileIndexPaths.put(numSpills, indexFilename);
         spillRec.writeToFile(indexFilename, localFs);
+      } else {
+        ShuffleUtils.writeSpillInfoToIndexPathCacheAndByteCache(outputContext, numSpills, outputFilePath, spillRec, null);
       }
-      ShuffleUtils.writeSpillInfoToIndexPathCacheAndByteCache(outputContext, numSpills, outputFilePath, spillRec, null);
 
       //TODO: honor cache limits
       indexCacheList.add(spillRec);
@@ -665,10 +666,11 @@ public class PipelinedSorter extends ExternalSorter {
           numSpills, partitions * MAP_OUTPUT_INDEX_RECORD_LENGTH);
       spillFileIndexPaths.put(numSpills, indexFilename);
       spillRec.writeToFile(indexFilename, localFs);
+    } else {
+      Path outputFilePath = byteArrayOutput == null ? spillFileName : null;
+      ShuffleUtils.writeSpillInfoToIndexPathCacheAndByteCache(
+          outputContext, numSpills, outputFilePath, spillRec, byteArrayOutput);
     }
-    Path outputFilePath = byteArrayOutput == null ? spillFileName : null;
-    ShuffleUtils.writeSpillInfoToIndexPathCacheAndByteCache(
-      outputContext, numSpills, outputFilePath, spillRec, byteArrayOutput);
     LOG.info("{}: Finished spill {}", outputContext.getDestinationVertexName(), numSpills);
 
     // TODO: honor cache limits

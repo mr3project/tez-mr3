@@ -1323,6 +1323,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     if (spillPathDetails.indexComputed) {
       if (spillPathDetails.indexFilePath != null) {
         // write the index record
+        assert writeSpillRecord;
         spillRecord.writeToFile(spillPathDetails.indexFilePath, localFs);
       } else {
         // only one of outputFilePath and byteArrayOutput is non-null
@@ -1599,7 +1600,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   }
 
   static class SpillPathDetails {
-    // null if writeSpillRecord == false, or when using hadoop_shuffle
+    // null if writeSpillRecord == false
     final Path indexFilePath;
     final Path outputFilePath;
 
