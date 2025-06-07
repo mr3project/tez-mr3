@@ -42,6 +42,8 @@ public class TezConstants {
    * The service id for the NodeManager plugin used to share intermediate data
    * between vertices.
    */
+  // Keep it as mapreduce_shuffle so that Hive-MR3 does not create ShuffleHandlers in local mode
+  // (in which TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID is not set explicitly).
   public static final String TEZ_SHUFFLE_HANDLER_SERVICE_ID = "mapreduce_shuffle";
 
   // Configuration keys used internally and not set by the users
