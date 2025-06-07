@@ -213,8 +213,8 @@ public class ShuffleUtils {
     sb.append("/");
     sb.append("mapOutput?job=");
     sb.append(appId.replace("application", "job"));
-    sb.append("&dag=");
-    sb.append(dagIdentifier);
+    // sb.append("&dag=");
+    // sb.append(dagIdentifier);
     sb.append("&reduce=");
     sb.append(range.toString());
     sb.append("&map=");
