@@ -120,11 +120,6 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
     return inputManager;
   }
 
-  // called only when inputContext.useShuffleHandlerProcessOnK8s()
-  public int[] getLocalShufflePorts() {
-    return shuffleServer.getLocalShufflePorts();
-  }
-
   // called from ShuffleInputEventHandler thread
   public void updateApproximateInputRecords(int delta) {
     if (delta <= 0) {

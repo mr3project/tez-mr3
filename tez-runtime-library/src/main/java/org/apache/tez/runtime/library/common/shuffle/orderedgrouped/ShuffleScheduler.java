@@ -432,10 +432,6 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
     mergeManager.waitForShuffleToMergeMemory();
   }
 
-  public int[] getLocalShufflePorts() {
-    return shuffleServer.getLocalShufflePorts();
-  }
-
   public FetchedInputAllocatorOrderedGrouped getAllocator() {
     return allocator;
   }

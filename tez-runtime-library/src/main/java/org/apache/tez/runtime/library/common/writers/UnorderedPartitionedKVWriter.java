@@ -947,13 +947,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       // Populate payload only if at least 1 partition has data
       payloadBuilder.setHost(host);
 
-      // if useShuffleHandlerProcessOnK8s == true, the consumer can retrieve ports from InputContext
-      if (!outputContext.useShuffleHandlerProcessOnK8s()) {
-        int[] shufflePorts = getShufflePort();
-        payloadBuilder.setNumPorts(shufflePorts.length);
-        for (int i = 0; i < shufflePorts.length; i++) {
-          payloadBuilder.addPorts(shufflePorts[i]);
-        }
+      int[] shufflePorts = getShufflePort();
+      payloadBuilder.setNumPorts(shufflePorts.length);
+      for (int i = 0; i < shufflePorts.length; i++) {
+        payloadBuilder.addPorts(shufflePorts[i]);
       }
 
       payloadBuilder.setPathComponent(ShuffleUtils.expandPathComponent(outputContext, compositeFetch, pathComponent));

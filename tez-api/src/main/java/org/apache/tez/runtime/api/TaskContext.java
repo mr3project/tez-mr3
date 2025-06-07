@@ -188,8 +188,6 @@ public interface TaskContext extends DecompressorPool {
 
   public scala.Tuple2<java.lang.Integer, java.lang.Integer> getDaemonShuffleHandlerUsePort();
 
-  public boolean useShuffleHandlerProcessOnK8s();
-
   /**
    * Request a specific amount of memory during initialization
    * (initialize(..*Context)) The requester is notified of allocation via the

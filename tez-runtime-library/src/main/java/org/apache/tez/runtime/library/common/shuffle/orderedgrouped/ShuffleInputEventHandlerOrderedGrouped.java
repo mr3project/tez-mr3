@@ -220,14 +220,8 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
   }
 
   private int getShufflePort(DataMovementEventPayloadProto shufflePayload, int targetIndex) {
-    if (inputContext.useShuffleHandlerProcessOnK8s()) {
-      int[] localShufflePorts = shuffleScheduler.getLocalShufflePorts();
-      int numPorts = localShufflePorts.length;
-      return localShufflePorts[(portIndex + targetIndex) % numPorts];
-    } else {
-      int numPorts = shufflePayload.getNumPorts();
-      return numPorts > 0 ? shufflePayload.getPorts((portIndex + targetIndex) % numPorts) : 0;
-    }
+    int numPorts = shufflePayload.getNumPorts();
+    return numPorts > 0 ? shufflePayload.getPorts((portIndex + targetIndex) % numPorts) : 0;
   }
 
   private void processTaskFailedEvent(InputFailedEvent ifEvent) {

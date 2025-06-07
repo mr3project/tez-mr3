@@ -312,14 +312,11 @@ public class ShuffleUtils {
       String host = context.getExecutionContext().getHostName();
       payloadBuilder.setHost(host);
 
-      // if useShuffleHandlerProcessOnK8s == true, the consumer can retrieve ports from InputContext
-      if (!context.useShuffleHandlerProcessOnK8s()) {
-        ByteBuffer shuffleMetadata = context.getServiceProviderMetaData(auxiliaryService);
-        int[] shufflePorts = ShuffleUtils.deserializeShuffleProviderMetaData(shuffleMetadata);
-        payloadBuilder.setNumPorts(shufflePorts.length);  // shufflePorts[] can be empty
-        for (int i = 0; i < shufflePorts.length; i++) {
-          payloadBuilder.addPorts(shufflePorts[i]);
-        }
+      ByteBuffer shuffleMetadata = context.getServiceProviderMetaData(auxiliaryService);
+      int[] shufflePorts = ShuffleUtils.deserializeShuffleProviderMetaData(shuffleMetadata);
+      payloadBuilder.setNumPorts(shufflePorts.length);  // shufflePorts[] can be empty
+      for (int i = 0; i < shufflePorts.length; i++) {
+        payloadBuilder.addPorts(shufflePorts[i]);
       }
 
       payloadBuilder.setPathComponent(expandPathComponent(context, compositeFetch, pathComponent));

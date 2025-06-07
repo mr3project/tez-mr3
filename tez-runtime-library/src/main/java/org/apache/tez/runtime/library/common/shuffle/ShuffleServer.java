@@ -214,13 +214,6 @@ public class ShuffleServer implements FetcherCallback {
   private final ListeningExecutorService fetcherExecutor;
   private final FetcherConfig fetcherConfig;
 
-  // taskContext.useShuffleHandlerProcessOnK8s() == false:
-  //   do not use localShufflePorts[] because taskContext.getServiceProviderMetaData(auxiliaryService)
-  //   may not be valid yet (which becomes valid only after all ShuffleHandlers start)
-  // taskContext.useShuffleHandlerProcessOnK8s() == true:
-  //   initialize localShufflePorts[] which is constant in all ContainerWorkers
-  public final int[] localShufflePorts;
-
   private final int maxTaskOutputAtOnce;
   private final RangesScheme rangesScheme;
 
@@ -271,14 +264,6 @@ public class ShuffleServer implements FetcherCallback {
     this.fetcherExecutor = MoreExecutors.listeningDecorator(fetcherRawExecutor);
     this.fetcherConfig = CodecUtils.constructFetcherConfig(conf, taskContext);
 
-    if (taskContext.useShuffleHandlerProcessOnK8s()) {
-      String auxiliaryService = ShuffleUtils.getTezShuffleHandlerServiceId(conf);
-      ByteBuffer shuffleMetadata = taskContext.getServiceProviderMetaData(auxiliaryService);
-      this.localShufflePorts = ShuffleUtils.deserializeShuffleProviderMetaData(shuffleMetadata);
-    } else {
-      this.localShufflePorts = null;
-    }
-
     /**
      * Setting to very high val can lead to Http 400 error. Cap it to 75; every attempt id would
      * be approximately 48 bytes; 48 * 75 = 3600 which should give some room for other info in URL.
@@ -310,10 +295,6 @@ public class ShuffleServer implements FetcherCallback {
 
     LOG.info("{} Configuration: numFetchers={}, maxTaskOutputAtOnce={}, FetcherConfig={}, rangesScheme={}, maxNumInputHosts={}",
         serverName, numFetchers, maxTaskOutputAtOnce, fetcherConfig, rangesScheme, maxNumInputHosts);
-  }
-
-  public int[] getLocalShufflePorts() {
-    return localShufflePorts;
   }
 
   public int getMaxTaskOutputAtOnce() {
