@@ -416,6 +416,9 @@ public class TezRuntimeConfiguration {
       "shuffle.stuck.fetcher.release.millis";
   public static final int TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_RELEASE_MILLIS_DEFAULT = 15 * 1000;
 
+  // if set to true, automatically set:
+  //   1. tez.runtime.optimize.local.fetch = false
+  //   2. tez.runtime.optimize.local.fetch.ordered = false
   @ConfigurationProperty(type = "boolean")
   public static final String TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT = TEZ_RUNTIME_PREFIX +
       "use.free.memory.writer.output";
@@ -469,6 +472,7 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_MAX_SIZE);
     tezRuntimeKeys.add(TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS);
     tezRuntimeKeys.add(TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH);
+    tezRuntimeKeys.add(TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_ORDERED);
     tezRuntimeKeys.add(TEZ_RUNTIME_SORTER_CLASS);
     tezRuntimeKeys.add(TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT);
     tezRuntimeKeys.add(TEZ_RUNTIME_UNORDERED_PARTITIONED_KVWRITER_BUFFER_MERGE_PERCENT);

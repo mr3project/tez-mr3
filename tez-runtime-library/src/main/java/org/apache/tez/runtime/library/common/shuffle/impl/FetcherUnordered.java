@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.TaskContext;
+import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.shuffle.DiskFetchedInput;
 import org.apache.tez.runtime.library.common.shuffle.FetchResult;
 import org.apache.tez.runtime.library.common.shuffle.FetchedInput;
@@ -129,19 +130,26 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     }
 
     boolean useLocalDiskFetch;
-    if (fetcherConfig.localDiskFetchEnabled &&
-        host.equals(fetcherConfig.localHostName)) {
-      if (fetcherConfig.compositeFetch) {
-        // inspect 'first' to find the container where all inputs originate from
-        InputAttemptIdentifier first = pendingInputsSeq.getInputs().get(0);
-        // true if inputs originate from the current ContainerWorker
-        useLocalDiskFetch = first.getPathComponent().startsWith(
-            taskContext.getExecutionContext().getContainerId());
-      } else {
-        useLocalDiskFetch = true;
-      }
-    } else {
+    boolean useFreeMemoryWriterOutput = conf.getBoolean(
+        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT,
+        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT_DEFAULT);
+    if (useFreeMemoryWriterOutput) {
       useLocalDiskFetch = false;
+    } else {
+      if (fetcherConfig.localDiskFetchEnabled &&
+          host.equals(fetcherConfig.localHostName)) {
+        if (fetcherConfig.compositeFetch) {
+          // inspect 'first' to find the container where all inputs originate from
+          InputAttemptIdentifier first = pendingInputsSeq.getInputs().get(0);
+          // true if inputs originate from the current ContainerWorker
+          useLocalDiskFetch = first.getPathComponent().startsWith(
+              taskContext.getExecutionContext().getContainerId());
+        } else {
+          useLocalDiskFetch = true;
+        }
+      } else {
+        useLocalDiskFetch = false;
+      }
     }
 
     HostFetchResult hostFetchResult;
