@@ -345,6 +345,7 @@ public class TezRuntimeConfiguration {
    * only for unordered fetch
    */
   // do not change the default value because local mode assumes 'true'.
+  // do not change the default value because tez-site.xml does not set it.
   @ConfigurationProperty(type = "boolean")
   public static final String TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH = TEZ_RUNTIME_PREFIX +
       "optimize.local.fetch";
@@ -353,6 +354,7 @@ public class TezRuntimeConfiguration {
   // for ordered fetched
   // set to false when tez.runtime.shuffle.memory-to-memory.enable=true.
   // do not change the default value because local mode assumes 'true'.
+  // do not change the default value because tez-site.xml does not set it.
   @ConfigurationProperty(type = "boolean")
   public static final String TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_ORDERED = TEZ_RUNTIME_PREFIX +
       "optimize.local.fetch.ordered";
