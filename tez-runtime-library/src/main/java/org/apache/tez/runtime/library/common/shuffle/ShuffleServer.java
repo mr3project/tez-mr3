@@ -556,11 +556,11 @@ public class ShuffleServer implements FetcherCallback {
 
     if (shuffleClient instanceof ShuffleManager) {
       return new FetcherUnordered(this,
-          conf, inputHost, pendingInputs, fetcherConfig, taskContext,
+          shuffleClient.conf, inputHost, pendingInputs, fetcherConfig, taskContext,
           0, (ShuffleManager)shuffleClient);
     } else {
       return new FetcherOrderedGrouped(this,
-          conf, inputHost, pendingInputs, fetcherConfig, taskContext,
+          shuffleClient.conf, inputHost, pendingInputs, fetcherConfig, taskContext,
           0, (ShuffleScheduler)shuffleClient);
     }
   }

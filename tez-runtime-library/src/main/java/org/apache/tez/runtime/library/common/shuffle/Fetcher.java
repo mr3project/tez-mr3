@@ -38,7 +38,11 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
   protected static final AtomicInteger fetcherIdGen = new AtomicInteger(0);
 
   protected final ShuffleServer fetcherCallback;
+
+  // conf is from ShuffleClient, not from ShuffleServer.
+  // For configurations of ShuffleServer, use fetcherConfig instead.
   protected final Configuration conf;
+
   protected final String applicationId;
   protected final ShuffleServer.FetcherConfig fetcherConfig;
   protected final TaskContext taskContext;

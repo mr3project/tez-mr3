@@ -93,6 +93,10 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
   protected final int numInputs;
 
   protected final InputContext inputContext;
+
+  // passed only to Fetcher and not used elsewhere, so public is okay
+  public final Configuration conf;
+
   protected final String srcNameTrimmed;
   private final String logIdentifier;
 
@@ -124,6 +128,7 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
     this.shuffleServer = (ShuffleServer)inputContext.getShuffleServer();
     this.shuffleClientId = shuffleServer.register(this);
     this.inputContext = inputContext;
+    this.conf = conf;
     this.srcNameTrimmed = srcNameTrimmed;
     this.logIdentifier = inputContext.getUniqueIdentifier() + "-" + srcNameTrimmed;
 
