@@ -76,8 +76,11 @@ public class UnorderedKVInput extends AbstractLogicalInput {
 
   private boolean isClosed = false;
 
+  private final boolean compositeFetch;
+
   public UnorderedKVInput(InputContext inputContext, int numPhysicalInputs) {
     super(inputContext, numPhysicalInputs);
+    this.compositeFetch = inputContext.getFetcherConfig().compositeFetch;
   }
 
   @Override
@@ -113,7 +116,6 @@ public class UnorderedKVInput extends AbstractLogicalInput {
       Configuration codecConf = ShuffleServer.getCodecConf(getContext().peekShuffleServer(), conf);
       CompressionCodec codec = CodecUtils.getCodec(codecConf);
 
-      boolean compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
       boolean ifileReadAhead = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD,
           TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_DEFAULT);
       int ifileReadAheadLength = 0;
@@ -131,7 +133,7 @@ public class UnorderedKVInput extends AbstractLogicalInput {
           inputContext.getTotalMemoryAvailableToTask(),
           memoryUpdateCallbackHandler.getMemoryAssigned(),
           inputContext.getExecutionContext().getContainerId(),
-          inputContext.getTaskVertexIndex());
+          inputContext.getTaskVertexIndex(), compositeFetch);
 
       String srcNameTrimmed = TezUtilsInternal.cleanVertexName(inputContext.getSourceVertexName());
       this.shuffleManager = new ShuffleManager(inputContext, conf, getNumPhysicalInputs(), inputManager, srcNameTrimmed);
@@ -261,7 +263,6 @@ public class UnorderedKVInput extends AbstractLogicalInput {
     confKeys.add(TezConfiguration.TEZ_COUNTERS_COUNTER_NAME_MAX_LENGTH);
     confKeys.add(TezConfiguration.TEZ_COUNTERS_MAX_GROUPS);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT);
-    confKeys.add(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID);   // TODO: remove because of ShuffleConfig
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT);
     // include to be able to override TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT);

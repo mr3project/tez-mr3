@@ -34,6 +34,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
@@ -102,7 +103,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       Configuration conf,
       InputHost inputHost,
       InputHost.PartitionToInputs pendingInputsSeq,
-      ShuffleServer.FetcherConfig fetcherConfig,
+      FetcherConfig fetcherConfig,
       TaskContext taskContext,
       int attempt,
       ShuffleScheduler shuffleScheduler) {

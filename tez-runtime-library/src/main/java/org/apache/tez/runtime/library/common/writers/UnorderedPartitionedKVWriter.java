@@ -1594,7 +1594,6 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   }
 
   int[] getShufflePort() throws IOException {
-    String auxiliaryService = ShuffleUtils.getTezShuffleHandlerServiceId(conf);
     ByteBuffer shuffleMetadata = outputContext.getServiceProviderMetaData(auxiliaryService);
     int[] shufflePorts = ShuffleUtils.deserializeShuffleProviderMetaData(shuffleMetadata);
     return shufflePorts;

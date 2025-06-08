@@ -63,11 +63,12 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
                                      Configuration conf,
                                      long maxTaskAvailableMemory,
                                      long memoryAssigned,
-                                     String containerId, int vertexId) {
+                                     String containerId, int vertexId,
+                                     boolean compositeFetch) {
     this.srcNameTrimmed = srcNameTrimmed;
     this.conf = conf;    
-    this.fileNameAllocator = new TezTaskOutputFiles(conf, uniqueIdentifier, dagID, containerId, vertexId,
-        ShuffleUtils.isTezShuffleHandler(conf));
+    this.fileNameAllocator = new TezTaskOutputFiles(
+        conf, uniqueIdentifier, dagID, containerId, vertexId, compositeFetch);
 
     this.memoryLimit = memoryAssigned;
 

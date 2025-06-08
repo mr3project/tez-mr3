@@ -21,6 +21,7 @@ package org.apache.tez.runtime.library.common.shuffle;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.tez.http.BaseHttpConnection;
+import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
@@ -44,7 +45,7 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
   protected final Configuration conf;
 
   protected final String applicationId;
-  protected final ShuffleServer.FetcherConfig fetcherConfig;
+  protected final FetcherConfig fetcherConfig;
   protected final TaskContext taskContext;
 
   public final InputHost inputHost;
@@ -119,7 +120,7 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
   public Fetcher(ShuffleServer fetcherCallback,
                  Configuration conf,
                  InputHost inputHost,
-                 ShuffleServer.FetcherConfig fetcherConfig,
+                 FetcherConfig fetcherConfig,
                  TaskContext taskContext,
                  InputHost.PartitionToInputs pendingInputsSeq,
                  int attempt) {

@@ -23,6 +23,7 @@ import java.util.Iterator;
 import java.util.List;
 
 import org.apache.hadoop.io.serializer.Serialization;
+import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
@@ -64,6 +65,7 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
   protected final int numPartitions;
   protected final CompressionCodec codec;
 
+  protected final String auxiliaryService;
   protected final boolean compositeFetch;
   protected final TezTaskOutput outputFileHandler;
   
@@ -172,7 +174,10 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
       throw new RuntimeException(e);
     }
 
-    this.compositeFetch = ShuffleUtils.isTezShuffleHandler(this.conf);
+    FetcherConfig fetcherConfig = outputContext.getFetcherConfig();
+    this.auxiliaryService = fetcherConfig.auxiliaryService;
+    this.compositeFetch = fetcherConfig.compositeFetch;
+
     this.outputFileHandler = TezRuntimeUtils.instantiateTaskOutputManager(
         this.conf, outputContext, this.compositeFetch);
   }

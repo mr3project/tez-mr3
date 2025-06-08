@@ -25,11 +25,8 @@ import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.LocalDirAllocator;
-import org.apache.hadoop.fs.RawLocalFileSystem;
-import org.apache.tez.common.security.JobTokenSecretManager;
 import org.apache.tez.dag.api.TezUncheckedException;
-import org.apache.tez.http.HttpConnectionParams;
+import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
@@ -78,81 +75,6 @@ public class ShuffleServer implements FetcherCallback {
       return new Configuration(((ShuffleServer)instance).fetcherConfig.codecConf);
     } else {
       return new Configuration(conf);
-    }
-  }
-
-  // parameters required by Fetchers
-  public static class FetcherConfig {
-    public final Configuration codecConf;
-    public final boolean ifileReadAhead;
-    public final int ifileReadAheadLength;
-    public final JobTokenSecretManager jobTokenSecretMgr;
-    public final HttpConnectionParams httpConnectionParams;
-    public final RawLocalFileSystem localFs;
-    public final LocalDirAllocator localDirAllocator;
-    public final String localHostName;
-    public final boolean localDiskFetchEnabled;
-    public final boolean localDiskFetchOrderedEnabled;
-    public final boolean verifyDiskChecksum;
-    public final boolean compositeFetch;
-    public final boolean connectionFailAllInput;
-    public final long speculativeExecutionWaitMillis;
-    public final int stuckFetcherThresholdMillis;
-    public final int stuckFetcherReleaseMillis;
-
-    public FetcherConfig(
-        Configuration codecConf,
-        boolean ifileReadAhead,
-        int ifileReadAheadLength,
-        JobTokenSecretManager jobTokenSecretMgr,
-        HttpConnectionParams httpConnectionParams,
-        RawLocalFileSystem localFs,
-        LocalDirAllocator localDirAllocator,
-        String localHostName,
-        boolean localDiskFetchEnabled,
-        boolean localDiskFetchOrderedEnabled,
-        boolean verifyDiskChecksum,
-        boolean compositeFetch,
-        boolean connectionFailAllInput,
-        long speculativeExecutionWaitMillis,
-        int stuckFetcherThresholdMillis,
-        int stuckFetcherReleaseMillis) {
-      this.codecConf = codecConf;
-      this.ifileReadAhead = ifileReadAhead;
-      this.ifileReadAheadLength = ifileReadAheadLength;
-      this.jobTokenSecretMgr = jobTokenSecretMgr;
-      this.httpConnectionParams = httpConnectionParams;
-      this.localFs = localFs;
-      this.localDirAllocator = localDirAllocator;
-      this.localHostName = localHostName;
-      this.localDiskFetchEnabled = localDiskFetchEnabled;
-      this.localDiskFetchOrderedEnabled = localDiskFetchOrderedEnabled;
-      this.verifyDiskChecksum = verifyDiskChecksum;
-      this.compositeFetch = compositeFetch;
-      this.connectionFailAllInput = connectionFailAllInput;
-      this.speculativeExecutionWaitMillis = speculativeExecutionWaitMillis;
-      this.stuckFetcherThresholdMillis = stuckFetcherThresholdMillis;
-      this.stuckFetcherReleaseMillis = stuckFetcherReleaseMillis;
-    }
-
-    public String toString() {
-      StringBuilder sb = new StringBuilder();
-      sb.append("[ifileReadAhead=");
-      sb.append(ifileReadAhead);
-      sb.append(", ifileReadAheadLength=");
-      sb.append(ifileReadAheadLength);
-      sb.append(", httpConnectionParams=");
-      sb.append(httpConnectionParams);
-      sb.append(", localDiskFetchEnabled=");
-      sb.append(localDiskFetchEnabled);
-      sb.append(", speculativeExecutionWaitMillis=");
-      sb.append(speculativeExecutionWaitMillis);
-      sb.append(", stuckFetcherThresholdMillis=");
-      sb.append(stuckFetcherThresholdMillis);
-      sb.append(", stuckFetcherReleaseMillis=");
-      sb.append(stuckFetcherReleaseMillis);
-      sb.append("]");
-      return sb.toString();
     }
   }
 
@@ -301,6 +223,8 @@ public class ShuffleServer implements FetcherCallback {
   }
 
   public void run() {
+    taskContext.setFetcherConfig(this.fetcherConfig);
+
     try {
       call();
       LOG.info("{} thread completed", serverName);

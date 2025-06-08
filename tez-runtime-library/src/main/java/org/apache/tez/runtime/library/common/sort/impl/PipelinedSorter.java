@@ -114,7 +114,6 @@ public class PipelinedSorter extends ExternalSorter {
   private final boolean lazyAllocateMem;
   private final boolean useSoftReference;
   private final Deflater deflater;
-  private final String auxiliaryService;
 
   /**
    * Store the events to be send in close.
@@ -170,8 +169,6 @@ public class PipelinedSorter extends ExternalSorter {
     finalMergeEnabled = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT,
         !pipelinedShuffle);
-
-    auxiliaryService = ShuffleUtils.getTezShuffleHandlerServiceId(conf);
 
     initialSetupLogLine.append(", UsingHashComparator=");
     // k/v serialization

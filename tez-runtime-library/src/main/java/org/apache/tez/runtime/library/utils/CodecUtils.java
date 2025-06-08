@@ -42,6 +42,7 @@ import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.security.JobTokenSecretManager;
 import org.apache.tez.http.HttpConnectionParams;
+import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.ConfigUtils;
@@ -61,7 +62,7 @@ public final class CodecUtils {
   private CodecUtils() {
   }
 
-  public static ShuffleServer.FetcherConfig constructFetcherConfig(
+  public static FetcherConfig constructFetcherConfig(
       Configuration conf, TaskContext taskContext) throws IOException {
     boolean ifileReadAhead = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD,
         TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_DEFAULT);
@@ -104,7 +105,7 @@ public final class CodecUtils {
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_RELEASE_MILLIS,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_RELEASE_MILLIS_DEFAULT);
 
-    return new ShuffleServer.FetcherConfig(
+    return new FetcherConfig(
         codecConf,
         ifileReadAhead,
         ifileReadAheadLength,
@@ -116,6 +117,7 @@ public final class CodecUtils {
         localDiskFetchEnabled,
         localDiskFetchOrderedEnabled,
         verifyDiskChecksum,
+        auxiliaryService,
         compositeFetch,
         connectionFailAllInput,
         speculativeExecutionWaitMillis,

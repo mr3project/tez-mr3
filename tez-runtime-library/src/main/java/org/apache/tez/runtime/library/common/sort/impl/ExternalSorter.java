@@ -28,6 +28,7 @@ import java.util.Map;
 
 import com.google.common.collect.Maps;
 import org.apache.tez.runtime.api.Event;
+import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.OutputStatisticsReporter;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
@@ -124,6 +125,7 @@ public abstract class ExternalSorter {
   protected final Map<Integer, Path> spillFileIndexPaths = Maps.newHashMap();
 
   // protected final boolean physicalHostFetch;  // TODO: currently unused
+  protected final String auxiliaryService;
   protected final boolean compositeFetch;
   protected final TezTaskOutput mapOutputFile;
 
@@ -248,7 +250,11 @@ public abstract class ExternalSorter {
     // this.physicalHostFetch = conf.getBoolean(
     //     TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH,
     //     TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_DEFAULT);
-    this.compositeFetch = ShuffleUtils.isTezShuffleHandler(this.conf);
+
+    FetcherConfig fetcherConfig = outputContext.getFetcherConfig();
+    this.auxiliaryService = fetcherConfig.auxiliaryService;
+    this.compositeFetch = fetcherConfig.compositeFetch;
+
     this.mapOutputFile = TezRuntimeUtils.instantiateTaskOutputManager(
         this.conf, outputContext, this.compositeFetch);
 

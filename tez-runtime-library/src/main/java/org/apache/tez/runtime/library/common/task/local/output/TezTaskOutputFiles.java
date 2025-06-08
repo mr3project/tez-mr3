@@ -47,7 +47,7 @@ public class TezTaskOutputFiles implements TezTaskOutput {
   private final String uniqueId;
   private final String outputDir;
   private final String dagId;   // = dag_${dagId}/${containerId}/
-  private final boolean isCompositeFetch;
+  private final boolean compositeFetch;
 
   /*
   Under YARN, this defaults to one or more of the local directories, along with the appId in the path.
@@ -67,15 +67,15 @@ public class TezTaskOutputFiles implements TezTaskOutput {
    */
   public TezTaskOutputFiles(Configuration conf, String uniqueId, int dagID,
                             String containerId, int vertexId,
-                            boolean isCompositeFetch) {
+                            boolean compositeFetch) {
     this.conf = conf;
     this.uniqueId = uniqueId;
-    this.outputDir = isCompositeFetch ?
+    this.outputDir = compositeFetch ?
         Constants.VERTEX_PREFIX + vertexId : Constants.TEZ_RUNTIME_TASK_OUTPUT_DIR;
-    this.dagId = isCompositeFetch ?
+    this.dagId = compositeFetch ?
         Constants.DAG_PREFIX + dagID + Path.SEPARATOR + containerId + Path.SEPARATOR :
         Constants.DAG_PREFIX + dagID + Path.SEPARATOR;
-    this.isCompositeFetch = isCompositeFetch;
+    this.compositeFetch = compositeFetch;
   }
 
   /*
@@ -290,6 +290,6 @@ public class TezTaskOutputFiles implements TezTaskOutput {
   }
 
   public String getDagOutputDir(String child) {
-    return isCompositeFetch ? dagId.concat(child) : child;
+    return compositeFetch ? dagId.concat(child) : child;
   }
 }

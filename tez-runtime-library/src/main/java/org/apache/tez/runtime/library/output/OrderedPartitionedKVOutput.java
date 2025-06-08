@@ -29,6 +29,7 @@ import java.util.zip.Deflater;
 
 import com.google.common.collect.Lists;
 
+import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.library.conf.OrderedPartitionedKVOutputConfig.SorterImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,11 +74,15 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
   boolean finalMergeEnabled;
   private boolean sendEmptyPartitionDetails;
 
-  private boolean compositeFetch;
+  private final String auxiliaryService;
+  private final boolean compositeFetch;
 
   public OrderedPartitionedKVOutput(OutputContext outputContext, int numPhysicalOutputs) {
     super(outputContext, numPhysicalOutputs);
     deflater = TezCommonUtils.newBestCompressionDeflater();
+    FetcherConfig fetcherConfig = getContext().getFetcherConfig();
+    auxiliaryService = fetcherConfig.auxiliaryService;
+    compositeFetch = fetcherConfig.compositeFetch;
   }
 
   @Override
@@ -97,8 +102,6 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
     sendEmptyPartitionDetails = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED,
         TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED_DEFAULT);
-
-    this.compositeFetch = ShuffleUtils.isTezShuffleHandler(this.conf);
 
     return Collections.emptyList();
   }
@@ -213,7 +216,6 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
           getContext(), pathComponentExpanded, sorter.getFinalIndexFile(), localFs);
 
       boolean isLastEvent = true;
-      String auxiliaryService = ShuffleUtils.getTezShuffleHandlerServiceId(conf);
       ShuffleUtils.generateEventOnSpill(eventList, finalMergeEnabled, isLastEvent,
           getContext(), 0, tezSpillRecord,
           getNumPhysicalOutputs(), sendEmptyPartitionDetails, pathComponent,
@@ -260,7 +262,6 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_SORTER_CLASS);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT);
-    confKeys.add(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID);
   }
 
   public static Set<String> getConfigurationKeySet() {

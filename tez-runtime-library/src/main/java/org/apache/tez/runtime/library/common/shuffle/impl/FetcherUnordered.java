@@ -33,6 +33,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.tez.http.HttpConnectionParams;
+import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.shuffle.DiskFetchedInput;
@@ -81,7 +82,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
                           Configuration conf,
                           InputHost inputHost,
                           InputHost.PartitionToInputs pendingInputsSeq,
-                          ShuffleServer.FetcherConfig fetcherConfig,
+                          FetcherConfig fetcherConfig,
                           TaskContext taskContext,
                           int attempt,
                           ShuffleManager shuffleManager) {
