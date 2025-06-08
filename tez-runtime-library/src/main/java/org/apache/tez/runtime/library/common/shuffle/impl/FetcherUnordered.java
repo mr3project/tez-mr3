@@ -133,7 +133,12 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     boolean useFreeMemoryWriterOutput = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT,
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT_DEFAULT);
-    if (useFreeMemoryWriterOutput) {
+    boolean useFreeMemoryFetchedInput = conf.getBoolean(
+        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT,
+        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT_DEFAULT);
+    if (useFreeMemoryWriterOutput || useFreeMemoryFetchedInput) {
+      // useFreeMemoryWriterOutput == true: required
+      // useFreeMemoryFetchedInput == true: recommended for performance
       useLocalDiskFetch = false;
     } else {
       if (fetcherConfig.localDiskFetchEnabled &&

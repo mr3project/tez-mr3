@@ -191,12 +191,16 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     boolean useFreeMemoryWriterOutput = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT,
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT_DEFAULT);
+    boolean useFreeMemoryFetchedInput = conf.getBoolean(
+        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT,
+        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT_DEFAULT);
     boolean shuffleMemToMem = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_ENABLE_MEMTOMEM,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_ENABLE_MEMTOMEM_DEFAULT);
-    if (useFreeMemoryWriterOutput || shuffleMemToMem) {
+    if (useFreeMemoryWriterOutput || useFreeMemoryFetchedInput || shuffleMemToMem) {
       // useFreeMemoryWriterOutput == true: required
-      // shuffleMemToMem == true: recommended
+      // useFreeMemoryFetchedInput == true: recommended for performance
+      // shuffleMemToMem == true: recommended for performance
       useLocalDiskFetch = false;
     } else {
       if (fetcherConfig.localDiskFetchOrderedEnabled &&
