@@ -206,58 +206,6 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
     shuffleServer.addKnownInput(this, inputHostName, port, srcAttempt, partitionId);
   }
 
-  public boolean cleanInputHostForConstructFetcher(InputHost.PartitionToInputs pendingInputs) {
-    // safe to update pendingInputs because we are running in FetcherServer.call() thread
-    assert pendingInputs.getShuffleClientId() == shuffleClientId;
-    assert pendingInputs.getInputs().size() <= shuffleServer.getMaxTaskOutputAtOnce();
-
-    boolean removedAnyInput = false;
-
-    // avoid adding attempts which have already been completed
-    synchronized (completedInputSet) {
-      for (Iterator<InputAttemptIdentifier> inputIter = pendingInputs.getInputs().iterator();
-           inputIter.hasNext();) {
-        InputAttemptIdentifier input = inputIter.next();
-
-        boolean alreadyCompleted;
-        if (input instanceof CompositeInputAttemptIdentifier) {
-          CompositeInputAttemptIdentifier compositeInput = (CompositeInputAttemptIdentifier) input;
-          int nextClearBit = completedInputSet.nextClearBit(compositeInput.getInputIdentifier());
-          int maxClearBit = compositeInput.getInputIdentifier() + compositeInput.getInputIdentifierCount();
-          alreadyCompleted = nextClearBit > maxClearBit;
-        } else {
-          alreadyCompleted = completedInputSet.get(input.getInputIdentifier());
-        }
-
-        if (alreadyCompleted) {
-          LOG.info("Skipping completed input: {}", input);
-          inputIter.remove();
-          removedAnyInput = true;
-        }
-      }
-    }
-
-    for (Iterator<InputAttemptIdentifier> inputIter = pendingInputs.getInputs().iterator();
-         inputIter.hasNext();) {
-      InputAttemptIdentifier input = inputIter.next();
-
-      // avoid adding attempts which have been marked as OBSOLETE
-      if (isObsoleteInputAttemptIdentifier(input)) {
-        LOG.info("Skipping obsolete input: {}", input);
-        inputIter.remove();
-        removedAnyInput = true;
-        continue;
-      }
-
-      if (!validateInputAttemptForPipelinedShuffle(input, false)) {
-        inputIter.remove();   // no need to fetch for input, so remove
-        removedAnyInput = true;
-      }
-    }
-
-    return removedAnyInput;
-  }
-
   public synchronized void fetchSucceeded(
       InputAttemptIdentifier srcAttemptIdentifier,
       MapOutput output,
