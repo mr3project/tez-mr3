@@ -664,7 +664,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
                 writer = new Writer(
                     keySerialization, valSerialization, fsOutput,
                     keyClass, valClass, codec, null, null, false,
-                    writeBuffer);
+                    writeBuffer, null);
               }
               numRecords += writePartition(buffer.partitionHeads[i], buffer, writer, key, val);
             }
@@ -1146,7 +1146,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         writer = new Writer(
             keySerialization, valSerialization, out, keyClass, valClass,
             codec, null, null, false,
-            writeBuffer );
+            writeBuffer, null);
         try {
           if (currentBuffer.nextPosition != 0
               && currentBuffer.partitionHeads[i] != WrappedBuffer.PARTITION_ABSENT_POSITION) {
@@ -1270,8 +1270,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           spilledRecordsCounter.increment(1);
           Writer writer = null;
           try {
-            writer = new IFile.Writer(keySerialization, valSerialization, out, keyClass, valClass, codec, null, null, false,
-                IFile.allocateWriteBufferSingle());
+            writer = new IFile.Writer(keySerialization, valSerialization, out, keyClass, valClass,
+                codec, null, null, false,
+                IFile.allocateWriteBufferSingle(), null);
             writer.append(key, value);
             outputLargeRecordsCounter.increment(1);
             numRecordsPerPartition[i]++;

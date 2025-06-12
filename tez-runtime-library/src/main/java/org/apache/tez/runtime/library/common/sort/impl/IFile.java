@@ -50,6 +50,8 @@ import org.apache.hadoop.io.serializer.Serialization;
 import org.apache.hadoop.io.serializer.Serializer;
 import org.apache.tez.common.counters.TezCounter;
 
+import javax.annotation.Nullable;
+
 /**
  * <code>IFile</code> is the simple <key-len, value-len, key, value> format
  * for the intermediate map-outputs in Map-Reduce.
@@ -154,7 +156,7 @@ public class IFile {
       super(keySerialization, valSerialization,
           new FSDataOutputStream(createBoundedBuffer(cacheSize), null),
           keyClass, valueClass, null,
-          writesCounter, serializedBytesCounter, false, writeBuffer);
+          writesCounter, serializedBytesCounter, false, writeBuffer, null);
       this.fs = fs;
       this.cacheStream = (BoundedByteArrayOutputStream) this.rawOut.getWrappedStream();
       this.taskOutput = taskOutput;
@@ -341,7 +343,7 @@ public class IFile {
                   TezCounter serializedBytesCounter,
                   byte[] writeBuffer) throws IOException {
       this(keySerialization, valSerialization, fs.create(file), keyClass, valueClass, codec,
-           writesCounter, serializedBytesCounter, false, writeBuffer);
+           writesCounter, serializedBytesCounter, false, writeBuffer, null);
       ownOutputStream = true;   // because of fs.create(file)
     }
 
@@ -350,7 +352,8 @@ public class IFile {
                   Class keyClass, Class valueClass,
                   CompressionCodec codec, TezCounter writesCounter, TezCounter serializedBytesCounter,
                   boolean rle,
-                  byte[] writeBuffer) throws IOException {
+                  byte[] writeBuffer,
+                  @Nullable Compressor compressorExternal) throws IOException {
       this.rawOut = outputStream;
       this.writtenRecordsCounter = writesCounter;
       this.serializedUncompressedBytes = serializedBytesCounter;

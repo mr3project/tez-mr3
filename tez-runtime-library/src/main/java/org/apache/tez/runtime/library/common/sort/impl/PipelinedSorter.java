@@ -514,7 +514,7 @@ public class PipelinedSorter extends ExternalSorter {
                 out,
                 serializationContext.getKeyClass(), serializationContext.getValueClass(),
                 codec, spilledRecordsCounter, null, false,
-                writeBuffer);
+                writeBuffer, null);
           }
           // we need not check for combiner since its a single record
           if (i == partition) {
@@ -624,7 +624,7 @@ public class PipelinedSorter extends ExternalSorter {
               fsOutput,
               serializationContext.getKeyClass(), serializationContext.getValueClass(),
               codec, spilledRecordsCounter, null, merger.needsRLE(),
-              writeBuffer);
+              writeBuffer, null);
         }
         if (combiner == null) {
           while (kvIter.next()) {
@@ -865,7 +865,7 @@ public class PipelinedSorter extends ExternalSorter {
               finalOut,
               serializationContext.getKeyClass(), serializationContext.getValueClass(),
               codec, spilledRecordsCounter, null, merger.needsRLE(),
-              writeBuffer);
+              writeBuffer, null);
           if (combiner == null || numSpills < minSpillsForCombine) {
             TezMerger.writeFile(kvIter, writer, progressable,
                 TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
