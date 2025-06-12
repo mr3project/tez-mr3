@@ -329,10 +329,9 @@ public abstract class ExternalSorter {
   }
 
   public static long getInitialMemoryRequirement(Configuration conf, long maxAvailableTaskMemory) {
-    int initialMemRequestMb = 
-        conf.getInt(
-            TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB, 
-            TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB_DEFAULT);
+    int initialMemRequestMb = conf.getInt(
+        TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB,
+        TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB_DEFAULT);
     long reqBytes = ((long) initialMemRequestMb) << 20;
     //Higher bound checks are done in individual sorter implementations
     Preconditions.checkArgument(initialMemRequestMb > 0 && reqBytes < maxAvailableTaskMemory,
@@ -340,8 +339,7 @@ public abstract class ExternalSorter {
     TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB, initialMemRequestMb, maxAvailableTaskMemory >> 20);
     if (LOG.isDebugEnabled()) {
       LOG.debug("Requested SortBufferSize ("
-          + TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB + "): "
-          + initialMemRequestMb);
+          + TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB + "): " + initialMemRequestMb);
     }
     return reqBytes;
   }

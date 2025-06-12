@@ -25,7 +25,6 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.ByteBuffer;
 
-import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.io.DataInputByteBuffer;
 import org.apache.tez.common.security.JobTokenSecretManager;
 import org.apache.tez.http.BaseHttpConnection;
@@ -181,9 +180,8 @@ public class TezRuntimeUtils {
 
   public static HttpConnectionParams getHttpConnectionParams(
       Configuration conf, boolean compositeFetch) {
-    int connectionTimeout =
-        conf.getInt(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_CONNECT_TIMEOUT,
-            TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_STALLED_COPY_TIMEOUT_DEFAULT);
+    int connectionTimeout = conf.getInt(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_CONNECT_TIMEOUT,
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_STALLED_COPY_TIMEOUT_DEFAULT);
 
     int readTimeout = conf.getInt(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_READ_TIMEOUT,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_READ_TIMEOUT_DEFAULT);

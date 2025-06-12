@@ -18,7 +18,6 @@
 
 package org.apache.tez.http;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.tez.common.Preconditions;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.IOUtils;
@@ -43,7 +42,6 @@ public class HttpConnection extends BaseHttpConnection {
   private URL url;
   private final String logIdentifier;
 
-  @VisibleForTesting
   protected volatile HttpURLConnection connection;
   private volatile DataInputStream input;
   private volatile boolean connectionSucceeed;

@@ -131,22 +131,21 @@ public class PipelinedSorter extends ExternalSorter {
       long initialMemoryAvailable) throws IOException {
     super(outputContext, conf, numOutputs, initialMemoryAvailable);
 
-    lazyAllocateMem = this.conf.getBoolean(TezRuntimeConfiguration
-        .TEZ_RUNTIME_PIPELINED_SORTER_LAZY_ALLOCATE_MEMORY, TezRuntimeConfiguration
-        .TEZ_RUNTIME_PIPELINED_SORTER_LAZY_ALLOCATE_MEMORY_DEFAULT);
+    lazyAllocateMem = this.conf.getBoolean(
+        TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_LAZY_ALLOCATE_MEMORY,
+        TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_LAZY_ALLOCATE_MEMORY_DEFAULT);
 
     if (lazyAllocateMem) {
       /**
        * When lazy-allocation is enabled, framework takes care of auto
        * allocating memory on need basis. Desirable block size is set to 256MB
        */
-      //256 MB - 64 bytes. See comment for the 32MB allocation.
+      // 256MB - 64 bytes. See comment for the 32MB allocation.
       MIN_BLOCK_SIZE = ((256 << 20) - 64);
     } else {
-      int minBlockSize = conf.getInt(TezRuntimeConfiguration
-              .TEZ_RUNTIME_PIPELINED_SORTER_MIN_BLOCK_SIZE_IN_MB,
-          TezRuntimeConfiguration
-              .TEZ_RUNTIME_PIPELINED_SORTER_MIN_BLOCK_SIZE_IN_MB_DEFAULT);
+      int minBlockSize = conf.getInt(
+          TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_MIN_BLOCK_SIZE_IN_MB,
+          TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_MIN_BLOCK_SIZE_IN_MB_DEFAULT);
       Preconditions.checkArgument(
           (minBlockSize > 0 && minBlockSize < 2047),
           "{}={} should be a positive value between 0 and 2047",
@@ -249,7 +248,7 @@ public class PipelinedSorter extends ExternalSorter {
 
   ByteBuffer allocateSpace() {
     if (currentAllocatableMemory <= 0) {
-      //No space available.
+      // No space available.
       return null;
     }
 
@@ -299,15 +298,15 @@ public class PipelinedSorter extends ExternalSorter {
      */
     if (lazyAllocateMem) {
       if (buffers == null || buffers.isEmpty()) {
-        //32 MB - 64 bytes
+        // 32 MB - 64 bytes
         // These buffers end up occupying 33554456 (32M + 24) bytes.
-        // On large JVMs (64G+), with G1Gc - the region size maxes out at
-        // 32M. Without the -64, this structure would end up using 2 regions.
+        // On large JVMs (64G+), with G1GC - the region size maxes out at 32M.
+        // Without the -64, this structure would end up using 2 regions.
         return ((32 << 20) - 64);
       }
     }
 
-    //Honor MIN_BLOCK_SIZE
+    // Honor MIN_BLOCK_SIZE
     maxBlockSize = Math.max(MIN_BLOCK_SIZE, maxBlockSize);
 
     if (availableMem < maxBlockSize) {
