@@ -335,6 +335,8 @@ public class IFile {
     private final ByteBuffer writeByteBuffer;
     private int writeOffset;
 
+    private final Compressor compressorExternal;  // not to be shared with concurrent threads
+
     public Writer(Serialization keySerialization, Serialization valSerialization,
                   FileSystem fs, Path file,
                   Class keyClass, Class valueClass,
@@ -365,6 +367,8 @@ public class IFile {
       this.writeByteBuffer = ByteBuffer.wrap(writeBuffer).order(ByteOrder.BIG_ENDIAN);
       this.writeOffset = 0;
 
+      this.compressorExternal = compressorExternal;
+
       setupOutputStream(codec);
       writeHeader(outputStream);
 
@@ -382,7 +386,11 @@ public class IFile {
     void setupOutputStream(CompressionCodec codec) throws IOException {
       this.checksumOut = new IFileOutputStream(this.rawOut);
       if (codec != null) {
-        this.compressor = CodecUtils.getCompressor(codec);
+        if (compressorExternal != null) {
+          this.compressor = compressorExternal;
+        } else {
+          this.compressor = CodecUtils.getCompressor(codec);
+        }
         if (this.compressor != null) {
           this.compressor.reset();
           this.compressedOut = CodecUtils.createOutputStream(codec, checksumOut, compressor);
@@ -450,7 +458,11 @@ public class IFile {
 
       if (compressOutput) {
         // Return back the compressor
-        CodecPool.returnCompressor(compressor);
+        // if compressorExternal != null, this Writer does not own compressor, so do not return it to CodecPool
+        if (compressorExternal == null) {
+          // this Writer owns compressor
+          CodecPool.returnCompressor(compressor);
+        }
         compressor = null;
       }
 
