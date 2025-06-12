@@ -52,7 +52,9 @@ import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.io.compress.CodecPool;
 import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.hadoop.io.compress.Compressor;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.tez.common.TezCommonUtils;
 import org.apache.tez.common.TezUtilsInternal;
@@ -76,6 +78,7 @@ import org.apache.tez.runtime.library.common.sort.impl.TezSpillRecord;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.shuffle.impl.ShuffleUserPayloads;
 import org.apache.tez.runtime.library.shuffle.impl.ShuffleUserPayloads.DataMovementEventPayloadProto;
+import org.apache.tez.runtime.library.utils.CodecUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -635,6 +638,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       FSDataOutputStream fsOutput = null;
       long compressedLength = 0;
       TezSpillRecord spillRecord = new TezSpillRecord(numPartitions);
+      Compressor compressorExternal = null;
       try {
         if (byteArrayOutput == null) {
           fsOutput = rfs.create(spillPathDetails.outputFilePath);
@@ -649,6 +653,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         DataInputBuffer key = new DataInputBuffer();
         DataInputBuffer val = new DataInputBuffer();
         byte[] writeBuffer = IFile.allocateWriteBuffer();
+
         for (int i = 0; i < numPartitions; i++) {
           IFile.Writer writer = null;
           try {
@@ -660,11 +665,14 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
                 continue;
               }
               if (writer == null) {
+                if (codec != null && compressorExternal == null) {
+                  compressorExternal = CodecUtils.getCompressor(codec);
+                }
                 // all Writer instances share the same FSDataOutputStream out
                 writer = new Writer(
                     keySerialization, valSerialization, fsOutput,
                     keyClass, valClass, codec, null, null, false,
-                    writeBuffer, null);
+                    writeBuffer, compressorExternal);
               }
               numRecords += writePartition(buffer.partitionHeads[i], buffer, writer, key, val);
             }
@@ -692,6 +700,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         key.close();
         val.close();
       } finally {
+        if (compressorExternal != null) {
+          CodecPool.returnCompressor(compressorExternal);
+        }
         if (fsOutput != null) {
           fsOutput.close();
         }

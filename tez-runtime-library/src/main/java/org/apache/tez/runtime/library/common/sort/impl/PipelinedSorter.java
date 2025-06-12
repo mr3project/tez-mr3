@@ -29,12 +29,15 @@ import java.util.PriorityQueue;
 import java.util.concurrent.*;
 import java.util.zip.Deflater;
 
+import org.apache.hadoop.io.compress.CodecPool;
+import org.apache.hadoop.io.compress.Compressor;
 import org.apache.tez.common.Preconditions;
 import com.google.common.collect.Lists;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.tez.runtime.api.MultiByteArrayOutputStream;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
+import org.apache.tez.runtime.library.utils.CodecUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -599,6 +602,7 @@ public class PipelinedSorter extends ExternalSorter {
     }
 
     FSDataOutputStream fsOutput = null;
+    Compressor compressorExternal = null;
     try {
       if (byteArrayOutput == null) {
         fsOutput = rfs.create(spillFileName, true, 4096);
@@ -619,12 +623,15 @@ public class PipelinedSorter extends ExternalSorter {
         Writer writer = null;
         boolean hasNext = kvIter.hasNext();
         if (hasNext || !sendEmptyPartitionDetails) {
+          if (codec != null && compressorExternal == null) {
+            compressorExternal = CodecUtils.getCompressor(codec);
+          }
           writer = new Writer(
               serializationContext.getKeySerialization(), serializationContext.getValSerialization(),
               fsOutput,
               serializationContext.getKeyClass(), serializationContext.getValueClass(),
               codec, spilledRecordsCounter, null, merger.needsRLE(),
-              writeBuffer, null);
+              writeBuffer, compressorExternal);
         }
         if (combiner == null) {
           while (kvIter.next()) {
@@ -653,6 +660,9 @@ public class PipelinedSorter extends ExternalSorter {
         }
       } // end of for loop
     } finally {
+      if (compressorExternal != null) {
+        CodecPool.returnCompressor(compressorExternal);
+      }
       if (fsOutput != null) {
         fsOutput.close();
       }
