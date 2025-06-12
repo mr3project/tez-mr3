@@ -139,8 +139,7 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
         }
 
         Preconditions.checkArgument(sorterImpl.equals(SorterImpl.PIPELINED),
-            TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED
-              + "only works with PipelinedSorter.");
+            TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED + "only works with PipelinedSorter.");
       }
 
       if (sorterImpl.equals(SorterImpl.PIPELINED)) {

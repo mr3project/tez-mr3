@@ -152,12 +152,10 @@ public class TezTaskOutputFiles implements TezTaskOutput {
   @Override
   public Path getOutputFileForWriteInVolume(Path existing) {
     //Get hold attempt directory (${appDir}/output/)
-    Preconditions.checkArgument(existing.getParent().getParent() != null, "Parent directory's "
-        + "parent can not be null");
+    Preconditions.checkArgument(existing.getParent().getParent() != null, "Parent directory's parent can not be null");
     Path attemptDir = new Path(existing.getParent().getParent(), uniqueId);
     return new Path(attemptDir, Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING);
   }
-
 
   /**
    * Create a local output index file name.
@@ -220,7 +218,7 @@ public class TezTaskOutputFiles implements TezTaskOutput {
   @Override
   public Path getSpillFileForWrite(int spillNumber, long size)
       throws IOException {
-    Preconditions.checkArgument(spillNumber >= 0, "Provide a valid spill number " + spillNumber);
+    Preconditions.checkArgument(spillNumber >= 0, "Provide a valid spill number {}", spillNumber);
     String dagPath = getDagOutputDir(this.outputDir);
     Path taskAttemptDir = new Path(dagPath,
         String.format(SPILL_FILE_DIR_PATTERN, uniqueId, spillNumber));
@@ -242,7 +240,7 @@ public class TezTaskOutputFiles implements TezTaskOutput {
   @Override
   public Path getSpillIndexFileForWrite(int spillNumber, long size)
       throws IOException {
-    Preconditions.checkArgument(spillNumber >= 0, "Provide a valid spill number " + spillNumber);
+    Preconditions.checkArgument(spillNumber >= 0, "Provide a valid spill number {}", spillNumber);
     String dagPath = getDagOutputDir(this.outputDir);
     Path taskAttemptDir = new Path(dagPath, String.format(
         SPILL_FILE_DIR_PATTERN, uniqueId, spillNumber));

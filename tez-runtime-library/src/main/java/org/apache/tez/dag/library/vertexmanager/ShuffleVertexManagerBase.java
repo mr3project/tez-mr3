@@ -18,7 +18,6 @@
 
 package org.apache.tez.dag.library.vertexmanager;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.UnsafeByteOperations;
 import org.apache.tez.common.Preconditions;
 import com.google.common.base.Predicate;
@@ -95,14 +94,12 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
   //Track source vertex and its finished tasks
   private final Map<String, SourceVertexInfo> srcVertexInfo = Maps.newConcurrentMap();
   boolean sourceVerticesScheduled = false;
-  @VisibleForTesting
   int bipartiteSources = 0;
   long completedSourceTasksOutputSize = 0;
   List<VertexStateUpdate> pendingStateUpdates = Lists.newArrayList();
   List<PendingTaskInfo> pendingTasks = Lists.newLinkedList();
   int totalTasksToSchedule = 0;
 
-  @VisibleForTesting
   Configuration conf;
   ShuffleVertexManagerBaseConfig config;
   // requires synchronized access
@@ -278,8 +275,8 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
     SourceVertexInfo srcInfo = srcVertexInfo.get(srcVertexName);
     if (srcInfo.vertexIsConfigured) {
       Preconditions.checkState(srcTaskId < srcInfo.numTasks,
-          "Received completion for srcTaskId " + srcTaskId + " but Vertex: " + srcVertexName +
-          " has only " + srcInfo.numTasks + " tasks");
+          "Received completion for srcTaskId {} but Vertex: {} has only {} tasks",
+          srcTaskId, srcVertexName, srcInfo.numTasks);
     }
     //handle duplicate events and count task completions from all source vertices
     BitSet completedSourceTasks = srcInfo.finishedTaskSet;
@@ -294,11 +291,9 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
     processPendingTasks(attempt);
   }
 
-  @VisibleForTesting
   void parsePartitionStats(SourceVertexInfo srcInfo,
       RoaringBitmap partitionStats) {
-    Preconditions.checkState(srcInfo.statsInMB != null,
-        "Stats should be initialized");
+    Preconditions.checkState(srcInfo.statsInMB != null, "Stats should be initialized");
     Iterator<Integer> it = partitionStats.iterator();
     final DATA_RANGE_IN_MB[] RANGES = DATA_RANGE_IN_MB.values();
     final int RANGE_LEN = RANGES.length;
@@ -345,8 +340,7 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
 
     String vName = producerTask.getVertexIdentifier().getName();
     SourceVertexInfo srcInfo = srcVertexInfo.get(vName);
-    Preconditions.checkState(srcInfo != null,
-        "Unknown vmEvent from " + producerTask);
+    Preconditions.checkState(srcInfo != null, "Unknown vmEvent from {}", producerTask);
 
     numVertexManagerEventsReceived++;
 
@@ -502,7 +496,6 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
    * Compute optimal parallelism needed for the job
    * @return true (if parallelism is determined), false otherwise
    */
-  @VisibleForTesting
   boolean determineParallelismAndApply(
       float minSourceVertexCompletedTaskFraction) {
     if (computeRoutingAction.equals(ComputeRoutingAction.WAIT)) {
@@ -653,8 +646,7 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
       for (Map.Entry<String, SourceVertexInfo> vInfo : getBipartiteInfo()) {
         SourceVertexInfo srcInfo = vInfo.getValue();
         // canScheduleTasks check has already verified all sources are configured
-        Preconditions.checkState(srcInfo.vertexIsConfigured,
-            "Vertex: " + vInfo.getKey());
+        Preconditions.checkState(srcInfo.vertexIsConfigured, "Vertex: {}", vInfo.getKey());
         if (srcInfo.numTasks > 0) {
           int numCompletedTasks = srcInfo.getNumCompletedTasks();
           float completedFraction =
@@ -778,11 +770,11 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
 
   private void handleVertexStateUpdate(VertexStateUpdate stateUpdate) {
     Preconditions.checkArgument(stateUpdate.getVertexState() == VertexState.CONFIGURED,
-        "Received incorrect state notification : " + stateUpdate.getVertexState() + " for vertex: "
-            + stateUpdate.getVertexName() + " in vertex: " + getContext().getVertexName());
+        "Received incorrect state notification: {} for vertex: {} in vertex: {}",
+        stateUpdate.getVertexState(), stateUpdate.getVertexName(), getContext().getVertexName());
     Preconditions.checkArgument(srcVertexInfo.containsKey(stateUpdate.getVertexName()),
-        "Received incorrect vertex notification : " + stateUpdate.getVertexState() + " for vertex: "
-            + stateUpdate.getVertexName() + " in vertex: " + getContext().getVertexName());
+        "Received incorrect vertex notification : {} for vertex: {} in vertex: {}",
+        stateUpdate.getVertexState(), stateUpdate.getVertexName(), getContext().getVertexName());
     SourceVertexInfo vInfo = srcVertexInfo.get(stateUpdate.getVertexName());
     Preconditions.checkState(vInfo.vertexIsConfigured == false);
     vInfo.vertexIsConfigured = true;

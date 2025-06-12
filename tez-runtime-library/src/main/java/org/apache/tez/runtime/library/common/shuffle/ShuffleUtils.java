@@ -431,8 +431,7 @@ public class ShuffleUtils {
     Preconditions.checkArgument(eventList != null, "EventList can't be null");
 
     if (finalMergeEnabled) {
-      Preconditions.checkArgument(isLastEvent, "Can not send multiple events when final merge is "
-          + "enabled");
+      Preconditions.checkArgument(isLastEvent, "Can not send multiple events when final merge is enabled");
     }
 
     if (LOG.isDebugEnabled()) {

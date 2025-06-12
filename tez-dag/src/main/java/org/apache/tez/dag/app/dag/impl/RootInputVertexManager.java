@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.tez.common.TezUtils;
 import org.apache.tez.dag.api.EdgeProperty;
@@ -104,7 +103,6 @@ public class RootInputVertexManager extends VertexManagerPlugin {
   float slowStartMinFraction = 0;
   float slowStartMaxFraction = 0;
 
-  @VisibleForTesting
   Configuration conf;
 
   static class PendingTaskInfo {

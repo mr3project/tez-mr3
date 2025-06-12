@@ -17,7 +17,6 @@
  */
 package org.apache.tez.runtime.library.cartesianproduct;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.UnsafeByteOperations;
 import org.apache.tez.common.Preconditions;
 import org.apache.tez.dag.api.EdgeManagerPluginDescriptor;
@@ -149,13 +148,11 @@ public class CartesianProductVertexManager extends VertexManagerPlugin {
         && empDescriptor.getClassName().equals(CartesianProductEdgeManager.class.getName())) {
         Preconditions.checkArgument(
           sourceVerticesConfig.contains(vertex) || sourceVerticesConfig.contains(group),
-          vertex + " has CartesianProductEdgeManager but isn't in " +
-            "CartesianProductVertexManagerConfig");
+          vertex + " has CartesianProductEdgeManager but isn't in CartesianProductVertexManagerConfig");
       } else {
         Preconditions.checkArgument(
           !sourceVerticesConfig.contains(vertex) && !sourceVerticesConfig.contains(group),
-          vertex + " has no CartesianProductEdgeManager but is in " +
-            "CartesianProductVertexManagerConfig");
+          vertex + " has no CartesianProductEdgeManager but is in CartesianProductVertexManagerConfig");
       }
 
       if (edgeProperty.getDataMovementType() == CUSTOM) {
@@ -174,12 +171,11 @@ public class CartesianProductVertexManager extends VertexManagerPlugin {
       for (String v : vertices) {
         Preconditions.checkArgument(
           sourceVerticesDAG.contains(v),
-          v + " is in CartesianProductVertexManagerConfig but not a source vertex in DAG");
+          "{} is in CartesianProductVertexManagerConfig but not a source vertex in DAG", v);
         Preconditions.checkArgument(
           edgePropertyMap.get(v).getEdgeManagerDescriptor().getClassName()
             .equals(CartesianProductEdgeManager.class.getName()),
-          v + " is in CartesianProductVertexManagerConfig and a source vertex, but has no " +
-            "CartesianProductEdgeManager");
+          "{} is in CartesianProductVertexManagerConfig and a source vertex, but has no CartesianProductEdgeManager", v);
       }
     }
 
@@ -189,7 +185,6 @@ public class CartesianProductVertexManager extends VertexManagerPlugin {
     vertexManagerReal.initialize(config);
   }
 
-  @VisibleForTesting
   protected CartesianProductVertexManagerReal getVertexManagerReal() {
     return this.vertexManagerReal;
   }

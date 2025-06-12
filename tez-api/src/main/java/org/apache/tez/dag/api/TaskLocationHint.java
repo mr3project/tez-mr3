@@ -22,10 +22,6 @@ import java.util.Collections;
 import java.util.Set;
 import java.util.Objects;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Evolving;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
-
 import org.apache.tez.common.Preconditions;
 
 /**
@@ -33,11 +29,8 @@ import org.apache.tez.common.Preconditions;
  * The system will make a best-effort attempt to run the tasks 
  * close to the specified locations.
  */
-@Public
-@Evolving
 public class TaskLocationHint {
 
-  @Unstable
   /**
    * Specifies location affinity to the given vertex and given task in that vertex
    */

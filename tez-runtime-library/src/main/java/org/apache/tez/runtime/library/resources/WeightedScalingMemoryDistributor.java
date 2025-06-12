@@ -26,9 +26,6 @@ import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.runtime.common.resources.InitialMemoryAllocator;
@@ -40,7 +37,6 @@ import org.apache.tez.runtime.library.input.UnorderedKVInput;
 import org.apache.tez.runtime.library.output.OrderedPartitionedKVOutput;
 import org.apache.tez.runtime.library.output.UnorderedPartitionedKVOutput;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.tez.common.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -56,8 +52,6 @@ import com.google.common.collect.Maps;
  * SortedShuffle will be given 20 times more; both may be scaled down to fit within the JVM though.
  *
  */
-@Public
-@Unstable
 public class WeightedScalingMemoryDistributor implements InitialMemoryAllocator {
 
   private static final Logger LOG = LoggerFactory.getLogger(WeightedScalingMemoryDistributor.class);
@@ -74,8 +68,6 @@ public class WeightedScalingMemoryDistributor implements InitialMemoryAllocator 
   public WeightedScalingMemoryDistributor() {
   }
 
-  @Private
-  @VisibleForTesting
   public enum RequestType {
     PARTITIONED_UNSORTED_OUTPUT, UNSORTED_INPUT, UNSORTED_OUTPUT, SORTED_OUTPUT,
     SORTED_MERGED_INPUT, PROCESSOR, OTHER

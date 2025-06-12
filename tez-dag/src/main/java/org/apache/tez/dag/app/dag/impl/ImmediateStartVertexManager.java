@@ -122,13 +122,15 @@ public class ImmediateStartVertexManager extends VertexManagerPlugin {
   @Override
   public void onVertexStateUpdated(VertexStateUpdate stateUpdate) {
     Preconditions.checkArgument(stateUpdate.getVertexState() == VertexState.CONFIGURED,
-        "Received incorrect state notification : " + stateUpdate.getVertexState() + " for vertex: "
-            + stateUpdate.getVertexName() + " in vertex: " + getContext().getVertexName());
+        "Received incorrect state notification : {} for vertex: {} in vertex: {}",
+        stateUpdate.getVertexState(), stateUpdate.getVertexName(), getContext().getVertexName());
     Preconditions.checkArgument(srcVertexConfigured.containsKey(stateUpdate.getVertexName()),
-        "Received incorrect vertex notification : " + stateUpdate.getVertexState() + " for vertex: "
-            + stateUpdate.getVertexName() + " in vertex: " + getContext().getVertexName());
-    Preconditions.checkState(srcVertexConfigured.put(stateUpdate.getVertexName(), true)
-        .booleanValue() == false);
+        "Received incorrect vertex notification : {} for vertex: {} in vertex: {}",
+        stateUpdate.getVertexState(), stateUpdate.getVertexName(), getContext().getVertexName());
+
+    // TODO: This Preconditions.checkState() is effectful.
+    Preconditions.checkState(!srcVertexConfigured.put(stateUpdate.getVertexName(), true).booleanValue());
+
     LOG.info("Received configured notification: {} for vertex: {} in vertex: {}",
         stateUpdate.getVertexState(), stateUpdate.getVertexName(), getContext().getVertexName());
     scheduleTasks();

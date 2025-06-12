@@ -17,7 +17,6 @@
  */
 package org.apache.tez.runtime.library.cartesianproduct;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.UnsafeByteOperations;
 import org.apache.tez.common.Preconditions;
 import org.apache.tez.dag.api.EdgeManagerPluginContext;
@@ -51,7 +50,6 @@ public class CartesianProductEdgeManager extends EdgeManagerPluginOnDemand {
     edgeManagerReal.initialize(config);
   }
 
-  @VisibleForTesting
   protected CartesianProductEdgeManagerReal getEdgeManagerReal() {
     return this.edgeManagerReal;
   }

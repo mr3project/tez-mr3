@@ -20,7 +20,6 @@ package org.apache.tez.mapreduce.input.base;
 
 import org.apache.tez.common.Preconditions;
 
-import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.TaskAttemptID;
@@ -30,10 +29,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.tez.common.TezUtils;
 import org.apache.tez.common.counters.TaskCounter;
 import org.apache.tez.common.counters.TezCounter;
-import org.apache.tez.dag.records.TezDAGID;
-import org.apache.tez.dag.records.TezTaskAttemptID;
-import org.apache.tez.dag.records.TezTaskID;
-import org.apache.tez.dag.records.TezVertexID;
 import org.apache.tez.mapreduce.hadoop.MRInputHelpers;
 import org.apache.tez.mapreduce.hadoop.MRJobConfig;
 import org.apache.tez.mapreduce.input.MRInput;
@@ -47,7 +42,6 @@ import java.io.IOException;
 import java.util.List;
 
 
-@InterfaceAudience.Private
 public abstract class MRInputBase extends AbstractLogicalInput {
 
   protected JobConf jobConf;
@@ -62,7 +56,6 @@ public abstract class MRInputBase extends AbstractLogicalInput {
     return null;
   }
 
-  @InterfaceAudience.Private
   protected boolean useNewApi;
 
   public List<Event> initialize() throws IOException {
@@ -71,7 +64,7 @@ public abstract class MRInputBase extends AbstractLogicalInput {
         MRInputHelpers.parseMRInputPayload(getContext().getUserPayload());
     boolean isGrouped = mrUserPayload.getGroupingEnabled();
     Preconditions.checkArgument(mrUserPayload.hasSplits() == false,
-        "Split information not expected in " + this.getClass().getName());
+        "Split information not expected in {}", this.getClass().getName());
     Configuration conf = TezUtils.createConfFromByteString(mrUserPayload.getConfigurationBytes());
     this.jobConf = new JobConf(conf);
     useNewApi = this.jobConf.getUseNewMapper();

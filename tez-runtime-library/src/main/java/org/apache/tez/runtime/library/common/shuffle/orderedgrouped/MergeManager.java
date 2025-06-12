@@ -547,9 +547,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       if (fileChunk.getPath().equals(file.getPath())) {
         // ensure offsets are not the same.
         Preconditions.checkArgument(fileChunk.getOffset() != file.getOffset(),
-            "Can't have a file with same path and offset."
-            + "OldFilePath=" + fileChunk.getPath() + ", OldFileOffset=" + fileChunk.getOffset() +
-            ", newFilePath=" + file.getPath() + ", newFileOffset=" + file.getOffset());
+            "Can't have a file with same path and offset. OldFilePath={}, OldFileOffset={}, newFilePath={}, newFileOffset={}",
+          fileChunk.getPath(), fileChunk.getOffset(), file.getPath(), file.getOffset());
       }
     }
 

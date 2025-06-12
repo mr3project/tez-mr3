@@ -600,8 +600,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     public SpillCallable(List<WrappedBuffer> filledBuffers, CompressionCodec codec,
         TezCounter numRecordsCounter, SpillPathDetails spillPathDetails) {
       this(filledBuffers, codec, numRecordsCounter, spillPathDetails.spillIndex);
-      Preconditions.checkArgument(spillPathDetails.outputFilePath != null, "Spill output file "
-          + "path can not be null");
+      Preconditions.checkArgument(spillPathDetails.outputFilePath != null, "Spill output file path can not be null");
       this.spillPathDetails = spillPathDetails;
     }
 

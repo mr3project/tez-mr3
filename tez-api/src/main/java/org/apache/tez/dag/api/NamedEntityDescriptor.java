@@ -19,13 +19,11 @@ import java.io.DataOutput;
 import java.io.IOException;
 
 import org.apache.tez.common.Preconditions;
-import org.apache.hadoop.classification.InterfaceAudience;
 
 @SuppressWarnings("unchecked")
 public class NamedEntityDescriptor<T extends NamedEntityDescriptor<T>> extends EntityDescriptor<NamedEntityDescriptor<T>>  {
   private final String entityName;
 
-  @InterfaceAudience.Private
   public NamedEntityDescriptor(String entityName, String className) {
     super(className);
     Preconditions.checkArgument(entityName != null, "EntityName must be specified");

@@ -37,11 +37,11 @@ public class Grouper {
 
   public Grouper init(int numItem, int numGroup) {
     Preconditions.checkArgument(numGroup > 0,
-      "Number of groups is " + numGroup + ". Should be positive");
+      "Number of groups should be positive: {}", numGroup);
     Preconditions.checkArgument(numItem > 0,
-      "Number of items is " + numItem + ". Should be positive");
+      "Number of items should be positeive: {}", numItem);
     Preconditions.checkArgument(numItem >= numGroup,
-      "Num of groups + " + numGroup + " shouldn't be more than number of items " + numItem);
+      "Num of groups shouldn't be more than number of items: {}, {}", numGroup, numItem);
     this.numItem = numItem;
     this.numGroup = numGroup;
     this.itemPerGroup1 = numItem / numGroup;
@@ -53,7 +53,7 @@ public class Grouper {
   }
 
   public int getFirstItemInGroup(int groupId) {
-    Preconditions.checkArgument(0 <= groupId && groupId < numGroup, "Invalid groupId " + groupId);
+    Preconditions.checkArgument(0 <= groupId && groupId < numGroup, "Invalid groupId {}", groupId);
     if (groupId < numGroup1) {
       return groupId * itemPerGroup1;
     } else {
@@ -62,17 +62,17 @@ public class Grouper {
   }
 
   public int getNumItemsInGroup(int groupId) {
-    Preconditions.checkArgument(0 <= groupId && groupId < numGroup, "Invalid groupId" + groupId);
+    Preconditions.checkArgument(0 <= groupId && groupId < numGroup, "Invalid groupId {}", groupId);
     return groupId < numGroup1 ? itemPerGroup1 : itemPerGroup2;
   }
 
   public int getLastItemInGroup(int groupId) {
-    Preconditions.checkArgument(0 <= groupId && groupId < numGroup, "Invalid groupId" + groupId);
+    Preconditions.checkArgument(0 <= groupId && groupId < numGroup, "Invalid groupId {}", groupId);
     return getFirstItemInGroup(groupId) + getNumItemsInGroup(groupId) - 1;
   }
 
   public int getGroupId(int itemId) {
-    Preconditions.checkArgument(0 <= itemId && itemId < numItem, "Invalid itemId" + itemId);
+    Preconditions.checkArgument(0 <= itemId && itemId < numItem, "Invalid itemId {}", itemId);
     if (itemId < itemPerGroup1 * numGroup1) {
       return itemId/ itemPerGroup1;
     } else {
@@ -81,8 +81,8 @@ public class Grouper {
   }
 
   public boolean isInGroup(int itemId, int groupId) {
-    Preconditions.checkArgument(0 <= groupId && groupId < numGroup, "Invalid groupId" + groupId);
-    Preconditions.checkArgument(0 <= itemId && itemId < numItem, "Invalid itemId" + itemId);
+    Preconditions.checkArgument(0 <= groupId && groupId < numGroup, "Invalid groupId {}", groupId);
+    Preconditions.checkArgument(0 <= itemId && itemId < numItem, "Invalid itemId {}", itemId);
     return getFirstItemInGroup(groupId) <= itemId
       && itemId < getFirstItemInGroup(groupId) + getNumItemsInGroup(groupId);
   }

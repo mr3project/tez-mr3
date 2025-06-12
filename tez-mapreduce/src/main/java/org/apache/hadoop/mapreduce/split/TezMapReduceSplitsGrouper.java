@@ -33,8 +33,6 @@ import org.apache.tez.mapreduce.grouper.SplitSizeEstimatorWrapperMapReduce;
 import org.apache.tez.mapreduce.grouper.TezSplitGrouper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.InputSplit;
 
@@ -43,8 +41,6 @@ import org.apache.hadoop.mapreduce.InputSplit;
  * on multiple parameters. It creates {@link TezGroupedSplit}
  * to wrap the each group of real InputSplits
  */
-@Public
-@Evolving
 public class TezMapReduceSplitsGrouper extends TezSplitGrouper {
   private static final Logger LOG = LoggerFactory.getLogger(TezMapReduceSplitsGrouper.class);
 
