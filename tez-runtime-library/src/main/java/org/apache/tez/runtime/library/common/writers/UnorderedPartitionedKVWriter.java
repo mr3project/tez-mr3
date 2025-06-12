@@ -147,8 +147,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   private int numInitializedBuffers;
   private WrappedBuffer currentBuffer;
 
-  private final List<SpillInfo> spillInfoList = Collections
-      .synchronizedList(new ArrayList<SpillInfo>());
+  private final List<SpillInfo> spillInfoList = Collections.synchronizedList(new ArrayList<SpillInfo>());
 
   private Semaphore availableSlots;
   private ListeningExecutorService spillExecutor;
@@ -270,10 +269,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     valSerializer.open(dos);
 
     if (!skipBuffers) {
-      // Allow unit tests to control the buffer sizes.
-      int maxSingleBufferSizeBytes = conf.getInt(
-          TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_OUTPUT_MAX_PER_BUFFER_SIZE_BYTES,
-          Integer.MAX_VALUE);
+      // originally the default value of TEZ_RUNTIME_UNORDERED_OUTPUT_MAX_PER_BUFFER_SIZE_BYTES
+      int maxSingleBufferSizeBytes = Integer.MAX_VALUE;
       computeNumBuffersAndSize(maxSingleBufferSizeBytes);
 
       availableBuffers = new LinkedBlockingQueue<WrappedBuffer>();
