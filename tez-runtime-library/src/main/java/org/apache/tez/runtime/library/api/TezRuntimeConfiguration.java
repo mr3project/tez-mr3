@@ -225,7 +225,7 @@ public class TezRuntimeConfiguration {
   @ConfigurationProperty(type = "integer")
   public static final String TEZ_RUNTIME_SHUFFLE_CONNECT_TIMEOUT = TEZ_RUNTIME_PREFIX +
       "shuffle.connect.timeout";
-  public static final int TEZ_RUNTIME_SHUFFLE_STALLED_COPY_TIMEOUT_DEFAULT = 12500;
+  public static final int TEZ_RUNTIME_SHUFFLE_STALLED_COPY_TIMEOUT_DEFAULT = 27500;
 
   @ConfigurationProperty(type = "boolean")
   public static final String TEZ_RUNTIME_SHUFFLE_KEEP_ALIVE_ENABLED = TEZ_RUNTIME_PREFIX +
@@ -404,17 +404,17 @@ public class TezRuntimeConfiguration {
   @ConfigurationProperty(type = "integer")
   public static final String TEZ_RUNTIME_SHUFFLE_SPECULATIVE_FETCH_WAIT_MILLIS = TEZ_RUNTIME_PREFIX +
       "shuffle.speculative.fetch.wait.millis";
-  public static final int TEZ_RUNTIME_SHUFFLE_SPECULATIVE_FETCH_WAIT_MILLIS_DEFAULT = 30 * 1000;
+  public static final int TEZ_RUNTIME_SHUFFLE_SPECULATIVE_FETCH_WAIT_MILLIS_DEFAULT = 12500;
 
   @ConfigurationProperty(type = "integer")
   public static final String TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_THRESHOLD_MILLIS = TEZ_RUNTIME_PREFIX +
       "shuffle.stuck.fetcher.threshold.millis";
-  public static final int TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_THRESHOLD_MILLIS_DEFAULT = 3000;
+  public static final int TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_THRESHOLD_MILLIS_DEFAULT = 2500;
 
   @ConfigurationProperty(type = "integer")
   public static final String TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_RELEASE_MILLIS = TEZ_RUNTIME_PREFIX +
       "shuffle.stuck.fetcher.release.millis";
-  public static final int TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_RELEASE_MILLIS_DEFAULT = 15 * 1000;
+  public static final int TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_RELEASE_MILLIS_DEFAULT = 7500;
 
   // if set to true, automatically set:
   //   1. tez.runtime.optimize.local.fetch = false
