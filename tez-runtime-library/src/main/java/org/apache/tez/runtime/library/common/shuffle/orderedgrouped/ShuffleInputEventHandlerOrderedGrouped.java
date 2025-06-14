@@ -53,7 +53,6 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
   private final boolean compositeFetch;
   private final Inflater inflater;
 
-  private final AtomicInteger nextToLogEventCount = new AtomicInteger(1);
   private final AtomicInteger numDmeEvents = new AtomicInteger(0);
   private final AtomicInteger numObsoletionEvents = new AtomicInteger(0);
   private final AtomicInteger numDmeEventsNoData = new AtomicInteger(0);
@@ -142,15 +141,19 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
       numObsoletionEvents.incrementAndGet();
       processTaskFailedEvent((InputFailedEvent) event);
     }
-    if (numDmeEvents.get() + numObsoletionEvents.get() == nextToLogEventCount.get()) {
+
+    if (numDmeEvents.get() == shuffleScheduler.getNumInputs() ||
+        numDmeEvents.get() + numObsoletionEvents.get() == shuffleScheduler.getNumInputs() ||
+        numDmeEvents.get() - numObsoletionEvents.get() == shuffleScheduler.getNumInputs()) {
       logProgress(false);
-      nextToLogEventCount.set(shuffleScheduler.getNumInputs());   // print after receiving all events
     }
   }
 
-  private void processDataMovementEvent(DataMovementEvent dmEvent, DataMovementEventPayloadProto shufflePayload, BitSet emptyPartitionsBitSet) {
+  private void processDataMovementEvent(
+      DataMovementEvent dmEvent, DataMovementEventPayloadProto shufflePayload, BitSet emptyPartitionsBitSet) {
     int partitionId = dmEvent.getSourceIndex();
-    CompositeInputAttemptIdentifier srcAttemptIdentifier = constructInputAttemptIdentifier(dmEvent.getTargetIndex(), 1, dmEvent.getVersion(), shufflePayload);
+    CompositeInputAttemptIdentifier srcAttemptIdentifier = constructInputAttemptIdentifier(
+        dmEvent.getTargetIndex(), 1, dmEvent.getVersion(), shufflePayload);
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("DME srcIdx: " + partitionId + ", targetIdx: " + dmEvent.getTargetIndex()
@@ -162,9 +165,8 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
       try {
         if (emptyPartitionsBitSet.get(partitionId)) {
           if (LOG.isDebugEnabled()) {
-            LOG.debug(
-                "Source partition: " + partitionId + " did not generate any data. SrcAttempt: ["
-                    + srcAttemptIdentifier + "]. Not fetching.");
+            LOG.debug("Source partition: " + partitionId + " did not generate any data. SrcAttempt: ["
+              + srcAttemptIdentifier + "]. Not fetching.");
           }
           numDmeEventsNoData.getAndIncrement();
           shuffleScheduler.fetchSucceeded(srcAttemptIdentifier.expand(0), null, 0, 0, 0);
@@ -227,9 +229,6 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
   private void processTaskFailedEvent(InputFailedEvent ifEvent) {
     InputAttemptIdentifier taIdentifier = new InputAttemptIdentifier(ifEvent.getTargetIndex(), ifEvent.getVersion());
     shuffleScheduler.obsoleteKnownInput(taIdentifier);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Obsoleting output of src-task: " + taIdentifier);
-    }
   }
 
   /**

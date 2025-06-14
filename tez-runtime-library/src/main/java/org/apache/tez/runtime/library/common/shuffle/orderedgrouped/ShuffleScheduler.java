@@ -34,7 +34,6 @@ import org.apache.tez.runtime.api.events.InputReadErrorEvent;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.TezRuntimeUtils;
-import org.apache.tez.runtime.library.common.shuffle.InputHost;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleClient;
 import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.MapOutput.Type;
 
@@ -454,5 +453,12 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
     synchronized (completedInputSet) {
       return completedInputSet.get(inputIndex);
     }
+  }
+
+  @Override
+  public void obsoleteKnownInput(InputAttemptIdentifier srcAttempt) {
+    super.obsoleteKnownInput(srcAttempt);
+    LOG.info("ShuffleScheduler: shuffleClientId={}, numInputs={}, remaining={}",
+        shuffleClientId, numInputs, remainingMaps.get());
   }
 }
