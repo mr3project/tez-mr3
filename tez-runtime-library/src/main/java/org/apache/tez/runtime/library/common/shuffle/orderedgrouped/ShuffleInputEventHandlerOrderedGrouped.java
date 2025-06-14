@@ -87,7 +87,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
     s.append(", numDmeEventsSeen=" + numDmeEvents.get());
     s.append(", numDmeEventsSeenWithNoData=" + numDmeEventsNoData.get());
     s.append(", numObsoletionEventsSeen=" + numObsoletionEvents.get());
-    s.append(updateOnClose == true ? ", updateOnClose" : "");
+    s.append(updateOnClose ? ", updateOnClose" : "");
     LOG.info(s.toString());
   }
 

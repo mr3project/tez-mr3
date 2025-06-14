@@ -68,7 +68,6 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
   private final boolean compositeFetch;
   private final Inflater inflater;
 
-  private final AtomicInteger nextToLogEventCount = new AtomicInteger(1);
   private final AtomicInteger numDmeEvents = new AtomicInteger(0);
   private final AtomicInteger numObsoletionEvents = new AtomicInteger(0);
   private final AtomicInteger numDmeEventsNoData = new AtomicInteger(0);
@@ -153,9 +152,11 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
     } else {
       throw new TezUncheckedException("Unexpected event type: " + event.getClass().getName());
     }
-    if (numDmeEvents.get() + numObsoletionEvents.get() == nextToLogEventCount.get()) {
+
+    if (numDmeEvents.get() == shuffleManager.getNumInputs() ||
+      numDmeEvents.get() + numObsoletionEvents.get() == shuffleManager.getNumInputs() ||
+      numDmeEvents.get() - numObsoletionEvents.get() == shuffleManager.getNumInputs()) {
       logProgress(false);
-      nextToLogEventCount.set(shuffleManager.getNumInputs());   // print after receiving all events
     }
   }
 
@@ -166,7 +167,7 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
     s.append(", numDmeEventsSeen=" + numDmeEvents.get());
     s.append(", numDmeEventsSeenWithNoData=" + numDmeEventsNoData.get());
     s.append(", numObsoletionEventsSeen=" + numObsoletionEvents.get());
-    s.append(updateOnClose == true ? ", updateOnClose" : "");
+    s.append(updateOnClose ? ", updateOnClose" : "");
     LOG.info(s.toString());
   }
 
