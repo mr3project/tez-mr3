@@ -197,12 +197,12 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
   }
 
   public void addKnownMapOutput(
-      String inputHostName, int port, int partitionId, CompositeInputAttemptIdentifier srcAttempt) {
+      String hostName, String containerId, int port, int partitionId, CompositeInputAttemptIdentifier srcAttempt) {
     if (!validateInputAttemptForPipelinedShuffle(srcAttempt, false)) {
       return;
     }
 
-    shuffleServer.addKnownInput(this, inputHostName, port, srcAttempt, partitionId);
+    shuffleServer.addKnownInput(this, hostName, containerId, port, srcAttempt, partitionId);
   }
 
   public synchronized void fetchSucceeded(

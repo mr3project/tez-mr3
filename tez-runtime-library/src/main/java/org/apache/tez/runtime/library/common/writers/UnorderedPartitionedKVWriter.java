@@ -936,13 +936,11 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       boolean isLastSpill, String pathComponent, BitSet emptyPartitions)
       throws IOException {
 
-    DataMovementEventPayloadProto.Builder payloadBuilder = DataMovementEventPayloadProto
-        .newBuilder();
+    DataMovementEventPayloadProto.Builder payloadBuilder = DataMovementEventPayloadProto.newBuilder();
     if (numPartitions == 1) {
       payloadBuilder.setNumRecord((int) outputRecordsCounter.getValue());
     }
 
-    String host = getHost();
     if (emptyPartitions.cardinality() != 0) {
       // Empty partitions exist
       ByteString emptyPartitionsByteString =
@@ -953,7 +951,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
     if (emptyPartitions.cardinality() != numPartitions) {
       // Populate payload only if at least 1 partition has data
+      String host = outputContext.getExecutionContext().getHostName();
+      String containerId = outputContext.getExecutionContext().getContainerId();
       payloadBuilder.setHost(host);
+      payloadBuilder.setContainerId(containerId);
 
       int[] shufflePorts = getShufflePort();
       payloadBuilder.setNumPorts(shufflePorts.length);
@@ -1595,10 +1596,6 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       this.spillRecord = spillRecord;
       this.outPath = outPath;
     }
-  }
-
-  String getHost() {
-    return outputContext.getExecutionContext().getHostName();
   }
 
   int[] getShufflePort() throws IOException {

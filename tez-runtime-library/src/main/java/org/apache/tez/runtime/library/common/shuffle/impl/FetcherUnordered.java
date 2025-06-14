@@ -249,8 +249,8 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
           pendingInputs.remove(failedFetch);
         }
       }
-      return new HostFetchResult(new FetchResult(
-          shuffleManagerId, host, port, pendingInputs),
+      return new HostFetchResult(
+          new FetchResult(shuffleManagerId, inputHost, pendingInputs),
           failedFetches, true);
     }
 
@@ -290,8 +290,8 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
             new InputAttemptIdentifier[]{ pendingInputsSeq.getInputs().get(currentIndex) };
         // It is okay to set pendingInputs[] to include all remaining IAIs, including failedFetches[0],
         // because call() removes failedInputs[0] from pendingInputs[].
-        return new HostFetchResult(new FetchResult(
-            shuffleManagerId, host, port, buildInputMapFromIndex(currentIndex)),
+        return new HostFetchResult(
+            new FetchResult(shuffleManagerId, inputHost, buildInputMapFromIndex(currentIndex)),
             failedFetches, false);
       }
     } catch (InterruptedException e) {
@@ -391,20 +391,20 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         }
         return getResultWithNoPendingInputsNoFailedInputBecauseAlreadyShutdown();
       }
-      return new HostFetchResult(new FetchResult(
-          shuffleManagerId, host, port, buildInputMapFromIndex(index)),
+      return new HostFetchResult(
+          new FetchResult(shuffleManagerId, inputHost, buildInputMapFromIndex(index)),
           failedInputs, false);
     } else {
       assert failedInputs == null;
-      return new HostFetchResult(new FetchResult(
-          shuffleManagerId, host, port, null),
+      return new HostFetchResult(
+          new FetchResult(shuffleManagerId, inputHost, null),
           null, false);
     }
   }
 
   private HostFetchResult getResultWithNoPendingInputsNoFailedInputBecauseAlreadyShutdown() {
-    return new HostFetchResult(new FetchResult(
-        shuffleManagerId, host, port, null),
+    return new HostFetchResult(
+        new FetchResult(shuffleManagerId, inputHost, null),
         null, false);
   }
 
@@ -486,13 +486,13 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         return getResultWithNoPendingInputsNoFailedInputBecauseAlreadyShutdown();
       } else {
         return new HostFetchResult(new FetchResult(
-            shuffleManagerId, host, port, null),
+            shuffleManagerId, inputHost, null),
             failedFetches.toArray(new InputAttemptIdentifier[failedFetches.size()]), false);
       }
     } else {
       // nothing needs to be done to requeue remaining entries
-      return new HostFetchResult(new FetchResult(
-          shuffleManagerId, host, port, null),
+      return new HostFetchResult(
+          new FetchResult(shuffleManagerId, inputHost, null),
           null, false);
     }
   }

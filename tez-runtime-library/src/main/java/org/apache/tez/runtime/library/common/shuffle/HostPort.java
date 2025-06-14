@@ -23,10 +23,12 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 public class HostPort {
 
   private final String host;
+  private final String containerId;
   private final int port;
 
-  public HostPort(String host, int port) {
+  public HostPort(String host, String containerId, int port) {
     this.host = host;
+    this.containerId = containerId;
     this.port = port;
   }
 
@@ -35,6 +37,7 @@ public class HostPort {
     final int prime = 31;
     int result = 1;
     result = prime * result + ((host == null) ? 0 : host.hashCode());
+    result = prime * result + ((containerId == null) ? 0 : containerId.hashCode());
     result = prime * result + port;
     return result;
   }
@@ -55,6 +58,11 @@ public class HostPort {
       return false;
     if (port != other.port)
       return false;
+    if (containerId == null) {
+      if (other.containerId != null)
+        return false;
+    } else if (!containerId.equals(other.containerId))
+      return false;
     return true;
   }
 
@@ -62,12 +70,12 @@ public class HostPort {
     return host;
   }
 
-  public int getPort() {
-    return port;
+  public String getContainerId() {
+    return containerId;
   }
 
-  public String getIdentifier() {
-    return host + ":" + port;
+  public int getPort() {
+    return port;
   }
 
   @Override

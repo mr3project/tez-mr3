@@ -545,9 +545,10 @@ public class ShuffleServer implements FetcherCallback {
     LOG.info("Unregistered ShuffleClient: {}", shuffleClientId);
   }
 
-  public void addKnownInput(ShuffleClient<?> shuffleClient, String hostName, int port,
+  public void addKnownInput(ShuffleClient<?> shuffleClient,
+                            String hostName, String containerId, int port,
                             CompositeInputAttemptIdentifier srcAttemptIdentifier, int partitionId) {
-    HostPort identifier = new HostPort(hostName, port);
+    HostPort identifier = new HostPort(hostName, containerId, port);
     InputHost host = knownSrcHosts.get(identifier);
     if (host == null) {
       host = new InputHost(identifier);
@@ -668,7 +669,7 @@ public class ShuffleServer implements FetcherCallback {
 
           Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs = result.getPendingInputs();
           if (pendingInputs != null) {
-            HostPort identifier = new HostPort(result.getHost(), result.getPort());
+            HostPort identifier = result.getHostPort();
             InputHost inputHost = knownSrcHosts.get(identifier);
             if (inputHost != null) {  // can be null (in rare cases) if unregister() has been called
               for (Map.Entry<InputAttemptIdentifier, InputHost.PartitionRange > input : pendingInputs.entrySet()) {

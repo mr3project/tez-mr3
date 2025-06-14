@@ -28,6 +28,7 @@ import java.util.zip.Inflater;
 import com.google.protobuf.UnsafeByteOperations;
 import org.apache.tez.runtime.api.events.CompositeRoutedDataMovementEvent;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
+import org.apache.tez.util.StringInterner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.io.compress.CompressionCodec;
@@ -169,7 +170,8 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
     LOG.info(s.toString());
   }
 
-  private void processDataMovementEvent(DataMovementEvent dme, DataMovementEventPayloadProto shufflePayload, BitSet emptyPartitionsBitSet) throws IOException {
+  private void processDataMovementEvent(
+      DataMovementEvent dme, DataMovementEventPayloadProto shufflePayload, BitSet emptyPartitionsBitSet) throws IOException {
     int srcIndex = dme.getSourceIndex();
 
     if (LOG.isDebugEnabled()) {
@@ -196,8 +198,8 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
       shuffleManager.updateApproximateInputRecords(shufflePayload.getNumRecord());
     }
 
-    CompositeInputAttemptIdentifier srcAttemptIdentifier = constructInputAttemptIdentifier(dme.getTargetIndex(), 1, dme.getVersion(),
-        shufflePayload);
+    CompositeInputAttemptIdentifier srcAttemptIdentifier = constructInputAttemptIdentifier(
+        dme.getTargetIndex(), 1, dme.getVersion(), shufflePayload);
 
     processShufflePayload(shufflePayload, srcAttemptIdentifier, srcIndex, dme.getTargetIndex());
   }
@@ -283,8 +285,10 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
 
       LOG.debug("Payload via DME : " + srcAttemptIdentifier);
     } else {
-      shuffleManager.addKnownInput(shufflePayload.getHost(), port,
-          srcAttemptIdentifier, partitionId);
+      shuffleManager.addKnownInput(
+          StringInterner.intern(shufflePayload.getHost()),
+          StringInterner.intern(shufflePayload.getContainerId()),
+          port, srcAttemptIdentifier, partitionId);
     }
   }
 
@@ -308,7 +312,8 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
    * @param shufflePayload
    * @return CompositeInputAttemptIdentifier
    */
-  private CompositeInputAttemptIdentifier constructInputAttemptIdentifier(int targetIndex, int targetIndexCount, int version,
+  private CompositeInputAttemptIdentifier constructInputAttemptIdentifier(
+      int targetIndex, int targetIndexCount, int version,
       DataMovementEventPayloadProto shufflePayload) {
     String pathComponent = (shufflePayload.hasPathComponent()) ? shufflePayload.getPathComponent() : null;
     CompositeInputAttemptIdentifier srcAttemptIdentifier = null;

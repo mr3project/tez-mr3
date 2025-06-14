@@ -25,16 +25,14 @@ import java.util.Map;
 public class FetchResult {
 
   private final Long shuffleClientId;
-  private final String host;
-  private final int port;
+  private final HostPort hostPort;
 
   private Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs;
 
-  public FetchResult(Long shuffleClientId, String host, int port,
+  public FetchResult(Long shuffleClientId, HostPort hostPort,
                      Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs) {
     this.shuffleClientId = shuffleClientId;
-    this.host = host;
-    this.port = port;
+    this.hostPort = hostPort;
     this.pendingInputs = pendingInputs;
   }
 
@@ -42,12 +40,8 @@ public class FetchResult {
     return shuffleClientId;
   }
 
-  public String getHost() {
-    return host;
-  }
-
-  public int getPort() {
-    return port;
+  public HostPort getHostPort() {
+    return hostPort;
   }
 
   public Map<InputAttemptIdentifier, InputHost.PartitionRange> getPendingInputs() {

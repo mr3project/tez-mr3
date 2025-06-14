@@ -177,8 +177,10 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
       }
     }
     int port = getShufflePort(shufflePayload, dmEvent.getTargetIndex());
-    shuffleScheduler.addKnownMapOutput(StringInterner.intern(shufflePayload.getHost()), port,
-        partitionId, srcAttemptIdentifier);
+    shuffleScheduler.addKnownMapOutput(
+        StringInterner.intern(shufflePayload.getHost()),
+        StringInterner.intern(shufflePayload.getContainerId()),
+        port, partitionId, srcAttemptIdentifier);
   }
 
   private void processCompositeRoutedDataMovementEvent(
@@ -217,8 +219,10 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
     }
 
     int port = getShufflePort(shufflePayload, crdmEvent.getTargetIndex());
-    shuffleScheduler.addKnownMapOutput(StringInterner.intern(shufflePayload.getHost()), port,
-        partitionId, compositeInputAttemptIdentifier);
+    shuffleScheduler.addKnownMapOutput(
+        StringInterner.intern(shufflePayload.getHost()),
+        StringInterner.intern(shufflePayload.getContainerId()),
+        port, partitionId, compositeInputAttemptIdentifier);
   }
 
   private int getShufflePort(DataMovementEventPayloadProto shufflePayload, int targetIndex) {

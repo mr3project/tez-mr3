@@ -182,11 +182,8 @@ public class ShuffleUtils {
 
     // Sanity check
     if (bytesLeft != 0) {
-      throw new IOException("Incomplete map output received for " +
-          identifier + " from " +
-          hostIdentifier + " (" + 
-          bytesLeft + " bytes missing of " + 
-          compressedLength + ")");
+      throw new IOException("Incomplete map output received for " + identifier + " from " + hostIdentifier +
+          " (" + bytesLeft + " bytes missing of " + compressedLength + ")");
     }
   }
 
@@ -310,7 +307,9 @@ public class ShuffleUtils {
 
     if (!sendEmptyPartitionDetails || outputGenerated) {
       String host = context.getExecutionContext().getHostName();
+      String containerId = context.getExecutionContext().getContainerId();
       payloadBuilder.setHost(host);
+      payloadBuilder.setContainerId(containerId);
 
       ByteBuffer shuffleMetadata = context.getServiceProviderMetaData(auxiliaryService);
       int[] shufflePorts = ShuffleUtils.deserializeShuffleProviderMetaData(shuffleMetadata);
@@ -347,8 +346,7 @@ public class ShuffleUtils {
                                                        OutputContext context,
                                                        boolean generateVmEvent,
                                                        boolean isCompositeEvent, Deflater deflater) throws IOException {
-    DataMovementEventPayloadProto.Builder payloadBuilder = DataMovementEventPayloadProto
-        .newBuilder();
+    DataMovementEventPayloadProto.Builder payloadBuilder = DataMovementEventPayloadProto.newBuilder();
 
     // Construct the VertexManager event if required.
     if (generateVmEvent) {
@@ -366,16 +364,15 @@ public class ShuffleUtils {
     LOG.info("Setting all {} partitions as empty for non-started output", numPhysicalOutputs);
     BitSet emptyPartitionDetails = new BitSet(numPhysicalOutputs);
     emptyPartitionDetails.set(0, numPhysicalOutputs, true);
-    ByteString emptyPartitionsBytesString =
-        TezCommonUtils.compressByteArrayToByteString(
-            TezUtilsInternal.toByteArray(emptyPartitionDetails), deflater);
+    ByteString emptyPartitionsBytesString = TezCommonUtils.compressByteArrayToByteString(
+        TezUtilsInternal.toByteArray(emptyPartitionDetails), deflater);
     payloadBuilder.setEmptyPartitions(emptyPartitionsBytesString);
     DataMovementEventPayloadProto payloadProto = payloadBuilder.build();
     ByteBuffer dmePayload = payloadProto.toByteString().asReadOnlyByteBuffer();
 
     if (isCompositeEvent) {
-      CompositeDataMovementEvent cdme =
-          CompositeDataMovementEvent.create(0, numPhysicalOutputs, dmePayload);
+      CompositeDataMovementEvent cdme = CompositeDataMovementEvent.create(
+          0, numPhysicalOutputs, dmePayload);
       eventList.add(cdme);
     } else {
       DataMovementEvent dme = DataMovementEvent.create(0, dmePayload);
@@ -384,8 +381,7 @@ public class ShuffleUtils {
   }
 
   public static DataMovementEvent generateEmptyDataMovementEvent(int numPhysicalOutputs) throws IOException {
-    DataMovementEventPayloadProto.Builder payloadBuilder = DataMovementEventPayloadProto
-      .newBuilder();
+    DataMovementEventPayloadProto.Builder payloadBuilder = DataMovementEventPayloadProto.newBuilder();
 
     BitSet emptyPartitionDetails = new BitSet(numPhysicalOutputs);
     emptyPartitionDetails.set(0, numPhysicalOutputs, true);

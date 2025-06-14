@@ -30,6 +30,7 @@ message DataMovementEventPayloadProto {
   optional bool last_event = 7; // Related to pipelined shuffle
   optional int32 spill_id = 8; //  Related to pipelined shuffle.
   optional int32 num_record = 9;
+  optional string containerId = 10;
 } 
 
 message DataProto {

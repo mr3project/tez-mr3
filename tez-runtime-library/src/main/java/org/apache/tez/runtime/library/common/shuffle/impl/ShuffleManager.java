@@ -175,7 +175,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
   /////////////////// Methods for ShuffleInputEventHandler
 
   // called sequentially from ShuffleInputEventHandler thread
-  public void addKnownInput(String hostName, int port,
+  public void addKnownInput(String hostName, String containerId, int port,
                             CompositeInputAttemptIdentifier srcAttemptIdentifier, int partitionId) {
     // Note: this check is optional.
     // if we skip this check, we call killSelf() after fetches with different attemptNumbers succeed
@@ -183,7 +183,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
       return;
     }
 
-    shuffleServer.addKnownInput(this, hostName, port, srcAttemptIdentifier, partitionId);
+    shuffleServer.addKnownInput(this, hostName, containerId, port, srcAttemptIdentifier, partitionId);
   }
 
   public void wakeupLoop() {

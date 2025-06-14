@@ -108,7 +108,7 @@ public class InputHost extends HostPort {
   private final static AtomicInteger numHostBlocked = new AtomicInteger(0);
 
   public InputHost(HostPort hostPort) {
-    super(hostPort.getHost(), hostPort.getPort());
+    super(hostPort.getHost(), hostPort.getContainerId(), hostPort.getPort());
     this.hasPendingInput = false;
     this.blockingFetchers = new HashSet<Fetcher<?>>();
   }

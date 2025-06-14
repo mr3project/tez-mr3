@@ -294,8 +294,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   }
 
   void setupParentThread(Thread shuffleSchedulerThread) {
-    LOG.info("Setting merger's parent thread to "
-        + shuffleSchedulerThread.getName());
+    LOG.info("Setting merger's parent thread to " + shuffleSchedulerThread.getName());
     if (this.memToMemMerger != null) {
       memToMemMerger.setParentThread(shuffleSchedulerThread);
     }
@@ -478,7 +477,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     inMemoryMapOutputs.add(mapOutput);
     trackAndLogCloseInMemoryFile(mapOutput);
 
-    commitMemory+= mapOutput.getSize();
+    commitMemory += mapOutput.getSize();
 
     if (commitMemory >= mergeThreshold) {
       startMemToDiskMerge();
