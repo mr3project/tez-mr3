@@ -279,7 +279,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         }
         return getResultWithNoPendingInputsNoFailedInputBecauseAlreadyShutdown();
       } else {
-        LOG.warn("{}: Fetch Failure while connecting from {} to: {}:{}, Informing ShuffleManager: {}",
+        LOG.warn("{}: Failed to verify reply after connecting from {} to {}:{}, informing ShuffleManager: {}",
             logIdentifier, fetcherConfig.localHostName, host, port,
             e.getClass().getName() + "/" + e.getMessage());
         // If we got a read error at this stage, it implies there was a problem with the first map,

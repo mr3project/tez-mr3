@@ -450,8 +450,8 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
             ie.getClass().getName() + "/" + ie.getMessage());
         shuffleErrorCounterGroup.connectionErrs.increment(1);
       } else {
-        LOG.warn("{}: Failed to verify reply after connecting from {} to {} with index = {}: {}", logIdentifier,
-            fetcherConfig.localHostName, host, currentIndex,
+        LOG.warn("{}: Failed to verify reply after connecting from {} to {} with index = {}, informing ShuffleScheduler: {}",
+            logIdentifier, fetcherConfig.localHostName, host, currentIndex,
             ie.getClass().getName() + "/" + ie.getMessage());
       }
 

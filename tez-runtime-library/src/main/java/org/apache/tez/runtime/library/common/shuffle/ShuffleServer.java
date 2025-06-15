@@ -668,11 +668,11 @@ public class ShuffleServer implements FetcherCallback {
           assert result.getShuffleClientId() == fetcher.getShuffleClient().getShuffleClientId();
 
           Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs = result.getPendingInputs();
-          if (pendingInputs != null) {
+          if (pendingInputs != null && !pendingInputs.isEmpty()) {
             HostPort identifier = result.getHostPort();
             InputHost inputHost = knownSrcHosts.get(identifier);
             if (inputHost != null) {  // can be null (in rare cases) if unregister() has been called
-              for (Map.Entry<InputAttemptIdentifier, InputHost.PartitionRange > input : pendingInputs.entrySet()) {
+              for (Map.Entry<InputAttemptIdentifier, InputHost.PartitionRange> input : pendingInputs.entrySet()) {
                 InputHost.PartitionRange range = input.getValue();
                 inputHost.addKnownInput(fetcher.getShuffleClient(),
                     range.getPartition(), range.getPartitionCount(), input.getKey(), pendingHosts);
