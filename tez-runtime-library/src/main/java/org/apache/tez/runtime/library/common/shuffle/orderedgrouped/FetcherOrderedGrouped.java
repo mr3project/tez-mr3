@@ -647,8 +647,9 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       }
       shuffleErrorCounterGroup.ioErrs.increment(1);
       if (srcAttemptId == null || mapOutput == null) {
-        LOG.info("{}: Failed to read map header {} decomp: {}, {}",
-            logIdentifier, srcAttemptId, decompressedLength, compressedLength, ioe);
+        LOG.info("{}: Failed to read map header {} ({}, {}): {}",
+            logIdentifier, srcAttemptId, decompressedLength, compressedLength,
+            ioe.getClass().getName() + "/" + ioe.getMessage());
         if (srcAttemptId == null) {
           // unlike Tez, do not fail all inputs starting from currentIndex -- fail only inputAttemptIdentifier
           return new InputAttemptIdentifier[]{ inputAttemptIdentifier };

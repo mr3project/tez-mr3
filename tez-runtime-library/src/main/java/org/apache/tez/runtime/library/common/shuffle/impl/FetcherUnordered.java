@@ -748,8 +748,9 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         throw new FetcherReadTimeoutException(ioe);
       }
       if (srcAttemptId == null || fetchedInput == null) {
-        LOG.info("{}: Failed to read map header {} decomp: {}, {}",
-            logIdentifier, srcAttemptId, decompressedLength, compressedLength, ioe);
+        LOG.info("{}: Failed to read map header {} ({}, {}): {}",
+            logIdentifier, srcAttemptId, decompressedLength, compressedLength,
+            ioe.getClass().getName() + "/" + ioe.getMessage());
         // Cleanup fetchedInput before returning.
         cleanupFetchedInput(fetchedInput);
         if (srcAttemptId == null) {
