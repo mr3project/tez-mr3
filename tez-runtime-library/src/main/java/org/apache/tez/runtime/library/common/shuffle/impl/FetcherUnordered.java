@@ -279,8 +279,9 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         }
         return getResultWithNoPendingInputsNoFailedInputBecauseAlreadyShutdown();
       } else {
-        LOG.warn("{}: Fetch Failure while connecting from {} to: {}:{}, Informing ShuffleManager",
-            logIdentifier, fetcherConfig.localHostName, host, port, e);
+        LOG.warn("{}: Fetch Failure while connecting from {} to: {}:{}, Informing ShuffleManager: {}",
+            logIdentifier, fetcherConfig.localHostName, host, port,
+            e.getClass().getName() + "/" + e.getMessage());
         // If we got a read error at this stage, it implies there was a problem with the first map,
         // typically lost map. So, penalize only that map and add the rest.
         // In this way, we can rerun one source Task at a time and avoid rerunning many source Tasks at once.

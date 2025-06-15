@@ -300,7 +300,6 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
 
   private void processInputFailedEvent(InputFailedEvent ife) {
     InputAttemptIdentifier srcAttemptIdentifier = new InputAttemptIdentifier(ife.getTargetIndex(), ife.getVersion());
-    LOG.info("Marking obsolete input: {} {}", inputContext.getSourceVertexName(), srcAttemptIdentifier);
     shuffleManager.obsoleteKnownInput(srcAttemptIdentifier);
   }
 

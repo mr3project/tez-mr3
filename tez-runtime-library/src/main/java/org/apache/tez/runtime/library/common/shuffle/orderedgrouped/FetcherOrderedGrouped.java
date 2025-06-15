@@ -440,19 +440,19 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         Thread.currentThread().interrupt();   // reset status
       }
       if (stopped) {
-        if (isDebugEnabled) {
-          LOG.debug("Not reporting fetch failure, since an Exception was caught after shutdown");
-        }
+        // Not reporting fetch failure, since an Exception was caught after shutdown
         return new HashMap<>();
       }
       shuffleErrorCounterGroup.ioErrs.increment(1);
       if (!connectSucceeded) {
-        LOG.warn("{}: Failed to connect from {} to {} with index = {}", logIdentifier, fetcherConfig.localHostName,
-            host, currentIndex, ie);
+        LOG.warn("{}: Failed to connect from {} to {} with index = {}: {}",
+            logIdentifier, fetcherConfig.localHostName, host, currentIndex,
+            ie.getClass().getName() + "/" + ie.getMessage());
         shuffleErrorCounterGroup.connectionErrs.increment(1);
       } else {
-        LOG.warn("{}: Failed to verify reply after connecting from {} to {} with index = {}", logIdentifier,
-            fetcherConfig.localHostName, host, currentIndex, ie);
+        LOG.warn("{}: Failed to verify reply after connecting from {} to {} with index = {}: {}", logIdentifier,
+            fetcherConfig.localHostName, host, currentIndex,
+            ie.getClass().getName() + "/" + ie.getMessage());
       }
 
       // similarly to FetcherUnordered, penalize only the first map and add the rest

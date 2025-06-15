@@ -343,18 +343,19 @@ public class InputHost extends HostPort {
 
   public synchronized void clearShuffleClientId(Long shuffleClientId) {
     Map<PartitionRange, List<InputAttemptIdentifier>> partitionMap = partitionToInputs.remove(shuffleClientId);
-    if (partitionMap != null) {
-      String logString = partitionMap.entrySet().stream()
-        .map(entry -> entry.getKey().toString() + " -> " + entry.getValue().size())
-        .collect(Collectors.joining(", ", "PartitionMap: {", "}"));
-      LOG.warn("{} still contains input for ShuffleClient {}: {}", this, shuffleClientId, logString);
+    if (LOG.isDebugEnabled()) {
+      if (partitionMap != null) {
+        String logString = partitionMap.entrySet().stream()
+          .map(entry -> entry.getKey().toString() + " -> " + entry.getValue().size())
+          .collect(Collectors.joining(", ", "PartitionMap: {", "}"));
+        LOG.warn("{} still contains input for ShuffleClient {}: {}", this, shuffleClientId, logString);
+      }
     }
   }
 
   public synchronized String toDetailedString() {
     return "HostPort=" + super.toString() + ", partitionToInputs=" +
-        partitionToInputs.keySet().stream().map(x -> x.toString())
-            .collect(Collectors.joining(", "));
+        partitionToInputs.keySet().stream().map(x -> x.toString()).collect(Collectors.joining(", "));
   }
   
   @Override

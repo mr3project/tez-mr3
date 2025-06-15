@@ -22,6 +22,7 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 @Private
 public class HostPort {
 
+  // Since containerId decides a unique host, use containerId in equals() and hashCode().
   private final String host;
   private final String containerId;
   private final int port;
@@ -36,7 +37,6 @@ public class HostPort {
   public int hashCode() {
     final int prime = 31;
     int result = 1;
-    result = prime * result + ((host == null) ? 0 : host.hashCode());
     result = prime * result + ((containerId == null) ? 0 : containerId.hashCode());
     result = prime * result + port;
     return result;
@@ -51,17 +51,12 @@ public class HostPort {
     if (getClass() != obj.getClass())
       return false;
     HostPort other = (HostPort) obj;
-    if (host == null) {
-      if (other.host != null)
-        return false;
-    } else if (!host.equals(other.host))
-      return false;
-    if (port != other.port)
-      return false;
     if (containerId == null) {
       if (other.containerId != null)
         return false;
     } else if (!containerId.equals(other.containerId))
+      return false;
+    if (port != other.port)
       return false;
     return true;
   }
@@ -80,6 +75,6 @@ public class HostPort {
 
   @Override
   public String toString() {
-    return host + ":" + port;
+    return host + ":" + containerId + ":" + port;
   }
 }

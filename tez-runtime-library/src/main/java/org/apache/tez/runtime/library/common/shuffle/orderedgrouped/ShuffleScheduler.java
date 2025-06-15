@@ -454,11 +454,4 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
       return completedInputSet.get(inputIndex);
     }
   }
-
-  @Override
-  public void obsoleteKnownInput(InputAttemptIdentifier srcAttempt) {
-    super.obsoleteKnownInput(srcAttempt);
-    LOG.info("ShuffleScheduler: shuffleClientId={}, numInputs={}, remaining={}",
-        shuffleClientId, numInputs, remainingMaps.get());
-  }
 }
