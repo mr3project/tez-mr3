@@ -28,25 +28,27 @@ public class FetcherConfig {
   public final long speculativeExecutionWaitMillis;
   public final int stuckFetcherThresholdMillis;
   public final int stuckFetcherReleaseMillis;
+  public final int maxSpeculativeFetchAttempts;
 
   public FetcherConfig(
-    Configuration codecConf,
-    boolean ifileReadAhead,
-    int ifileReadAheadLength,
-    JobTokenSecretManager jobTokenSecretMgr,
-    HttpConnectionParams httpConnectionParams,
-    RawLocalFileSystem localFs,
-    LocalDirAllocator localDirAllocator,
-    String localHostName,
-    boolean localDiskFetchEnabled,
-    boolean localDiskFetchOrderedEnabled,
-    boolean verifyDiskChecksum,
-    String auxiliaryService,
-    boolean compositeFetch,
-    boolean connectionFailAllInput,
-    long speculativeExecutionWaitMillis,
-    int stuckFetcherThresholdMillis,
-    int stuckFetcherReleaseMillis) {
+      Configuration codecConf,
+      boolean ifileReadAhead,
+      int ifileReadAheadLength,
+      JobTokenSecretManager jobTokenSecretMgr,
+      HttpConnectionParams httpConnectionParams,
+      RawLocalFileSystem localFs,
+      LocalDirAllocator localDirAllocator,
+      String localHostName,
+      boolean localDiskFetchEnabled,
+      boolean localDiskFetchOrderedEnabled,
+      boolean verifyDiskChecksum,
+      String auxiliaryService,
+      boolean compositeFetch,
+      boolean connectionFailAllInput,
+      long speculativeExecutionWaitMillis,
+      int stuckFetcherThresholdMillis,
+      int stuckFetcherReleaseMillis,
+      int maxSpeculativeFetchAttempts) {
     this.codecConf = codecConf;
     this.ifileReadAhead = ifileReadAhead;
     this.ifileReadAheadLength = ifileReadAheadLength;
@@ -66,6 +68,7 @@ public class FetcherConfig {
     this.speculativeExecutionWaitMillis = speculativeExecutionWaitMillis;
     this.stuckFetcherThresholdMillis = stuckFetcherThresholdMillis;
     this.stuckFetcherReleaseMillis = stuckFetcherReleaseMillis;
+    this.maxSpeculativeFetchAttempts = maxSpeculativeFetchAttempts;
   }
 
   public String toString() {
@@ -88,6 +91,8 @@ public class FetcherConfig {
     sb.append(stuckFetcherThresholdMillis);
     sb.append(", stuckFetcherReleaseMillis=");
     sb.append(stuckFetcherReleaseMillis);
+    sb.append(", maxSpeculativeFetchAttempts=");
+    sb.append(maxSpeculativeFetchAttempts);
     sb.append("]");
     return sb.toString();
   }

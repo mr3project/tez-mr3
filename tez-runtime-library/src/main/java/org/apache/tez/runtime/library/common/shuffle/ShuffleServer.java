@@ -164,7 +164,6 @@ public class ShuffleServer implements FetcherCallback {
 
   private final ExecutorService shutdownExecutor;
 
-  private static final int MAX_SPECULATIVE_FETCH_ATTEMPTS = 5;
   private static final int LAUNCH_LOOP_WAIT_PERIOD_MILLIS = 1000;
   private static final int CHECK_STUCK_FETCHER_PERIOD_MILLIS = 250;
 
@@ -428,7 +427,7 @@ public class ShuffleServer implements FetcherCallback {
 
   private void trySpeculativeFetcher(Fetcher<?> fetcher) {
     // create a speculative fetcher only if its ShuffleClient is still alive
-    if (fetcher.attempt < MAX_SPECULATIVE_FETCH_ATTEMPTS &&
+    if (fetcher.attempt < fetcherConfig.maxSpeculativeFetchAttempts &&
       shuffleClients.get(fetcher.getShuffleClient().getShuffleClientId()) != null) {
       Fetcher<?> speculativeFetcher = fetcher.createClone();
       runFetcher(speculativeFetcher);   // incurs concurrent modification

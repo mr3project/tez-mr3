@@ -104,6 +104,9 @@ public final class CodecUtils {
     int stuckFetcherReleaseMillis = conf.getInt(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_RELEASE_MILLIS,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_RELEASE_MILLIS_DEFAULT);
+    int maxSpeculativeFetchAttempts = conf.getInt(
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MAX_SPECULATIVE_FETCH_ATTEMPTS,
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MAX_SPECULATIVE_FETCH_ATTEMPTS_DEFAULT);
 
     return new FetcherConfig(
         codecConf,
@@ -122,7 +125,8 @@ public final class CodecUtils {
         connectionFailAllInput,
         speculativeExecutionWaitMillis,
         stuckFetcherThresholdMillis,
-        stuckFetcherReleaseMillis);
+        stuckFetcherReleaseMillis,
+        maxSpeculativeFetchAttempts);
   }
 
   private static Configuration reduceConfForCodec(Configuration conf) {
