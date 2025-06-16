@@ -131,8 +131,8 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
     this.taskContext = taskContext;
 
     this.inputHost = inputHost;
-    this.host = inputHost.getHost();
-    this.port = inputHost.getPort();
+    this.host = inputHost.getHostPort().getHost();
+    this.port = inputHost.getHostPort().getPort();
 
     this.numInputs = pendingInputsSeq.getInputs().size();
     this.pendingInputsSeq = pendingInputsSeq;

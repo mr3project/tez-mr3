@@ -169,7 +169,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     }
 
     if (pendingInputs != null) {
-      return new FetchResult(shuffleSchedulerId, inputHost, pendingInputs);
+      return new FetchResult(shuffleSchedulerId, inputHost.getHostPort(), pendingInputs);
     } else {
       return null;
     }

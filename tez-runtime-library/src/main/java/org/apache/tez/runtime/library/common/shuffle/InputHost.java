@@ -41,7 +41,7 @@ import static org.apache.tez.runtime.library.common.shuffle.ShuffleServer.Ranges
  * Represents a Host with respect to the MapReduce ShuffleHandler.
  * 
  */
-public class InputHost extends HostPort {
+public class InputHost {
 
   private static final Logger LOG = LoggerFactory.getLogger(InputHost.class);
 
@@ -107,10 +107,16 @@ public class InputHost extends HostPort {
   // shared by all InputHosts
   private final static AtomicInteger numHostBlocked = new AtomicInteger(0);
 
+  private final HostPort hostPort;
+
   public InputHost(HostPort hostPort) {
-    super(hostPort.getHost(), hostPort.getContainerId(), hostPort.getPort());
     this.hasPendingInput = false;
     this.blockingFetchers = new HashSet<Fetcher<?>>();
+    this.hostPort = hostPort;
+  }
+
+  public HostPort getHostPort() {
+    return hostPort;
   }
 
   public void addHostBlocked(Fetcher<?> fetcher) {
@@ -203,7 +209,7 @@ public class InputHost extends HostPort {
     if (!hasPendingInput) {
       boolean added = pendingHosts.offer(this);
       if (!added) {
-        String errorMessage = "Unable to add host " + super.toString() + " to pending queue";
+        String errorMessage = "Unable to add host " + hostPort.toString() + " to pending queue";
         throw new TezUncheckedException(errorMessage);
       }
       hasPendingInput = true;
@@ -354,23 +360,13 @@ public class InputHost extends HostPort {
   }
 
   public synchronized String toDetailedString() {
-    return "HostPort=" + super.toString() + ", partitionToInputs=" +
+    return "HostPort=" + hostPort.toString() + ", partitionToInputs=" +
         partitionToInputs.keySet().stream().map(x -> x.toString()).collect(Collectors.joining(", "));
   }
   
   @Override
   public String toString() {
-    return "InputHost " + super.toString();
-  }
-
-  @Override
-  public int hashCode() {
-    return super.hashCode();
-  }
-
-  @Override
-  public boolean equals(Object to) {
-    return super.equals(to);
+    return "InputHost " + hostPort.toString();
   }
 
   public static class PartitionToInputs {

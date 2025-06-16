@@ -48,9 +48,7 @@ public class HostPort {
       return true;
     if (obj == null)
       return false;
-    // do not compare with getClass() because HostPort can be compared with InputHost
-    // see ShuffleServer.onSuccess()
-    if (!(obj instanceof HostPort))
+    if (getClass() != obj.getClass())
       return false;
     HostPort other = (HostPort) obj;
     if (containerId == null) {
