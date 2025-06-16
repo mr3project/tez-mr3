@@ -196,6 +196,8 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
           pathToAttemptMap.put(pp, cin.expand(k));
         }
       } else {
+        // ShuffleServer.addKnownInput(), the only entry point, takes CompositeInputAttemptIdentifier.
+        assert false;
         assert partitionCount == 1;
         ShuffleServer.PathPartition pp = new ShuffleServer.PathPartition(pathComponent, partitionId);
         assert !pathToAttemptMap.containsKey(pp);
