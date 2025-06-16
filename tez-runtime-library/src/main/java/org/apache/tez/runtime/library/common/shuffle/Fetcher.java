@@ -166,6 +166,10 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
     return sb.toString();
   }
 
+  protected InputHost.PartitionRange getPartitionRange() {
+    return new InputHost.PartitionRange(minPartition, maxPartition - minPartition + 1);
+  }
+
   protected InputAttemptIdentifier[] buildInputSeqFromIndex(int pendingInputsIndex) {
     // TODO: just create a sub-array
     InputAttemptIdentifier[] inputsSeq = new InputAttemptIdentifier[numInputs - pendingInputsIndex];

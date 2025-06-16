@@ -212,6 +212,8 @@ public class InputHost {
         LOG.warn("ShuffleClient {} / PartitionMap {} already contains {}, so skip adding",
             shuffleClientId, partitionRange, srcAttempt);
       } else {
+        LOG.info("ShuffleClient {} / PartitionMap {} adds as pending input: {}",
+            shuffleClientId, partitionRange, srcAttempt);
         inputs.add(srcAttempt);
       }
     } else {
@@ -369,6 +371,18 @@ public class InputHost {
         LOG.warn("{} still contains input for ShuffleClient {}: {}", this, shuffleClientId, logString);
       }
     }
+  }
+
+  public synchronized boolean containsInput(
+      Long shuffleClientId, PartitionRange partitionRange, InputAttemptIdentifier srcAttemptIdentifier) {
+    Map<PartitionRange, List<InputAttemptIdentifier>> partitionMap = partitionToInputs.get(shuffleClientId);
+    if (partitionMap != null) {
+      List<InputAttemptIdentifier> inputs = partitionMap.get(partitionRange);
+      if (inputs != null) {
+        return inputs.contains(srcAttemptIdentifier);
+      }
+    }
+    return false;
   }
 
   public synchronized String toDetailedString() {

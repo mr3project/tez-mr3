@@ -40,6 +40,7 @@ import org.apache.tez.runtime.library.utils.CodecUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
@@ -590,13 +591,22 @@ public class ShuffleServer implements FetcherCallback {
 
   public void fetchFailed(Long shuffleClientId,
                           InputAttemptIdentifier srcAttemptIdentifier,
-                          boolean readFailed, boolean connectFailed) {
+                          boolean readFailed, boolean connectFailed,
+                          @Nullable InputHost inputHost, InputHost.PartitionRange partitionRange) {
     ShuffleClient<?> shuffleClient = shuffleClients.get(shuffleClientId);
     if (shuffleClient == null) {
       LOG.warn("ShuffleClient {} already unregistered, ignoring fetchFailed: {}",
           shuffleClientId, srcAttemptIdentifier);
     } else {
-      shuffleClient.fetchFailed(srcAttemptIdentifier, readFailed, connectFailed);
+      if (inputHost != null && inputHost.containsInput(
+            shuffleClientId, partitionRange, srcAttemptIdentifier)) {
+        // This can happen if some speculative fetcher finds 'mapOutput.getType() == Type.WAIT' and
+        // enqueue itself, while another speculative fetcher fails afterwards.
+        LOG.info("Do not fail {} because the same input is currently in the queue of {}",
+            srcAttemptIdentifier, inputHost);
+      } else {
+        shuffleClient.fetchFailed(srcAttemptIdentifier, readFailed, connectFailed);
+      }
     }
   }
 
@@ -687,7 +697,7 @@ public class ShuffleServer implements FetcherCallback {
               LOG.warn("Reporting fetch failure for all pending inputs because {} for ShuffleClient {} is gone",
                   identifier, shuffleClientId);
               for (Map.Entry<InputAttemptIdentifier, InputHost.PartitionRange> input : pendingInputs.entrySet()) {
-                fetchFailed(shuffleClientId, input.getKey(), false, true);
+                fetchFailed(shuffleClientId, input.getKey(), false, true, null, null);
               }
             }
           }

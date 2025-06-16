@@ -174,7 +174,8 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs =
             hostFetchResult.fetchResult.getPendingInputs();
         for (InputAttemptIdentifier failed : hostFetchResult.failedInputs) {
-          fetcherCallback.fetchFailed(shuffleManagerId, failed, false, hostFetchResult.connectFailed);
+          fetcherCallback.fetchFailed(shuffleManagerId, failed, false, hostFetchResult.connectFailed,
+              inputHost, getPartitionRange());
           if (pendingInputs != null) {
             pendingInputs.remove(failed);
           }

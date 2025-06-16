@@ -22,6 +22,8 @@ import java.io.IOException;
 
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 
+import javax.annotation.Nullable;
+
 public interface FetcherCallback {
 
   void fetchSucceeded(
@@ -31,5 +33,6 @@ public interface FetcherCallback {
 
   void fetchFailed(
       Long shuffleClientId, InputAttemptIdentifier srcAttemptIdentifier,
-      boolean readFailed, boolean connectFailed);
+      boolean readFailed, boolean connectFailed,
+      @Nullable InputHost inputHost, InputHost.PartitionRange partitionRange);
 }

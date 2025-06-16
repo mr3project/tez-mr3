@@ -233,7 +233,8 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     } finally {
       if (failedFetches != null && !failedFetches.isEmpty()) {
         failedFetches.forEach(input ->
-          fetcherCallback.fetchFailed(shuffleSchedulerId, input, true, false));
+          fetcherCallback.fetchFailed(shuffleSchedulerId, input, true, false,
+              inputHost, getPartitionRange()));
       }
       if (!useLocalDiskFetch) {
         // This is a minor optimization that cleans up the current connection.
@@ -332,7 +333,8 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
           LOG.warn("copyMapOutput failed for tasks: " + Arrays.toString(failedInputs));
           for (InputAttemptIdentifier failedInput : failedInputs) {
             // readError == false and connectError == false, so we only report fetch failure
-            fetcherCallback.fetchFailed(shuffleSchedulerId, failedInput, true, false);
+            fetcherCallback.fetchFailed(shuffleSchedulerId, failedInput, true, false,
+                inputHost, getPartitionRange());
 
             // Try to remove failedInput from pendingInputsFinal[] because it reports fetch failure to AM.
             // If failedInput == srcAttemptId (instead of inputAttemptIdentifier) in copyMapOutput(),
@@ -407,13 +409,15 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         // no pending inputs && only failed inputs
         InputAttemptIdentifier[] failedFetches = buildInputSeqFromIndex(currentIndex);
         for (InputAttemptIdentifier failedFetch : failedFetches) {
-          fetcherCallback.fetchFailed(shuffleSchedulerId, failedFetch, false, true);
+          fetcherCallback.fetchFailed(shuffleSchedulerId, failedFetch, false, true,
+              inputHost, getPartitionRange());
         }
         return new HashMap<>();   // non-null, so failure; empty, so no pendingInputs[]
       } else {
         // pending inputs == all remaining, except failedInput == InputAttemptIdentifier at currentIndex
         InputAttemptIdentifier failedFetch =  pendingInputsSeq.getInputs().get(currentIndex);
-        fetcherCallback.fetchFailed(shuffleSchedulerId, failedFetch, false, true);
+        fetcherCallback.fetchFailed(shuffleSchedulerId, failedFetch, false, true,
+            inputHost, getPartitionRange());
 
         Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs = buildInputMapFromIndex(currentIndex);
         pendingInputs.remove(failedFetch);
@@ -457,7 +461,8 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
 
       // similarly to FetcherUnordered, penalize only the first map and add the rest
       InputAttemptIdentifier failedFetch = pendingInputsSeq.getInputs().get(currentIndex);
-      fetcherCallback.fetchFailed(shuffleSchedulerId, failedFetch, connectSucceeded, !connectSucceeded);
+      fetcherCallback.fetchFailed(shuffleSchedulerId, failedFetch, connectSucceeded, !connectSucceeded,
+          inputHost, getPartitionRange());
 
       Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs = buildInputMapFromIndex(currentIndex);
       pendingInputs.remove(failedFetch);
@@ -726,7 +731,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
           if (!stopped) {
             hasFailures = true;
             shuffleErrorCounterGroup.ioErrs.increment(1);
-            fetcherCallback.fetchFailed(shuffleSchedulerId, srcAttemptId, true, false);
+            fetcherCallback.fetchFailed(shuffleSchedulerId, srcAttemptId, true, false, null, null);
             LOG.warn("{}: Failed to read local disk output of {} from {}", logIdentifier, srcAttemptId, host, e);
           } else {
             if (isDebugEnabled) {
