@@ -163,7 +163,7 @@ public class ShuffleServer implements FetcherCallback {
 
   private final ExecutorService shutdownExecutor;
 
-  private static final int MAX_SPECULATIVE_FETCH_ATTEMPTS = 3;
+  private static final int MAX_SPECULATIVE_FETCH_ATTEMPTS = 5;
   private static final int LAUNCH_LOOP_WAIT_PERIOD_MILLIS = 1000;
   private static final int CHECK_STUCK_FETCHER_PERIOD_MILLIS = 250;
 
