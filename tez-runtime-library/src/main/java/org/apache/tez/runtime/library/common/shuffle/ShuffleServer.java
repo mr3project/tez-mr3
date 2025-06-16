@@ -347,6 +347,7 @@ public class ShuffleServer implements FetcherCallback {
             removeHostBlocked(fetcher);
             LOG.warn("Fetcher STUCK to SPECULATIVE: {} in stage {}",
                 fetcher.getFetcherIdentifier(), fetcher.getStage());
+            trySpeculativeFetcher(fetcher);
           }
         });
       }

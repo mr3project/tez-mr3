@@ -240,14 +240,12 @@ public class TezRuntimeConfiguration {
   @ConfigurationProperty(type = "integer")
   public static final String TEZ_RUNTIME_SHUFFLE_READ_TIMEOUT =
       TEZ_RUNTIME_PREFIX + "shuffle.read.timeout";
-  public final static int TEZ_RUNTIME_SHUFFLE_READ_TIMEOUT_DEFAULT =
-      3 * 60 * 1000;
+  public final static int TEZ_RUNTIME_SHUFFLE_READ_TIMEOUT_DEFAULT = 2 * 60 * 1000;
 
   @ConfigurationProperty(type = "integer")
   public static final String TEZ_RUNTIME_SHUFFLE_BUFFER_SIZE =
       TEZ_RUNTIME_PREFIX + "shuffle.buffersize";
-  public final static int TEZ_RUNTIME_SHUFFLE_BUFFER_SIZE_DEFAULT =
-      8 * 1024;
+  public final static int TEZ_RUNTIME_SHUFFLE_BUFFER_SIZE_DEFAULT = 8 * 1024;
 
   @ConfigurationProperty(type = "boolean")
   public static final String TEZ_RUNTIME_SHUFFLE_ENABLE_SSL = TEZ_RUNTIME_PREFIX +
@@ -414,7 +412,7 @@ public class TezRuntimeConfiguration {
   @ConfigurationProperty(type = "integer")
   public static final String TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_RELEASE_MILLIS = TEZ_RUNTIME_PREFIX +
       "shuffle.stuck.fetcher.release.millis";
-  public static final int TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_RELEASE_MILLIS_DEFAULT = 7500;
+  public static final int TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_RELEASE_MILLIS_DEFAULT = 10000;
 
   // if set to true, automatically set:
   //   1. tez.runtime.optimize.local.fetch = false
