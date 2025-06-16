@@ -122,6 +122,7 @@ public class InputAttemptIdentifier {
       return true;
     if (obj == null)
       return false;
+    // TODO: this means that IAI should be compared with IAI only, while CIAI should be compared with CIAI only
     if (getClass() != obj.getClass())
       return false;
     InputAttemptIdentifier other = (InputAttemptIdentifier) obj;

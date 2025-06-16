@@ -58,6 +58,7 @@ public class CompositeInputAttemptIdentifier extends InputAttemptIdentifier {
     return super.hashCode();
   }
 
+  // TODO: this is a bug because we should compare inputIdentifierCount as well
   @Override
   public boolean equals(Object obj) {
     return super.equals(obj);

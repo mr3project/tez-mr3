@@ -559,8 +559,11 @@ public class ShuffleServer implements FetcherCallback {
       }
     }
 
+    // We pass srcAttemptIdentifier.getInputIdentifierCount(), and
+    // from this point on, we use only InputAttemptIdentifier inside ShuffleServer.
     host.addKnownInput(shuffleClient, partitionId,
-        srcAttemptIdentifier.getInputIdentifierCount(), srcAttemptIdentifier, pendingHosts);
+        srcAttemptIdentifier.getInputIdentifierCount(), srcAttemptIdentifier, pendingHosts,
+        false);
   }
 
   public void fetchSucceeded(Long shuffleClientId, String host,
@@ -676,7 +679,8 @@ public class ShuffleServer implements FetcherCallback {
               for (Map.Entry<InputAttemptIdentifier, InputHost.PartitionRange> input : pendingInputs.entrySet()) {
                 InputHost.PartitionRange range = input.getValue();
                 inputHost.addKnownInput(fetcher.getShuffleClient(),
-                    range.getPartition(), range.getPartitionCount(), input.getKey(), pendingHosts);
+                    range.getPartition(), range.getPartitionCount(), input.getKey(), pendingHosts,
+                    true);
               }
             } else {
               Long shuffleClientId = result.getShuffleClientId();

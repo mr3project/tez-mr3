@@ -96,6 +96,7 @@ public class InputHost {
   //   1. partitionToInputs[shuffleClientId] is never empty
   //   2. partitionToInputs[shuffleClientId][partitionRange] is never empty
   // no need to use concurrent Map/Queue because we guard all access with synchronized{}
+  // InputAttemptIdentifier is actually CompositeInputAttemptIdentifier, but we treat it as InputAttemptIdentifier.
   private final Map<Long, Map<PartitionRange, List<InputAttemptIdentifier>>> partitionToInputs = new HashMap<>();
 
   private boolean hasPendingInput;
@@ -188,7 +189,7 @@ public class InputHost {
   public synchronized void addKnownInput(
       ShuffleClient<?> shuffleClient,
       int partitionId, int partitionCount, InputAttemptIdentifier srcAttempt,
-      BlockingQueue<InputHost> pendingHosts) {
+      BlockingQueue<InputHost> pendingHosts, boolean checkForDuplicate) {
     Long shuffleClientId = shuffleClient.getShuffleClientId();
     Map<PartitionRange, List<InputAttemptIdentifier>> partitionMap = partitionToInputs.get(shuffleClientId);
     if (partitionMap == null) {
@@ -204,7 +205,18 @@ public class InputHost {
       shuffleClient.partitionRangeAdded();
     }
 
-    inputs.add(srcAttempt);
+    if (checkForDuplicate) {
+      if (inputs.contains(srcAttempt)) {
+        // This can happen if multiple Fetchers are created from the same IAI and then some of them
+        // return IAI in pendingInputs[] (e.g., mapOutput.getType() == Type.WAIT in FetcherOrderedGrouped)
+        LOG.warn("ShuffleClient {} / PartitionMap {} already contains {}, so skip adding",
+            shuffleClientId, partitionRange, srcAttempt);
+      } else {
+        inputs.add(srcAttempt);
+      }
+    } else {
+      inputs.add(srcAttempt);
+    }
 
     if (!hasPendingInput) {
       boolean added = pendingHosts.offer(this);

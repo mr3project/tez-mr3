@@ -265,8 +265,8 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
       }
     }
 
-    CompositeInputAttemptIdentifier srcAttemptIdentifier = constructInputAttemptIdentifier(crdme.getTargetIndex(), crdme.getCount(), crdme.getVersion(),
-        shufflePayload);
+    CompositeInputAttemptIdentifier srcAttemptIdentifier = constructInputAttemptIdentifier(
+        crdme.getTargetIndex(), crdme.getCount(), crdme.getVersion(), shufflePayload);
 
     processShufflePayload(shufflePayload, srcAttemptIdentifier, partitionId, crdme.getTargetIndex());
   }

@@ -589,7 +589,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         // Check if we can shuffle *now* ...
         if (mapOutput.getType() == Type.WAIT) {
           LOG.info("{}: MergerManager returned Status.WAIT...", logIdentifier);
-          //Not an error but wait to process data.
+          // Not an error but wait to process data.
           return EMPTY_ATTEMPT_ID_ARRAY;
         }
 

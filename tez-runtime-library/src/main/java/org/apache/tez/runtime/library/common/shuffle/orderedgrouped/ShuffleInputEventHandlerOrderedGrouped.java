@@ -188,8 +188,8 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
       DataMovementEventPayloadProto shufflePayload,
       BitSet emptyPartitionsBitSet) throws IOException {
     int partitionId = crdmEvent.getSourceIndex();
-    CompositeInputAttemptIdentifier compositeInputAttemptIdentifier =
-        constructInputAttemptIdentifier(crdmEvent.getTargetIndex(), crdmEvent.getCount(), crdmEvent.getVersion(), shufflePayload);
+    CompositeInputAttemptIdentifier compositeInputAttemptIdentifier = constructInputAttemptIdentifier(
+        crdmEvent.getTargetIndex(), crdmEvent.getCount(), crdmEvent.getVersion(), shufflePayload);
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("DME srcIdx: " + partitionId + ", targetIdx: " + crdmEvent.getTargetIndex() + ", count:" + crdmEvent.getCount()
