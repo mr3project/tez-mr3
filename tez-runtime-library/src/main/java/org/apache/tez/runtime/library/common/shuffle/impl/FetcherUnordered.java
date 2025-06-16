@@ -92,8 +92,8 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     this.shuffleManagerId = shuffleManager.getShuffleClientId();
     this.fetcherIdentifier = fetcherIdGen.getAndIncrement();
     this.logIdentifier = attempt == 0 ?
-        shuffleManager.getLogIdentifier() + "-U-" + fetcherIdentifier :
-        shuffleManager.getLogIdentifier() + "-U-" + fetcherIdentifier + "/" + attempt;
+        shuffleManager.getLogIdentifier() + "-U-" + minPartition:
+        shuffleManager.getLogIdentifier() + "-U-" + minPartition+ "-" + attempt;
   }
 
   public FetcherUnordered createClone() {
@@ -175,7 +175,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
             hostFetchResult.fetchResult.getPendingInputs();
         for (InputAttemptIdentifier failed : hostFetchResult.failedInputs) {
           fetcherCallback.fetchFailed(shuffleManagerId, failed, false, hostFetchResult.connectFailed,
-              inputHost, getPartitionRange());
+              inputHost, getPartitionRange(), this);
           if (pendingInputs != null) {
             pendingInputs.remove(failed);
           }

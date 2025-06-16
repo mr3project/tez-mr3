@@ -34,5 +34,6 @@ public interface FetcherCallback {
   void fetchFailed(
       Long shuffleClientId, InputAttemptIdentifier srcAttemptIdentifier,
       boolean readFailed, boolean connectFailed,
-      @Nullable InputHost inputHost, InputHost.PartitionRange partitionRange);
+      @Nullable InputHost inputHost, InputHost.PartitionRange partitionRange,
+      @Nullable Fetcher<?> fetcher);
 }

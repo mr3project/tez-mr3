@@ -590,24 +590,41 @@ public class ShuffleServer implements FetcherCallback {
   }
 
   public void fetchFailed(Long shuffleClientId,
-                          InputAttemptIdentifier srcAttemptIdentifier,
+                          final InputAttemptIdentifier srcAttemptIdentifier,
                           boolean readFailed, boolean connectFailed,
-                          @Nullable InputHost inputHost, InputHost.PartitionRange partitionRange) {
+                          @Nullable InputHost inputHost, InputHost.PartitionRange partitionRange,
+                          @Nullable Fetcher<?> fetcher) {
     ShuffleClient<?> shuffleClient = shuffleClients.get(shuffleClientId);
     if (shuffleClient == null) {
       LOG.warn("ShuffleClient {} already unregistered, ignoring fetchFailed: {}",
           shuffleClientId, srcAttemptIdentifier);
-    } else {
-      if (inputHost != null && inputHost.containsInput(
-            shuffleClientId, partitionRange, srcAttemptIdentifier)) {
+      return;
+    }
+
+    if (inputHost != null) {
+      if (inputHost.containsInput(shuffleClientId, partitionRange, srcAttemptIdentifier)) {
         // This can happen if some speculative fetcher finds 'mapOutput.getType() == Type.WAIT' and
         // enqueue itself, while another speculative fetcher fails afterwards.
         LOG.info("Do not fail {} because the same input is currently in the queue of {}",
             srcAttemptIdentifier, inputHost);
-      } else {
-        shuffleClient.fetchFailed(srcAttemptIdentifier, readFailed, connectFailed);
+        return;
+      }
+
+      if (fetcher != null) {
+        boolean existsConcurrentFetcher = runningFetchers.stream().anyMatch(f -> {
+          return f != fetcher &&
+            f.inputHost.getHostPort().equals(inputHost.getHostPort()) &&  // redundant, but for quick filtering
+            f.containsInputAttemptIdentifier(srcAttemptIdentifier);
+        });
+        if (existsConcurrentFetcher) {
+          LOG.info("Do not fail {} of {} because another fetcher is running",
+              srcAttemptIdentifier, fetcher);
+          return;
+        }
       }
     }
+
+    shuffleClient.fetchFailed(srcAttemptIdentifier, readFailed, connectFailed);
   }
 
   public void dagLeaving(int dagIdId) {
@@ -697,7 +714,7 @@ public class ShuffleServer implements FetcherCallback {
               LOG.warn("Reporting fetch failure for all pending inputs because {} for ShuffleClient {} is gone",
                   identifier, shuffleClientId);
               for (Map.Entry<InputAttemptIdentifier, InputHost.PartitionRange> input : pendingInputs.entrySet()) {
-                fetchFailed(shuffleClientId, input.getKey(), false, true, null, null);
+                fetchFailed(shuffleClientId, input.getKey(), false, true, null, null, null);
               }
             }
           }
