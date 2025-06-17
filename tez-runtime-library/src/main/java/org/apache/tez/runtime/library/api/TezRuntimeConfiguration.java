@@ -419,7 +419,6 @@ public class TezRuntimeConfiguration {
       "shuffle.max.speculative.fetch.attempts";
   public static final int TEZ_RUNTIME_SHUFFLE_MAX_SPECULATIVE_FETCH_ATTEMPTS_DEFAULT = 2;
 
-
   // if set to true, automatically set:
   //   1. tez.runtime.optimize.local.fetch = false
   //   2. tez.runtime.optimize.local.fetch.ordered = false

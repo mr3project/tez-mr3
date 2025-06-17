@@ -113,8 +113,8 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
 
     this.fetcherIdentifier = fetcherIdGen.incrementAndGet();
     this.logIdentifier = attempt == 0 ?
-        shuffleScheduler.getLogIdentifier() + "-O-" + minPartition:
-        shuffleScheduler.getLogIdentifier() + "-O-" + minPartition + "-" + attempt;
+        shuffleScheduler.getLogIdentifier() + "_" + fetcherIdentifier + "-O-" + minPartition:
+        shuffleScheduler.getLogIdentifier() + "_" + fetcherIdentifier + "-O-" + minPartition + "=" + attempt;
 
     this.allocator = shuffleScheduler.getAllocator();
     this.exceptionReporter = shuffleScheduler.getExceptionReporter();

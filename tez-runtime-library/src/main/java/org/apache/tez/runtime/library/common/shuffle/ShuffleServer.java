@@ -399,7 +399,7 @@ public class ShuffleServer implements FetcherCallback {
           }
 
           if (inputHost.isHostNormal()) {
-            Fetcher<?> fetcher = constructFetcherForHost(inputHost, conf);
+            Fetcher<?> fetcher = constructFetcherForHost(inputHost);
             // even when fetcher == null, inputHost may still have inputs if 'ShuffleClient == null'
             if (fetcher != null) {
               runFetcher(fetcher);
@@ -454,7 +454,7 @@ public class ShuffleServer implements FetcherCallback {
     Futures.addCallback(future, new FetchFutureCallback(fetcher));
   }
 
-  private Fetcher<?> constructFetcherForHost(InputHost inputHost, Configuration conf) {
+  private Fetcher<?> constructFetcherForHost(InputHost inputHost) {
     InputHost.PartitionToInputs pendingInputs = inputHost.clearAndGetOnePartitionRange(
         shuffleClients, maxTaskOutputAtOnce, rangesScheme);
     if (pendingInputs == null) {
@@ -503,7 +503,7 @@ public class ShuffleServer implements FetcherCallback {
     synchronized (registerLock) {
       shuffleClients.put(shuffleClientId, shuffleClient);
     }
-    LOG.info("Registered ShuffleClient: {}, total={}", shuffleClientId, shuffleClients.size());
+    LOG.info("Registered ShuffleClient for {}: {}, total={}", shuffleClient.getLogIdentifier(), shuffleClientId, shuffleClients.size());
     return shuffleClientId;
   }
 

@@ -259,7 +259,8 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
         }
         updateStats = true;
       } else {
-        LOG.warn("Duplicate fetch of unordered input: {}", srcAttemptIdentifier);
+        LOG.warn("Duplicate fetch of unordered input for {}: {}",
+            inputContext.getUniqueIdentifier(), srcAttemptIdentifier);
         fetchedInput.abort();
       }
     }
@@ -301,7 +302,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
   private void registerCompletedInputForPipelinedShuffle(
       InputAttemptIdentifier srcAttemptIdentifier, FetchedInput fetchedInput) {
     if (isObsoleteInputAttemptIdentifier(srcAttemptIdentifier)) {
-      LOG.info("Do not register obsolete input: {}", srcAttemptIdentifier);
+      LOG.info("Do not register obsolete input for {}: {}", inputContext.getUniqueIdentifier(), srcAttemptIdentifier);
       return;
     }
 
@@ -318,6 +319,14 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
       int inputIdentifier = srcAttemptIdentifier.getInputIdentifier();
       ShuffleEventInfo eventInfo = shuffleInfoEventsMap.get(inputIdentifier);
       assert eventInfo != null;
+
+      // What if the same spill was already processed by speculative fetchers?
+      boolean isAlreadyProcessed = eventInfo.getEventsProcessed().get(srcAttemptIdentifier.getSpillEventId());
+      if (isAlreadyProcessed) {
+        LOG.info("Spill already processed for {} (numCompletedInputs={}): {}",
+            inputContext.getUniqueIdentifier(), numCompletedInputs.get(), srcAttemptIdentifier);
+        return;
+      }
 
       eventInfo.spillProcessed(srcAttemptIdentifier.getSpillEventId());
       numFetchedSpills.getAndIncrement();

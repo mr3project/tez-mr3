@@ -92,8 +92,8 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     this.shuffleManagerId = shuffleManager.getShuffleClientId();
     this.fetcherIdentifier = fetcherIdGen.getAndIncrement();
     this.logIdentifier = attempt == 0 ?
-        shuffleManager.getLogIdentifier() + "-U-" + minPartition:
-        shuffleManager.getLogIdentifier() + "-U-" + minPartition+ "-" + attempt;
+        shuffleManager.getLogIdentifier() + "_" + fetcherIdentifier + "-U-" + minPartition:
+        shuffleManager.getLogIdentifier() + "_" + fetcherIdentifier + "-U-" + minPartition+ "=" + attempt;
   }
 
   public FetcherUnordered createClone() {

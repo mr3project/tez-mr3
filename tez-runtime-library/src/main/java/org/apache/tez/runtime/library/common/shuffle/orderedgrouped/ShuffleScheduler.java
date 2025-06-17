@@ -18,7 +18,6 @@
 package org.apache.tez.runtime.library.common.shuffle.orderedgrouped;
 
 import java.io.IOException;
-import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -252,15 +251,15 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
       logProgress();
       reduceShuffleBytes.increment(bytesCompressed);
       reduceBytesDecompressed.increment(bytesDecompressed);
+
       if (LOG.isDebugEnabled()) {
-        LOG.debug("src task: "
-            + TezRuntimeUtils.getTaskAttemptIdentifier(
-            inputContext.getSourceVertexName(), srcAttemptIdentifier.getInputIdentifier(),
-            srcAttemptIdentifier.getAttemptNumber()) + " done");
+        LOG.debug("Source done for {} ({} remaining): {}",
+          inputContext.getUniqueIdentifier(), remainingMaps.get(), srcAttemptIdentifier);
       }
     } else {
       // input is already finished. duplicate fetch.
-      LOG.warn("Duplicate fetch of ordered input: {}", srcAttemptIdentifier);
+      LOG.warn("Duplicate fetch of ordered input for {} ({} remaining): {}",
+          inputContext.getUniqueIdentifier(), remainingMaps.get(), srcAttemptIdentifier);
       // free the resource - especially memory
 
       // If the src does not generate data, output will be null.
@@ -284,7 +283,7 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
     // corresponds to ShuffleManager.registerCompletedInputForPipelinedShuffle()
 
     if (isObsoleteInputAttemptIdentifier(srcAttemptIdentifier)) {
-      LOG.info("Do not register obsolete input: {}", srcAttemptIdentifier);
+      LOG.info("Do not register obsolete input for {}: {}", inputContext.getUniqueIdentifier(), srcAttemptIdentifier);
       return;
     }
 
@@ -298,6 +297,14 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
     // synchronized (shuffleInfoEventsMap) {  // covered by this.synchronized
     ShuffleEventInfo eventInfo = shuffleInfoEventsMap.get(inputIdentifier);
     assert eventInfo != null;
+
+    // What if the same spill was already processed by speculative fetchers?
+    boolean isAlreadyProcessed = eventInfo.getEventsProcessed().get(srcAttemptIdentifier.getSpillEventId());
+    if (isAlreadyProcessed) {
+      LOG.info("Spill already processed for {} (remaining={}): {}",
+          inputContext.getUniqueIdentifier(), remainingMaps.get(), srcAttemptIdentifier);
+      return;
+    }
 
     eventInfo.spillProcessed(srcAttemptIdentifier.getSpillEventId());
     numFetchedSpills++;
