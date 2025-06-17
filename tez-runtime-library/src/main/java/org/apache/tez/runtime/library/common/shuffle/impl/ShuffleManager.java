@@ -28,7 +28,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.tez.runtime.api.TaskFailureType;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.hadoop.conf.Configuration;
@@ -179,7 +178,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
                             CompositeInputAttemptIdentifier srcAttemptIdentifier, int partitionId) {
     // Note: this check is optional.
     // if we skip this check, we call killSelf() after fetches with different attemptNumbers succeed
-    if (!validateInputAttemptForPipelinedShuffle(srcAttemptIdentifier, false)) {
+    if (!validateInputAttemptForPipelinedShuffle(srcAttemptIdentifier.getInput(), false)) {
       return;
     }
 
@@ -211,8 +210,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
   }
 
   public void addCompletedInputWithData(
-      InputAttemptIdentifier srcAttemptIdentifier, FetchedInput fetchedInput) throws IOException {
-    //InputIdentifier inputIdentifier = srcAttemptIdentifier.getInputIdentifier();
+      CompositeInputAttemptIdentifier srcAttemptIdentifier, FetchedInput fetchedInput) throws IOException {
     int inputIdentifier = srcAttemptIdentifier.getInputIdentifier();
     if (LOG.isDebugEnabled()) {
       LOG.debug("Received Data via Event: " + srcAttemptIdentifier + " to " + fetchedInput.getType());
@@ -377,7 +375,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
   // called from Fetcher threads, via ShuffleServer (except calls from FetchFutureCallback.onSuccess())
   // readFailed is not used in ShuffleManager
   public void fetchFailed(
-      InputAttemptIdentifier srcAttemptIdentifier, boolean readFailed, boolean connectFailed) {
+      CompositeInputAttemptIdentifier srcAttemptIdentifier, boolean readFailed, boolean connectFailed) {
     assert !readFailed;   // ignore in ShuffleManager
     final int inputIdentifier = srcAttemptIdentifier.getInputIdentifier();
     failedShufflesCounter.increment(1);
@@ -481,7 +479,6 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
    * Fake input that is added to the completed input list in case an input does not have any data.
    *
    */
-  @VisibleForTesting
   static class NullFetchedInput extends FetchedInput {
 
     public NullFetchedInput(InputAttemptIdentifier inputAttemptIdentifier) {

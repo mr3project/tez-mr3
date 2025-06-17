@@ -36,6 +36,7 @@ import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
+import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.shuffle.DiskFetchedInput;
 import org.apache.tez.runtime.library.common.shuffle.FetchResult;
 import org.apache.tez.runtime.library.common.shuffle.FetchedInput;
@@ -146,7 +147,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
           host.equals(fetcherConfig.localHostName)) {
         if (fetcherConfig.compositeFetch) {
           // inspect 'first' to find the container where all inputs originate from
-          InputAttemptIdentifier first = pendingInputsSeq.getInputs().get(0);
+          CompositeInputAttemptIdentifier first = pendingInputsSeq.getInputs().get(0);
           // true if inputs originate from the current ContainerWorker
           useLocalDiskFetch = first.getPathComponent().startsWith(
               taskContext.getExecutionContext().getContainerId());
@@ -171,9 +172,9 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
             logIdentifier, Arrays.toString(hostFetchResult.failedInputs));
 
         // never add back those InputAttemptIdentifiers that are sent to AM with InputReadError.
-        Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs =
+        Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> pendingInputs =
             hostFetchResult.fetchResult.getPendingInputs();
-        for (InputAttemptIdentifier failed : hostFetchResult.failedInputs) {
+        for (CompositeInputAttemptIdentifier failed : hostFetchResult.failedInputs) {
           fetcherCallback.fetchFailed(shuffleManagerId, failed, false, hostFetchResult.connectFailed,
               inputHost, getPartitionRange(), this);
           if (pendingInputs != null) {
@@ -211,7 +212,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       StringBuilder baseURI = ShuffleUtils.constructBaseURIForShuffleHandler(finalHost,
           port, range, applicationId, shuffleManager.getDagIdentifier(), httpConnectionParams.isSslShuffle());
 
-      Collection<InputAttemptIdentifier> inputsForPathComponents =
+      Collection<CompositeInputAttemptIdentifier> inputsForPathComponents =
         pendingInputsSeq.getInputs().subList(currentIndex, pendingInputsSeq.getInputs().size());
       // inputsForPathComponents[] is a View, so do not update it
       URL url = ShuffleUtils.constructInputURL(baseURI.toString(), inputsForPathComponents,
@@ -225,8 +226,8 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         Thread.currentThread().interrupt();
       }
       // If connect did not succeed, just mark all the maps as failed.
-      InputAttemptIdentifier[] failedFetches;
-      Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs;
+      CompositeInputAttemptIdentifier[] failedFetches;
+      Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> pendingInputs;
       if (isShutDown.get()) {
         if (isDebugEnabled) {
           LOG.debug("Not reporting fetch failure during connection establishment, since an Exception was caught after shutdown." +
@@ -242,8 +243,8 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
           pendingInputs = null;
         } else {
           // all pending inputs, except failedInput == InputAttemptIdentifier at currentIndex
-          InputAttemptIdentifier failedFetch =  pendingInputsSeq.getInputs().get(currentIndex);
-          failedFetches = new InputAttemptIdentifier[]{ failedFetch };
+          CompositeInputAttemptIdentifier failedFetch =  pendingInputsSeq.getInputs().get(currentIndex);
+          failedFetches = new CompositeInputAttemptIdentifier[]{ failedFetch };
 
           pendingInputs = buildInputMapFromIndex(currentIndex);
           // pendingInputs.remove() is optional because call() removes failedFetches[] from pendingInputs[]
@@ -288,8 +289,8 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         // In this way, we can rerun one source Task at a time and avoid rerunning many source Tasks at once.
         // Cf. gla2024.4.8.pptx: What if a ContainerWorker becomes unreachable temporarily?
         // no need to apply TEZ-4174 because we send InputReadError regardless of connectFailed (see ShuffleManager.fetchFailed())
-        InputAttemptIdentifier[] failedFetches =
-            new InputAttemptIdentifier[]{ pendingInputsSeq.getInputs().get(currentIndex) };
+        CompositeInputAttemptIdentifier[] failedFetches =
+            new CompositeInputAttemptIdentifier[]{ pendingInputsSeq.getInputs().get(currentIndex) };
         // It is okay to set pendingInputs[] to include all remaining IAIs, including failedFetches[0],
         // because call() removes failedInputs[0] from pendingInputs[].
         return new HostFetchResult(
@@ -329,9 +330,9 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     // after putting back the remaining maps to the
     // yet_to_be_fetched list and marking the failed tasks.
     int index = 0;  // points to the next input to be consumed
-    InputAttemptIdentifier[] failedInputs = null;
+    CompositeInputAttemptIdentifier[] failedInputs = null;
     while (index < numInputs) {
-      InputAttemptIdentifier inputAttemptIdentifier = pendingInputsSeq.getInputs().get(index);
+      CompositeInputAttemptIdentifier inputAttemptIdentifier = pendingInputsSeq.getInputs().get(index);
 
       if (isShutDown.get()) {
         cleanupCurrentConnection(false);  // disconnect = false because we can reuse HTTPConnection
@@ -417,7 +418,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     setStage(STAGE_FIRST_FETCHED);  // local reads should not interfere with stage
 
     int index = 0;  // points to the next input to be consumed
-    List<InputAttemptIdentifier> failedFetches = new ArrayList<>();
+    List<CompositeInputAttemptIdentifier> failedFetches = new ArrayList<>();
     while (index < numInputs) {
       if (isShutDown.get()) {
         if (isDebugEnabled) {
@@ -426,7 +427,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         return getResultWithNoPendingInputsNoFailedInputBecauseAlreadyShutdown();
       }
 
-      InputAttemptIdentifier inputAttemptIdentifier = pendingInputsSeq.getInputs().get(index);
+      CompositeInputAttemptIdentifier inputAttemptIdentifier = pendingInputsSeq.getInputs().get(index);
       String pathComponent = inputAttemptIdentifier.getPathComponent();   // already in expanded form
       TezSpillRecord spillRecord = null;  // specific to each inputAttemptIdentifier/pathComponent
       Path inputFilePath = null;
@@ -489,7 +490,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       } else {
         return new HostFetchResult(new FetchResult(
             shuffleManagerId, inputHost.getHostPort(), null),
-            failedFetches.toArray(new InputAttemptIdentifier[failedFetches.size()]), false);
+            failedFetches.toArray(new CompositeInputAttemptIdentifier[failedFetches.size()]), false);
       }
     } else {
       // nothing needs to be done to requeue remaining entries
@@ -528,11 +529,11 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
 
   static class HostFetchResult {
     private final FetchResult fetchResult;
-    private final InputAttemptIdentifier[] failedInputs;
+    private final CompositeInputAttemptIdentifier[] failedInputs;
     private final boolean connectFailed;
 
     public HostFetchResult(FetchResult fetchResult,
-                           InputAttemptIdentifier[] failedInputs,
+                           CompositeInputAttemptIdentifier[] failedInputs,
                            boolean connectFailed) {
       this.fetchResult = fetchResult;
       this.failedInputs = failedInputs;
@@ -590,9 +591,9 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     }
   }
 
-  private InputAttemptIdentifier[] fetchInputs(
+  private CompositeInputAttemptIdentifier[] fetchInputs(
       DataInputStream input,
-      InputAttemptIdentifier inputAttemptIdentifier,
+      CompositeInputAttemptIdentifier inputAttemptIdentifier,
       int currentIndex) throws FetcherReadTimeoutException {
     FetchedInput fetchedInput = null;
     InputAttemptIdentifier srcAttemptId = null;   // to be constructed from data fetched from ShuffleServer
@@ -626,7 +627,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
               LOG.warn("{}: ShuffleHandler error - {}, while fetching {}",
                   logIdentifier, pathComponent, inputAttemptIdentifier);
               // this should be treated as local fetch failure in order to send InputReadError
-              return new InputAttemptIdentifier[]{ inputAttemptIdentifier };
+              return new CompositeInputAttemptIdentifier[]{ inputAttemptIdentifier };
             }
             throw new IllegalArgumentException("Invalid map id: " + header.getMapId() + ", expected to start with " +
                 InputAttemptIdentifier.PATH_PREFIX_MR3 + "/" + InputAttemptIdentifier.PATH_PREFIX + ", partition: " + header.getPartition()
@@ -667,7 +668,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
           if (!isShutDown.get()) {
             srcAttemptId = mapOutputStat.srcAttemptId;
             assert srcAttemptId != null;
-            return new InputAttemptIdentifier[]{ srcAttemptId };
+            return new CompositeInputAttemptIdentifier[]{ new CompositeInputAttemptIdentifier(srcAttemptId) };
           } else {
             if (isDebugEnabled) {
               LOG.debug("Already shutdown. Ignoring verification failure.");
@@ -757,7 +758,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         if (srcAttemptId == null) {
           return buildInputSeqFromIndex(currentIndex);
         } else {
-          return new InputAttemptIdentifier[]{ srcAttemptId };
+          return new CompositeInputAttemptIdentifier[]{ new CompositeInputAttemptIdentifier(srcAttemptId) };
         }
       }
       LOG.warn("{}: Failed to shuffle output of {} from {} to {}",
@@ -765,7 +766,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
 
       // Cleanup fetchedInput
       cleanupFetchedInput(fetchedInput);
-      return new InputAttemptIdentifier[]{ srcAttemptId };
+      return new CompositeInputAttemptIdentifier[]{ new CompositeInputAttemptIdentifier(srcAttemptId) };
     }
 
     return null;

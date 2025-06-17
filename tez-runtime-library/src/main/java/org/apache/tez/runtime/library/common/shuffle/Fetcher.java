@@ -65,6 +65,7 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
 
   // Maps from the pathComponents (unique per srcTaskId) to the specific taskId
   // filled in buildPathToAttemptMap() at the beginning of call()
+  // pathToAttemptMap contains InputAttemptIdentifier, not CompositeInputAttemptIdentifier.
   protected final Map<ShuffleServer.PathPartition, InputAttemptIdentifier> pathToAttemptMap;
 
   // Initial value is 0, which means it hasn't retried yet.
@@ -170,9 +171,9 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
     return pendingInputsSeq.getPartitionRange();
   }
 
-  protected InputAttemptIdentifier[] buildInputSeqFromIndex(int pendingInputsIndex) {
+  protected CompositeInputAttemptIdentifier[] buildInputSeqFromIndex(int pendingInputsIndex) {
     // TODO: just create a sub-array
-    InputAttemptIdentifier[] inputsSeq = new InputAttemptIdentifier[numInputs - pendingInputsIndex];
+    CompositeInputAttemptIdentifier[] inputsSeq = new CompositeInputAttemptIdentifier[numInputs - pendingInputsIndex];
     for (int i = pendingInputsIndex; i < numInputs; i++) {
       inputsSeq[i - pendingInputsIndex] = pendingInputsSeq.getInputs().get(i);
     }
@@ -188,37 +189,26 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
     // build pathToAttemptMap[]
     for (int i = 0; i < numInputs; i++) {
       String pathComponent = pendingInputsSeq.getInputs().get(i).getPathComponent();
-      InputAttemptIdentifier input = pendingInputsSeq.getInputs().get(i);
+      CompositeInputAttemptIdentifier cin = pendingInputsSeq.getInputs().get(i);
+      assert cin.getInputIdentifierCount() == partitionCount;
 
-      if (input instanceof CompositeInputAttemptIdentifier) {
-        CompositeInputAttemptIdentifier cin = (CompositeInputAttemptIdentifier)input;
-        assert cin.getInputIdentifierCount() == partitionCount;
-
-        for (int k = 0; k < partitionCount; k++) {
-          ShuffleServer.PathPartition pp = new ShuffleServer.PathPartition(pathComponent, partitionId + k);
-          assert !pathToAttemptMap.containsKey(pp);
-          pathToAttemptMap.put(pp, cin.expand(k));
-        }
-      } else {
-        // ShuffleServer.addKnownInput(), the only entry point, takes CompositeInputAttemptIdentifier.
-        assert false;
-        assert partitionCount == 1;
-        ShuffleServer.PathPartition pp = new ShuffleServer.PathPartition(pathComponent, partitionId);
+      for (int k = 0; k < partitionCount; k++) {
+        ShuffleServer.PathPartition pp = new ShuffleServer.PathPartition(pathComponent, partitionId + k);
         assert !pathToAttemptMap.containsKey(pp);
-        pathToAttemptMap.put(pp, input);
+        pathToAttemptMap.put(pp, cin.expand(k));
       }
     }
   }
 
-  protected Map<InputAttemptIdentifier, InputHost.PartitionRange> buildInputMapFromIndex(int pendingInputsIndex) {
-    Map<InputAttemptIdentifier, InputHost.PartitionRange> inputsMap = new HashMap<>();
+  protected Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> buildInputMapFromIndex(int pendingInputsIndex) {
+    Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> inputsMap = new HashMap<>();
     for (int i = pendingInputsIndex; i < numInputs; i++) {
       inputsMap.put(pendingInputsSeq.getInputs().get(i), pendingInputsSeq.getPartitionRange());
     }
     return inputsMap;
   }
 
-  public boolean containsInputAttemptIdentifier(InputAttemptIdentifier srcAttemptIdentifier) {
+  public boolean containsInputAttemptIdentifier(CompositeInputAttemptIdentifier srcAttemptIdentifier) {
     return pendingInputsSeq.getInputs().contains(srcAttemptIdentifier);
   }
 }

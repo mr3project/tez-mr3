@@ -559,8 +559,6 @@ public class ShuffleServer implements FetcherCallback {
       }
     }
 
-    // We pass srcAttemptIdentifier.getInputIdentifierCount(), and
-    // from this point on, we use only InputAttemptIdentifier inside ShuffleServer.
     host.addKnownInput(shuffleClient, partitionId,
         srcAttemptIdentifier.getInputIdentifierCount(), srcAttemptIdentifier, pendingHosts,
         false);
@@ -589,7 +587,7 @@ public class ShuffleServer implements FetcherCallback {
   }
 
   public void fetchFailed(Long shuffleClientId,
-                          final InputAttemptIdentifier srcAttemptIdentifier,
+                          final CompositeInputAttemptIdentifier srcAttemptIdentifier,
                           boolean readFailed, boolean connectFailed,
                           @Nullable InputHost inputHost, InputHost.PartitionRange partitionRange,
                           @Nullable Fetcher<?> fetcher) {
@@ -642,7 +640,7 @@ public class ShuffleServer implements FetcherCallback {
     }
   }
 
-  public void informAM(Long shuffleSchedulerId, InputAttemptIdentifier srcAttempt) {
+  public void informAM(Long shuffleSchedulerId, CompositeInputAttemptIdentifier srcAttempt) {
     ShuffleScheduler shuffleScheduler = (ShuffleScheduler)shuffleClients.get(shuffleSchedulerId);
     if (shuffleScheduler == null) {
       LOG.warn("ShuffleScheduler {} already unregistered, ignoring informAM(): {}",
@@ -697,12 +695,12 @@ public class ShuffleServer implements FetcherCallback {
           // use '==' instead of 'equals' because we want to avoid conversion from long to Long
           assert result.getShuffleClientId() == fetcher.getShuffleClient().getShuffleClientId();
 
-          Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs = result.getPendingInputs();
+          Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> pendingInputs = result.getPendingInputs();
           if (pendingInputs != null && !pendingInputs.isEmpty()) {
             HostPort identifier = result.getHostPort();
             InputHost inputHost = knownSrcHosts.get(identifier);
             if (inputHost != null) {  // can be null (in rare cases) if unregister() has been called
-              for (Map.Entry<InputAttemptIdentifier, InputHost.PartitionRange> input : pendingInputs.entrySet()) {
+              for (Map.Entry<CompositeInputAttemptIdentifier, InputHost.PartitionRange> input : pendingInputs.entrySet()) {
                 InputHost.PartitionRange range = input.getValue();
                 inputHost.addKnownInput(fetcher.getShuffleClient(),
                     range.getPartition(), range.getPartitionCount(), input.getKey(), pendingHosts,
@@ -712,7 +710,7 @@ public class ShuffleServer implements FetcherCallback {
               Long shuffleClientId = result.getShuffleClientId();
               LOG.warn("Reporting fetch failure for all pending inputs because {} for ShuffleClient {} is gone",
                   identifier, shuffleClientId);
-              for (Map.Entry<InputAttemptIdentifier, InputHost.PartitionRange> input : pendingInputs.entrySet()) {
+              for (Map.Entry<CompositeInputAttemptIdentifier, InputHost.PartitionRange> input : pendingInputs.entrySet()) {
                 fetchFailed(shuffleClientId, input.getKey(), false, true, null, null, null);
               }
             }

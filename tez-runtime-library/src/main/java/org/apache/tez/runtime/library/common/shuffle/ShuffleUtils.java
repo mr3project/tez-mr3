@@ -50,6 +50,7 @@ import org.apache.tez.runtime.api.ConcurrentByteCache;
 import org.apache.tez.runtime.api.IndexPathCache;
 import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.api.events.DataMovementEvent;
+import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.TezRuntimeUtils;
 import org.apache.tez.runtime.api.MultiByteArrayOutputStream;
@@ -159,8 +160,7 @@ public class ShuffleUtils {
         while (bytesLeft > 0) {
           int n = input.read(buf, 0, (int) Math.min(bytesLeft, BYTES_TO_READ));
           if (n < 0) {
-            throw new IOException("read past end of stream reading "
-                + identifier);
+            throw new IOException("read past end of stream reading " + identifier);
           }
           output.write(buf, 0, n);
           bytesLeft -= n;
@@ -219,10 +219,10 @@ public class ShuffleUtils {
   }
 
   public static URL constructInputURL(String baseURI,
-      Collection<InputAttemptIdentifier> inputs, boolean keepAlive) throws MalformedURLException {
+                                      Collection<CompositeInputAttemptIdentifier> inputs, boolean keepAlive) throws MalformedURLException {
     StringBuilder url = new StringBuilder(baseURI);
     boolean first = true;
-    for (InputAttemptIdentifier input : inputs) {
+    for (CompositeInputAttemptIdentifier input : inputs) {
       if (first) {
         first = false;
         url.append(input.getPathComponent());

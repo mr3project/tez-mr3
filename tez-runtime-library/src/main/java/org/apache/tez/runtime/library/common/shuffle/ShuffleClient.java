@@ -27,6 +27,7 @@ import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.awt.*;
 import java.io.IOException;
 import java.util.BitSet;
 import java.util.Collections;
@@ -107,7 +108,7 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
 
   // thread-safe for reading and updating
   // InputAttemptIdentifier is immutable
-  private final Set<InputAttemptIdentifier> obsoletedInputs;
+  private final Set<InputAttemptIdentifier> obsoletedInputs;  // not CompositeInputAttemptIdentifier
 
   protected final int maxNumFetchers;
 
@@ -164,31 +165,25 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
     // avoid adding attempts which have already been completed
     // guard with synchronized because completedInputSet should not be updated while traversing
     synchronized (completedInputSet) {
-      for (Iterator<InputAttemptIdentifier> inputIter = pendingInputs.getInputs().iterator();
+      for (Iterator<CompositeInputAttemptIdentifier> inputIter = pendingInputs.getInputs().iterator();
            inputIter.hasNext();) {
-        InputAttemptIdentifier input = inputIter.next();
+        CompositeInputAttemptIdentifier compositeInput = inputIter.next();
 
-        boolean alreadyCompleted;
-        if (input instanceof CompositeInputAttemptIdentifier) {
-          CompositeInputAttemptIdentifier compositeInput = (CompositeInputAttemptIdentifier) input;
-          int nextClearBit = completedInputSet.nextClearBit(compositeInput.getInputIdentifier());
-          int maxClearBit = compositeInput.getInputIdentifier() + compositeInput.getInputIdentifierCount();
-          alreadyCompleted = nextClearBit > maxClearBit;
-        } else {
-          alreadyCompleted = completedInputSet.get(input.getInputIdentifier());
-        }
+        int nextClearBit = completedInputSet.nextClearBit(compositeInput.getInputIdentifier());
+        int maxClearBit = compositeInput.getInputIdentifier() + compositeInput.getInputIdentifierCount();
+        boolean alreadyCompleted = nextClearBit > maxClearBit;
 
         if (alreadyCompleted) {
-          LOG.info("Skipping completed input: {}", input);
+          LOG.info("Skipping completed input: {}", compositeInput);
           inputIter.remove();
           removedAnyInput = true;
         }
       }
     }
 
-    for (Iterator<InputAttemptIdentifier> inputIter = pendingInputs.getInputs().iterator();
+    for (Iterator<CompositeInputAttemptIdentifier> inputIter = pendingInputs.getInputs().iterator();
          inputIter.hasNext();) {
-      InputAttemptIdentifier input = inputIter.next();
+      CompositeInputAttemptIdentifier input = inputIter.next();
 
       // avoid adding attempts which have been marked as OBSOLETE
       if (isObsoleteInputAttemptIdentifier(input)) {
@@ -198,7 +193,7 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
         continue;
       }
 
-      if (!validateInputAttemptForPipelinedShuffle(input, false)) {
+      if (!validateInputAttemptForPipelinedShuffle(input.getInput(), false)) {
         inputIter.remove();   // no need to fetch for input, so remove
         removedAnyInput = true;
       }
@@ -218,6 +213,10 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
   }
 
   // thread-safe because InputAttemptIdentifier is immutable
+  protected boolean isObsoleteInputAttemptIdentifier(CompositeInputAttemptIdentifier input) {
+    return isObsoleteInputAttemptIdentifier(input.getInput());
+  }
+
   protected boolean isObsoleteInputAttemptIdentifier(InputAttemptIdentifier input) {
     if (input == null || obsoletedInputs.isEmpty()) {
       return false;
@@ -283,7 +282,7 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
       long fetchedBytes, long decompressedLength, long copyDuration) throws IOException;
 
   public abstract void fetchFailed(
-      InputAttemptIdentifier srcAttemptIdentifier,
+      CompositeInputAttemptIdentifier srcAttemptIdentifier,
       boolean readFailed, boolean connectFailed);
 
   protected abstract boolean validateInputAttemptForPipelinedShuffle(

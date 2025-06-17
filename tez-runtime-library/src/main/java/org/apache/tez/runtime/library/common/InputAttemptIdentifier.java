@@ -37,9 +37,9 @@ public class InputAttemptIdentifier {
   public static final String PATH_PREFIX_MR3 = com.datamonad.mr3.container.ContainerID$.MODULE$.prefixInContainerWorkerEnv();
 
   public enum SPILL_INFO {
-    FINAL_MERGE_ENABLED, //Final merge is enabled at source
-    INCREMENTAL_UPDATE, //Final merge is disabled and qualifies for incremental spill updates.(i.e spill 0, 1 etc)
-    FINAL_UPDATE //Indicates final piece of data in the pipelined shuffle.
+    FINAL_MERGE_ENABLED,  // Final merge is enabled at source
+    INCREMENTAL_UPDATE,   // Final merge is disabled and qualifies for incremental spill updates.(i.e spill 0, 1 etc)
+    FINAL_UPDATE          // Indicates final piece of data in the pipelined shuffle.
   }
 
   /**
@@ -122,7 +122,6 @@ public class InputAttemptIdentifier {
       return true;
     if (obj == null)
       return false;
-    // TODO: this means that IAI should be compared with IAI only, while CIAI should be compared with CIAI only
     if (getClass() != obj.getClass())
       return false;
     InputAttemptIdentifier other = (InputAttemptIdentifier) obj;
@@ -131,6 +130,8 @@ public class InputAttemptIdentifier {
     if (inputIdentifier != other.inputIdentifier)
       return false;
     // do not compare pathComponent as they may not always be present
+    if (spillEventId != other.spillEventId)
+      return false;
     return true;
   }
 

@@ -20,6 +20,7 @@ package org.apache.tez.runtime.library.common.shuffle;
 
 import java.io.IOException;
 
+import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 
 import javax.annotation.Nullable;
@@ -32,7 +33,7 @@ public interface FetcherCallback {
       long fetchedBytes, long decompressedLength, long copyDuration) throws IOException;
 
   void fetchFailed(
-      Long shuffleClientId, InputAttemptIdentifier srcAttemptIdentifier,
+      Long shuffleClientId, CompositeInputAttemptIdentifier srcAttemptIdentifier,
       boolean readFailed, boolean connectFailed,
       @Nullable InputHost inputHost, InputHost.PartitionRange partitionRange,
       @Nullable Fetcher<?> fetcher);

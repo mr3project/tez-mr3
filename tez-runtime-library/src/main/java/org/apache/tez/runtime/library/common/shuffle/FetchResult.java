@@ -18,6 +18,7 @@
 
 package org.apache.tez.runtime.library.common.shuffle;
 
+import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 
 import java.util.Map;
@@ -27,10 +28,10 @@ public class FetchResult {
   private final Long shuffleClientId;
   private final HostPort hostPort;
 
-  private Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs;
+  private Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> pendingInputs;
 
   public FetchResult(Long shuffleClientId, HostPort hostPort,
-                     Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs) {
+                     Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> pendingInputs) {
     this.shuffleClientId = shuffleClientId;
     this.hostPort = hostPort;
     this.pendingInputs = pendingInputs;
@@ -44,7 +45,7 @@ public class FetchResult {
     return hostPort;
   }
 
-  public Map<InputAttemptIdentifier, InputHost.PartitionRange> getPendingInputs() {
+  public Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> getPendingInputs() {
     return pendingInputs;
   }
 }

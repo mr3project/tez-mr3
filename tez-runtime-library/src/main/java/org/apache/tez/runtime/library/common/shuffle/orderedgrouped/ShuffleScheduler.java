@@ -197,7 +197,7 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
 
   public void addKnownMapOutput(
       String hostName, String containerId, int port, int partitionId, CompositeInputAttemptIdentifier srcAttempt) {
-    if (!validateInputAttemptForPipelinedShuffle(srcAttempt, false)) {
+    if (!validateInputAttemptForPipelinedShuffle(srcAttempt.getInput(), false)) {
       return;
     }
 
@@ -325,7 +325,7 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
     }
   }
 
-  public void fetchFailed(InputAttemptIdentifier srcAttemptIdentifier,
+  public void fetchFailed(CompositeInputAttemptIdentifier srcAttemptIdentifier,
                           boolean readFailed, boolean connectFailed) {
     failedShuffleCounter.increment(1);
 
@@ -367,7 +367,7 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
   }
 
   // Notify AM
-  public void informAM(InputAttemptIdentifier srcAttempt) {
+  public void informAM(CompositeInputAttemptIdentifier srcAttempt) {
     LOG.info("ShuffleScheduler {}: Reporting fetch failure for InputIdentifier: {}, taskAttemptIdentifier: {}",
         shuffleClientId, srcAttempt,
         TezRuntimeUtils.getTaskAttemptIdentifier(
@@ -398,6 +398,7 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
     return shuffleErrorCounterGroup;
   }
 
+  // can run in ShuffleServer.call() thread, ShuffleInputEventHandler thread, Fetcher thread
   protected synchronized boolean validateInputAttemptForPipelinedShuffle(
       InputAttemptIdentifier input, boolean registerShuffleInfoEvent) {
     // For pipelined shuffle
