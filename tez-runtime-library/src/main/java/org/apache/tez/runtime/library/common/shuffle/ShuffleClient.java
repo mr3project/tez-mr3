@@ -27,7 +27,6 @@ import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.awt.*;
 import java.io.IOException;
 import java.util.BitSet;
 import java.util.Collections;
@@ -193,6 +192,7 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
         continue;
       }
 
+      // use input.getInput() for quick checking
       if (!validateInputAttemptForPipelinedShuffle(input.getInput(), false)) {
         inputIter.remove();   // no need to fetch for input, so remove
         removedAnyInput = true;
@@ -214,7 +214,17 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
 
   // thread-safe because InputAttemptIdentifier is immutable
   protected boolean isObsoleteInputAttemptIdentifier(CompositeInputAttemptIdentifier input) {
-    return isObsoleteInputAttemptIdentifier(input.getInput());
+    if (input == null || obsoletedInputs.isEmpty()) {
+      return false;
+    }
+    Iterator<InputAttemptIdentifier> obsoleteInputsIter = obsoletedInputs.iterator();
+    while (obsoleteInputsIter.hasNext()) {
+      InputAttemptIdentifier obsoleteInput = obsoleteInputsIter.next();
+      if (input.include(obsoleteInput.getInputIdentifier(), obsoleteInput.getAttemptNumber())) {
+        return true;
+      }
+    }
+    return false;
   }
 
   protected boolean isObsoleteInputAttemptIdentifier(InputAttemptIdentifier input) {

@@ -27,12 +27,15 @@ public class CompositeInputAttemptIdentifier {
 
   private final int inputIdentifierCount;
 
-  public CompositeInputAttemptIdentifier(int inputIdentifier, int attemptNumber, String pathComponent, int inputIdentifierCount) {
+  public CompositeInputAttemptIdentifier(
+      int inputIdentifier, int attemptNumber, String pathComponent, int inputIdentifierCount) {
     this(inputIdentifier, attemptNumber, pathComponent, InputAttemptIdentifier.SPILL_INFO.FINAL_MERGE_ENABLED, -1, inputIdentifierCount);
   }
 
-  public CompositeInputAttemptIdentifier(int inputIdentifier, int attemptNumber, String pathComponent,
-                                         InputAttemptIdentifier.SPILL_INFO fetchTypeInfo, int spillEventId, int inputIdentifierCount) {
+  public CompositeInputAttemptIdentifier(
+      int inputIdentifier, int attemptNumber, String pathComponent,
+      InputAttemptIdentifier.SPILL_INFO fetchTypeInfo, int spillEventId,
+      int inputIdentifierCount) {
     this.input = new InputAttemptIdentifier(inputIdentifier, attemptNumber, pathComponent, fetchTypeInfo, spillEventId);
     this.inputIdentifierCount = inputIdentifierCount;
   }
@@ -105,6 +108,10 @@ public class CompositeInputAttemptIdentifier {
 
   @Override
   public String toString() {
-    return input.toString() + ", count=" + inputIdentifierCount;
+    StringBuilder s = new StringBuilder();
+    s.append(input.toString());
+    s.append(", count=");
+    s.append(inputIdentifierCount);
+    return s.toString();
   }
 }

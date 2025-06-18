@@ -197,6 +197,8 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
 
   public void addKnownMapOutput(
       String hostName, String containerId, int port, int partitionId, CompositeInputAttemptIdentifier srcAttempt) {
+    // Note: this check is optional.
+    // use srcAttempt.getInput() for quick checking
     if (!validateInputAttemptForPipelinedShuffle(srcAttempt.getInput(), false)) {
       return;
     }

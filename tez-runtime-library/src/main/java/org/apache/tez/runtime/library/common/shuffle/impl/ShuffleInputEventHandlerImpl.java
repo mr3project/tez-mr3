@@ -276,13 +276,15 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
                                      int partitionId, int targetIndex) throws IOException {
     int port = getShufflePort(shufflePayload, targetIndex);
     if (shufflePayload.hasData()) {
+      // hasData() == true iff. numPartitions == 1, so call shuffleManager.addCompletedInputWithData() only once
+      InputAttemptIdentifier input = srcAttemptIdentifier.getInput();
       DataProto dataProto = shufflePayload.getData();
 
       String hostIdentifier = shufflePayload.getHost() + ":" + port;
       FetchedInput fetchedInput = inputAllocator.allocate(dataProto.getRawLength(),
-          dataProto.getCompressedLength(), srcAttemptIdentifier.getInput());
+          dataProto.getCompressedLength(), input);
       moveDataToFetchedInput(dataProto, fetchedInput, hostIdentifier);
-      shuffleManager.addCompletedInputWithData(srcAttemptIdentifier, fetchedInput);
+      shuffleManager.addCompletedInputWithData(input, fetchedInput);
 
       LOG.debug("Payload via DME : " + srcAttemptIdentifier);
     } else {

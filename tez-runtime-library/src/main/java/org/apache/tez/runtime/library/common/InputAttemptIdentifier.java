@@ -137,8 +137,18 @@ public class InputAttemptIdentifier {
 
   @Override
   public String toString() {
-    return "InputAttemptIdentifier [inputIdentifier=" + inputIdentifier
-        + ", attemptNumber=" + attemptNumber + ", pathComponent="
-        + pathComponent + ", spillType=" + fetchTypeInfo + ", spillId=" + spillEventId + "]";
+    StringBuilder s = new StringBuilder();
+    s.append("InputAttemptIdentifier [inputIdentifier=");
+    s.append(inputIdentifier);
+    s.append(", attemptNumber=");
+    s.append(attemptNumber);
+    s.append(", pathComponent=");
+    s.append(pathComponent);
+    s.append(", spillType=");
+    s.append(fetchTypeInfo);
+    s.append(", spillId=");
+    s.append(spillEventId);
+    s.append("]");
+    return s.toString();
   }
 }

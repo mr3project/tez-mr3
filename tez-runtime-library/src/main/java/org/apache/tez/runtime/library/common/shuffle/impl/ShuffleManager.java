@@ -178,6 +178,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
                             CompositeInputAttemptIdentifier srcAttemptIdentifier, int partitionId) {
     // Note: this check is optional.
     // if we skip this check, we call killSelf() after fetches with different attemptNumbers succeed
+    // use input.getInput() for quick checking
     if (!validateInputAttemptForPipelinedShuffle(srcAttemptIdentifier.getInput(), false)) {
       return;
     }
@@ -210,7 +211,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
   }
 
   public void addCompletedInputWithData(
-      CompositeInputAttemptIdentifier srcAttemptIdentifier, FetchedInput fetchedInput) throws IOException {
+      InputAttemptIdentifier srcAttemptIdentifier, FetchedInput fetchedInput) throws IOException {
     int inputIdentifier = srcAttemptIdentifier.getInputIdentifier();
     if (LOG.isDebugEnabled()) {
       LOG.debug("Received Data via Event: " + srcAttemptIdentifier + " to " + fetchedInput.getType());
