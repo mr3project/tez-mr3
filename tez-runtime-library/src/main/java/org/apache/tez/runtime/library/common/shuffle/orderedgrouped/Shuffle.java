@@ -276,7 +276,7 @@ public class Shuffle implements ExceptionReporter {
       try {
         kvIter = merger.close(true);
       } catch (Throwable e) {
-        // Set the throwable so that future.get() sees the reported errror.
+        // Set the throwable so that future.get() sees the reported error.
         throwable.set(e);
         throw new ShuffleError("Error while doing final merge ", e);
       }
@@ -361,8 +361,7 @@ public class Shuffle implements ExceptionReporter {
           srcNameTrimmed, t.getMessage(), Thread.currentThread().getName());
       throwable.set(t);
       throwingThreadName = Thread.currentThread().getName();
-      // Notify the scheduler so that the reporting thread finds the 
-      // exception immediately.
+      // Notify the scheduler so that the reporting thread finds the exception immediately.
       cleanupShuffleSchedulerIgnoreErrors();
     }
   }

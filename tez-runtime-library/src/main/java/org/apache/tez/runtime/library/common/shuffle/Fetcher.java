@@ -20,6 +20,7 @@ package org.apache.tez.runtime.library.common.shuffle;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.http.BaseHttpConnection;
 import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.TaskContext;
@@ -201,9 +202,15 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
   }
 
   protected Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> buildInputMapFromIndex(int pendingInputsIndex) {
+    // This is the only place where Map<CompositeInputAttemptIdentifier, ...> is created.
+    // Ideally this should be List<Pair<CompositeInputAttemptIdentifier, ...>>.
+    // To make sure that Map<...> is effectively a List<...>, we have to make sure that
+    // all CompositeInputAttemptIdentifier instances are distinct. See CompositeInputAttemptIdentifier.equals().
     Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> inputsMap = new HashMap<>();
     for (int i = pendingInputsIndex; i < numInputs; i++) {
-      inputsMap.put(pendingInputsSeq.getInputs().get(i), pendingInputsSeq.getPartitionRange());
+      CompositeInputAttemptIdentifier input = pendingInputsSeq.getInputs().get(i);
+      assert !inputsMap.containsKey(input) : "Duplicate CompositeInputAttemptIdentifier instances found: " + input;
+      inputsMap.put(input, pendingInputsSeq.getPartitionRange());
     }
     return inputsMap;
   }
