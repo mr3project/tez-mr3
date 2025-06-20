@@ -48,12 +48,11 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
 
   private static final Logger LOG = LoggerFactory.getLogger(ShuffleInputEventHandlerOrderedGrouped.class);
 
-  private final ShuffleScheduler scheduler;
+  private final ShuffleScheduler shuffleScheduler;
   private final InputContext inputContext;
   private final boolean compositeFetch;
   private final Inflater inflater;
 
-  private final AtomicInteger nextToLogEventCount = new AtomicInteger(0);
   private final AtomicInteger numDmeEvents = new AtomicInteger(0);
   private final AtomicInteger numObsoletionEvents = new AtomicInteger(0);
   private final AtomicInteger numDmeEventsNoData = new AtomicInteger(0);
@@ -61,10 +60,10 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
   private final int portIndex;
 
   public ShuffleInputEventHandlerOrderedGrouped(InputContext inputContext,
-      ShuffleScheduler scheduler,
+      ShuffleScheduler shuffleScheduler,
       boolean compositeFetch) {
     this.inputContext = inputContext;
-    this.scheduler = scheduler;
+    this.shuffleScheduler = shuffleScheduler;
     this.compositeFetch = compositeFetch;
     this.inflater = TezCommonUtils.newInflater();
 
@@ -78,6 +77,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
     for (Event event : events) {
       handleEvent(event);
     }
+    shuffleScheduler.wakeupLoop();
   }
 
   @Override
@@ -87,7 +87,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
     s.append(", numDmeEventsSeen=" + numDmeEvents.get());
     s.append(", numDmeEventsSeenWithNoData=" + numDmeEventsNoData.get());
     s.append(", numObsoletionEventsSeen=" + numObsoletionEvents.get());
-    s.append(updateOnClose == true ? ", updateOnClose" : "");
+    s.append(updateOnClose ? ", updateOnClose" : "");
     LOG.info(s.toString());
   }
 
@@ -141,16 +141,19 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
       numObsoletionEvents.incrementAndGet();
       processTaskFailedEvent((InputFailedEvent) event);
     }
-    if (numDmeEvents.get() + numObsoletionEvents.get() > nextToLogEventCount.get()) {
+
+    if (numDmeEvents.get() == shuffleScheduler.getNumInputs() ||
+        numDmeEvents.get() + numObsoletionEvents.get() == shuffleScheduler.getNumInputs() ||
+        numDmeEvents.get() - numObsoletionEvents.get() == shuffleScheduler.getNumInputs()) {
       logProgress(false);
-      // Log every 1000 events seen.
-      nextToLogEventCount.addAndGet(1000);
     }
   }
 
-  private void processDataMovementEvent(DataMovementEvent dmEvent, DataMovementEventPayloadProto shufflePayload, BitSet emptyPartitionsBitSet) throws IOException {
+  private void processDataMovementEvent(
+      DataMovementEvent dmEvent, DataMovementEventPayloadProto shufflePayload, BitSet emptyPartitionsBitSet) {
     int partitionId = dmEvent.getSourceIndex();
-    CompositeInputAttemptIdentifier srcAttemptIdentifier = constructInputAttemptIdentifier(dmEvent.getTargetIndex(), 1, dmEvent.getVersion(), shufflePayload);
+    CompositeInputAttemptIdentifier srcAttemptIdentifier = constructInputAttemptIdentifier(
+        dmEvent.getTargetIndex(), 1, dmEvent.getVersion(), shufflePayload);
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("DME srcIdx: " + partitionId + ", targetIdx: " + dmEvent.getTargetIndex()
@@ -162,12 +165,11 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
       try {
         if (emptyPartitionsBitSet.get(partitionId)) {
           if (LOG.isDebugEnabled()) {
-            LOG.debug(
-                "Source partition: " + partitionId + " did not generate any data. SrcAttempt: ["
-                    + srcAttemptIdentifier + "]. Not fetching.");
+            LOG.debug("Source partition: " + partitionId + " did not generate any data. SrcAttempt: ["
+              + srcAttemptIdentifier + "]. Not fetching.");
           }
           numDmeEventsNoData.getAndIncrement();
-          scheduler.fetchSucceeded(srcAttemptIdentifier.expand(0), null, 0, 0, 0);
+          shuffleScheduler.fetchSucceeded(srcAttemptIdentifier.expand(0), null, 0, 0, 0);
           return;
         }
       } catch (IOException e) {
@@ -175,8 +177,10 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
       }
     }
     int port = getShufflePort(shufflePayload, dmEvent.getTargetIndex());
-    scheduler.addKnownMapOutput(StringInterner.intern(shufflePayload.getHost()), port,
-        partitionId, srcAttemptIdentifier);
+    shuffleScheduler.addKnownMapOutput(
+        StringInterner.intern(shufflePayload.getHost()),
+        StringInterner.intern(shufflePayload.getContainerId()),
+        port, partitionId, srcAttemptIdentifier);
   }
 
   private void processCompositeRoutedDataMovementEvent(
@@ -184,8 +188,8 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
       DataMovementEventPayloadProto shufflePayload,
       BitSet emptyPartitionsBitSet) throws IOException {
     int partitionId = crdmEvent.getSourceIndex();
-    CompositeInputAttemptIdentifier compositeInputAttemptIdentifier =
-        constructInputAttemptIdentifier(crdmEvent.getTargetIndex(), crdmEvent.getCount(), crdmEvent.getVersion(), shufflePayload);
+    CompositeInputAttemptIdentifier compositeInputAttemptIdentifier = constructInputAttemptIdentifier(
+        crdmEvent.getTargetIndex(), crdmEvent.getCount(), crdmEvent.getVersion(), shufflePayload);
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("DME srcIdx: " + partitionId + ", targetIdx: " + crdmEvent.getTargetIndex() + ", count:" + crdmEvent.getCount()
@@ -205,7 +209,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
                 + srcInputAttemptIdentifier + "]. Not fetching.");
           }
           numDmeEventsNoData.getAndIncrement();
-          scheduler.fetchSucceeded(srcInputAttemptIdentifier, null, 0, 0, 0);
+          shuffleScheduler.fetchSucceeded(srcInputAttemptIdentifier, null, 0, 0, 0);
         }
       }
 
@@ -215,27 +219,20 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
     }
 
     int port = getShufflePort(shufflePayload, crdmEvent.getTargetIndex());
-    scheduler.addKnownMapOutput(StringInterner.intern(shufflePayload.getHost()), port,
-        partitionId, compositeInputAttemptIdentifier);
+    shuffleScheduler.addKnownMapOutput(
+        StringInterner.intern(shufflePayload.getHost()),
+        StringInterner.intern(shufflePayload.getContainerId()),
+        port, partitionId, compositeInputAttemptIdentifier);
   }
 
   private int getShufflePort(DataMovementEventPayloadProto shufflePayload, int targetIndex) {
-    if (inputContext.useShuffleHandlerProcessOnK8s()) {
-      int[] localShufflePorts = scheduler.getLocalShufflePorts();
-      int numPorts = localShufflePorts.length;
-      return localShufflePorts[(portIndex + targetIndex) % numPorts];
-    } else {
-      int numPorts = shufflePayload.getNumPorts();
-      return numPorts > 0 ? shufflePayload.getPorts((portIndex + targetIndex) % numPorts) : 0;
-    }
+    int numPorts = shufflePayload.getNumPorts();
+    return numPorts > 0 ? shufflePayload.getPorts((portIndex + targetIndex) % numPorts) : 0;
   }
 
   private void processTaskFailedEvent(InputFailedEvent ifEvent) {
     InputAttemptIdentifier taIdentifier = new InputAttemptIdentifier(ifEvent.getTargetIndex(), ifEvent.getVersion());
-    scheduler.obsoleteKnownInput(taIdentifier);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Obsoleting output of src-task: " + taIdentifier);
-    }
+    shuffleScheduler.obsoleteKnownInput(taIdentifier);
   }
 
   /**

@@ -17,12 +17,8 @@
  */
 package org.apache.tez.runtime.library.common.shuffle.orderedgrouped;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.tez.common.Preconditions;
 import org.apache.commons.io.FilenameUtils;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ChecksumFileSystem;
 import org.apache.hadoop.fs.FileStatus;
@@ -35,7 +31,6 @@ import org.apache.hadoop.io.FileChunk;
 import org.apache.hadoop.io.RawComparator;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.util.Progressable;
-import org.apache.tez.common.TezUtilsInternal;
 import org.apache.tez.common.counters.TaskCounter;
 import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.dag.api.TezUncheckedException;
@@ -46,6 +41,7 @@ import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.combine.Combiner;
 import org.apache.tez.runtime.library.common.serializer.SerializationContext;
+import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Writer;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger;
@@ -72,8 +68,6 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Usage. Create instance. setInitialMemoryAvailable(long), configureAndStart()
  *
  */
-@InterfaceAudience.Private
-@InterfaceStability.Unstable
 @SuppressWarnings(value={"rawtypes"})
 public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   
@@ -92,23 +86,18 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   };
   private final Combiner combiner;  
   
-  @VisibleForTesting
   final Set<MapOutput> inMemoryMergedMapOutputs =
     new TreeSet<MapOutput>(new MapOutput.MapOutputComparator());
   private final IntermediateMemoryToMemoryMerger memToMemMerger;
 
-  @VisibleForTesting
   final Set<MapOutput> inMemoryMapOutputs =
     new TreeSet<MapOutput>(new MapOutput.MapOutputComparator());
   private final InMemoryMerger inMemoryMerger;
 
-  @VisibleForTesting
   final Set<FileChunk> onDiskMapOutputs = new TreeSet<FileChunk>();
-  @VisibleForTesting
   final OnDiskMerger onDiskMerger;
   
   private final long memoryLimit;
-  @VisibleForTesting
   final long postMergeMemLimit;
   private long usedMemory;
   private long commitMemory;
@@ -136,7 +125,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   
   private final boolean ifileReadAhead;
   private final int ifileReadAheadLength;
-  private final int ifileBufferSize;
 
   // Variables for stats
   private final SegmentStatsTracker statsInMemTotal = new SegmentStatsTracker();
@@ -148,6 +136,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   private final SerializationContext serializationContext;
 
   private final boolean useFreeMemoryFetchedInput;
+  private final long freeMemoryThreshold;
 
   /**
    * Construct the MergeManager. Must call start before it becomes usable.
@@ -173,11 +162,14 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
     this.spilledRecordsCounter = spilledRecordsCounter;
     this.mergedMapOutputsCounter = mergedMapOutputsCounter;
+
+    boolean compositeFetch = inputContext.getFetcherConfig().compositeFetch;
     this.mapOutputFile = new TezTaskOutputFiles(conf,
         inputContext.getUniqueIdentifier(),
         inputContext.getDagIdentifier(),
         inputContext.getExecutionContext().getContainerId(),
-        inputContext.getTaskVertexIndex());
+        inputContext.getTaskVertexIndex(),
+        compositeFetch);
 
     this.localFS = localFS;
     this.rfs = ((LocalFileSystem)localFS).getRaw();
@@ -197,9 +189,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     } else {
       this.ifileReadAheadLength = 0;
     }
-    this.ifileBufferSize = conf.getInt("io.file.buffer.size",
-        TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_BUFFER_SIZE_DEFAULT);
-    
+
     // Figure out initial memory req start
     final float maxInMemCopyUse = conf.getFloat(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT,
@@ -299,11 +289,12 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     this.useFreeMemoryFetchedInput = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT,
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT_DEFAULT);
+    this.freeMemoryThreshold = inputContext.getTotalMemoryAvailableToTask();
+    // TODO: introduce a factor for freeMemoryThreshold (e.g. 0.5)
   }
 
   void setupParentThread(Thread shuffleSchedulerThread) {
-    LOG.info("Setting merger's parent thread to "
-        + shuffleSchedulerThread.getName());
+    LOG.info("Setting merger's parent thread to " + shuffleSchedulerThread.getName());
     if (this.memToMemMerger != null) {
       memToMemMerger.setParentThread(shuffleSchedulerThread);
     }
@@ -311,7 +302,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     this.onDiskMerger.setParentThread(shuffleSchedulerThread);
   }
 
-  @Private
   void configureAndStart() {
     if (this.memToMemMerger != null) {
       memToMemMerger.start();
@@ -323,7 +313,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   /**
    * Exposing this to get an initial memory ask without instantiating the object.
    */
-  @Private
   static long getInitialMemoryRequirement(Configuration conf, long maxAvailableTaskMemory) {
     final float maxInMemCopyUse =
         conf.getFloat(
@@ -436,9 +425,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         }
         // Check if we can find free memory in the current ContainerWorker
         long currentFreeMemory = Runtime.getRuntime().freeMemory();
-        if (currentFreeMemory < inputContext.getTotalMemoryAvailableToTask()){
+        if (currentFreeMemory < freeMemoryThreshold){
           // this ContainerWorker is busy serving Tasks, so do not borrow
-          // TODO: introduce a factor for maxAvailableTaskMemory (e.g. 0.5). Cf. SimpleFetchedInputAllocator
           return stallShuffle;
         }
         if (LOG.isDebugEnabled()) {
@@ -489,7 +477,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     inMemoryMapOutputs.add(mapOutput);
     trackAndLogCloseInMemoryFile(mapOutput);
 
-    commitMemory+= mapOutput.getSize();
+    commitMemory += mapOutput.getSize();
 
     if (commitMemory >= mergeThreshold) {
       startMemToDiskMerge();
@@ -553,14 +541,13 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
   @Override
   public synchronized void closeOnDiskFile(FileChunk file) {
-    //including only path & offset for valdiations.
+    // including only path & offset for valdiations.
     for (FileChunk fileChunk : onDiskMapOutputs) {
       if (fileChunk.getPath().equals(file.getPath())) {
-        //ensure offsets are not the same.
+        // ensure offsets are not the same.
         Preconditions.checkArgument(fileChunk.getOffset() != file.getOffset(),
-            "Can't have a file with same path and offset."
-            + "OldFilePath=" + fileChunk.getPath() + ", OldFileOffset=" + fileChunk.getOffset() +
-            ", newFilePath=" + file.getPath() + ", newFileOffset=" + file.getOffset());
+            "Can't have a file with same path and offset. OldFilePath={}, OldFileOffset={}, newFilePath={}, newFileOffset={}",
+          fileChunk.getPath(), fileChunk.getOffset(), file.getPath(), file.getOffset());
       }
     }
 
@@ -577,9 +564,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
   private void logCloseOnDiskFile(FileChunk file) {
     if (LOG.isDebugEnabled()) {
-      LOG.debug(
-          "close onDiskFile=" + file.getPath() + ", len=" + file.getLength() +
-              ", onDisMapOutputs=" + onDiskMapOutputs.size());
+      LOG.debug("close onDiskFile=" + file.getPath() + ", len=" + file.getLength() +
+          ", onDisMapOutputs=" + onDiskMapOutputs.size());
     }
   }
 
@@ -592,8 +578,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       inMemoryMerger.close();
       onDiskMerger.close();
 
-      List<MapOutput> memory =
-          new ArrayList<MapOutput>(inMemoryMergedMapOutputs);
+      List<MapOutput> memory = new ArrayList<MapOutput>(inMemoryMergedMapOutputs);
       inMemoryMergedMapOutputs.clear();
       memory.addAll(inMemoryMapOutputs);
       inMemoryMapOutputs.clear();
@@ -605,7 +590,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
             "TotalInMemFetchStats: count={}, totalSize={}, min={}, max={}, avg={}",
             statsInMemTotal.count, statsInMemTotal.size,
             statsInMemTotal.minSize, statsInMemTotal.maxSize,
-            (statsInMemTotal.size / (float) statsInMemTotal.size));
+            (statsInMemTotal.size / (float) statsInMemTotal.count));
       }
 
       // Don't attempt a final merge if close is invoked as a result of a previous
@@ -615,7 +600,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
           TezRawKeyValueIterator kvIter = finalMerge(conf, rfs, memory, disk);
           return kvIter;
         } catch (InterruptedException e) {
-          //Cleanup the disk segments
+          // Clean up the disk segments
           if (cleanup) {
             cleanup(localFS, disk);
             cleanup(localFS, onDiskMapOutputs);
@@ -628,11 +613,9 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     return null;
   }
 
-  @VisibleForTesting
   public boolean isShutdown() {
     return isShutdown.get();
   }
-
 
   static void cleanup(FileSystem fs, Collection<FileChunk> fileChunkList) {
     for (FileChunk fileChunk : fileChunkList) {
@@ -669,9 +652,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     public IntermediateMemoryToMemoryMerger(MergeManager manager, 
                                             int mergeFactor) {
       super(manager, mergeFactor, exceptionReporter);
-      setName("MemToMemMerger [" + TezUtilsInternal
-          .cleanVertexName(inputContext.getSourceVertexName())
-          + "_" + inputContext.getUniqueIdentifier() + "]");
+      setName("MemToMemMerger [" + inputContext.getSourceVertexName() + "_" + inputContext.getUniqueIdentifier() + "]");
       setDaemon(true);
     }
 
@@ -703,7 +684,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
                   + ", usedMemory=" + manager.getUsedMemory()
                   + ", memoryLimit=" + memoryLimit);
             }
-            continue;
           } else {
             mergeOutputSize += mo.getSize();
             IFile.Reader reader = new InMemoryReader(MergeManager.this,
@@ -712,7 +692,9 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
                 (mo.isPrimaryMapOutput() ? mergedMapOutputsCounter : null)));
             lastAddedMapOutput = mo;
             it.remove();
-            LOG.debug("Added segment for merging. mergeOutputSize=" + mergeOutputSize);
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Added segment for merging. mergeOutputSize=" + mergeOutputSize);
+            }
           }
         }
 
@@ -732,7 +714,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
       int noInMemorySegments = inMemorySegments.size();
 
-      Writer writer = new InMemoryWriter(mergedMapOutputs.getMemory());
+      IFile.WriterAppend writer = new InMemoryWriter(mergedMapOutputs.getMemory());
 
       LOG.info("{}: Initiating Memory-to-Memory merge with {} segments of total-size: {}",
           inputContext.getSourceVertexName(), noInMemorySegments, mergeOutputSize);
@@ -773,21 +755,17 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
    */
   private class InMemoryMerger extends MergeThread<MapOutput> {
 
-    @VisibleForTesting
     volatile InputAttemptIdentifier srcTaskIdentifier;
-
-    @VisibleForTesting
     volatile Path outputPath;
-
-    @VisibleForTesting
     volatile Path tmpDir;
+
+    private final byte[] writeBuffer;
 
     public InMemoryMerger(MergeManager manager) {
       super(manager, Integer.MAX_VALUE, exceptionReporter);
-      setName("MemtoDiskMerger [" +  TezUtilsInternal
-          .cleanVertexName(inputContext.getSourceVertexName())
-          + "_" + inputContext.getUniqueIdentifier()  + "]");
+      setName("MemtoDiskMerger [" + inputContext.getSourceVertexName() + "_" + inputContext.getUniqueIdentifier()  + "]");
       setDaemon(true);
+      writeBuffer = IFile.allocateWriteBuffer();
     }
     
     @Override
@@ -798,15 +776,15 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
       numMemToDiskMerges.increment(1);
 
-      //name this output file same as the name of the first file that is 
-      //there in the current list of inmem files (this is guaranteed to
-      //be absent on the disk currently. So we don't overwrite a prev. 
-      //created spill). Also we need to create the output file now since
-      //it is not guaranteed that this file will be present after merge
-      //is called (we delete empty files as soon as we see them
-      //in the merge method)
+      // name this output file same as the name of the first file that is
+      // there in the current list of inmem files (this is guaranteed to
+      // be absent on the disk currently. So we don't overwrite a prev.
+      // created spill). Also we need to create the output file now since
+      // it is not guaranteed that this file will be present after merge
+      // is called (we delete empty files as soon as we see them
+      // in the merge method)
 
-      //figure out the mapId 
+      // figure out the mapId
       srcTaskIdentifier = inputs.get(0).getAttemptIdentifier();
 
       List<Segment> inMemorySegments = new ArrayList<Segment>();
@@ -824,11 +802,10 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       Writer writer = null;
       long outFileLen = 0;
       try {
-        writer =
-            new Writer(serializationContext.getKeySerialization(),
-                serializationContext.getValSerialization(), rfs, outputPath,
-                serializationContext.getKeyClass(), serializationContext.getValueClass(), codec,
-                null, null);
+        writer = new Writer(serializationContext.getKeySerialization(),
+            serializationContext.getValSerialization(), rfs, outputPath,
+            serializationContext.getKeyClass(), serializationContext.getValueClass(), codec,
+            null, null, writeBuffer);
 
         TezRawKeyValueIterator rIter = null;
         LOG.info("Initiating in-memory merge with {} segments", noInMemorySegments);
@@ -847,7 +824,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         if (null == combiner) {
           TezMerger.writeFile(rIter, writer, progressable, TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
         } else {
-          // TODO Counters for Combine
           runCombineProcessor(rIter, writer);
         }
         writer.close();
@@ -889,20 +865,18 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   /**
    * Merges multiple on-disk segments
    */
-  @VisibleForTesting
   class OnDiskMerger extends MergeThread<FileChunk> {
 
-    @VisibleForTesting
     volatile Path outputPath;
-    @VisibleForTesting
     volatile Path tmpDir;
+
+    private final byte[] writeBuffer;
 
     public OnDiskMerger(MergeManager manager) {
       super(manager, ioSortFactor, exceptionReporter);
-      setName("DiskToDiskMerger [" +  TezUtilsInternal
-          .cleanVertexName(inputContext.getSourceVertexName())
-          + "_" + inputContext.getUniqueIdentifier() + "]");
+      setName("DiskToDiskMerger [" +  inputContext.getSourceVertexName() + "_" + inputContext.getUniqueIdentifier() + "]");
       setDaemon(true);
+      writeBuffer = IFile.allocateWriteBuffer();
     }
     
     @Override
@@ -935,7 +909,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         final Path file = fileChunk.getPath();
         approxOutputSize += size;
         DiskSegment segment = new DiskSegment(rfs, file, offset, size, codec, ifileReadAhead,
-            ifileReadAheadLength, ifileBufferSize, preserve, inputContext);
+            ifileReadAheadLength, preserve, inputContext);
         inputSegments.add(segment);
       }
 
@@ -965,7 +939,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       Writer writer = new Writer(serializationContext.getKeySerialization(),
           serializationContext.getValSerialization(), rfs, outputPath,
           serializationContext.getKeyClass(), serializationContext.getValueClass(), codec, null,
-          null);
+          null, writeBuffer);
       tmpDir = new Path(inputContext.getUniqueIdentifier());
       try {
         TezRawKeyValueIterator iter = TezMerger.merge(conf, rfs,
@@ -977,8 +951,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
             mergedMapOutputsCounter, null, inputContext);
 
         // TODO Maybe differentiate between data written because of Merges and
-        // the finalMerge (i.e. final mem available may be different from
-        // initial merge mem)
+        // the finalMerge (i.e. final mem available may be different from initial merge mem)
         TezMerger.writeFile(iter, writer, progressable, TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
         writer.close();
         additionalBytesWritten.increment(writer.getCompressedLength());
@@ -1046,10 +1019,11 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     public RawKVIteratorReader(TezRawKeyValueIterator kvIter, long size)
         throws IOException {
       super(null, size, null, spilledRecordsCounter, null, ifileReadAhead,
-          ifileReadAheadLength, ifileBufferSize, inputContext);
+          ifileReadAheadLength, inputContext);
       this.kvIter = kvIter;
       this.size = size;
     }
+
     @Override
     public KeyState readRawKey(DataInputBuffer key) throws IOException {
       if (kvIter.next()) {
@@ -1062,6 +1036,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       }
       return KeyState.NO_KEY;
     }
+
     public void nextRawValue(DataInputBuffer value) throws IOException {
       final DataInputBuffer vb = kvIter.getValue();
       final int vp = vb.getPosition();
@@ -1069,6 +1044,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       value.reset(vb.getData(), vp, vlen);
       bytesRead += vlen;
     }
+
     public long getPosition() throws IOException {
       return bytesRead;
     }
@@ -1103,8 +1079,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       int srcTaskId = inMemoryMapOutputs.get(0).getAttemptIdentifier().getInputIdentifier();
       inMemToDiskBytes = createInMemorySegments(inMemoryMapOutputs, memDiskSegments, this.postMergeMemLimit);
       final int numMemDiskSegments = memDiskSegments.size();
-      if (numMemDiskSegments > 0 &&
-            ioSortFactor > onDiskMapOutputs.size()) {
+      if (numMemDiskSegments > 0 && ioSortFactor > onDiskMapOutputs.size()) {
         
         // If we reach here, it implies that we have less than io.sort.factor
         // disk segments and this will be incremented by 1 (result of the 
@@ -1122,9 +1097,10 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         final TezRawKeyValueIterator rIter = TezMerger.merge(job, fs, serContext,
             memDiskSegments, numMemDiskSegments, tmpDir, comparator, progressable,
             spilledRecordsCounter, null, additionalBytesRead, null, inputContext);
+        final byte[] writeBuffer = IFile.allocateWriteBuffer();
         final Writer writer = new Writer(serContext.getKeySerialization(),
             serContext.getValSerialization(), fs, outputPath, serContext.getKeyClass(),
-            serContext.getValueClass(), codec, null, null);
+            serContext.getValueClass(), codec, null, null, writeBuffer);
         try {
           TezMerger.writeFile(rIter, writer, progressable, TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
         } catch (IOException e) {
@@ -1189,7 +1165,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       final long fileOffset = fileChunk.getOffset();
       final boolean preserve = fileChunk.isLocalFile();
       diskSegments.add(new DiskSegment(fs, file, fileOffset, fileLength, codec, ifileReadAhead,
-                                   ifileReadAheadLength, ifileBufferSize, preserve, counter, inputContext));
+                                   ifileReadAheadLength, preserve, counter, inputContext));
     }
     if (LOG.isInfoEnabled()) {
       finalMergeLog.append(". DiskSeg: " + onDisk.length + ", " + onDiskBytes);
@@ -1243,7 +1219,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         additionalBytesRead, null, inputContext);
   }
 
-
   private void logFinalMergeStart(List<MapOutput> inMemoryMapOutputs,
                                   List<FileChunk> onDiskMapOutputs) {
     long inMemSegmentSize = 0;
@@ -1272,12 +1247,10 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   }
 
   // always called inside synchronized (MergeManager) {}
-  @VisibleForTesting
   long getUsedMemory() {
     return usedMemory;
   }
 
-  @VisibleForTesting
   void waitForMemToMemMerge() throws InterruptedException {
     memToMemMerger.waitForMerge();
   }

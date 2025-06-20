@@ -21,13 +21,10 @@ package org.apache.tez.runtime.api;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
 
 import javax.annotation.Nullable;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.tez.common.counters.TezCounters;
 import org.apache.tez.dag.api.UserPayload;
@@ -37,7 +34,6 @@ import org.apache.tez.dag.api.UserPayload;
  * and Processor instances.
  * This interface is not supposed to be implemented by users
  */
-@Public
 public interface TaskContext extends DecompressorPool {
   /**
    * Get the {@link ApplicationId} for the running app
@@ -104,6 +100,8 @@ public interface TaskContext extends DecompressorPool {
    */
   public UserPayload getUserPayload();
 
+  public Configuration getConfigurationFromUserPayload(boolean createCopy);
+
   /**
    * Get the work directories for the Input/Output/Processor
    * @return an array of work dirs
@@ -117,7 +115,9 @@ public interface TaskContext extends DecompressorPool {
    * @return a unique identifier
    */
   public String getUniqueIdentifier();
-  
+
+  public String getTaskAttemptIdStr();
+
   /**
    * Returns a shared {@link ObjectRegistry} to hold user objects in memory 
    * between tasks. 
@@ -157,8 +157,6 @@ public interface TaskContext extends DecompressorPool {
    * @param exception an associated exception
    * @param message an associated diagnostic message
    */
-  @Private
-  @Unstable
   void killSelf(@Nullable Throwable exception, @Nullable String message);
 
   /**
@@ -189,8 +187,6 @@ public interface TaskContext extends DecompressorPool {
   public int consumeServiceProviderMetaData(String service);
 
   public scala.Tuple2<java.lang.Integer, java.lang.Integer> getDaemonShuffleHandlerUsePort();
-
-  public boolean useShuffleHandlerProcessOnK8s();
 
   /**
    * Request a specific amount of memory during initialization
@@ -262,4 +258,11 @@ public interface TaskContext extends DecompressorPool {
   // we use Object (instead of ShuffleServer) because of dependency issues
   public void setShuffleServer(Object shuffleServer);
   public Object getShuffleServer() throws IOException;
+  public Object peekShuffleServer();
+
+  public IndexPathCache getIndexPathCache();
+  public ConcurrentByteCache getConcurrentByteCache();
+
+  public void setFetcherConfig(FetcherConfig fetcherConfig);
+  public FetcherConfig getFetcherConfig();
 }

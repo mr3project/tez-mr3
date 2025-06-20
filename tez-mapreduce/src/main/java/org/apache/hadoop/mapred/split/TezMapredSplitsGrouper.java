@@ -33,8 +33,6 @@ import org.apache.tez.mapreduce.grouper.SplitSizeEstimatorWrapperMapred;
 import org.apache.tez.mapreduce.grouper.TezSplitGrouper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapred.InputSplit;
 
@@ -43,8 +41,6 @@ import org.apache.hadoop.mapred.InputSplit;
  * using various parameters. A {@link TezGroupedSplit} is used
  * to wrap the real InputSplits in a group.
  */
-@Public
-@Evolving
 public class TezMapredSplitsGrouper extends TezSplitGrouper {
   private static final Logger LOG = LoggerFactory.getLogger(TezMapredSplitsGrouper.class);
 

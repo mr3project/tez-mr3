@@ -17,10 +17,6 @@
  */
 package org.apache.tez.dag.api;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
-
 import org.apache.tez.common.Preconditions;
 
 /**
@@ -31,7 +27,6 @@ import org.apache.tez.common.Preconditions;
  * at the destination via the @link {@link InputDescriptor} and @link
  * {@link OutputDescriptor}
  */
-@Public
 public class EdgeProperty {
 
 
@@ -78,14 +73,12 @@ public class EdgeProperty {
     /**
      * Source data is stored reliably and will always be available. This is not supported yet.
      */
-    @Unstable
     PERSISTED_RELIABLE,
     /**
      * Data produced by the source task is available only while the source task
      * is running. This requires the destination task to run concurrently with 
      * the source task. This is not supported yet.
      */
-    @Unstable
     EPHEMERAL
   }
   
@@ -103,7 +96,6 @@ public class EdgeProperty {
      * Destination task must run concurrently with the source task.
      *  This is not supported yet.
      */
-    @Unstable
     CONCURRENT
   }
   
@@ -155,7 +147,6 @@ public class EdgeProperty {
         edgeDestination);
   }
 
-  @Private
   public static EdgeProperty create(EdgeManagerPluginDescriptor edgeManagerDescriptor,
       DataMovementType dataMovementType, DataSourceType dataSourceType,
       SchedulingType schedulingType, OutputDescriptor edgeSource, InputDescriptor edgeDestination) {
@@ -236,7 +227,6 @@ public class EdgeProperty {
    * Returns the Edge Manager specifications for this edge.  
    * @return @link {@link EdgeManagerPluginDescriptor} if a custom edge was setup, null otherwise.
    */
-  @Private
   public EdgeManagerPluginDescriptor getEdgeManagerDescriptor() {
     return edgeManagerDescriptor;
   }

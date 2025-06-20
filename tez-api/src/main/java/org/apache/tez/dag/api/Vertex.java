@@ -25,10 +25,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.yarn.api.records.LocalResource;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.tez.common.TezCommonUtils;
@@ -45,7 +41,6 @@ import com.google.common.collect.Maps;
  * vertex represents the template from which tasks are created to execute 
  * the application in parallel across a distributed execution environment.
  */
-@Public
 public class Vertex {
 
   private final String vertexName;
@@ -74,7 +69,6 @@ public class Vertex {
   
   private String taskLaunchCmdOpts = "";
 
-  @InterfaceAudience.Private
   Vertex(String vertexName,
          ProcessorDescriptor processorDescriptor,
          int parallelism,
@@ -332,9 +326,9 @@ public class Vertex {
    */
   public Vertex addDataSource(String inputName, DataSourceDescriptor dataSourceDescriptor) {
     Preconditions.checkArgument(StringUtils.isNotBlank(inputName),
-        "InputName should not be null, empty or white space only, inputName=" + inputName);
+        "InputName should not be null, empty or white space only, inputName={}", inputName);
     Preconditions.checkArgument(!additionalInputs.containsKey(inputName),
-        "Duplicated input:" + inputName + ", vertexName=" + vertexName);
+        "Duplicated input {}, vertexName {}", inputName,  vertexName);
     additionalInputs
         .put(inputName, new RootInputLeafOutput<InputDescriptor, InputInitializerDescriptor>(
             inputName, dataSourceDescriptor.getInputDescriptor(),
@@ -363,9 +357,9 @@ public class Vertex {
    */
   public Vertex addDataSink(String outputName, DataSinkDescriptor dataSinkDescriptor) {
     Preconditions.checkArgument(StringUtils.isNotBlank(outputName),
-        "OutputName should not be null, empty or white space only, outputName=" + outputName);
+        "OutputName should not be null, empty or white space only, outputName={}", outputName);
     Preconditions.checkArgument(!additionalOutputs.containsKey(outputName),
-        "Duplicated output:" + outputName + ", vertexName=" + vertexName);
+        "Duplicated output {}, vertexName {}", outputName, vertexName);
     additionalOutputs
         .put(outputName, new RootInputLeafOutput<OutputDescriptor, OutputCommitterDescriptor>(
             outputName, dataSinkDescriptor.getOutputDescriptor(),
@@ -376,9 +370,9 @@ public class Vertex {
 
   Vertex addAdditionalDataSink(RootInputLeafOutput<OutputDescriptor, OutputCommitterDescriptor> output) {
     Preconditions.checkArgument(StringUtils.isNotBlank(output.getName()),
-        "OutputName should not be null, empty or white space only, outputName=" + output.getName());
+        "OutputName should not be null, empty or white space only, outputName={}", output.getName());
     Preconditions.checkArgument(!additionalOutputs.containsKey(output.getName()),
-        "Duplicated output:" + output.getName() + ", vertexName=" + vertexName);
+        "Duplicated output {}, vertexName {}", output.getName(), vertexName);
     additionalOutputs.put(output.getName(), output);
     return this;
   }
@@ -424,7 +418,6 @@ public class Vertex {
    * @param value the value for the property
    * @return the current DAG being constructed
    */
-  @InterfaceStability.Unstable
   public Vertex setConf(String property, String value) {
     TezConfiguration.validateProperty(property, Scope.VERTEX);
     this.vertexConf.put(property, value);
@@ -449,8 +442,6 @@ public class Vertex {
   /**
    * The execution context for a running vertex.
    */
-  @Public
-  @InterfaceStability.Unstable
   public static class VertexExecutionContext {
     final boolean executeInAm;
     final boolean executeInContainers;
@@ -657,17 +648,14 @@ public class Vertex {
     this.taskResource = resource;
   }
 
-  @Private
   public List<DataSourceDescriptor> getDataSources() {
     return dataSources;
   }
   
-  @Private
   public List<DataSinkDescriptor> getDataSinks() {
     return dataSinks;
   }
 
-  @Private
   public VertexExecutionContext getVertexExecutionContext() {
     return this.vertexExecutionContext;
   }

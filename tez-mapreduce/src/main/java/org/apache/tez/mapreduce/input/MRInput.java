@@ -29,8 +29,6 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.tez.runtime.api.ProgressFailedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -40,7 +38,6 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.split.JobSplit.TaskSplitIndex;
 import org.apache.hadoop.mapreduce.split.JobSplit.TaskSplitMetaInfo;
 import org.apache.hadoop.security.Credentials;
-import org.apache.tez.common.TezUtils;
 import org.apache.tez.common.counters.TaskCounter;
 import org.apache.tez.dag.api.DataSourceDescriptor;
 import org.apache.tez.dag.api.InputDescriptor;
@@ -80,13 +77,18 @@ import com.google.common.collect.Lists;
  * 
  * This class is not meant to be extended by external projects.
  */
-@Public
 public class MRInput extends MRInputBase {
 
-  @Private public static final String TEZ_MAPREDUCE_DAG_ID= "tez.mapreduce.dag.id";
-  @Private public static final String TEZ_MAPREDUCE_TASK_ATTEMPT_ID = "tez.mapreduce.task.attempt.id";
+  // Not read in Tez-MR3, but required by Hive-MR3 LlapRecordReader for MDC.
+  // Can be set to any string because it is used only for MDC.
+  public static final String TEZ_MAPREDUCE_DAG_ID= "tez.mapreduce.dag.id";
 
-  @Private public static final String TEZ_MR3_SCHEDULED_ON_HOST = "tez.mr3.scheduled.on.host";
+  // Not read in Tez-MR3, but required by Hive-MR3 LlapRecordReader as the identifier for FragmentCountersMap.
+  // Can be set to any string in MRInputBase as long as it is consistent with the setting in
+  // TezProcessor.initializeAndRunProcessor().
+  public static final String TEZ_MAPREDUCE_TASK_ATTEMPT_ID = "tez.mapreduce.task.attempt.id";
+
+  public static final String TEZ_MR3_SCHEDULED_ON_HOST = "tez.mr3.scheduled.on.host";
 
   /**
    * Helper class to configure {@link MRInput}
@@ -126,12 +128,10 @@ public class MRInput extends MRInputBase {
         try {
           if (useNewApi) {
             this.inputFormat = conf.getClassByName(conf.get(MRJobConfig.INPUT_FORMAT_CLASS_ATTR));
-            Preconditions.checkState(org.apache.hadoop.mapreduce.InputFormat.class
-                .isAssignableFrom(this.inputFormat));
+            Preconditions.checkState(org.apache.hadoop.mapreduce.InputFormat.class.isAssignableFrom(this.inputFormat));
           } else {
             this.inputFormat = conf.getClassByName(conf.get("mapred.input.format.class"));
-            Preconditions.checkState(org.apache.hadoop.mapred.InputFormat.class
-                .isAssignableFrom(this.inputFormat));
+            Preconditions.checkState(org.apache.hadoop.mapred.InputFormat.class.isAssignableFrom(this.inputFormat));
           }
         } catch (ClassNotFoundException e) {
           throw new TezUncheckedException(e);
@@ -418,7 +418,6 @@ public class MRInput extends MRInputBase {
 
   // Potential counters - #splits, #totalSize, #actualyBytesRead
   
-  @Private
   volatile boolean splitInfoViaEvents;
 
   public MRInput(InputContext inputContext, int numPhysicalInputs) {
@@ -431,8 +430,8 @@ public class MRInput extends MRInputBase {
     getContext().inputIsReady();
     this.splitInfoViaEvents = jobConf.getBoolean(MRJobConfig.MR_TEZ_SPLITS_VIA_EVENTS,
         MRJobConfig.MR_TEZ_SPLITS_VIA_EVENTS_DEFAULT);
-    LOG.info("{} using newmapreduce API={}, split via event={}, numPhysicalInputs={}",  // log useNewApi to check if Iceberg is correctly handled
-        getContext().getSourceVertexName(), useNewApi, splitInfoViaEvents, getNumPhysicalInputs());
+    if (LOG.isDebugEnabled()) { LOG.debug("{} using newmapreduce API={}, split via event={}, numPhysicalInputs={}",  // log useNewApi to check if Iceberg is correctly handled
+        getContext().getSourceVertexName(), useNewApi, splitInfoViaEvents, getNumPhysicalInputs()); }
     initializeInternal();
     return null;
   }
@@ -443,7 +442,6 @@ public class MRInput extends MRInputBase {
         "Expecting 0 or 1 physical input for MRInput");
   }
 
-  @Private
   void initializeInternal() throws IOException {
     // Primarily for visibility
     rrLock.lock();
@@ -507,9 +505,8 @@ public class MRInput extends MRInputBase {
    */
   @Override
   public KeyValueReader getReader() throws IOException {
-    Preconditions
-        .checkState(readerCreated == false,
-            "Only a single instance of record reader can be created for this input.");
+    Preconditions.checkState(readerCreated == false,
+        "Only a single instance of record reader can be created for this input.");
     readerCreated = true;
     if (getNumPhysicalInputs() == 0) {
       return new KeyValueReader() {
@@ -627,7 +624,6 @@ public class MRInput extends MRInputBase {
     }
   }
 
-  @Private
   void initFromEvent(InputDataInformationEvent initEvent)
       throws IOException {
     rrLock.lock();

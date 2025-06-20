@@ -20,7 +20,6 @@ package org.apache.tez.mapreduce.input.base;
 
 import org.apache.tez.common.Preconditions;
 
-import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.TaskAttemptID;
@@ -30,10 +29,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.tez.common.TezUtils;
 import org.apache.tez.common.counters.TaskCounter;
 import org.apache.tez.common.counters.TezCounter;
-import org.apache.tez.dag.records.TezDAGID;
-import org.apache.tez.dag.records.TezTaskAttemptID;
-import org.apache.tez.dag.records.TezTaskID;
-import org.apache.tez.dag.records.TezVertexID;
 import org.apache.tez.mapreduce.hadoop.MRInputHelpers;
 import org.apache.tez.mapreduce.hadoop.MRJobConfig;
 import org.apache.tez.mapreduce.input.MRInput;
@@ -47,7 +42,6 @@ import java.io.IOException;
 import java.util.List;
 
 
-@InterfaceAudience.Private
 public abstract class MRInputBase extends AbstractLogicalInput {
 
   protected JobConf jobConf;
@@ -62,7 +56,6 @@ public abstract class MRInputBase extends AbstractLogicalInput {
     return null;
   }
 
-  @InterfaceAudience.Private
   protected boolean useNewApi;
 
   public List<Event> initialize() throws IOException {
@@ -71,9 +64,8 @@ public abstract class MRInputBase extends AbstractLogicalInput {
         MRInputHelpers.parseMRInputPayload(getContext().getUserPayload());
     boolean isGrouped = mrUserPayload.getGroupingEnabled();
     Preconditions.checkArgument(mrUserPayload.hasSplits() == false,
-        "Split information not expected in " + this.getClass().getName());
-    Configuration conf = TezUtils
-        .createConfFromByteString(mrUserPayload.getConfigurationBytes());
+        "Split information not expected in {}", this.getClass().getName());
+    Configuration conf = TezUtils.createConfFromByteString(mrUserPayload.getConfigurationBytes());
     this.jobConf = new JobConf(conf);
     useNewApi = this.jobConf.getUseNewMapper();
     if (isGrouped) {
@@ -95,18 +87,11 @@ public abstract class MRInputBase extends AbstractLogicalInput {
             getContext().getApplicationId().getId(), TaskType.MAP,
             getContext().getTaskIndex()),
         getContext().getTaskAttemptNumber());
+    jobConf.set(MRJobConfig.TASK_ATTEMPT_ID, taskAttemptId.toString());
+    jobConf.setInt(MRJobConfig.APPLICATION_ATTEMPT_ID, getContext().getDAGAttemptNumber());
 
-    jobConf.set(MRJobConfig.TASK_ATTEMPT_ID,
-        taskAttemptId.toString());
-    jobConf.setInt(MRJobConfig.APPLICATION_ATTEMPT_ID,
-        getContext().getDAGAttemptNumber());
-
-    TezDAGID tezDAGID = TezDAGID.getInstance(getContext().getApplicationId(), getContext().getDagIdentifier());
-    TezVertexID tezVertexID = TezVertexID.getInstance(tezDAGID, getContext().getTaskVertexIndex());
-    TezTaskID tezTaskID = TezTaskID.getInstance(tezVertexID, getContext().getTaskIndex());
-    TezTaskAttemptID tezTaskAttemptID = TezTaskAttemptID.getInstance(tezTaskID, getContext().getTaskAttemptNumber());
-    jobConf.set(MRInput.TEZ_MAPREDUCE_DAG_ID, tezDAGID.toString());
-    jobConf.set(MRInput.TEZ_MAPREDUCE_TASK_ATTEMPT_ID, tezTaskAttemptID.toString());
+    jobConf.set(MRInput.TEZ_MAPREDUCE_DAG_ID, "DAG_" + getContext().getDagIdentifier());
+    jobConf.set(MRInput.TEZ_MAPREDUCE_TASK_ATTEMPT_ID, getContext().getTaskAttemptIdStr());
 
     jobConf.setBoolean(MRInput.TEZ_MR3_SCHEDULED_ON_HOST, getContext().getScheduledOnHost());
 

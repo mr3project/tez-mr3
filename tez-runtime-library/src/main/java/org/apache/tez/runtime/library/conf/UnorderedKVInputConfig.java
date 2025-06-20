@@ -26,12 +26,9 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.Objects;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.tez.common.Preconditions;
 import com.google.common.collect.Lists;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.tez.common.TezUtils;
@@ -40,8 +37,6 @@ import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.ConfigUtils;
 import org.apache.tez.runtime.library.input.UnorderedKVInput;
 
-@InterfaceAudience.Public
-@InterfaceStability.Evolving
 /**
  * Configure {@link org.apache.tez.runtime.library.input.UnorderedKVInput} </p>
  *
@@ -53,7 +48,6 @@ public class UnorderedKVInputConfig {
   /**
    * Configure parameters which are specific to the Input.
    */
-  @InterfaceAudience.Private
   public static interface SpecificConfigBuilder<T> extends BaseConfigBuilder<T> {
 
     /**
@@ -89,8 +83,6 @@ public class UnorderedKVInputConfig {
   }
 
   @SuppressWarnings("rawtypes")
-  @InterfaceAudience.Public
-  @InterfaceStability.Evolving
   public static class SpecificBuilder<E extends HadoopKeyValuesBasedBaseEdgeConfig.Builder> implements
       SpecificConfigBuilder<SpecificBuilder> {
 
@@ -98,7 +90,6 @@ public class UnorderedKVInputConfig {
     private final UnorderedKVInputConfig.Builder builder;
 
 
-    @InterfaceAudience.Private
     SpecificBuilder(E edgeBuilder, UnorderedKVInputConfig.Builder builder) {
       this.edgeBuilder = edgeBuilder;
       this.builder = builder;
@@ -152,12 +143,8 @@ public class UnorderedKVInputConfig {
 
   }
 
-  @InterfaceAudience.Private
-  @VisibleForTesting
   Configuration conf;
 
-  @InterfaceAudience.Private
-  @VisibleForTesting
   UnorderedKVInputConfig() {
   }
 
@@ -177,7 +164,6 @@ public class UnorderedKVInputConfig {
     }
   }
 
-  @InterfaceAudience.Private
   public void fromUserPayload(UserPayload payload) {
     try {
       this.conf = TezUtils.createConfFromUserPayload(payload);
@@ -186,7 +172,6 @@ public class UnorderedKVInputConfig {
     }
   }
 
-  @InterfaceAudience.Private
   String toHistoryText() {
     return null;
   }
@@ -195,8 +180,6 @@ public class UnorderedKVInputConfig {
     return new Builder(keyClass, valueClass);
   }
 
-  @InterfaceAudience.Public
-  @InterfaceStability.Evolving
   public static class Builder implements SpecificConfigBuilder<Builder> {
 
     private final Configuration conf = new Configuration(false);
@@ -207,7 +190,6 @@ public class UnorderedKVInputConfig {
      * @param keyClassName         the key class name
      * @param valueClassName       the value class name
      */
-    @InterfaceAudience.Private
     Builder(String keyClassName, String valueClassName) {
       this();
       Objects.requireNonNull(keyClassName, "Key class name cannot be null");
@@ -216,7 +198,6 @@ public class UnorderedKVInputConfig {
       setValueClassName(valueClassName);
     }
 
-    @InterfaceAudience.Private
     Builder() {
       Map<String, String> tezDefaults = ConfigUtils
           .extractConfigurationMap(TezRuntimeConfiguration.getTezRuntimeConfigDefaults(),
@@ -225,14 +206,12 @@ public class UnorderedKVInputConfig {
       ConfigUtils.addConfigMapToConfiguration(this.conf, TezRuntimeConfiguration.getOtherConfigDefaults());
     }
 
-    @InterfaceAudience.Private
     Builder setKeyClassName(String keyClassName) {
       Objects.requireNonNull(keyClassName, "Key class name cannot be null");
       this.conf.set(TezRuntimeConfiguration.TEZ_RUNTIME_KEY_CLASS, keyClassName);
       return this;
     }
 
-    @InterfaceAudience.Private
     Builder setValueClassName(String valueClassName) {
       Objects.requireNonNull(valueClassName, "Value class name cannot be null");
       this.conf.set(TezRuntimeConfiguration.TEZ_RUNTIME_VALUE_CLASS, valueClassName);

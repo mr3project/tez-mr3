@@ -102,13 +102,33 @@ public class InMemoryReader extends Reader {
     }
 
     @Override
-    public int readInt() throws IOException {
-      throw new UnsupportedOperationException();
+    public int readInt() {
+      if (pos + 4 > count) {
+        throw new RuntimeException("Not enough bytes to read an int");
+      }
+      int value = ((buf[pos] & 0xFF) << 24) |
+                  ((buf[pos + 1] & 0xFF) << 16) |
+                  ((buf[pos + 2] & 0xFF) << 8) |
+                  (buf[pos + 3] & 0xFF);
+      pos += 4;
+      return value;
     }
 
     @Override
-    public long readLong() throws IOException {
-      throw new UnsupportedOperationException();
+    public long readLong() {
+      if (pos + 8 > count) {
+        throw new RuntimeException("Not enough bytes to read a long");
+      }
+      long value = ((long)(buf[pos] & 0xFF) << 56) |
+                   ((long)(buf[pos + 1] & 0xFF) << 48) |
+                   ((long)(buf[pos + 2] & 0xFF) << 40) |
+                   ((long)(buf[pos + 3] & 0xFF) << 32) |
+                   ((long)(buf[pos + 4] & 0xFF) << 24) |
+                   ((long)(buf[pos + 5] & 0xFF) << 16) |
+                   ((long)(buf[pos + 6] & 0xFF) << 8) |
+                   (buf[pos + 7] & 0xFF);
+      pos += 8;
+      return value;
     }
 
     @Override
@@ -132,24 +152,26 @@ public class InMemoryReader extends Reader {
     }
   }
 
-  private final InputAttemptIdentifier taskAttemptId;
   private final MergeManager merger;
-  ByteArrayDataInput memDataIn;
-  private int start;
-  private int length;
+  private final InputAttemptIdentifier taskAttemptId;
   private int originalKeyPos;
 
-  public InMemoryReader(MergeManager merger,
-      InputAttemptIdentifier taskAttemptId, byte[] data, int start,
-      int length)
-      throws IOException {
-    super(null, length - start, null, null, null, false, 0, -1, null);
-    this.taskAttemptId = taskAttemptId;
-    this.merger = merger;
+  private byte[] buffer = null;
+  private final int bufferSize;
+  private final ByteArrayDataInput memDataIn;
+  private final int start;
+  private final int length;
 
-    buffer = data;
-    bufferSize = (int) length;
-    memDataIn = new ByteArrayDataInput(buffer, start, length);
+  public InMemoryReader(MergeManager merger, InputAttemptIdentifier taskAttemptId,
+                        byte[] data, int start, int length)
+      throws IOException {
+    super(null, length - start, null, null, null, false, 0, null);
+    this.merger = merger;
+    this.taskAttemptId = taskAttemptId;
+
+    this.buffer = data;
+    this.bufferSize = (int) length;
+    this.memDataIn = new ByteArrayDataInput(buffer, start, length);
     this.start = start;
     this.length = length;
   }

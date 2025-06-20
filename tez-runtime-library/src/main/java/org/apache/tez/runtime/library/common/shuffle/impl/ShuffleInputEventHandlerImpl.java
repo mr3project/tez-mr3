@@ -29,6 +29,7 @@ import com.google.protobuf.ByteString;
 
 import org.apache.tez.runtime.api.events.CompositeRoutedDataMovementEvent;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
+import org.apache.tez.util.StringInterner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.io.compress.CompressionCodec;
@@ -68,7 +69,6 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
   private final boolean compositeFetch;
   private final Inflater inflater;
 
-  private final AtomicInteger nextToLogEventCount = new AtomicInteger(0);
   private final AtomicInteger numDmeEvents = new AtomicInteger(0);
   private final AtomicInteger numObsoletionEvents = new AtomicInteger(0);
   private final AtomicInteger numDmeEventsNoData = new AtomicInteger(0);
@@ -98,6 +98,7 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
     for (Event event : events) {
       handleEvent(event);
     }
+    shuffleManager.wakeupLoop();
   }
   
   private void handleEvent(Event event) throws IOException {
@@ -152,10 +153,11 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
     } else {
       throw new TezUncheckedException("Unexpected event type: " + event.getClass().getName());
     }
-    if (numDmeEvents.get() + numObsoletionEvents.get() > nextToLogEventCount.get()) {
+
+    if (numDmeEvents.get() == shuffleManager.getNumInputs() ||
+      numDmeEvents.get() + numObsoletionEvents.get() == shuffleManager.getNumInputs() ||
+      numDmeEvents.get() - numObsoletionEvents.get() == shuffleManager.getNumInputs()) {
       logProgress(false);
-      // Log every 1000 events seen.
-      nextToLogEventCount.addAndGet(1000);
     }
   }
 
@@ -166,11 +168,12 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
     s.append(", numDmeEventsSeen=" + numDmeEvents.get());
     s.append(", numDmeEventsSeenWithNoData=" + numDmeEventsNoData.get());
     s.append(", numObsoletionEventsSeen=" + numObsoletionEvents.get());
-    s.append(updateOnClose == true ? ", updateOnClose" : "");
+    s.append(updateOnClose ? ", updateOnClose" : "");
     LOG.info(s.toString());
   }
 
-  private void processDataMovementEvent(DataMovementEvent dme, DataMovementEventPayloadProto shufflePayload, BitSet emptyPartitionsBitSet) throws IOException {
+  private void processDataMovementEvent(
+      DataMovementEvent dme, DataMovementEventPayloadProto shufflePayload, BitSet emptyPartitionsBitSet) throws IOException {
     int srcIndex = dme.getSourceIndex();
 
     if (LOG.isDebugEnabled()) {
@@ -197,8 +200,8 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
       shuffleManager.updateApproximateInputRecords(shufflePayload.getNumRecord());
     }
 
-    CompositeInputAttemptIdentifier srcAttemptIdentifier = constructInputAttemptIdentifier(dme.getTargetIndex(), 1, dme.getVersion(),
-        shufflePayload);
+    CompositeInputAttemptIdentifier srcAttemptIdentifier = constructInputAttemptIdentifier(
+        dme.getTargetIndex(), 1, dme.getVersion(), shufflePayload);
 
     processShufflePayload(shufflePayload, srcAttemptIdentifier, srcIndex, dme.getTargetIndex());
   }
@@ -263,8 +266,8 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
       }
     }
 
-    CompositeInputAttemptIdentifier srcAttemptIdentifier = constructInputAttemptIdentifier(crdme.getTargetIndex(), crdme.getCount(), crdme.getVersion(),
-        shufflePayload);
+    CompositeInputAttemptIdentifier srcAttemptIdentifier = constructInputAttemptIdentifier(
+        crdme.getTargetIndex(), crdme.getCount(), crdme.getVersion(), shufflePayload);
 
     processShufflePayload(shufflePayload, srcAttemptIdentifier, partitionId, crdme.getTargetIndex());
   }
@@ -274,35 +277,32 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
                                      int partitionId, int targetIndex) throws IOException {
     int port = getShufflePort(shufflePayload, targetIndex);
     if (shufflePayload.hasData()) {
+      // hasData() == true iff. numPartitions == 1, so call shuffleManager.addCompletedInputWithData() only once
+      InputAttemptIdentifier input = srcAttemptIdentifier.getInput();
       DataProto dataProto = shufflePayload.getData();
 
       String hostIdentifier = shufflePayload.getHost() + ":" + port;
       FetchedInput fetchedInput = inputAllocator.allocate(dataProto.getRawLength(),
-          dataProto.getCompressedLength(), srcAttemptIdentifier);
+          dataProto.getCompressedLength(), input);
       moveDataToFetchedInput(dataProto, fetchedInput, hostIdentifier);
-      shuffleManager.addCompletedInputWithData(srcAttemptIdentifier, fetchedInput);
+      shuffleManager.addCompletedInputWithData(input, fetchedInput);
 
       LOG.debug("Payload via DME : " + srcAttemptIdentifier);
     } else {
-      shuffleManager.addKnownInput(shufflePayload.getHost(), port,
-          srcAttemptIdentifier, partitionId);
+      shuffleManager.addKnownInput(
+          StringInterner.intern(shufflePayload.getHost()),
+          StringInterner.intern(shufflePayload.getContainerId()),
+          port, srcAttemptIdentifier, partitionId);
     }
   }
 
   private int getShufflePort(DataMovementEventPayloadProto shufflePayload, int targetIndex) {
-    if (inputContext.useShuffleHandlerProcessOnK8s()) {
-      int[] localShufflePorts = shuffleManager.getLocalShufflePorts();
-      int numPorts = localShufflePorts.length;
-      return localShufflePorts[(portIndex + targetIndex) % numPorts];
-    } else {
-      int numPorts = shufflePayload.getNumPorts();
-      return numPorts > 0 ? shufflePayload.getPorts((portIndex + targetIndex) % numPorts) : 0;
-    }
+    int numPorts = shufflePayload.getNumPorts();
+    return numPorts > 0 ? shufflePayload.getPorts((portIndex + targetIndex) % numPorts) : 0;
   }
 
   private void processInputFailedEvent(InputFailedEvent ife) {
     InputAttemptIdentifier srcAttemptIdentifier = new InputAttemptIdentifier(ife.getTargetIndex(), ife.getVersion());
-    LOG.info("Marking obsolete input: {} {}", inputContext.getSourceVertexName(), srcAttemptIdentifier);
     shuffleManager.obsoleteKnownInput(srcAttemptIdentifier);
   }
 
@@ -315,7 +315,8 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
    * @param shufflePayload
    * @return CompositeInputAttemptIdentifier
    */
-  private CompositeInputAttemptIdentifier constructInputAttemptIdentifier(int targetIndex, int targetIndexCount, int version,
+  private CompositeInputAttemptIdentifier constructInputAttemptIdentifier(
+      int targetIndex, int targetIndexCount, int version,
       DataMovementEventPayloadProto shufflePayload) {
     String pathComponent = (shufflePayload.hasPathComponent()) ? shufflePayload.getPathComponent() : null;
     CompositeInputAttemptIdentifier srcAttemptIdentifier = null;
@@ -332,6 +333,4 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
     }
     return srcAttemptIdentifier;
   }
-
 }
-

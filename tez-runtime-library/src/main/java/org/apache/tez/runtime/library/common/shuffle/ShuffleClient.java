@@ -38,6 +38,10 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public abstract class ShuffleClient<T extends ShuffleInput> {
 
+  protected static final Logger LOG = LoggerFactory.getLogger(ShuffleClient.class);
+  protected static final Logger LOG_FETCH = LoggerFactory.getLogger(LOG.getName() + ".fetch");
+  protected static final ShuffleUtils.FetchStatsLogger fetchStatsLogger = new ShuffleUtils.FetchStatsLogger(LOG_FETCH, LOG);
+
   /**
    * Placeholder for tracking shuffle events in case we get multiple spills info for the same attempt.
    */
@@ -81,8 +85,6 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
     }
   }
 
-  private static final Logger LOG = LoggerFactory.getLogger(ShuffleClient.class);
-
   // not thread-safe - accessed from:
   //   1. ShuffleServer.call() thread
   //   2. ShuffleInputEventHandler thread
@@ -91,6 +93,10 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
   protected final int numInputs;
 
   protected final InputContext inputContext;
+
+  // passed only to Fetcher and not used elsewhere, so public is okay
+  public final Configuration conf;
+
   protected final String srcNameTrimmed;
   private final String logIdentifier;
 
@@ -101,7 +107,7 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
 
   // thread-safe for reading and updating
   // InputAttemptIdentifier is immutable
-  private final Set<InputAttemptIdentifier> obsoletedInputs;
+  private final Set<InputAttemptIdentifier> obsoletedInputs;  // not CompositeInputAttemptIdentifier
 
   protected final int maxNumFetchers;
 
@@ -122,6 +128,7 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
     this.shuffleServer = (ShuffleServer)inputContext.getShuffleServer();
     this.shuffleClientId = shuffleServer.register(this);
     this.inputContext = inputContext;
+    this.conf = conf;
     this.srcNameTrimmed = srcNameTrimmed;
     this.logIdentifier = inputContext.getUniqueIdentifier() + "-" + srcNameTrimmed;
 
@@ -137,6 +144,10 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
     this.shuffleInfoEventsMap = new HashMap<Integer, ShuffleEventInfo>();
   }
 
+  public int getNumInputs() {
+    return numInputs;
+  }
+
   public String getLogIdentifier() {
     return logIdentifier;
   }
@@ -144,6 +155,7 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
   // inside ShuffleServer.call() thread
   protected boolean cleanInputHostForConstructFetcher(InputHost.PartitionToInputs pendingInputs) {
     // safe to update pendingInputs because we are running in ShuffleServer.call() thread
+    // use '==' instead of 'equals' because we want to avoid conversion from long to Long
     assert pendingInputs.getShuffleClientId() == shuffleClientId;
     assert pendingInputs.getInputs().size() <= shuffleServer.getMaxTaskOutputAtOnce();
 
@@ -152,41 +164,36 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
     // avoid adding attempts which have already been completed
     // guard with synchronized because completedInputSet should not be updated while traversing
     synchronized (completedInputSet) {
-      for (Iterator<InputAttemptIdentifier> inputIter = pendingInputs.getInputs().iterator();
+      for (Iterator<CompositeInputAttemptIdentifier> inputIter = pendingInputs.getInputs().iterator();
            inputIter.hasNext();) {
-        InputAttemptIdentifier input = inputIter.next();
+        CompositeInputAttemptIdentifier compositeInput = inputIter.next();
 
-        boolean alreadyCompleted;
-        if (input instanceof CompositeInputAttemptIdentifier) {
-          CompositeInputAttemptIdentifier compositeInput = (CompositeInputAttemptIdentifier) input;
-          int nextClearBit = completedInputSet.nextClearBit(compositeInput.getInputIdentifier());
-          int maxClearBit = compositeInput.getInputIdentifier() + compositeInput.getInputIdentifierCount();
-          alreadyCompleted = nextClearBit > maxClearBit;
-        } else {
-          alreadyCompleted = completedInputSet.get(input.getInputIdentifier());
-        }
+        int nextClearBit = completedInputSet.nextClearBit(compositeInput.getInputIdentifier());
+        int maxClearBit = compositeInput.getInputIdentifier() + compositeInput.getInputIdentifierCount();
+        boolean alreadyCompleted = nextClearBit > maxClearBit;
 
         if (alreadyCompleted) {
-          LOG.info("Skipping completed input: " + input);
+          LOG.info("Skipping completed input: {}", compositeInput);
           inputIter.remove();
           removedAnyInput = true;
         }
       }
     }
 
-    for (Iterator<InputAttemptIdentifier> inputIter = pendingInputs.getInputs().iterator();
+    for (Iterator<CompositeInputAttemptIdentifier> inputIter = pendingInputs.getInputs().iterator();
          inputIter.hasNext();) {
-      InputAttemptIdentifier input = inputIter.next();
+      CompositeInputAttemptIdentifier input = inputIter.next();
 
       // avoid adding attempts which have been marked as OBSOLETE
       if (isObsoleteInputAttemptIdentifier(input)) {
-        LOG.info("Skipping obsolete input: " + input);
+        LOG.info("Skipping obsolete input: {}", input);
         inputIter.remove();
         removedAnyInput = true;
         continue;
       }
 
-      if (!validateInputAttemptForPipelinedShuffle(input, false)) {
+      // use input.getInput() for quick checking
+      if (!validateInputAttemptForPipelinedShuffle(input.getInput(), false)) {
         inputIter.remove();   // no need to fetch for input, so remove
         removedAnyInput = true;
       }
@@ -197,7 +204,7 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
 
   public void obsoleteKnownInput(InputAttemptIdentifier srcAttempt) {
     // The incoming srcAttempt does not contain a path component.
-    LOG.info("{}: Adding obsolete input: {}", srcNameTrimmed, srcAttempt);
+    LOG.info("{}/{}: Adding obsolete input: {}", inputContext.getUniqueIdentifier(), srcNameTrimmed, srcAttempt);
 
     // Even if we remove ShuffleEventInfo from shuffleInfoEventsMap[] (see below),
     // new Fetchers may be created from obsolete input again.
@@ -206,6 +213,20 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
   }
 
   // thread-safe because InputAttemptIdentifier is immutable
+  protected boolean isObsoleteInputAttemptIdentifier(CompositeInputAttemptIdentifier input) {
+    if (input == null || obsoletedInputs.isEmpty()) {
+      return false;
+    }
+    Iterator<InputAttemptIdentifier> obsoleteInputsIter = obsoletedInputs.iterator();
+    while (obsoleteInputsIter.hasNext()) {
+      InputAttemptIdentifier obsoleteInput = obsoleteInputsIter.next();
+      if (input.include(obsoleteInput.getInputIdentifier(), obsoleteInput.getAttemptNumber())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   protected boolean isObsoleteInputAttemptIdentifier(InputAttemptIdentifier input) {
     if (input == null || obsoletedInputs.isEmpty()) {
       return false;
@@ -258,7 +279,7 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
   }
 
   // if true, we should scan pending InputHosts in ShuffleServer
-  // if false, no need to consider this ShuffleManager for now
+  // if false, no need to consider this ShuffleClient for now
   public boolean shouldScanPendingInputs() {
     synchronized (lock) {
       return numPartitionRanges > 0 && numFetchers < maxNumFetchers;
@@ -271,7 +292,7 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
       long fetchedBytes, long decompressedLength, long copyDuration) throws IOException;
 
   public abstract void fetchFailed(
-      InputAttemptIdentifier srcAttemptIdentifier,
+      CompositeInputAttemptIdentifier srcAttemptIdentifier,
       boolean readFailed, boolean connectFailed);
 
   protected abstract boolean validateInputAttemptForPipelinedShuffle(

@@ -16,16 +16,11 @@
  * limitations under the License.
  */
 
-package org.apache.tez.runtime.library.common.task.local.output;
+package org.apache.tez.runtime.api;
 
 import java.io.IOException;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.tez.runtime.library.common.Constants;
-import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 
 /**
  * Manipulate the working area for the transient store for components in tez-runtime-library
@@ -33,30 +28,7 @@ import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
  * This class is used by Inputs and Outputs in tez-runtime-library to identify the directories
  * that they need to write to / read from for intermediate files.
  */
-@InterfaceAudience.Private
-@InterfaceStability.Unstable
-public abstract class TezTaskOutput {
-
-  protected final Configuration conf;
-  protected final String uniqueId;
-  protected final String dagId;   // = dag_${dagId}/${containerId}/
-
-  /**
-   * @param conf     the configuration from which local-dirs will be picked up
-   * @param uniqueId a unique identifier for the specific input / output. This is expected to be
-   *                 unique for all the Inputs / Outputs within a container - i.e. even if the
-   *                 container is used for multiple tasks, this id should be unique for inputs /
-   *                 outputs spanning across tasks. This is also expected to be unique across all
-   *                 tasks for a vertex.
-   * @param dagID    DAG identifier for the specific job
-   */
-  public TezTaskOutput(Configuration conf, String uniqueId, int dagID, String containerId) {
-    this.conf = conf;
-    this.uniqueId = uniqueId;
-    this.dagId = ShuffleUtils.isTezShuffleHandler(conf) ?
-      Constants.DAG_PREFIX + dagID + Path.SEPARATOR + containerId + Path.SEPARATOR :
-      Constants.DAG_PREFIX + dagID + Path.SEPARATOR;
-  }
+public interface TezTaskOutput {
 
   /**
    * Create a local output file name.
@@ -65,7 +37,7 @@ public abstract class TezTaskOutput {
    * @return path the path to write to
    * @throws IOException
    */
-  public abstract Path getOutputFileForWrite(long size) throws IOException;
+  public Path getOutputFileForWrite(long size) throws IOException;
 
   /**
    * Create a local output file name. This method is meant to be used *only* if
@@ -74,7 +46,7 @@ public abstract class TezTaskOutput {
    * @return path the path to write to
    * @throws IOException
    */
-  public abstract Path getOutputFileForWrite() throws IOException;
+  public Path getOutputFileForWrite() throws IOException;
 
   /**
    * Create a local output file name on the same volume.
@@ -83,7 +55,7 @@ public abstract class TezTaskOutput {
    *
    * @return path the path of the output file within the same volume
    */
-  public abstract Path getOutputFileForWriteInVolume(Path existing);
+  public Path getOutputFileForWriteInVolume(Path existing);
 
   /**
    * Create a local output index file name.
@@ -92,7 +64,7 @@ public abstract class TezTaskOutput {
    * @return path the path to write the index file to
    * @throws IOException
    */
-  public abstract Path getOutputIndexFileForWrite(long size) throws IOException;
+  public Path getOutputIndexFileForWrite(long size) throws IOException;
 
   /**
    * Create a local output index file name on the same volume.
@@ -100,7 +72,7 @@ public abstract class TezTaskOutput {
    * associated data file.
    * @return path the path of the index file within the same volume
    */
-  public abstract Path getOutputIndexFileForWriteInVolume(Path existing);
+  public Path getOutputIndexFileForWriteInVolume(Path existing);
 
   /**
    * Create a local output spill file name.
@@ -110,7 +82,7 @@ public abstract class TezTaskOutput {
    * @return path the path to write the spill file for the specific spillNumber
    * @throws IOException
    */
-  public abstract Path getSpillFileForWrite(int spillNumber, long size)
+  public Path getSpillFileForWrite(int spillNumber, long size)
       throws IOException;
 
 
@@ -122,7 +94,7 @@ public abstract class TezTaskOutput {
    * @return path the path to write the spill index file for the specific spillNumber
    * @throws IOException
    */
-  public abstract Path getSpillIndexFileForWrite(int spillNumber, long size)
+  public Path getSpillIndexFileForWrite(int spillNumber, long size)
       throws IOException;
 
   /**
@@ -133,7 +105,7 @@ public abstract class TezTaskOutput {
    * @param size the size of the file  @return path the path to the input file.
    * @throws IOException
    */
-  public abstract Path getInputFileForWrite(int srcIdentifier,
+  public Path getInputFileForWrite(int srcIdentifier,
       int spillNum, long size) throws IOException;
 
   /**
@@ -143,6 +115,6 @@ public abstract class TezTaskOutput {
    * @param spillNum
    * @return a spill file name independent of the unique identifier and local directories
    */
-  public abstract String getSpillFileName(int srcId, int spillNum);
+  public String getSpillFileName(int srcId, int spillNum);
 
 }

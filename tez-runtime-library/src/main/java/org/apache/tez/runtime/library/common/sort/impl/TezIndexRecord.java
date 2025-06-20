@@ -23,8 +23,6 @@ public class TezIndexRecord {
   private long rawLength;
   private long partLength;
 
-  public TezIndexRecord() { }
-
   /**
    * @param startOffset start offset within the data file
    * @param rawLength raw data length - typically uncompressed

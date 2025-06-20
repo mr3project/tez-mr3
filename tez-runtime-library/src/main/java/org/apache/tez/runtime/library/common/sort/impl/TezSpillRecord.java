@@ -24,7 +24,6 @@ import java.util.zip.CheckedInputStream;
 import java.util.zip.CheckedOutputStream;
 import java.util.zip.Checksum;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ChecksumException;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -44,27 +43,18 @@ public class TezSpillRecord {
   private final LongBuffer entries;
 
   public TezSpillRecord(int numPartitions) {
-    buf = ByteBuffer.allocate(
-        numPartitions * Constants.MAP_OUTPUT_INDEX_RECORD_LENGTH);
+    buf = ByteBuffer.allocate(numPartitions * Constants.MAP_OUTPUT_INDEX_RECORD_LENGTH);
     entries = buf.asLongBuffer();
-  }
-
-  public TezSpillRecord(Path indexFileName, Configuration conf) throws IOException {
-    this(indexFileName, FileSystem.getLocal(conf).getRaw());
-  }
-
-  public TezSpillRecord(Path indexFileName, FileSystem fs) throws IOException {
-    this(indexFileName, fs, null);
   }
 
   public TezSpillRecord(Path indexFileName, FileSystem fs, String expectedIndexOwner)
     throws IOException {
-    this(indexFileName, fs, new PureJavaCrc32(), expectedIndexOwner);
+    this(indexFileName, fs);
   }
 
-  public TezSpillRecord(Path indexFileName, FileSystem rfs, Checksum crc,
-                     String expectedIndexOwner)
-      throws IOException {
+  public TezSpillRecord(Path indexFileName, FileSystem rfs) throws IOException {
+    assert indexFileName != null;   // writeSpillRecord should be false in UnorderedPartitionedKVWriter/PipelinedSorter
+    Checksum crc = new PureJavaCrc32();
 
     final FSDataInputStream in = rfs.open(indexFileName);
     try {
@@ -74,21 +64,43 @@ public class TezSpillRecord {
       final int size = partitions * Constants.MAP_OUTPUT_INDEX_RECORD_LENGTH;
 
       buf = ByteBuffer.allocate(size);
-      if (crc != null) {
-        crc.reset();
-        CheckedInputStream chk = new CheckedInputStream(in, crc);
-        IOUtils.readFully(chk, buf.array(), 0, size);
-        if (chk.getChecksum().getValue() != in.readLong()) {
-          throw new ChecksumException("Checksum error reading spill index: " +
-                                indexFileName, -1);
-        }
-      } else {
-        IOUtils.readFully(in, buf.array(), 0, size);
+      crc.reset();
+      CheckedInputStream chk = new CheckedInputStream(in, crc);
+      IOUtils.readFully(chk, buf.array(), 0, size);
+      if (chk.getChecksum().getValue() != in.readLong()) {
+        throw new ChecksumException("Checksum error reading spill index: " + indexFileName, -1);
       }
       entries = buf.asLongBuffer();
     } finally {
       in.close();
     }
+  }
+
+  public TezSpillRecord(ByteBuffer buf) {
+    this.buf = buf;
+    this.entries = buf.asLongBuffer();
+  }
+
+  public ByteBuffer getByteBuffer() {
+    return buf;
+  }
+
+  public boolean equalByteBuffer(ByteBuffer otherBuf) {
+      if (otherBuf == null) {
+          return false;
+      }
+      if (buf == otherBuf) {
+          return true;
+      }
+      if (buf.capacity() != otherBuf.capacity()) {
+          return false;
+      }
+      for (int i = 0; i < buf.capacity(); i++) {
+          if (buf.get(i) != otherBuf.get(i)) {
+              return false;
+          }
+      }
+      return true;
   }
 
   /**
@@ -103,8 +115,7 @@ public class TezSpillRecord {
    */
   public TezIndexRecord getIndex(int partition) {
     final int pos = partition * Constants.MAP_OUTPUT_INDEX_RECORD_LENGTH / 8;
-    return new TezIndexRecord(entries.get(pos), entries.get(pos + 1),
-                           entries.get(pos + 2));
+    return new TezIndexRecord(entries.get(pos), entries.get(pos + 1), entries.get(pos + 2));
   }
 
   /**
@@ -120,23 +131,15 @@ public class TezSpillRecord {
   /**
    * Write this spill record to the location provided.
    */
-  public void writeToFile(Path loc, Configuration job, FileSystem fs) throws IOException {
-    writeToFile(loc, job, fs, new PureJavaCrc32());
-  }
-
-  public void writeToFile(Path loc, Configuration job, FileSystem rfs, Checksum crc)
-      throws IOException {
+  public void writeToFile(Path loc, FileSystem rfs) throws IOException {
+    PureJavaCrc32 crc = new PureJavaCrc32();
     CheckedOutputStream chk = null;
     final FSDataOutputStream out = rfs.create(loc);
     try {
-      if (crc != null) {
-        crc.reset();
-        chk = new CheckedOutputStream(out, crc);
-        chk.write(buf.array());
-        out.writeLong(chk.getChecksum().getValue());
-      } else {
-        out.write(buf.array());
-      }
+      crc.reset();
+      chk = new CheckedOutputStream(out, crc);
+      chk.write(buf.array());
+      out.writeLong(chk.getChecksum().getValue());
     } finally {
       if (chk != null) {
         chk.close();

@@ -17,12 +17,10 @@
  */
 package org.apache.tez.runtime.library.cartesianproduct;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.tez.common.Preconditions;
 import com.google.common.primitives.Ints;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
-import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.dag.api.UserPayload;
 
@@ -43,7 +41,6 @@ import static org.apache.tez.runtime.library.cartesianproduct.CartesianProductUs
  * <class>CartesianProductFilterDescriptor</class>. User may also configure min/max fractions used
  * in slow start.
  */
-@Evolving
 public class CartesianProductConfig {
   private final boolean isPartitioned;
   private final String[] sources;
@@ -59,7 +56,7 @@ public class CartesianProductConfig {
   public CartesianProductConfig(List<String> sources) {
     Preconditions.checkArgument(sources != null, "source list cannot be null");
     Preconditions.checkArgument(sources.size() > 1,
-      "there must be more than 1 source " + "67, currently only " + sources.size());
+      "there must be more than 1 source, currently only {}", sources.size());
 
     this.isPartitioned = false;
     this.sources = sources.toArray(new String[sources.size()]);
@@ -84,7 +81,7 @@ public class CartesianProductConfig {
                                 CartesianProductFilterDescriptor filterDescriptor) {
     Preconditions.checkArgument(vertexPartitionMap != null, "vertex-partition map cannot be null");
     Preconditions.checkArgument(vertexPartitionMap.size() > 1,
-      "there must be more than 1 source vertices, currently only " + vertexPartitionMap.size());
+      "there must be more than 1 source vertices, currently only {}", vertexPartitionMap.size());
 
     this.isPartitioned = true;
     this.numPartitions = new int[vertexPartitionMap.size()];
@@ -107,16 +104,15 @@ public class CartesianProductConfig {
    * @param sources
    * @param filterDescriptor
    */
-  @VisibleForTesting
   protected CartesianProductConfig(int[] numPartitions, String[] sources,
                                    CartesianProductFilterDescriptor filterDescriptor) {
     Preconditions.checkArgument(numPartitions != null, "partitions count array can't be null");
     Preconditions.checkArgument(sources != null, "source array can't be null");
     Preconditions.checkArgument(numPartitions.length == sources.length,
-      "partitions count array(length: " + numPartitions.length + ") and source array " +
-        "(length: " + sources.length + ") cannot have different length");
+      "partitions count array (length: {}) and source array (length: {}) cannot have different length",
+      numPartitions.length, sources.length);
     Preconditions.checkArgument(sources.length > 1,
-      "there must be more than 1 source " + ", currently only " + sources.length);
+      "there must be more than 1 source, currently only {}", sources.length);
 
     this.isPartitioned = true;
     this.numPartitions = numPartitions;
@@ -138,13 +134,13 @@ public class CartesianProductConfig {
     this.filterDescriptor = filterDescriptor;
   }
 
-  @VisibleForTesting
   protected void checkNumPartitions() {
     if (isPartitioned) {
       boolean isUnpartitioned = true;
       for (int i = 0; i < numPartitions.length; i++) {
         Preconditions.checkArgument(this.numPartitions[i] > 0,
-          "Vertex " + sources[i] + "has negative (" + numPartitions[i] + ") partitions");
+          "Vertex {} has negative ({}) partitions",
+          sources[i], numPartitions[i]);
         isUnpartitioned = isUnpartitioned && numPartitions[i] == 1;
       }
       Preconditions.checkArgument(!isUnpartitioned,
@@ -222,8 +218,8 @@ public class CartesianProductConfig {
         builder.setGroupingFraction(Float.parseFloat(
           conf.get(CartesianProductVertexManager.TEZ_CARTESIAN_PRODUCT_GROUPING_FRACTION)));
         Preconditions.checkArgument(0 < builder.getGroupingFraction() &&
-          builder.getGroupingFraction() <= 1, "grouping fraction should be larger than 0 and less" +
-          " or equal to 1, current value: " + builder.getGroupingFraction());
+          builder.getGroupingFraction() <= 1,
+          "grouping fraction should be larger than 0 and less or equal to 1, current value: {}", builder.getGroupingFraction());
       }
       if (conf.get(CartesianProductVertexManager.TEZ_CARTESIAN_PRODUCT_NUM_PARTITIONS) != null) {
         builder.setNumPartitionsForFairCase(Integer.parseInt(
@@ -233,12 +229,12 @@ public class CartesianProductConfig {
       }
     }
     Preconditions.checkArgument(builder.getMinFraction() <= builder.getMaxFraction(),
-      "min fraction(" + builder.getMinFraction() + ") should be less than max fraction(" +
-        builder.getMaxFraction() + ") in cartesian product slow start");
+      "min fraction {} should be less than max fraction {} in cartesian product slow start",
+        builder.getMinFraction(), builder.getMaxFraction());
     Preconditions.checkArgument(builder.getMaxParallelism() > 0,
-      "max parallelism must be positive, currently is " + builder.getMaxParallelism());
+      "max parallelism must be positive, currently is {}", builder.getMaxParallelism());
     Preconditions.checkArgument(builder.getMinOpsPerWorker() > 0,
-      "Min ops per worker must be positive, currently is " + builder.getMinOpsPerWorker());
+      "Min ops per worker must be positive, currently is {}", builder.getMinOpsPerWorker());
 
     return builder.build();
   }

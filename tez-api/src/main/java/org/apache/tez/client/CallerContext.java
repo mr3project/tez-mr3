@@ -20,14 +20,8 @@ package org.apache.tez.client;
 
 import javax.annotation.Nullable;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
-
 import org.apache.tez.common.Preconditions;
 
-@Public
-@Unstable
 public class CallerContext {
 
   /**
@@ -88,7 +82,6 @@ public class CallerContext {
    *             this could be the Hive query text.
    * @return CallerContext
    */
-  @Private
   public static CallerContext create(String context, @Nullable String blob) {
     return new CallerContext(context, blob);
   }

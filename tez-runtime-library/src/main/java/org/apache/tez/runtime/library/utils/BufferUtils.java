@@ -26,6 +26,7 @@ import org.apache.hadoop.io.DataOutputBuffer;
 
 @Private
 public class BufferUtils {
+
   public static int compare(DataInputBuffer buf1, DataInputBuffer buf2) {
     byte[] b1 = buf1.getData();
     byte[] b2 = buf2.getData();
@@ -46,6 +47,16 @@ public class BufferUtils {
     return FastByteComparisons.compareTo(b1, s1, l1, b2, s2, l2);
   }
 
+  public static boolean compareEqual(DataOutputBuffer buf1, DataOutputBuffer buf2) {
+    byte[] b1 = buf1.getData();
+    byte[] b2 = buf2.getData();
+    int s1 = 0;
+    int s2 = 0;
+    int l1 = buf1.getLength();
+    int l2 = buf2.getLength();
+    return FastByteComparisons.compareEqual(b1, s1, l1, b2, s2, l2);
+  }
+
   public static int compare(DataInputBuffer buf1, DataOutputBuffer buf2) {
     byte[] b1 = buf1.getData();
     byte[] b2 = buf2.getData();
@@ -58,6 +69,16 @@ public class BufferUtils {
 
   public static int compare(DataOutputBuffer buf1, DataInputBuffer buf2) {
     return compare(buf2, buf1);
+  }
+
+  public static boolean compareEqual(DataOutputBuffer buf2, DataInputBuffer buf1) {
+    byte[] b1 = buf1.getData();
+    byte[] b2 = buf2.getData();
+    int s1 = buf1.getPosition();
+    int s2 = 0;
+    int l1 = buf1.getLength();
+    int l2 = buf2.getLength();
+    return FastByteComparisons.compareEqual(b1, s1, (l1 - s1), b2, s2, l2);
   }
 
   public static void copy(DataInputBuffer src, DataOutputBuffer dst) throws IOException {

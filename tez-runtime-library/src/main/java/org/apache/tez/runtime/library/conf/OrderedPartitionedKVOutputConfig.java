@@ -26,12 +26,9 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.Objects;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.tez.common.Preconditions;
 import com.google.common.collect.Lists;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.tez.common.TezUtils;
@@ -40,9 +37,6 @@ import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.ConfigUtils;
 import org.apache.tez.runtime.library.output.OrderedPartitionedKVOutput;
 
-
-@InterfaceAudience.Public
-@InterfaceStability.Evolving
 /**
  * Configure {@link org.apache.tez.runtime.library.output.OrderedPartitionedKVOutput} </p>
  * 
@@ -55,10 +49,6 @@ public class OrderedPartitionedKVOutputConfig {
    * Currently supported sorter implementations
    */
   public enum SorterImpl {
-    /** Legacy sorter implementation based on Hadoop MapReduce shuffle impl.
-     * Restricted to 2 GB memory limits.
-     */
-    LEGACY,
     /** Pipeline sorter - a more efficient sorter that supports > 2 GB sort buffers */
     PIPELINED
   }
@@ -67,7 +57,6 @@ public class OrderedPartitionedKVOutputConfig {
   /**
    * Configure parameters which are specific to the Output.
    */
-  @InterfaceAudience.Private
   public static interface SpecificConfigBuilder<T> extends BaseConfigBuilder<T> {
     /**
      * Set the buffer size to use when sort the output
@@ -118,8 +107,6 @@ public class OrderedPartitionedKVOutputConfig {
   }
 
   @SuppressWarnings("rawtypes")
-  @InterfaceAudience.Public
-  @InterfaceStability.Evolving
   public static class SpecificBuilder<E extends HadoopKeyValuesBasedBaseEdgeConfig.Builder> implements
       SpecificConfigBuilder<SpecificBuilder> {
 
@@ -190,12 +177,8 @@ public class OrderedPartitionedKVOutputConfig {
     }
   }
 
-  @InterfaceAudience.Private
-  @VisibleForTesting
   Configuration conf;
 
-  @InterfaceAudience.Private
-  @VisibleForTesting
   OrderedPartitionedKVOutputConfig() {
   }
 
@@ -215,7 +198,6 @@ public class OrderedPartitionedKVOutputConfig {
     }
   }
 
-  @InterfaceAudience.Private
   public void fromUserPayload(UserPayload payload) {
     try {
       this.conf = TezUtils.createConfFromUserPayload(payload);
@@ -224,7 +206,6 @@ public class OrderedPartitionedKVOutputConfig {
     }
   }
 
-  @InterfaceAudience.Private
   String toHistoryText() {
     return null;
   }
@@ -238,8 +219,6 @@ public class OrderedPartitionedKVOutputConfig {
     return new Builder(keyClass, valueClass, partitionerClassName, partitionerConf);
   }
 
-  @InterfaceAudience.Public
-  @InterfaceStability.Evolving
   public static class Builder implements SpecificConfigBuilder<Builder> {
 
     private final Configuration conf = new Configuration(false);
@@ -254,7 +233,6 @@ public class OrderedPartitionedKVOutputConfig {
      *                             java.util.Map} of key-value pairs. The keys should be limited to
      *                             the ones required by the partitioner.
      */
-    @InterfaceAudience.Private
     Builder(String keyClassName, String valueClassName, String partitionerClassName,
                    @Nullable Map<String, String> partitionerConf) {
       this();
@@ -266,7 +244,6 @@ public class OrderedPartitionedKVOutputConfig {
       setPartitioner(partitionerClassName, partitionerConf);
     }
 
-    @InterfaceAudience.Private
     Builder() {
       Map<String, String> tezDefaults = ConfigUtils
           .extractConfigurationMap(TezRuntimeConfiguration.getTezRuntimeConfigDefaults(),
@@ -275,21 +252,18 @@ public class OrderedPartitionedKVOutputConfig {
       ConfigUtils.addConfigMapToConfiguration(this.conf, TezRuntimeConfiguration.getOtherConfigDefaults());
     }
 
-    @InterfaceAudience.Private
     Builder setKeyClassName(String keyClassName) {
       Objects.requireNonNull(keyClassName, "Key class name cannot be null");
       this.conf.set(TezRuntimeConfiguration.TEZ_RUNTIME_KEY_CLASS, keyClassName);
       return this;
     }
 
-    @InterfaceAudience.Private
     Builder setValueClassName(String valueClassName) {
       Objects.requireNonNull(valueClassName, "Value class name cannot be null");
       this.conf.set(TezRuntimeConfiguration.TEZ_RUNTIME_VALUE_CLASS, valueClassName);
       return this;
     }
 
-    @InterfaceAudience.Private
     Builder setPartitioner(String partitionerClassName, @Nullable Map<String, String> partitionerConf) {
       Objects.requireNonNull(partitionerClassName, "Partitioner class name cannot be null");
       this.conf.set(TezRuntimeConfiguration.TEZ_RUNTIME_PARTITIONER_CLASS, partitionerClassName);

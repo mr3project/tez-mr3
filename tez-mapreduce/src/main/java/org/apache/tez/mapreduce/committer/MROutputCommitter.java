@@ -145,11 +145,8 @@ public class MROutputCommitter extends OutputCommitter {
           "mapred.output.committer.class", FileOutputCommitter.class,
           org.apache.hadoop.mapred.OutputCommitter.class), jobConf);
     }
-    LOG.info("OutputCommitter for outputName="
-        + context.getOutputName()
-        + ", vertexName=" + context.getVertexName()
-        + ", outputCommitterClass="
-        + committer.getClass().getName());
+    LOG.info("OutputCommitter for outputName={}, vertexName={}, outputCommitterClass={}",
+        context.getOutputName(), context.getVertexName(), committer.getClass().getName());
     return committer;
   }
 

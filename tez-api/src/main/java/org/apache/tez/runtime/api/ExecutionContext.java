@@ -14,14 +14,11 @@
 
 package org.apache.tez.runtime.api;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-
 /**
  * The context for the executor within which a task runs. May be shared between tasks
  *
  * This interface is not meant to be implemented by users
  */
-@InterfaceAudience.Public
 public interface ExecutionContext {
 
   /**

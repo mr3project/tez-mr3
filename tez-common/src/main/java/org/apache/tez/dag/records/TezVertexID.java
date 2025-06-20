@@ -22,9 +22,6 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
-
 import org.apache.tez.common.Preconditions;
 import org.apache.tez.util.FastNumberFormat;
 
@@ -39,8 +36,6 @@ import org.apache.tez.util.FastNumberFormat;
  * @see TezDAGID
  * @see TezTaskID
  */
-@InterfaceAudience.Public
-@InterfaceStability.Stable
 public class TezVertexID extends TezID {
   public static final String VERTEX = "vertex";
   static final ThreadLocal<FastNumberFormat> tezVertexIdFormat = new ThreadLocal<FastNumberFormat>() {
@@ -70,7 +65,6 @@ public class TezVertexID extends TezID {
     return tezVertexIDCache.getInstance(new TezVertexID(dagId, id));
   }
 
-  @InterfaceAudience.Private
   public static void clearCache() {
     tezVertexIDCache.clear();
   }

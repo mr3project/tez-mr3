@@ -21,6 +21,7 @@ import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.WritableComparator;
+import org.apache.tez.runtime.library.utils.FastByteComparisons;
 
 @Public
 @Unstable
@@ -37,7 +38,7 @@ public final class TezBytesComparator extends WritableComparator implements
   @Override
   public int compare(byte[] b1, int s1, int l1,
       byte[] b2, int s2, int l2) {
-    return compareBytes(b1, s1, l1, b2, s2, l2);
+    return FastByteComparisons.compareTo(b1, s1, l1, b2, s2, l2);
   }
 
   @Override

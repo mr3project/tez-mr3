@@ -38,9 +38,12 @@ import org.apache.tez.common.security.JobTokenSecretManager;
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class SecureShuffleUtils {
+
   public static final String HTTP_HEADER_URL_HASH = "UrlHash";
   public static final String HTTP_HEADER_REPLY_URL_HASH = "ReplyHash";
-  
+  public static final String SHUFFLE_SKIP_VERIFY_REQUEST = "tez.shuffle.skip.verify.request";
+  public static final boolean SHUFFLE_SKIP_VERIFY_REQUEST_DEFAULT = false;
+
   /**
    * Base64 encoded hash of msg
    * @param msg

@@ -23,7 +23,9 @@ import java.util.Iterator;
 import java.util.List;
 
 import org.apache.hadoop.io.serializer.Serialization;
+import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
+import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -41,7 +43,7 @@ import org.apache.tez.runtime.library.api.Partitioner;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.ConfigUtils;
 import org.apache.tez.runtime.library.common.TezRuntimeUtils;
-import org.apache.tez.runtime.library.common.task.local.output.TezTaskOutput;
+import org.apache.tez.runtime.api.TezTaskOutput;
 import org.apache.tez.runtime.library.utils.CodecUtils;
 
 @SuppressWarnings("rawtypes")
@@ -62,11 +64,13 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
   protected final Serialization valSerialization;
   protected final int numPartitions;
   protected final CompressionCodec codec;
+
+  protected final String auxiliaryService;
+  protected final boolean compositeFetch;
   protected final TezTaskOutput outputFileHandler;
   
   protected final boolean ifileReadAhead;
   protected final int ifileReadAheadLength;
-  protected final int ifileBufferSize;
 
   /**
    * Represents the serialized size of the output records. Does not consider
@@ -144,7 +148,7 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
 
     // compression
     try {
-      Configuration codecConf = ShuffleServer.getInstance().getCodecConf();
+      Configuration codecConf = ShuffleServer.getCodecConf(outputContext.peekShuffleServer(), conf);
       this.codec = CodecUtils.getCodec(codecConf);
     } catch (IOException e) {
       throw new RuntimeException(e);
@@ -160,8 +164,6 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
     } else {
       this.ifileReadAheadLength = 0;
     }
-    this.ifileBufferSize = conf.getInt("io.file.buffer.size",
-        TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_BUFFER_SIZE_DEFAULT);
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Instantiating Partitioner: [" + conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_PARTITIONER_CLASS) + "]");
@@ -171,7 +173,13 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-    outputFileHandler = TezRuntimeUtils.instantiateTaskOutputManager(conf, outputContext);
+
+    FetcherConfig fetcherConfig = outputContext.getFetcherConfig();
+    this.auxiliaryService = fetcherConfig.auxiliaryService;
+    this.compositeFetch = fetcherConfig.compositeFetch;
+
+    this.outputFileHandler = TezRuntimeUtils.instantiateTaskOutputManager(
+        this.conf, outputContext, this.compositeFetch);
   }
 
   @Override
@@ -179,9 +187,9 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
 
   @Override
   public void write(Object key, Iterable<Object> values) throws IOException {
-    //TODO: UnorderedPartitionedKVWriter should override this method later.
+    // TODO: UnorderedPartitionedKVWriter should override this method later.
     Iterator<Object> it = values.iterator();
-    while(it.hasNext()) {
+    while (it.hasNext()) {
       write(key, it.next());
     }
   }

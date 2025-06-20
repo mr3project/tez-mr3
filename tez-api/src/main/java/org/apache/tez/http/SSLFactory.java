@@ -18,12 +18,6 @@
 
 package org.apache.tez.http;
 
-import io.netty.handler.ssl.ClientAuth;
-import io.netty.handler.ssl.JdkSslContext;
-import io.netty.handler.ssl.SupportedCipherSuiteFilter;
-
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.authentication.client.ConnectionConfigurator;
 import org.apache.hadoop.security.ssl.FileBasedKeyStoresFactory;
@@ -57,8 +51,6 @@ import static org.apache.hadoop.security.ssl.SSLFactory.SSL_SERVER_CONF_KEY;
  * This factory is used to configure HTTPS in Hadoop HTTP based endpoints, both
  * client and server.
  */
-@InterfaceAudience.Private
-@InterfaceStability.Evolving
 public class SSLFactory implements ConnectionConfigurator {
 
   public static final String SSL_ENABLED_PROTOCOLS = "hadoop.ssl.enabled.protocols";

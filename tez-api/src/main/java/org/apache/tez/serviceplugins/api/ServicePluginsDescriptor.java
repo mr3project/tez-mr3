@@ -17,16 +17,11 @@ package org.apache.tez.serviceplugins.api;
 import java.util.Arrays;
 
 import org.apache.tez.common.Preconditions;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.tez.dag.api.TezConfiguration;
 
 /**
  * An {@link ServicePluginsDescriptor} describes the list of plugins running within the AM for
  * sourcing resources, launching and executing work.
  */
-@InterfaceAudience.Public
-@InterfaceStability.Unstable
 public class ServicePluginsDescriptor {
 
   private final boolean enableContainers;
@@ -118,27 +113,22 @@ public class ServicePluginsDescriptor {
   }
 
 
-  @InterfaceAudience.Private
   public boolean areContainersEnabled() {
     return enableContainers;
   }
 
-  @InterfaceAudience.Private
   public boolean isUberEnabled() {
     return enableUber;
   }
 
-  @InterfaceAudience.Private
   public TaskSchedulerDescriptor[] getTaskSchedulerDescriptors() {
     return taskSchedulerDescriptors;
   }
 
-  @InterfaceAudience.Private
   public ContainerLauncherDescriptor[] getContainerLauncherDescriptors() {
     return containerLauncherDescriptors;
   }
 
-  @InterfaceAudience.Private
   public TaskCommunicatorDescriptor[] getTaskCommunicatorDescriptors() {
     return taskCommunicatorDescriptors;
   }

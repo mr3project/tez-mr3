@@ -31,27 +31,25 @@ import org.apache.tez.http.BaseHttpConnection;
 import org.apache.tez.http.HttpConnection;
 import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.http.SSLFactory;
+import org.apache.tez.runtime.library.common.security.SecureShuffleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.runtime.api.OutputContext;
 import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.library.api.Partitioner;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.combine.Combiner;
-import org.apache.tez.runtime.library.common.task.local.output.TezTaskOutput;
+import org.apache.tez.runtime.api.TezTaskOutput;
 import org.apache.tez.runtime.library.common.task.local.output.TezTaskOutputFiles;
 
-@Private
 public class TezRuntimeUtils {
 
   private static final Logger LOG = LoggerFactory
       .getLogger(TezRuntimeUtils.class);
-  //Shared by multiple threads
+  // Shared by multiple threads
   private static volatile SSLFactory sslFactory;
-  //ShufflePort by default for ContainerLaunchers
+  // ShufflePort by default for ContainerLaunchers
   public static final int INVALID_PORT = -1;
 
   public static String getTaskIdentifier(String vertexName, int taskIndex) {
@@ -63,7 +61,6 @@ public class TezRuntimeUtils {
     return String.format("%d_%d", taskIndex, taskAttemptNumber);
   }
 
-  // TODO Maybe include a dag name in this.
   public static String getTaskAttemptIdentifier(String vertexName,
       int taskIndex, int taskAttemptNumber) {
     return String.format("%s_%06d_%02d", vertexName, taskIndex,
@@ -153,24 +150,15 @@ public class TezRuntimeUtils {
     return partitioner;
   }
 
-  public static TezTaskOutput instantiateTaskOutputManager(Configuration conf, OutputContext outputContext) {
-    Class<?> clazz = conf.getClass(Constants.TEZ_RUNTIME_TASK_OUTPUT_MANAGER,
-        TezTaskOutputFiles.class);
-    try {
-      Constructor<?> ctor = clazz.getConstructor(Configuration.class, String.class, int.class, String.class, int.class);
-      ctor.setAccessible(true);
-      TezTaskOutput instance = (TezTaskOutput) ctor.newInstance(conf,
-          outputContext.getUniqueIdentifier(),
-          outputContext.getDagIdentifier(),
-          outputContext.getExecutionContext().getContainerId(),
-          outputContext.getTaskVertexIndex());
-      return instance;
-    } catch (Exception e) {
-      throw new TezUncheckedException(
-          "Unable to instantiate configured TezOutputFileManager: "
-              + conf.get(Constants.TEZ_RUNTIME_TASK_OUTPUT_MANAGER,
-                  TezTaskOutputFiles.class.getName()), e);
-    }
+  public static TezTaskOutput instantiateTaskOutputManager(
+      Configuration conf, OutputContext outputContext,
+      boolean isCompositeFetch) {
+    return new TezTaskOutputFiles(conf,
+        outputContext.getUniqueIdentifier(),
+        outputContext.getDagIdentifier(),
+        outputContext.getExecutionContext().getContainerId(),
+        outputContext.getTaskVertexIndex(),
+        isCompositeFetch);
   }
 
   public static URL constructBaseURIForShuffleHandlerDagComplete(
@@ -190,10 +178,10 @@ public class TezRuntimeUtils {
     return new URL(sb.toString());
   }
 
-  public static HttpConnectionParams getHttpConnectionParams(Configuration conf) {
-    int connectionTimeout =
-        conf.getInt(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_CONNECT_TIMEOUT,
-            TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_STALLED_COPY_TIMEOUT_DEFAULT);
+  public static HttpConnectionParams getHttpConnectionParams(
+      Configuration conf, boolean compositeFetch) {
+    int connectionTimeout = conf.getInt(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_CONNECT_TIMEOUT,
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_STALLED_COPY_TIMEOUT_DEFAULT);
 
     int readTimeout = conf.getInt(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_READ_TIMEOUT,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_READ_TIMEOUT_DEFAULT);
@@ -234,10 +222,13 @@ public class TezRuntimeUtils {
       }
     }
 
-    HttpConnectionParams httpConnParams = new HttpConnectionParams(keepAlive,
-        keepAliveMaxConnections, connectionTimeout, readTimeout, bufferSize, sslShuffle,
-        sslFactory);
-    return httpConnParams;
+    // skipVerifyRequest is false if compositeFetch == false, i.e, when using mapreduce_shuffle
+    boolean skipVerifyRequest = compositeFetch && conf.getBoolean(
+        SecureShuffleUtils.SHUFFLE_SKIP_VERIFY_REQUEST, SecureShuffleUtils.SHUFFLE_SKIP_VERIFY_REQUEST_DEFAULT);
+
+    return new HttpConnectionParams(keepAlive,
+        keepAliveMaxConnections, connectionTimeout, readTimeout, bufferSize,
+        sslShuffle, sslFactory, skipVerifyRequest);
   }
 
   public static BaseHttpConnection getHttpConnection(

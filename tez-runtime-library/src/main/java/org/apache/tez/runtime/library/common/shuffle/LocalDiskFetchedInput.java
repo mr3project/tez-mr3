@@ -22,19 +22,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
-import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.tez.common.Preconditions;
 import org.apache.commons.io.input.BoundedInputStream;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 
 public class LocalDiskFetchedInput extends FetchedInput {
-  private static final Logger LOG = LoggerFactory.getLogger(LocalDiskFetchedInput.class);
 
   private final Path inputFile;
   private final FileSystem localFS;
@@ -43,13 +39,13 @@ public class LocalDiskFetchedInput extends FetchedInput {
 
   public LocalDiskFetchedInput(long startOffset, long compressedSize,
                                InputAttemptIdentifier inputAttemptIdentifier, Path inputFile,
-                               Configuration conf, FetchedInputCallback callbackHandler)
-      throws IOException {
+                               RawLocalFileSystem localFs,
+                               FetchedInputCallback callbackHandler) {
     super(inputAttemptIdentifier, callbackHandler);
     this.size = compressedSize;
     this.startOffset = startOffset;
     this.inputFile = inputFile;
-    localFS = FileSystem.getLocal(conf).getRaw();
+    this.localFS = localFs;
   }
 
   @Override
@@ -112,17 +108,14 @@ public class LocalDiskFetchedInput extends FetchedInput {
         ", state=" + getState() + "]";
   }
 
-  @VisibleForTesting
   protected Path getInputFile() {
     return inputFile;
   }
 
-  @VisibleForTesting
   protected long getStartOffset() {
     return startOffset;
   }
 
-  @VisibleForTesting
   protected FileSystem getLocalFS() {
     return localFS;
   }

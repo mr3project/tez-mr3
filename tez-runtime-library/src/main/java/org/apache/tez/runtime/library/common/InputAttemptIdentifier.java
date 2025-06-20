@@ -37,9 +37,9 @@ public class InputAttemptIdentifier {
   public static final String PATH_PREFIX_MR3 = com.datamonad.mr3.container.ContainerID$.MODULE$.prefixInContainerWorkerEnv();
 
   public enum SPILL_INFO {
-    FINAL_MERGE_ENABLED, //Final merge is enabled at source
-    INCREMENTAL_UPDATE, //Final merge is disabled and qualifies for incremental spill updates.(i.e spill 0, 1 etc)
-    FINAL_UPDATE //Indicates final piece of data in the pipelined shuffle.
+    FINAL_MERGE_ENABLED,  // Final merge is enabled at source
+    INCREMENTAL_UPDATE,   // Final merge is disabled and qualifies for incremental spill updates.(i.e spill 0, 1 etc)
+    FINAL_UPDATE          // Indicates final piece of data in the pipelined shuffle.
   }
 
   /**
@@ -130,13 +130,25 @@ public class InputAttemptIdentifier {
     if (inputIdentifier != other.inputIdentifier)
       return false;
     // do not compare pathComponent as they may not always be present
+    if (spillEventId != other.spillEventId)
+      return false;
     return true;
   }
 
   @Override
   public String toString() {
-    return "InputAttemptIdentifier [inputIdentifier=" + inputIdentifier
-        + ", attemptNumber=" + attemptNumber + ", pathComponent="
-        + pathComponent + ", spillType=" + fetchTypeInfo + ", spillId=" + spillEventId + "]";
+    StringBuilder s = new StringBuilder();
+    s.append("InputAttemptIdentifier [inputIdentifier=");
+    s.append(inputIdentifier);
+    s.append(", attemptNumber=");
+    s.append(attemptNumber);
+    s.append(", pathComponent=");
+    s.append(pathComponent);
+    s.append(", spillType=");
+    s.append(fetchTypeInfo);
+    s.append(", spillId=");
+    s.append(spillEventId);
+    s.append("]");
+    return s.toString();
   }
 }

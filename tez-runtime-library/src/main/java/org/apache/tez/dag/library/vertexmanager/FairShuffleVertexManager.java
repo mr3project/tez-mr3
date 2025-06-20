@@ -455,8 +455,7 @@ public class FairShuffleVertexManager extends ShuffleVertexManagerBase {
       descriptor.setUserPayload(fairEdgeConfig.getBytePayload());
       vInfo.getValue().newDescriptor = descriptor;
     }
-    ReconfigVertexParams params = new ReconfigVertexParams(
-        finalTaskParallelism, null);
+    ReconfigVertexParams params = new ReconfigVertexParams(finalTaskParallelism);
 
     return params;
   }

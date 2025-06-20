@@ -27,20 +27,17 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.Deflater;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 
+import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.library.conf.OrderedPartitionedKVOutputConfig.SorterImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.tez.common.TezCommonUtils;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
-import org.apache.tez.common.TezUtils;
 import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.runtime.api.AbstractLogicalOutput;
 import org.apache.tez.runtime.api.Event;
@@ -52,7 +49,6 @@ import org.apache.tez.runtime.library.common.MemoryUpdateCallbackHandler;
 import org.apache.tez.runtime.library.common.sort.impl.ExternalSorter;
 import org.apache.tez.runtime.library.common.sort.impl.PipelinedSorter;
 import org.apache.tez.runtime.library.common.sort.impl.TezSpillRecord;
-import org.apache.tez.runtime.library.common.sort.impl.dflt.DefaultSorter;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 
 import org.apache.tez.common.Preconditions;
@@ -62,37 +58,39 @@ import org.apache.tez.common.Preconditions;
  * key/value pairs written to it. It also partitions the output based on a
  * {@link Partitioner}
  */
-@Public
 public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
 
   private static final Logger LOG = LoggerFactory.getLogger(OrderedPartitionedKVOutput.class);
 
   protected ExternalSorter sorter;
+  private boolean usePipelinedSorter = false;
   protected Configuration conf;
   private RawLocalFileSystem localFs;
   protected MemoryUpdateCallbackHandler memoryUpdateCallbackHandler;
   private final AtomicBoolean isStarted = new AtomicBoolean(false);
   private final Deflater deflater;
 
-  @VisibleForTesting
   boolean pipelinedShuffle;
-  private boolean sendEmptyPartitionDetails;
-  @VisibleForTesting
   boolean finalMergeEnabled;
+  private boolean sendEmptyPartitionDetails;
 
-  private boolean compositeFetch;
+  private final String auxiliaryService;
+  private final boolean compositeFetch;
 
   public OrderedPartitionedKVOutput(OutputContext outputContext, int numPhysicalOutputs) {
     super(outputContext, numPhysicalOutputs);
     deflater = TezCommonUtils.newBestCompressionDeflater();
+    FetcherConfig fetcherConfig = getContext().getFetcherConfig();
+    auxiliaryService = fetcherConfig.auxiliaryService;
+    compositeFetch = fetcherConfig.compositeFetch;
   }
 
   @Override
   public synchronized List<Event> initialize() throws IOException {
-    this.conf = TezUtils.createConfFromUserPayload(getContext().getUserPayload());
+    this.conf = getContext().getConfigurationFromUserPayload(true);
     this.localFs = (RawLocalFileSystem) FileSystem.getLocal(conf).getRaw();
 
-    // Initializing this parametr in this conf since it is used in multiple
+    // Initializing this parameter in this conf since it is used in multiple
     // places (wherever LocalDirAllocator is used) - TezTaskOutputFiles,
     // TezMerger, etc.
     this.conf.setStrings(TezRuntimeFrameworkConfigs.LOCAL_DIRS, getContext().getWorkDirs());
@@ -104,8 +102,6 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
     sendEmptyPartitionDetails = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED,
         TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED_DEFAULT);
-
-    this.compositeFetch = ShuffleUtils.isTezShuffleHandler(this.conf);
 
     return Collections.emptyList();
   }
@@ -126,13 +122,13 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
             + ", validValues=" + Arrays.asList(SorterImpl.values()));
       }
 
+      pipelinedShuffle = conf.getBoolean(
+          TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED,
+          TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT);
+      // set finalMergeEnabled = !pipelinedShuffleConf unless set explicitly in tez-site.xml
       finalMergeEnabled = conf.getBoolean(
           TezRuntimeConfiguration.TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT,
-          TezRuntimeConfiguration.TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT_DEFAULT);
-
-      pipelinedShuffle = this.conf.getBoolean(TezRuntimeConfiguration
-          .TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED, TezRuntimeConfiguration
-          .TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT);
+          !pipelinedShuffle);
 
       if (pipelinedShuffle) {
         if (finalMergeEnabled) {
@@ -143,16 +139,13 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
         }
 
         Preconditions.checkArgument(sorterImpl.equals(SorterImpl.PIPELINED),
-            TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED
-              + "only works with PipelinedSorter.");
+            TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED + "only works with PipelinedSorter.");
       }
 
       if (sorterImpl.equals(SorterImpl.PIPELINED)) {
         sorter = new PipelinedSorter(getContext(), conf, getNumPhysicalOutputs(),
             memoryUpdateCallbackHandler.getMemoryAssigned());
-      } else if (sorterImpl.equals(SorterImpl.LEGACY)) {
-        sorter = new DefaultSorter(getContext(), conf, getNumPhysicalOutputs(),
-            memoryUpdateCallbackHandler.getMemoryAssigned());
+        usePipelinedSorter = true;
       } else {
         throw new UnsupportedOperationException("Unsupported sorter class specified in config"
             + ", propertyName=" + TezRuntimeConfiguration.TEZ_RUNTIME_SORTER_CLASS
@@ -206,17 +199,25 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
   private List<Event> generateEvents() throws IOException {
     List<Event> eventList = Lists.newLinkedList();
     if (finalMergeEnabled && !pipelinedShuffle) {
-      boolean isLastEvent = true;
-      String auxiliaryService = conf.get(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
-          TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT);
-      if (sorter.getFinalIndexFile() == null) {
+      if (!sorter.getFinalIndexComputed()) {
         // return an empty list because TezSpillRecord() throws NPE
         // this occurs when PipelinedSorter threads gets interrupted and LogicalOutput.close() is closed
         return eventList;
       }
+
+      // In PipelinedSorter.flush() skips renaming output directories if finalMergeEnabled == true && numSpills == 1.
+      // Here we adjust pathComponent in accordance so that downstream tasks can request, e.g., ".../...10031_0/file.out".
+      String pathComponent = (usePipelinedSorter && sorter.getNumSpills() == 1) ?
+          getContext().getUniqueIdentifier() + "_0" :   // use original output directory ".../...10031_0"
+          getContext().getUniqueIdentifier();           // use renamed output directory ".../...10031"
+      String pathComponentExpanded = ShuffleUtils.expandPathComponent(getContext(), compositeFetch, pathComponent);
+      TezSpillRecord tezSpillRecord = ShuffleUtils.getTezSpillRecord(
+          getContext(), pathComponentExpanded, sorter.getFinalIndexFile(), localFs);
+
+      boolean isLastEvent = true;
       ShuffleUtils.generateEventOnSpill(eventList, finalMergeEnabled, isLastEvent,
-          getContext(), 0, new TezSpillRecord(sorter.getFinalIndexFile(), localFs),
-          getNumPhysicalOutputs(), sendEmptyPartitionDetails, getContext().getUniqueIdentifier(),
+          getContext(), 0, tezSpillRecord,
+          getNumPhysicalOutputs(), sendEmptyPartitionDetails, pathComponent,
           sorter.getPartitionStats(), sorter.reportDetailedPartitionStats(), auxiliaryService, deflater,
           compositeFetch);
     }
@@ -229,18 +230,14 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
     return eventList;
   }
 
-
   private static final Set<String> confKeys = new HashSet<String>();
 
   static {
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_BYTES);
-    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_IO_FILE_BUFFER_SIZE);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_FACTOR);
-    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_SORT_SPILL_PERCENT);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_REPORT_PARTITION_STATS);
-    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_INDEX_CACHE_MEMORY_LIMIT_BYTES);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_COMBINE_MIN_SPILLS);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_SORT_THREADS);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_MIN_BLOCK_SIZE_IN_MB);
@@ -263,13 +260,9 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
     confKeys.add(TezConfiguration.TEZ_COUNTERS_MAX_GROUPS);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_SORTER_CLASS);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT);
-    confKeys.add(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID);
+    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT);
   }
 
-  // TODO Maybe add helper methods to extract keys
-  // TODO Maybe add constants or an Enum to access the keys
-
-  @InterfaceAudience.Private
   public static Set<String> getConfigurationKeySet() {
     return Collections.unmodifiableSet(confKeys);
   }

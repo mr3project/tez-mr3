@@ -37,8 +37,4 @@ public class TezRuntimeFrameworkConfigs {
   public static final String LOCAL_DIRS = TEZ_RUNTIME_FRAMEWORK_PREFIX + "local.dirs";
 
   public static final String TEZ_RUNTIME_NUM_EXPECTED_PARTITIONS = TEZ_RUNTIME_FRAMEWORK_PREFIX + "num.expected.partitions";
-
-  public static final String TEZ_RUNTIME_METRICS_SESSION_ID = TEZ_RUNTIME_FRAMEWORK_PREFIX +
-      "metrics.session.id";
-  public static final String TEZ_RUNTIME_METRICS_SESSION_ID_DEFAULT = "";
 }

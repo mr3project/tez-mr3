@@ -20,9 +20,6 @@ package org.apache.tez.runtime.api.events;
 
 import java.nio.ByteBuffer;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.tez.dag.api.VertexManagerPlugin;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.TaskAttemptIdentifier;
@@ -34,8 +31,6 @@ import org.apache.tez.common.Preconditions;
  * This may be used to send statistics like samples etc to the VertexManager for
  * automatic plan reconfigurations based on observed statistics
  */
-@Unstable
-@Public
 public class VertexManagerEvent extends Event
   implements com.datamonad.mr3.api.EventToVertexManager {
 
@@ -90,7 +85,6 @@ public class VertexManagerEvent extends Event
     return producerAttempt;
   }
   
-  @Private
   public void setProducerAttemptIdentifier(TaskAttemptIdentifier producerAttempt) {
     this.producerAttempt = producerAttempt;
   }

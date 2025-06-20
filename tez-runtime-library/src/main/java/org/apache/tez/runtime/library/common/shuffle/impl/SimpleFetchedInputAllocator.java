@@ -20,9 +20,9 @@ package org.apache.tez.runtime.library.common.shuffle.impl;
 
 import java.io.IOException;
 
+import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
@@ -38,7 +38,6 @@ import org.apache.tez.runtime.library.common.shuffle.MemoryFetchedInput;
  * Usage: Create instance, setInitialMemoryAvailable(long), configureAndStart()
  *
  */
-@Private
 public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
     FetchedInputCallback {
 
@@ -49,7 +48,6 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
   private final TezTaskOutputFiles fileNameAllocator;
 
   // Configuration parameters
-  private final long maxAvailableTaskMemory;
   private final long memoryLimit;
   private final long maxSingleMemoryShuffle;
 
@@ -58,18 +56,20 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
   private volatile long usedMemory = 0;
 
   private final boolean useFreeMemoryFetchedInput;
+  private final long freeMemoryThreshold;
 
   public SimpleFetchedInputAllocator(String srcNameTrimmed,
                                      String uniqueIdentifier, int dagID,
                                      Configuration conf,
                                      long maxTaskAvailableMemory,
                                      long memoryAssigned,
-                                     String containerId, int vertexId) {
+                                     String containerId, int vertexId,
+                                     boolean compositeFetch) {
     this.srcNameTrimmed = srcNameTrimmed;
     this.conf = conf;    
-    this.fileNameAllocator = new TezTaskOutputFiles(conf, uniqueIdentifier, dagID, containerId, vertexId);
+    this.fileNameAllocator = new TezTaskOutputFiles(
+        conf, uniqueIdentifier, dagID, containerId, vertexId, compositeFetch);
 
-    this.maxAvailableTaskMemory = maxTaskAvailableMemory;
     this.memoryLimit = memoryAssigned;
 
     final float maxSingleShuffleMemoryPercent = conf.getFloat(
@@ -87,12 +87,13 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
     this.useFreeMemoryFetchedInput = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT,
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT_DEFAULT);
+    this.freeMemoryThreshold = maxTaskAvailableMemory;
+    // TODO: introduce a factor for freeMemoryThreshold (e.g. 0.5)
 
     LOG.info("{}: memoryLimit={}, maxSingleMemoryShuffle={}",
         srcNameTrimmed, this.memoryLimit, this.maxSingleMemoryShuffle);
   }
 
-  @Private
   public static long getInitialMemoryReq(Configuration conf, long maxAvailableTaskMemory) {
     final float maxInMemCopyUse = conf.getFloat(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT,
@@ -123,10 +124,9 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
       }
       // Check if we can find free memory in the current ContainerWorker.
       long currentFreeMemory = Runtime.getRuntime().freeMemory();
-      if (currentFreeMemory < maxAvailableTaskMemory){
+      if (currentFreeMemory < freeMemoryThreshold) {
         // this ContainerWorker is busy serving Tasks, so do not borrow
-        // TODO: introduce a factor for maxAvailableTaskMemory (e.g. 0.5)
-        LOG.info("Creating DiskFetchedInput: {}, {} < maxAvailableTaskMemory", actualSize, currentFreeMemory);
+        LOG.info("Creating DiskFetchedInput: {}, {} < freeMemoryThreshold", actualSize, currentFreeMemory);
         return new DiskFetchedInput(compressedSize,
             inputAttemptIdentifier, this, conf,
             fileNameAllocator);

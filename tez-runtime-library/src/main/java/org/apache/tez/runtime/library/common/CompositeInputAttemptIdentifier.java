@@ -18,53 +18,100 @@
 
 package org.apache.tez.runtime.library.common;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-
 /**
  * Container for a task number and an attempt number for the task.
  */
-@Private
-public class CompositeInputAttemptIdentifier extends InputAttemptIdentifier {
+public class CompositeInputAttemptIdentifier {
+
+  private final InputAttemptIdentifier input;
+
   private final int inputIdentifierCount;
 
-  public CompositeInputAttemptIdentifier(int inputIdentifier, int attemptNumber, String pathComponent, int inputIdentifierCount) {
-    this(inputIdentifier, attemptNumber, pathComponent, SPILL_INFO.FINAL_MERGE_ENABLED, -1, inputIdentifierCount);
+  public CompositeInputAttemptIdentifier(
+      int inputIdentifier, int attemptNumber, String pathComponent, int inputIdentifierCount) {
+    this(inputIdentifier, attemptNumber, pathComponent, InputAttemptIdentifier.SPILL_INFO.FINAL_MERGE_ENABLED, -1, inputIdentifierCount);
   }
 
-  public CompositeInputAttemptIdentifier(int inputIdentifier, int attemptNumber, String pathComponent,
-      SPILL_INFO fetchTypeInfo, int spillEventId, int inputIdentifierCount) {
-    super(inputIdentifier, attemptNumber, pathComponent, fetchTypeInfo, spillEventId);
+  public CompositeInputAttemptIdentifier(
+      int inputIdentifier, int attemptNumber, String pathComponent,
+      InputAttemptIdentifier.SPILL_INFO fetchTypeInfo, int spillEventId,
+      int inputIdentifierCount) {
+    this.input = new InputAttemptIdentifier(inputIdentifier, attemptNumber, pathComponent, fetchTypeInfo, spillEventId);
     this.inputIdentifierCount = inputIdentifierCount;
   }
 
+  public CompositeInputAttemptIdentifier(InputAttemptIdentifier input) {
+    this.input = input;
+    this.inputIdentifierCount = 1;
+  }
+
+  public InputAttemptIdentifier getInput() {
+    return input;
+  }
 
   public int getInputIdentifierCount() {
     return inputIdentifierCount;
   }
 
+  public int getInputIdentifier() {
+    return input.getInputIdentifier();
+  }
+
+  public int getAttemptNumber() {
+    return input.getAttemptNumber();
+  }
+
+  public String getPathComponent() {
+    return input.getPathComponent();
+  }
+
+  public InputAttemptIdentifier.SPILL_INFO getFetchTypeInfo() {
+    return input.getFetchTypeInfo();
+  }
+
+  public int getSpillEventId() {
+    return input.getSpillEventId();
+  }
+
+  public boolean canRetrieveInputInChunks() {
+    return input.canRetrieveInputInChunks();
+  }
+
   public InputAttemptIdentifier expand(int inputIdentifierOffset) {
-    return new InputAttemptIdentifier(getInputIdentifier() + inputIdentifierOffset, getAttemptNumber(), getPathComponent(), getFetchTypeInfo(), getSpillEventId());
+    return new InputAttemptIdentifier(getInputIdentifier() + inputIdentifierOffset,
+        getAttemptNumber(), getPathComponent(), getFetchTypeInfo(), getSpillEventId());
   }
 
   public boolean include(int thatInputIdentifier, int thatAttemptNumber) {
     return
-        super.getInputIdentifier() <= thatInputIdentifier && thatInputIdentifier < (super.getInputIdentifier() + inputIdentifierCount) &&
-        super.getAttemptNumber() == thatAttemptNumber;
+        getInputIdentifier() <= thatInputIdentifier && thatInputIdentifier < (getInputIdentifier() + inputIdentifierCount) &&
+        getAttemptNumber() == thatAttemptNumber;
   }
 
   // PathComponent & shared does not need to be part of the hashCode and equals computation.
   @Override
   public int hashCode() {
-    return super.hashCode();
+    return 31 * input.hashCode() + inputIdentifierCount;
   }
 
   @Override
   public boolean equals(Object obj) {
-    return super.equals(obj);
+    if (this == obj)
+      return true;
+    if (obj == null)
+      return false;
+    if (getClass() != obj.getClass())
+      return false;
+    CompositeInputAttemptIdentifier other = (CompositeInputAttemptIdentifier) obj;
+    return input.equals(other.input) && inputIdentifierCount == other.inputIdentifierCount;
   }
 
   @Override
   public String toString() {
-    return super.toString() + ", count=" + inputIdentifierCount;
+    StringBuilder s = new StringBuilder();
+    s.append(input.toString());
+    s.append(", count=");
+    s.append(inputIdentifierCount);
+    return s.toString();
   }
 }

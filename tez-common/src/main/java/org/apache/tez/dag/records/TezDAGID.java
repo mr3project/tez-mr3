@@ -22,7 +22,6 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 
-import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 
 import org.apache.tez.common.Preconditions;
@@ -51,12 +50,11 @@ public class TezDAGID extends TezID {
   public static TezDAGID getInstance(ApplicationId applicationId, int id) {
     // The newly created TezDAGIds are primarily for their hashCode method, and
     // will be short-lived.
-    // Alternately the cache can be keyed by the hash of the incoming paramters.
+    // Alternately the cache can be keyed by the hash of the incoming parameters.
     Preconditions.checkArgument(applicationId != null, "ApplicationID cannot be null");
     return tezDAGIDCache.getInstance(new TezDAGID(applicationId, id));
   }
 
-  @InterfaceAudience.Private
   public static void clearCache() {
     tezDAGIDCache.clear();
   }

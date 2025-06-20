@@ -25,9 +25,6 @@ import java.security.PrivilegedAction;
 
 import sun.misc.Unsafe;
 
-import com.google.common.primitives.Longs;
-import com.google.common.primitives.UnsignedBytes;
-
 /**
  * Same as {@link org.apache.hadoop.io.FastByteComparisons}
  *
@@ -35,7 +32,7 @@ import com.google.common.primitives.UnsignedBytes;
  * This is borrowed and slightly modified from Guava's {@link com.google.common.primitives.UnsignedBytes}
  * class to be able to compare arrays that start at non-zero offsets.
  */
-final class FastByteComparisons {
+public final class FastByteComparisons {
 
   /**
    * Lexicographically compare two byte arrays.
@@ -46,6 +43,56 @@ final class FastByteComparisons {
         b1, s1, l1, b2, s2, l2);
   }
 
+  /* Determine if two strings are equal from two byte arrays each
+   * with their own start position and length.
+   * Use lexicographic unsigned byte value order.
+   * This is what's used for UTF-8 sort order.
+   */
+  public static boolean compareEqual(byte[] arg1, final int start1, final int len1,
+                                     byte[] arg2, final int start2, final int len2) {
+    if (len1 != len2) {
+      return false;
+    }
+    if (len1 == 0) {
+      return true;
+    }
+
+    // do bounds check for OOB exception
+    if (arg1[start1] != arg2[start2]
+      || arg1[start1 + len1 - 1] != arg2[start2 + len2 - 1]) {
+      return false;
+    }
+
+    if (len1 == len2) {
+      // prove invariant to the compiler: len1 = len2
+      // all array access between (start1, start1+len1)
+      // and (start2, start2+len2) are valid
+      // no more OOB exceptions are possible
+      final int step = 8;
+      final int remainder = len1 % step;
+      final int wlen = len1 - remainder;
+      // suffix first
+      for (int i = wlen; i < len1; i++) {
+        if (arg1[start1 + i] != arg2[start2 + i]) {
+          return false;
+        }
+      }
+      // SIMD loop
+      for (int i = 0; i < wlen; i += step) {
+        final int s1 = start1 + i;
+        final int s2 = start2 + i;
+        boolean neq = false;
+        for (int j = 0; j < step; j++) {
+          neq = (arg1[s1 + j] != arg2[s2 + j]) || neq;
+        }
+        if (neq) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
 
   private interface Comparer<T> {
     abstract public int compareTo(T buffer1, int offset1, int length1,
@@ -123,6 +170,10 @@ final class FastByteComparisons {
       static final int BYTE_ARRAY_BASE_OFFSET;
 
       static {
+        if (ByteOrder.nativeOrder().equals(ByteOrder.BIG_ENDIAN)) {
+          throw new AssertionError("ERROR: Big-endian architectures are not supported.");
+        }
+
         theUnsafe = (Unsafe) AccessController.doPrivileged(
             new PrivilegedAction<Object>() {
               @Override
@@ -149,9 +200,6 @@ final class FastByteComparisons {
         }
       }
 
-      static final boolean littleEndian =
-          ByteOrder.nativeOrder().equals(ByteOrder.LITTLE_ENDIAN);
-
       /**
        * Returns true if x1 is less than x2, when both values are treated as
        * unsigned.
@@ -174,63 +222,39 @@ final class FastByteComparisons {
       @Override
       public int compareTo(byte[] buffer1, int offset1, int length1,
           byte[] buffer2, int offset2, int length2) {
-        // Short circuit equal case
         if (buffer1 == buffer2 &&
             offset1 == offset2 &&
             length1 == length2) {
           return 0;
         }
+
+        final int stride = 8;
         int minLength = Math.min(length1, length2);
-        int minWords = minLength / Longs.BYTES;
+        int strideLimit = minLength & ~(stride - 1);
         int offset1Adj = offset1 + BYTE_ARRAY_BASE_OFFSET;
         int offset2Adj = offset2 + BYTE_ARRAY_BASE_OFFSET;
+        int i;
 
-        /*
-         * Compare 8 bytes at a time. Benchmarking shows comparing 8 bytes at a
-         * time is no slower than comparing 4 bytes at a time even on 32-bit.
-         * On the other hand, it is substantially faster on 64-bit.
-         */
-        for (int i = 0; i < minWords * Longs.BYTES; i += Longs.BYTES) {
+        for (i = 0; i < strideLimit; i += stride) {
           long lw = theUnsafe.getLong(buffer1, offset1Adj + (long) i);
           long rw = theUnsafe.getLong(buffer2, offset2Adj + (long) i);
-          long diff = lw ^ rw;
 
-          if (diff != 0) {
-            if (!littleEndian) {
-              return lessThanUnsigned(lw, rw) ? -1 : 1;
-            }
-
-            // Use binary search
-            int n = 0;
-            int y;
-            int x = (int) diff;
-            if (x == 0) {
-              x = (int) (diff >>> 32);
-              n = 32;
-            }
-
-            y = x << 16;
-            if (y == 0) {
-              n += 16;
-            } else {
-              x = y;
-            }
-
-            y = x << 8;
-            if (y == 0) {
-              n += 8;
-            }
-            return (int) (((lw >>> n) & 0xFFL) - ((rw >>> n) & 0xFFL));
+          if (lw != rw) {
+            // original approach (slower in JMH testing)
+            // int n = Long.numberOfTrailingZeros(lw ^ rw) & ~0x7;
+            // return ((int) ((lw >>> n) & 0xFF)) - ((int) ((rw >>> n) & 0xFF));
+            long bw = Long.reverseBytes(lw);
+            long br = Long.reverseBytes(rw);
+            return Long.compareUnsigned(bw, br);
           }
         }
 
-        // The epilogue to cover the last (minLength % 8) elements.
-        for (int i = minWords * Longs.BYTES; i < minLength; i++) {
-          int result = UnsignedBytes.compare(
-              buffer1[offset1 + i],
-              buffer2[offset2 + i]);
-          if (result != 0) {
-            return result;
+        for (; i < minLength; i++) {
+          // do not use UnsignedBytes.compare() because we want to avoid Guava
+          int b1 = buffer1[offset1 + i] & 0xFF;
+          int b2 = buffer2[offset2 + i] & 0xFF;
+          if (b1 != b2) {
+            return b1 - b2;
           }
         }
         return length1 - length2;

@@ -22,23 +22,22 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.SocketTimeoutException;
 import java.net.URL;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.tez.common.TezRuntimeFrameworkConfigs;
-import org.apache.tez.http.BaseHttpConnection;
+import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.TaskContext;
-import org.apache.tez.runtime.library.common.Constants;
+import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
+import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.shuffle.FetchResult;
 import org.apache.tez.runtime.library.common.shuffle.Fetcher;
@@ -60,10 +59,9 @@ import org.slf4j.LoggerFactory;
 public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
 
   private static final Logger LOG = LoggerFactory.getLogger(FetcherOrderedGrouped.class);
-  private static final AtomicInteger fetcherIdGen = new AtomicInteger(0);
-  private final boolean isDebugEnabled = LOG.isDebugEnabled();
+  private static final boolean isDebugEnabled = LOG.isDebugEnabled();
 
-  private static final InputAttemptIdentifier[] EMPTY_ATTEMPT_ID_ARRAY = new InputAttemptIdentifier[0];
+  private static final CompositeInputAttemptIdentifier[] EMPTY_ATTEMPT_ID_ARRAY = new CompositeInputAttemptIdentifier[0];
 
   private static class MapOutputStat {
     final InputAttemptIdentifier srcAttemptId;
@@ -88,69 +86,46 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     }
   }
 
-  private final ShuffleServer shuffleSchedulerServer;
-  private final Configuration conf;
-  private final String applicationId;
-  private final ShuffleServer.FetcherConfig fetcherConfig;
-  private final TaskContext taskContext;
-
-  private final String host;
-  private final int port;
-
   private final int fetcherIdentifier;
   private final String logIdentifier;
+  private final ShuffleScheduler shuffleScheduler;
+  private final Long shuffleSchedulerId;
+
+  private final FetchedInputAllocatorOrderedGrouped allocator;
+  private final ExceptionReporter exceptionReporter;
+  private final ShuffleErrorCounterGroup shuffleErrorCounterGroup;
 
   private volatile boolean stopped = false;
-
-  // Initiative value is 0, which means it hasn't retried yet.
-  private long retryStartTime = 0;
-
-  // set in assignShuffleClient()
-  private ShuffleScheduler shuffleScheduler;
-  private Long shuffleSchedulerId;
-  private int dagId;
-  private FetchedInputAllocatorOrderedGrouped allocator;
-  private ExceptionReporter exceptionReporter;
-  private ShuffleErrorCounterGroup shuffleErrorCounterGroup;
-
-  private volatile BaseHttpConnection httpConnection;
-  private volatile DataInputStream input;
-
   private final Object cleanupLock = new Object();
 
-  private CompressionCodec codec;
-
   public FetcherOrderedGrouped(
-      ShuffleServer shuffleSchedulerServer,
+      ShuffleServer fetcherCallback,
       Configuration conf,
       InputHost inputHost,
       InputHost.PartitionToInputs pendingInputsSeq,
-      ShuffleServer.FetcherConfig fetcherConfig,
+      FetcherConfig fetcherConfig,
       TaskContext taskContext,
+      int attempt,
       ShuffleScheduler shuffleScheduler) {
-    super(pendingInputsSeq);
+    super(fetcherCallback, conf, inputHost, fetcherConfig, taskContext, pendingInputsSeq, attempt);
 
-    this.shuffleSchedulerServer = shuffleSchedulerServer;
-    this.conf = conf;
-    this.applicationId = taskContext.getApplicationId().toString();
-    this.fetcherConfig = fetcherConfig;
-    this.taskContext = taskContext;
-
-    this.host = inputHost.getHost();
-    this.port = inputHost.getPort();
+    this.shuffleScheduler = shuffleScheduler;
+    this.shuffleSchedulerId = shuffleScheduler.getShuffleClientId();
 
     this.fetcherIdentifier = fetcherIdGen.incrementAndGet();
-    this.logIdentifier = shuffleScheduler.getLogIdentifier() + "-O-" + fetcherIdentifier;
-  }
-
-  public void assignShuffleClient(ShuffleClient<MapOutput> shuffleClient) {
-    this.shuffleScheduler = (ShuffleScheduler)shuffleClient;
-    this.shuffleSchedulerId = shuffleClient.getShuffleClientId();
-    this.dagId = shuffleClient.getDagIdentifier();
+    this.logIdentifier = attempt == 0 ?
+        shuffleScheduler.getLogIdentifier() + "_" + fetcherIdentifier + "-O-" + minPartition:
+        shuffleScheduler.getLogIdentifier() + "_" + fetcherIdentifier + "-O-" + minPartition + "=" + attempt;
 
     this.allocator = shuffleScheduler.getAllocator();
     this.exceptionReporter = shuffleScheduler.getExceptionReporter();
     this.shuffleErrorCounterGroup = shuffleScheduler.getShuffleErrorCounterGroup();
+  }
+
+  public FetcherOrderedGrouped createClone() {
+    return new FetcherOrderedGrouped(
+        fetcherCallback, conf, inputHost, pendingInputsSeq,
+        fetcherConfig, taskContext, this.attempt + 1, shuffleScheduler);
   }
 
   public ShuffleClient<MapOutput> getShuffleClient() {
@@ -168,9 +143,10 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
   public FetchResult call() {
     assert !pendingInputsSeq.getInputs().isEmpty();
 
+    startMillis = System.currentTimeMillis();
     buildPathToAttemptMap();
 
-    Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs = null;
+    Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> pendingInputs = null;
     try {
       codec = codecHolder.get();
       if (codec == null) {
@@ -192,49 +168,85 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     }
 
     if (pendingInputs != null) {
-      return new FetchResult(shuffleSchedulerId, host, port, pendingInputs);
+      return new FetchResult(shuffleSchedulerId, inputHost.getHostPort(), pendingInputs);
     } else {
       return null;
     }
   }
 
-  public void shutdown() {
+  // called from ShuffleServer or at the end of call()
+  public void shutdown(boolean disconnect) {
     if (!stopped) {
       if (isDebugEnabled) {
         LOG.debug("Fetcher stopped for host " + host);
       }
       stopped = true;
       // An interrupt will come in while shutting down the thread.
-      cleanupCurrentConnection(false);
+      cleanupCurrentConnection(disconnect);
     }
   }
 
-  private Map<InputAttemptIdentifier, InputHost.PartitionRange> fetchNext() throws InterruptedException {
-    List<InputAttemptIdentifier> failedFetches = null;
-    Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs = null;
-    try {
-      shuffleSchedulerServer.waitForMergeManager(shuffleSchedulerId);
+  private Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> fetchNext() throws InterruptedException {
+    boolean useLocalDiskFetch;
+    boolean useFreeMemoryWriterOutput = conf.getBoolean(
+        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT,
+        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT_DEFAULT);
+    boolean useFreeMemoryFetchedInput = conf.getBoolean(
+        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT,
+        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT_DEFAULT);
+    boolean shuffleMemToMem = conf.getBoolean(
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_ENABLE_MEMTOMEM,
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_ENABLE_MEMTOMEM_DEFAULT);
+    if (useFreeMemoryWriterOutput || useFreeMemoryFetchedInput || shuffleMemToMem) {
+      // useFreeMemoryWriterOutput == true: required
+      // useFreeMemoryFetchedInput == true: recommended for performance
+      // shuffleMemToMem == true: recommended for performance
+      useLocalDiskFetch = false;
+    } else {
+      if (fetcherConfig.localDiskFetchOrderedEnabled &&
+          host.equals(fetcherConfig.localHostName)) {
+        if (fetcherConfig.compositeFetch) {
+          // inspect 'first' to find the container where all inputs originate from
+          CompositeInputAttemptIdentifier first = pendingInputsSeq.getInputs().get(0);
+          // true if inputs originate from the current ContainerWorker
+          useLocalDiskFetch = first.getPathComponent().startsWith(
+              taskContext.getExecutionContext().getContainerId());
+        } else {
+          useLocalDiskFetch = true;
+        }
+      } else {
+        useLocalDiskFetch = false;
+      }
+    }
 
-      if (fetcherConfig.localDiskFetchEnabled
-          && host.equals(fetcherConfig.localHostName)) {
+    List<CompositeInputAttemptIdentifier> failedFetches = null;
+    Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> pendingInputs = null;
+
+    try {
+      fetcherCallback.waitForMergeManager(shuffleSchedulerId);
+      if (useLocalDiskFetch) {
         failedFetches = setupLocalDiskFetch();
       } else {
         pendingInputs = copyFromHost();
       }
     } finally {
-      // FIXME
       if (failedFetches != null && !failedFetches.isEmpty()) {
-        failedFetches.stream().forEach(input ->
-          shuffleSchedulerServer.fetchFailed(shuffleSchedulerId, input, true, false));
+        failedFetches.forEach(input ->
+          fetcherCallback.fetchFailed(shuffleSchedulerId, input, true, false,
+              inputHost, getPartitionRange(), this));
       }
-      cleanupCurrentConnection(false);
+      if (!useLocalDiskFetch) {
+        // This is a minor optimization that cleans up the current connection.
+        // shutdown() will call cleanupCurrentConnection() again, but will have no effect.
+        cleanupCurrentConnection(false);  // false to reuse connection
+      }
     }
 
     return pendingInputs;
   }
 
   // return pendingInputs[]
-  private Map<InputAttemptIdentifier, InputHost.PartitionRange> copyFromHost() {
+  private Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> copyFromHost() {
     // reset retryStartTime for a new host
     retryStartTime = 0;
 
@@ -243,10 +255,11 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
           + ", partition range: " + minPartition + "-" + maxPartition);
     }
 
-    Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs = setupConnection(0);
+    Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> pendingInputs = setupConnection(0);
     if (pendingInputs != null) {  // stopped or failure
       if (stopped) {
-        cleanupCurrentConnection(true);
+        // perhaps cleanupCurrentConnection() was already called in shutdown()
+        cleanupCurrentConnection(false);  // disconnect = false because we can reuse HTTPConnection
         return null;
       }
       return pendingInputs;
@@ -257,10 +270,9 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     // after putting back the remaining maps to the
     // yet_to_be_fetched list and marking the failed tasks.
     int index = 0;  // points to the next input to be consumed
-    InputAttemptIdentifier[] failedInputs = null;
-
+    CompositeInputAttemptIdentifier[] failedInputs = null;
     while (index < numInputs) {
-      InputAttemptIdentifier inputAttemptIdentifier = pendingInputsSeq.getInputs().get(index);
+      CompositeInputAttemptIdentifier inputAttemptIdentifier = pendingInputsSeq.getInputs().get(index);
 
       // fail immediately after first failure because we don't know how much to
       // skip for this error in the input stream. So we cannot move on to the
@@ -272,20 +284,22 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         }
         index++;
       } catch (FetcherReadTimeoutException e) {
-        // Setup connection again if disconnected
-        cleanupCurrentConnection(true);
+        cleanupCurrentConnection(true);   // disconnect = true because of error
         if (stopped) {
-          // do not put back remaining inputs because stopped
+          // perhaps cleanupCurrentConnection(false) was already called in shutdown(),
+          // but we just called cleanupCurrentConnection(true) anyway
           if (isDebugEnabled) {
             LOG.debug("Not re-establishing connection since Fetcher has been stopped");
           }
+          // do not put back remaining inputs because stopped
           return null;
         }
         // Connect with retry
-        Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputsNew = setupConnection(index);
+        Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> pendingInputsNew = setupConnection(index);
         if (pendingInputsNew != null) {   // stopped or failure
           if (stopped) {
-            cleanupCurrentConnection(true);
+            // perhaps cleanupCurrentConnection() was already called in shutdown()
+            cleanupCurrentConnection(false);  // disconnect = false because we can reuse HTTPConnection
             if (isDebugEnabled) {
               LOG.debug("Not reporting connection re-establishment failure since fetcher is stopped");
             }
@@ -296,7 +310,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       }
     }
 
-    Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputsFinal;
+    Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> pendingInputsFinal;
     if (index == numInputs) {   // success
       assert failedInputs == null;
       // no need to return pendingInputs[] because this is success
@@ -311,13 +325,15 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
             LOG.debug("Ignoring copyMapOutput failures for tasks: " + Arrays.toString(failedInputs) +
               " since Fetcher has been stopped");
           }
-          cleanupCurrentConnection(false);  // TODO: why disconnect == false???
+          // perhaps cleanupCurrentConnection() was already called in shutdown()
+          cleanupCurrentConnection(false);  // disconnect = false because we can reuse HTTPConnection
           return null;
         } else {
           LOG.warn("copyMapOutput failed for tasks: " + Arrays.toString(failedInputs));
-          for (InputAttemptIdentifier failedInput : failedInputs) {
+          for (CompositeInputAttemptIdentifier failedInput : failedInputs) {
             // readError == false and connectError == false, so we only report fetch failure
-            shuffleSchedulerServer.fetchFailed(shuffleSchedulerId, failedInput, true, false);
+            fetcherCallback.fetchFailed(shuffleSchedulerId, failedInput, true, false,
+                inputHost, getPartitionRange(), this);
 
             // Try to remove failedInput from pendingInputsFinal[] because it reports fetch failure to AM.
             // If failedInput == srcAttemptId (instead of inputAttemptIdentifier) in copyMapOutput(),
@@ -334,7 +350,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       }
     }
 
-    cleanupCurrentConnection(false);
+    // no need to call cleanupCurrentConnection(false) because of finally{} in fetchNext()
     return pendingInputsFinal;
   }
 
@@ -345,7 +361,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
   //   - pendingInputs[] should be put back in the queue
   //   - pendingInputs[] can be empty
   //   - shuffleSchedulerServer.fetchFailed() has been called for failedInputs[]
-  private Map<InputAttemptIdentifier, InputHost.PartitionRange> setupConnection(int currentIndex) {
+  private Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> setupConnection(int currentIndex) {
     assert currentIndex < pendingInputsSeq.getInputs().size();
 
     boolean connectSucceeded = false;
@@ -353,6 +369,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       String finalHost;
       boolean sslShuffle = fetcherConfig.httpConnectionParams.isSslShuffle();
       if (sslShuffle) {
+        // TODO: cache in host
         finalHost = InetAddress.getByName(host).getHostName();
       } else {
         finalHost = host;
@@ -363,7 +380,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
           port, range, applicationId, shuffleScheduler.getDagIdentifier(),
           fetcherConfig.httpConnectionParams.isSslShuffle());
 
-      Collection<InputAttemptIdentifier> inputsForPathComponents =
+      Collection<CompositeInputAttemptIdentifier> inputsForPathComponents =
         pendingInputsSeq.getInputs().subList(currentIndex, pendingInputsSeq.getInputs().size());
       // inputsForPathComponents[] is a View, so do not update it
       URL url = ShuffleUtils.constructInputURL(baseURI.toString(), inputsForPathComponents,
@@ -389,17 +406,19 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
 
       if (fetcherConfig.connectionFailAllInput) {
         // no pending inputs && only failed inputs
-        InputAttemptIdentifier[] failedFetches = buildInputSeqFromIndex(currentIndex);
-        for (InputAttemptIdentifier failedFetch : failedFetches) {
-          shuffleSchedulerServer.fetchFailed(shuffleSchedulerId, failedFetch, false, true);
+        CompositeInputAttemptIdentifier[] failedFetches = buildInputSeqFromIndex(currentIndex);
+        for (CompositeInputAttemptIdentifier failedFetch : failedFetches) {
+          fetcherCallback.fetchFailed(shuffleSchedulerId, failedFetch, false, true,
+              inputHost, getPartitionRange(), this);
         }
         return new HashMap<>();   // non-null, so failure; empty, so no pendingInputs[]
       } else {
         // pending inputs == all remaining, except failedInput == InputAttemptIdentifier at currentIndex
-        InputAttemptIdentifier failedFetch =  pendingInputsSeq.getInputs().get(currentIndex);
-        shuffleSchedulerServer.fetchFailed(shuffleSchedulerId, failedFetch, false, true);
+        CompositeInputAttemptIdentifier failedFetch =  pendingInputsSeq.getInputs().get(currentIndex);
+        fetcherCallback.fetchFailed(shuffleSchedulerId, failedFetch, false, true,
+            inputHost, getPartitionRange(), this);
 
-        Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs = buildInputMapFromIndex(currentIndex);
+        Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> pendingInputs = buildInputMapFromIndex(currentIndex);
         pendingInputs.remove(failedFetch);
         return pendingInputs;   // non-null, so failure; non-empty pendingInputs[]
       }
@@ -413,33 +432,38 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     }
 
     try {
-      input = httpConnection.getInputStream();
+      input = httpConnection.getInputStream();  // incurs a network transmission
+      setStage(STAGE_FIRST_FETCHED);
+      if (getState() == STATE_STUCK) {
+        fetcherCallback.wakeupLoop();
+      }
       httpConnection.validate();
     } catch (IOException | InterruptedException ie) {
       if (ie instanceof InterruptedException) {
         Thread.currentThread().interrupt();   // reset status
       }
       if (stopped) {
-        if (isDebugEnabled) {
-          LOG.debug("Not reporting fetch failure, since an Exception was caught after shutdown");
-        }
+        // Not reporting fetch failure, since an Exception was caught after shutdown
         return new HashMap<>();
       }
       shuffleErrorCounterGroup.ioErrs.increment(1);
       if (!connectSucceeded) {
-        LOG.warn("{}: Failed to connect from {} to {} with index = {}", logIdentifier, fetcherConfig.localHostName,
-            host, currentIndex, ie);
+        LOG.warn("{}: Failed to connect from {} to {} with index = {}: {}",
+            logIdentifier, fetcherConfig.localHostName, host, currentIndex,
+            ie.getClass().getName() + "/" + ie.getMessage());
         shuffleErrorCounterGroup.connectionErrs.increment(1);
       } else {
-        LOG.warn("{}: Failed to verify reply after connecting from {} to {} with index = {}", logIdentifier,
-            fetcherConfig.localHostName, host, currentIndex, ie);
+        LOG.warn("{}: Failed to verify reply after connecting from {} to {} with index = {}, informing ShuffleScheduler: {}",
+            logIdentifier, fetcherConfig.localHostName, host, currentIndex,
+            ie.getClass().getName() + "/" + ie.getMessage());
       }
 
       // similarly to FetcherUnordered, penalize only the first map and add the rest
-      InputAttemptIdentifier failedFetch = pendingInputsSeq.getInputs().get(currentIndex);
-      shuffleSchedulerServer.fetchFailed(shuffleSchedulerId, failedFetch, connectSucceeded, !connectSucceeded);
+      CompositeInputAttemptIdentifier failedFetch = pendingInputsSeq.getInputs().get(currentIndex);
+      fetcherCallback.fetchFailed(shuffleSchedulerId, failedFetch, connectSucceeded, !connectSucceeded,
+          inputHost, getPartitionRange(), this);
 
-      Map<InputAttemptIdentifier, InputHost.PartitionRange> pendingInputs = buildInputMapFromIndex(currentIndex);
+      Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> pendingInputs = buildInputMapFromIndex(currentIndex);
       pendingInputs.remove(failedFetch);
       return pendingInputs;
     }
@@ -448,27 +472,27 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
   }
 
   // return failedInputs[]
-  private InputAttemptIdentifier[] copyMapOutput(
+  private CompositeInputAttemptIdentifier[] copyMapOutput(
       DataInputStream input,
-      InputAttemptIdentifier inputAttemptIdentifier) throws FetcherReadTimeoutException {
+      CompositeInputAttemptIdentifier inputAttemptIdentifier) throws FetcherReadTimeoutException {
     MapOutput mapOutput = null;
     InputAttemptIdentifier srcAttemptId = null;
     long decompressedLength = 0;
     long compressedLength = 0;
     try {
       long startTime = System.currentTimeMillis();
-      int partitionCount = 1;
+      int partitionCount = 1;   // single partition only when using Hadoop shuffle service
 
       if (fetcherConfig.compositeFetch) {
         // Multiple partitions are fetched
-        partitionCount = WritableUtils.readVInt(input);
+        partitionCount = input.readInt();
       }
       ArrayList<MapOutputStat> mapOutputStats = new ArrayList<>(partitionCount);
       for (int mapOutputIndex = 0; mapOutputIndex < partitionCount; mapOutputIndex++) {
         MapOutputStat mapOutputStat = null;
         try {
           // Read the shuffle header
-          ShuffleHeader header = new ShuffleHeader();
+          ShuffleHeader header = new ShuffleHeader(fetcherConfig.compositeFetch);
           // TODO Review: Multiple header reads in case of status WAIT ?
           header.readFields(input);
           if (!header.mapId.startsWith(InputAttemptIdentifier.PATH_PREFIX_MR3) && !header.mapId.startsWith(InputAttemptIdentifier.PATH_PREFIX)) {
@@ -478,13 +502,13 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
                 LOG.warn("{}: ShuffleHandler error - {}, while fetching {}",
                     logIdentifier, header.mapId, inputAttemptIdentifier);
                 // TODO: Why is this necessary? We return [inputAttemptIdentifier] anyway.
-                shuffleSchedulerServer.informAM(shuffleSchedulerId, inputAttemptIdentifier);
+                fetcherCallback.informAM(shuffleSchedulerId, inputAttemptIdentifier);
               } else {
                 LOG.warn("{}: Invalid map id: {}, expected to start with {} / {}, partition: {}",
                     logIdentifier, header.mapId,
                     InputAttemptIdentifier.PATH_PREFIX_MR3, InputAttemptIdentifier.PATH_PREFIX, header.forReduce);
               }
-              return new InputAttemptIdentifier[]{ inputAttemptIdentifier };
+              return new CompositeInputAttemptIdentifier[]{ inputAttemptIdentifier };
             } else {
               if (isDebugEnabled) {
                 LOG.debug("Already shutdown. Ignoring invalid map id error");
@@ -510,7 +534,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
             LOG.warn("{}: Invalid map id", logIdentifier, e);
             // Don't know which one was bad, so consider this one bad and don't read
             // the remaining because we don't know where to start reading from. YARN-1773
-            return new InputAttemptIdentifier[]{ inputAttemptIdentifier };
+            return new CompositeInputAttemptIdentifier[]{ inputAttemptIdentifier };
           } else {
             if (isDebugEnabled) {
               LOG.debug("Already shutdown. Ignoring invalid map id error. Exception: " +
@@ -526,11 +550,11 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
           if (!stopped) {
             srcAttemptId = mapOutputStat.srcAttemptId;
             if (srcAttemptId == null) {
-              srcAttemptId = inputAttemptIdentifier;
-              LOG.warn("{}: Was expecting {} but got null", logIdentifier, srcAttemptId);
+              LOG.warn("{}: Was expecting {} but got null", logIdentifier, inputAttemptIdentifier);
+              return new CompositeInputAttemptIdentifier[]{ inputAttemptIdentifier};
+            } else {
+              return new CompositeInputAttemptIdentifier[]{ new CompositeInputAttemptIdentifier(srcAttemptId) };
             }
-            assert (srcAttemptId != null);
-            return new InputAttemptIdentifier[]{ srcAttemptId };
           } else {
             if (isDebugEnabled) {
               LOG.debug("Already stopped. Ignoring verification failure.");
@@ -569,7 +593,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         // Check if we can shuffle *now* ...
         if (mapOutput.getType() == Type.WAIT) {
           LOG.info("{}: MergerManager returned Status.WAIT...", logIdentifier);
-          //Not an error but wait to process data.
+          // Not an error but wait to process data.
           return EMPTY_ATTEMPT_ID_ARRAY;
         }
 
@@ -599,8 +623,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         long endTime = System.currentTimeMillis();
         // Reset retryStartTime as map task make progress if retried before.
         retryStartTime = 0;
-
-        shuffleSchedulerServer.fetchSucceeded(shuffleSchedulerId, host, srcAttemptId, mapOutput,
+        fetcherCallback.fetchSucceeded(shuffleSchedulerId, host, srcAttemptId, mapOutput,
             compressedLength, decompressedLength, endTime - startTime);
       }
 
@@ -611,7 +634,8 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
           LOG.debug("Not reporting fetch failure for exception during data copy: ["
               + ioe.getClass().getName() + ", " + ioe.getMessage() + "]");
         }
-        cleanupCurrentConnection(true);
+        // perhaps cleanupCurrentConnection(false) was already called in shutdown()
+        cleanupCurrentConnection(true);   // true because of error
         if (mapOutput != null) {
           mapOutput.abort(); // Release resources
         }
@@ -627,26 +651,27 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       }
       shuffleErrorCounterGroup.ioErrs.increment(1);
       if (srcAttemptId == null || mapOutput == null) {
-        LOG.info("{}: Failed to read map header {} decomp: {}, {}",
-            logIdentifier, srcAttemptId, decompressedLength, compressedLength, ioe);
+        LOG.info("{}: Failed to read map header {} ({}, {}): {}",
+            logIdentifier, srcAttemptId, decompressedLength, compressedLength,
+            ioe.getClass().getName() + "/" + ioe.getMessage());
         if (srcAttemptId == null) {
           // unlike Tez, do not fail all inputs starting from currentIndex -- fail only inputAttemptIdentifier
-          return new InputAttemptIdentifier[]{ inputAttemptIdentifier };
+          return new CompositeInputAttemptIdentifier[]{ inputAttemptIdentifier };
         } else {
-          return new InputAttemptIdentifier[]{ srcAttemptId };
+          return new CompositeInputAttemptIdentifier[]{ new CompositeInputAttemptIdentifier(srcAttemptId) };
         }
       }
       LOG.warn("{}: Failed to shuffle output of {} from {}", logIdentifier, srcAttemptId, host, ioe);
 
       // Inform the ShuffleScheduler
       mapOutput.abort();
-      return new InputAttemptIdentifier[]{ srcAttemptId };
+      return new CompositeInputAttemptIdentifier[]{ new CompositeInputAttemptIdentifier(srcAttemptId) };
     }
 
     return null;
   }
 
-  private List<InputAttemptIdentifier> setupLocalDiskFetch() {
+  private List<CompositeInputAttemptIdentifier> setupLocalDiskFetch() {
     if (isDebugEnabled) {
       LOG.debug("Fetcher " + fetcherIdentifier + " going to fetch (local disk) from " + host
           + ", partition range: " + minPartition + "-" + maxPartition);
@@ -655,16 +680,20 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     int partitionId = pendingInputsSeq.getPartition();
     int partitionCount = pendingInputsSeq.getPartitionCount();
 
+    setStage(STAGE_FIRST_FETCHED);  // local reads should not interfere with stage
+
     int index = 0;  // points to the next input to be consumed
-    List<InputAttemptIdentifier> failedFetches = new ArrayList<>();
+    List<CompositeInputAttemptIdentifier> failedFetches = new ArrayList<>();
     while (index < numInputs) {
       // Avoid fetching more if already stopped
       if (stopped) {
         return null;
       }
 
-      InputAttemptIdentifier inputAttemptIdentifier = pendingInputsSeq.getInputs().get(index);
-      String pathComponent = inputAttemptIdentifier.getPathComponent();
+      CompositeInputAttemptIdentifier inputAttemptIdentifier = pendingInputsSeq.getInputs().get(index);
+      String pathComponent = inputAttemptIdentifier.getPathComponent();   // already in expanded form
+      TezSpillRecord spillRecord = null;  // specific to each inputAttemptIdentifier/pathComponent
+      Path inputFilePath = null;
 
       MapOutput mapOutput = null;
       boolean hasFailures = false;
@@ -675,14 +704,24 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
 
         try {
           long startTime = System.currentTimeMillis();
-          Path filename = getShuffleInputFileName(pathComponent, "");
-          TezIndexRecord indexRecord = getIndexRecord(pathComponent, reduceId);
-          if(!indexRecord.hasData()) {
+
+          // pathComponent == srcAttemptId.getPathComponent(), so we compute spillRecord and inputFilePath only once
+          if (spillRecord == null) {
+            AbstractMap.SimpleEntry<TezSpillRecord, Path> pair = ShuffleUtils.getTezSpillRecordInputFilePath(
+                taskContext, pathComponent, fetcherConfig.compositeFetch,
+                shuffleScheduler.getDagIdentifier(), conf,
+                fetcherConfig.localDirAllocator, fetcherConfig.localFs);
+            spillRecord = pair.getKey();
+            inputFilePath = pair.getValue();
+          }
+          TezIndexRecord indexRecord = spillRecord.getIndex(reduceId);
+          if (!indexRecord.hasData()) {
             continue;
           }
-          mapOutput = getMapOutputForDirectDiskFetch(srcAttemptId, filename, indexRecord);
+
+          mapOutput = getMapOutputForDirectDiskFetch(srcAttemptId, inputFilePath, indexRecord);
           long endTime = System.currentTimeMillis();
-          shuffleSchedulerServer.fetchSucceeded(shuffleSchedulerId, host, srcAttemptId, mapOutput,
+          fetcherCallback.fetchSucceeded(shuffleSchedulerId, host, srcAttemptId, mapOutput,
               indexRecord.getPartLength(), indexRecord.getRawLength(), (endTime - startTime));
         } catch (IOException | InternalError e) {
           if (mapOutput != null) {
@@ -691,7 +730,8 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
           if (!stopped) {
             hasFailures = true;
             shuffleErrorCounterGroup.ioErrs.increment(1);
-            shuffleSchedulerServer.fetchFailed(shuffleSchedulerId, srcAttemptId, true, false);
+            fetcherCallback.fetchFailed(shuffleSchedulerId, new CompositeInputAttemptIdentifier(srcAttemptId),
+                true, false, null, null, null);
             LOG.warn("{}: Failed to read local disk output of {} from {}", logIdentifier, srcAttemptId, host, e);
           } else {
             if (isDebugEnabled) {
@@ -715,40 +755,22 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
   }
 
   private void cleanupCurrentConnection(boolean disconnect) {
-    // Synchronizing on cleanupLock to ensure we don't run into a parallel close
-    // Can't synchronize on the main class itself since that would cause the
-    // shutdown request to block
+    // Synchronizing on cleanupLock to ensure we don't run into a parallel close.
+    // Can't synchronize on the main class itself since that would cause the shutdown request to block.
     synchronized (cleanupLock) {
       try {
         if (httpConnection != null) {
           httpConnection.cleanup(disconnect);
-          httpConnection = null;
+          // do not set httpConnection to null because shutdown() can be called at any moment and
+          // we may see NPE from httpConnection.validate(), for example.
         }
       } catch (IOException e) {
+        LOG.info("{}: Exception while shutting down: {}", logIdentifier, e.getMessage());
         if (isDebugEnabled) {
-          LOG.debug("Exception while shutting down fetcher " + logIdentifier, e);
-        } else {
-          LOG.info("Exception while shutting down fetcher {}: {}", logIdentifier, e.getMessage());
+          LOG.debug(StringUtils.EMPTY, e);
         }
       }
     }
-  }
-
-  //TODO: Refactor following to make use of methods from TezTaskOutputFiles to be consistent.
-  private Path getShuffleInputFileName(String pathComponent, String suffix) throws IOException {
-    LocalDirAllocator localDirAllocator = new LocalDirAllocator(TezRuntimeFrameworkConfigs.LOCAL_DIRS);
-    String pathFromLocalDir =
-        ShuffleUtils.adjustPathComponent(fetcherConfig.compositeFetch, dagId, pathComponent) +
-            Path.SEPARATOR + Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING + suffix;
-
-    return localDirAllocator.getLocalPathToRead(pathFromLocalDir, conf);
-  }
-
-  private TezIndexRecord getIndexRecord(String pathComponent, int partitionId) throws IOException {
-    Path indexFile = getShuffleInputFileName(pathComponent,
-        Constants.TEZ_RUNTIME_TASK_OUTPUT_INDEX_SUFFIX_STRING);
-    TezSpillRecord spillRecord = new TezSpillRecord(indexFile, fetcherConfig.localFs);
-    return spillRecord.getIndex(partitionId);
   }
 
   private MapOutput getMapOutputForDirectDiskFetch(InputAttemptIdentifier srcAttemptId, Path filename,

@@ -18,7 +18,6 @@
 package org.apache.tez.runtime.library.common.shuffle.orderedgrouped;
 
 import java.io.IOException;
-import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -34,12 +33,8 @@ import org.apache.tez.runtime.api.events.InputReadErrorEvent;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.TezRuntimeUtils;
-import org.apache.tez.runtime.library.common.shuffle.InputHost;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleClient;
-import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils.FetchStatsLogger;
 import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.MapOutput.Type;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class ShuffleScheduler extends ShuffleClient<MapOutput> {
 
@@ -76,10 +71,6 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
     WRONG_REDUCE
   }
   private final static String SHUFFLE_ERR_GRP_NAME = "Shuffle Errors";
-
-  private static final Logger LOG = LoggerFactory.getLogger(ShuffleScheduler.class);
-  private static final Logger LOG_FETCH = LoggerFactory.getLogger(LOG.getName() + ".fetch");
-  private static final FetchStatsLogger fetchStatsLogger = new FetchStatsLogger(LOG_FETCH, LOG);
 
   private final TezCounter shuffledInputsCounter;
   private final TezCounter skippedInputCounter;
@@ -157,7 +148,8 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
 
     this.skippedInputCounter = inputContext.getCounters().findCounter(TaskCounter.NUM_SKIPPED_INPUTS);
 
-    LOG.info("ShuffleScheduler running for sourceVertex: {}", inputContext.getSourceVertexName());
+    LOG.info("ShuffleScheduler for {}/{}: shuffleClientId={}, numInputs={}",
+      inputContext.getUniqueIdentifier(), srcNameTrimmed, shuffleClientId, numInputs);
   }
 
   public void start() throws Exception {
@@ -199,65 +191,19 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
     }
   }
 
+  public void wakeupLoop() {
+    shuffleServer.wakeupLoop();
+  }
+
   public void addKnownMapOutput(
-      String inputHostName, int port, int partitionId, CompositeInputAttemptIdentifier srcAttempt) {
-    if (!validateInputAttemptForPipelinedShuffle(srcAttempt, false)) {
+      String hostName, String containerId, int port, int partitionId, CompositeInputAttemptIdentifier srcAttempt) {
+    // Note: this check is optional.
+    // use srcAttempt.getInput() for quick checking
+    if (!validateInputAttemptForPipelinedShuffle(srcAttempt.getInput(), false)) {
       return;
     }
 
-    shuffleServer.addKnownInput(this, inputHostName, port, srcAttempt, partitionId);
-  }
-
-  public boolean cleanInputHostForConstructFetcher(InputHost.PartitionToInputs pendingInputs) {
-    // safe to update pendingInputs because we are running in FetcherServer.call() thread
-    assert pendingInputs.getShuffleClientId() == shuffleClientId;
-    assert pendingInputs.getInputs().size() <= shuffleServer.getMaxTaskOutputAtOnce();
-
-    boolean removedAnyInput = false;
-
-    // avoid adding attempts which have already been completed
-    synchronized (completedInputSet) {
-      for (Iterator<InputAttemptIdentifier> inputIter = pendingInputs.getInputs().iterator();
-           inputIter.hasNext();) {
-        InputAttemptIdentifier input = inputIter.next();
-
-        boolean alreadyCompleted;
-        if (input instanceof CompositeInputAttemptIdentifier) {
-          CompositeInputAttemptIdentifier compositeInput = (CompositeInputAttemptIdentifier) input;
-          int nextClearBit = completedInputSet.nextClearBit(compositeInput.getInputIdentifier());
-          int maxClearBit = compositeInput.getInputIdentifier() + compositeInput.getInputIdentifierCount();
-          alreadyCompleted = nextClearBit > maxClearBit;
-        } else {
-          alreadyCompleted = completedInputSet.get(input.getInputIdentifier());
-        }
-
-        if (alreadyCompleted) {
-          LOG.info("Skipping completed input: " + input);
-          inputIter.remove();
-          removedAnyInput = true;
-        }
-      }
-    }
-
-    for (Iterator<InputAttemptIdentifier> inputIter = pendingInputs.getInputs().iterator();
-         inputIter.hasNext();) {
-      InputAttemptIdentifier input = inputIter.next();
-
-      // avoid adding attempts which have been marked as OBSOLETE
-      if (isObsoleteInputAttemptIdentifier(input)) {
-        LOG.info("Skipping obsolete input: " + input);
-        inputIter.remove();
-        removedAnyInput = true;
-        continue;
-      }
-
-      if (!validateInputAttemptForPipelinedShuffle(input, false)) {
-        inputIter.remove();   // no need to fetch for input, so remove
-        removedAnyInput = true;
-      }
-    }
-
-    return removedAnyInput;
+    shuffleServer.addKnownInput(this, hostName, containerId, port, srcAttempt, partitionId);
   }
 
   public synchronized void fetchSucceeded(
@@ -299,7 +245,7 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
 
       if (remainingMaps.get() == 0) {
         notifyAll();
-        LOG.info("All inputs fetched for input vertex: " + inputContext.getSourceVertexName());
+        LOG.info("All inputs fetched for ShuffleScheduler {}", shuffleClientId);
       }
 
       // update the status
@@ -307,15 +253,15 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
       logProgress();
       reduceShuffleBytes.increment(bytesCompressed);
       reduceBytesDecompressed.increment(bytesDecompressed);
+
       if (LOG.isDebugEnabled()) {
-        LOG.debug("src task: "
-            + TezRuntimeUtils.getTaskAttemptIdentifier(
-            inputContext.getSourceVertexName(), srcAttemptIdentifier.getInputIdentifier(),
-            srcAttemptIdentifier.getAttemptNumber()) + " done");
+        LOG.debug("Source done for {} ({} remaining): {}",
+          inputContext.getUniqueIdentifier(), remainingMaps.get(), srcAttemptIdentifier);
       }
     } else {
       // input is already finished. duplicate fetch.
-      LOG.warn("Duplicate fetch of input no longer needs to be fetched: " + srcAttemptIdentifier);
+      LOG.warn("Duplicate fetch of ordered input for {} ({} remaining): {}",
+          inputContext.getUniqueIdentifier(), remainingMaps.get(), srcAttemptIdentifier);
       // free the resource - especially memory
 
       // If the src does not generate data, output will be null.
@@ -339,7 +285,7 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
     // corresponds to ShuffleManager.registerCompletedInputForPipelinedShuffle()
 
     if (isObsoleteInputAttemptIdentifier(srcAttemptIdentifier)) {
-      LOG.info("Do not register obsolete input: " + srcAttemptIdentifier);
+      LOG.info("Do not register obsolete input for {}: {}", inputContext.getUniqueIdentifier(), srcAttemptIdentifier);
       return;
     }
 
@@ -353,6 +299,14 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
     // synchronized (shuffleInfoEventsMap) {  // covered by this.synchronized
     ShuffleEventInfo eventInfo = shuffleInfoEventsMap.get(inputIdentifier);
     assert eventInfo != null;
+
+    // What if the same spill was already processed by speculative fetchers?
+    boolean isAlreadyProcessed = eventInfo.getEventsProcessed().get(srcAttemptIdentifier.getSpillEventId());
+    if (isAlreadyProcessed) {
+      LOG.info("Spill already processed for {} (remaining={}): {}",
+          inputContext.getUniqueIdentifier(), remainingMaps.get(), srcAttemptIdentifier);
+      return;
+    }
 
     eventInfo.spillProcessed(srcAttemptIdentifier.getSpillEventId());
     numFetchedSpills++;
@@ -373,12 +327,18 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
     }
   }
 
-  public void fetchFailed(InputAttemptIdentifier srcAttemptIdentifier,
+  public void fetchFailed(CompositeInputAttemptIdentifier srcAttemptIdentifier,
                           boolean readFailed, boolean connectFailed) {
     failedShuffleCounter.increment(1);
 
+    if (isInputFinished(srcAttemptIdentifier.getInputIdentifier())) {
+      LOG.warn("Ordered fetch failed for {}, but input already completed: InputIdentifier={}",
+        shuffleClientId, srcAttemptIdentifier);
+      return;
+    }
+
     if (isObsoleteInputAttemptIdentifier(srcAttemptIdentifier)) {
-      LOG.info("Do not report obsolete input: " + srcAttemptIdentifier);
+      LOG.info("Do not report obsolete input: {}", srcAttemptIdentifier);
       return;
     }
 
@@ -409,17 +369,13 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
   }
 
   // Notify AM
-  public void informAM(InputAttemptIdentifier srcAttempt) {
-    LOG.info("{}: Reporting fetch failure for InputIdentifier: {} taskAttemptIdentifier: {}",
-        srcNameTrimmed, srcAttempt,
+  public void informAM(CompositeInputAttemptIdentifier srcAttempt) {
+    LOG.info("ShuffleScheduler {}: Reporting fetch failure for InputIdentifier: {}, taskAttemptIdentifier: {}",
+        shuffleClientId, srcAttempt,
         TezRuntimeUtils.getTaskAttemptIdentifier(
             inputContext.getSourceVertexName(), srcAttempt.getInputIdentifier(), srcAttempt.getAttemptNumber()));
     InputReadErrorEvent readError = InputReadErrorEvent.create(
-        "Ordered: Fetch failure while fetching from "
-          + TezRuntimeUtils.getTaskAttemptIdentifier(
-          inputContext.getSourceVertexName(),
-          srcAttempt.getInputIdentifier(),
-          srcAttempt.getAttemptNumber()),
+        "Ordered: Fetch failure while fetching from " + inputContext.getUniqueIdentifier(),
         srcAttempt.getInputIdentifier(),
         srcAttempt.getAttemptNumber());
     List<Event> failedEvents = Lists.newArrayListWithCapacity(1);
@@ -430,10 +386,6 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
   public void waitForMergeManager() throws InterruptedException {
     mergeManager.waitForInMemoryMerge();
     mergeManager.waitForShuffleToMergeMemory();
-  }
-
-  public int[] getLocalShufflePorts() {
-    return shuffleServer.getLocalShufflePorts();
   }
 
   public FetchedInputAllocatorOrderedGrouped getAllocator() {
@@ -448,6 +400,7 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
     return shuffleErrorCounterGroup;
   }
 
+  // can run in ShuffleServer.call() thread, ShuffleInputEventHandler thread, Fetcher thread
   protected synchronized boolean validateInputAttemptForPipelinedShuffle(
       InputAttemptIdentifier input, boolean registerShuffleInfoEvent) {
     // For pipelined shuffle
@@ -486,15 +439,16 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
   private void logProgress() {
     int inputsDone = numInputs - remainingMaps.get();
     if (inputsDone == numInputs || isShutdown.get()) {
-      double mbs = (double) totalBytesShuffledTillNow / (1024 * 1024);
+      long kbs = totalBytesShuffledTillNow / 1024;
       long secsSinceStart = (System.currentTimeMillis() - startTime) / 1000 + 1;
+      long transferRate = kbs / secsSinceStart;
 
-      double transferRate = mbs / secsSinceStart;
       StringBuilder s = new StringBuilder();
-      s.append("copy=" + inputsDone);
+      s.append("ShuffleScheduler " + shuffleClientId);
+      s.append(", copy=" + inputsDone);
       s.append(", numFetchedSpills=" + numFetchedSpills);
       s.append(", numInputs=" + numInputs);
-      s.append(", transfer rate (MB/s) = " + transferRate);  // CumulativeDataFetched/TimeSinceInputStarted
+      s.append(", transfer rate (KB/s) = " + transferRate);
       LOG.info(s.toString());
     }
   }

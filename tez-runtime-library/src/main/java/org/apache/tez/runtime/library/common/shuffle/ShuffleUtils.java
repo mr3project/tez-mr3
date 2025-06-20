@@ -25,33 +25,36 @@ import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.ByteBuffer;
-import java.text.DecimalFormat;
+import java.util.AbstractMap;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
 import java.util.zip.Deflater;
 
 import javax.annotation.Nullable;
 import javax.crypto.SecretKey;
 
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.tez.common.Preconditions;
-import com.google.common.primitives.Ints;
 import com.google.protobuf.ByteString;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.http.BaseHttpConnection;
 import org.apache.tez.http.HttpConnectionParams;
+import org.apache.tez.runtime.api.ConcurrentByteCache;
+import org.apache.tez.runtime.api.IndexPathCache;
 import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.api.events.DataMovementEvent;
+import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.TezRuntimeUtils;
+import org.apache.tez.runtime.api.MultiByteArrayOutputStream;
 import org.apache.tez.runtime.library.utils.DATA_RANGE_IN_MB;
-import org.apache.tez.util.FastNumberFormat;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,23 +82,8 @@ public class ShuffleUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(ShuffleUtils.class);
   private static final long MB = 1024l * 1024l;
-
-  public static final ThreadLocal<DecimalFormat> MBPS_FORMAT =
-      new ThreadLocal<DecimalFormat>() {
-        @Override
-        protected DecimalFormat initialValue() {
-          return new DecimalFormat("0.00");
-        }
-      };
-  public static final ThreadLocal<FastNumberFormat> MBPS_FAST_FORMAT =
-      new ThreadLocal<FastNumberFormat>() {
-        @Override
-        protected FastNumberFormat initialValue() {
-          FastNumberFormat fmt = FastNumberFormat.getInstance();
-          fmt.setMinimumIntegerDigits(2);
-          return fmt;
-        }
-      };
+  private static final long KB = 1024l;
+  private static final long KB_THRESHOLD = 1024l * 1024l * 1024l;   // corresponds to 1TB
 
   public static SecretKey getJobTokenSecretFromTokenBytes(ByteBuffer meta)
       throws IOException {
@@ -138,6 +126,8 @@ public class ShuffleUtils {
       // finished reading shuffleData.length bytes from identifier
     } catch (InternalError | Exception e) {
       // Close the streams
+      // taskContext.getUniqueIdentifier() == ShuffleServerDaemonTaskAttempt, so no need to print it.
+      // Fetcher was likely stalled and disconnected, e.g., after speculative Fetchers are created.
       LOG.info("Failed to read data to memory for {}. len={}, decomp={}. ExceptionMessage={}",
           identifier, compressedLength, decompressedLength, e.getMessage());
       ioCleanup(input);
@@ -170,8 +160,7 @@ public class ShuffleUtils {
         while (bytesLeft > 0) {
           int n = input.read(buf, 0, (int) Math.min(bytesLeft, BYTES_TO_READ));
           if (n < 0) {
-            throw new IOException("read past end of stream reading "
-                + identifier);
+            throw new IOException("read past end of stream reading " + identifier);
           }
           output.write(buf, 0, n);
           bytesLeft -= n;
@@ -183,6 +172,7 @@ public class ShuffleUtils {
       output.close();
     } catch (IOException ioe) {
       // Close the streams
+      // Fetcher was likely stalled and disconnected, e.g., after speculative Fetchers are created.
       LOG.info("Failed to read data to disk for {}. len={}, decomp={}. ExceptionMessage={}",
           identifier, compressedLength, decompressedLength, ioe.getMessage());
       ioCleanup(input, output);
@@ -192,11 +182,8 @@ public class ShuffleUtils {
 
     // Sanity check
     if (bytesLeft != 0) {
-      throw new IOException("Incomplete map output received for " +
-          identifier + " from " +
-          hostIdentifier + " (" + 
-          bytesLeft + " bytes missing of " + 
-          compressedLength + ")");
+      throw new IOException("Incomplete map output received for " + identifier + " from " + hostIdentifier +
+          " (" + bytesLeft + " bytes missing of " + compressedLength + ")");
     }
   }
 
@@ -223,8 +210,8 @@ public class ShuffleUtils {
     sb.append("/");
     sb.append("mapOutput?job=");
     sb.append(appId.replace("application", "job"));
-    sb.append("&dag=");
-    sb.append(dagIdentifier);
+    // sb.append("&dag=");
+    // sb.append(dagIdentifier);
     sb.append("&reduce=");
     sb.append(range.toString());
     sb.append("&map=");
@@ -232,10 +219,10 @@ public class ShuffleUtils {
   }
 
   public static URL constructInputURL(String baseURI,
-      Collection<InputAttemptIdentifier> inputs, boolean keepAlive) throws MalformedURLException {
+                                      Collection<CompositeInputAttemptIdentifier> inputs, boolean keepAlive) throws MalformedURLException {
     StringBuilder url = new StringBuilder(baseURI);
     boolean first = true;
-    for (InputAttemptIdentifier input : inputs) {
+    for (CompositeInputAttemptIdentifier input : inputs) {
       if (first) {
         first = false;
         url.append(input.getPathComponent());
@@ -295,8 +282,7 @@ public class ShuffleUtils {
       int spillId, boolean finalMergeEnabled, boolean isLastEvent, String pathComponent, String auxiliaryService, Deflater deflater,
       boolean compositeFetch)
       throws IOException {
-    DataMovementEventPayloadProto.Builder payloadBuilder = DataMovementEventPayloadProto
-        .newBuilder();
+    DataMovementEventPayloadProto.Builder payloadBuilder = DataMovementEventPayloadProto.newBuilder();
 
     boolean outputGenerated = true;
     if (sendEmptyPartitionDetails) {
@@ -321,19 +307,17 @@ public class ShuffleUtils {
 
     if (!sendEmptyPartitionDetails || outputGenerated) {
       String host = context.getExecutionContext().getHostName();
+      String containerId = context.getExecutionContext().getContainerId();
       payloadBuilder.setHost(host);
+      payloadBuilder.setContainerId(containerId);
 
-      // if useShuffleHandlerProcessOnK8s == true, the consumer can retrieve ports from InputContext
-      if (!context.useShuffleHandlerProcessOnK8s()) {
-        ByteBuffer shuffleMetadata = context.getServiceProviderMetaData(auxiliaryService);
-        int[] shufflePorts = ShuffleUtils.deserializeShuffleProviderMetaData(shuffleMetadata);
-        payloadBuilder.setNumPorts(shufflePorts.length);  // shufflePorts[] can be empty
-        for (int i = 0; i < shufflePorts.length; i++) {
-          payloadBuilder.addPorts(shufflePorts[i]);
-        }
+      ByteBuffer shuffleMetadata = context.getServiceProviderMetaData(auxiliaryService);
+      int[] shufflePorts = ShuffleUtils.deserializeShuffleProviderMetaData(shuffleMetadata);
+      payloadBuilder.setNumPorts(shufflePorts.length);  // shufflePorts[] can be empty
+      for (int i = 0; i < shufflePorts.length; i++) {
+        payloadBuilder.addPorts(shufflePorts[i]);
       }
 
-      //Path component is always 0 indexed
       payloadBuilder.setPathComponent(expandPathComponent(context, compositeFetch, pathComponent));
     }
 
@@ -362,8 +346,7 @@ public class ShuffleUtils {
                                                        OutputContext context,
                                                        boolean generateVmEvent,
                                                        boolean isCompositeEvent, Deflater deflater) throws IOException {
-    DataMovementEventPayloadProto.Builder payloadBuilder = DataMovementEventPayloadProto
-        .newBuilder();
+    DataMovementEventPayloadProto.Builder payloadBuilder = DataMovementEventPayloadProto.newBuilder();
 
     // Construct the VertexManager event if required.
     if (generateVmEvent) {
@@ -381,16 +364,15 @@ public class ShuffleUtils {
     LOG.info("Setting all {} partitions as empty for non-started output", numPhysicalOutputs);
     BitSet emptyPartitionDetails = new BitSet(numPhysicalOutputs);
     emptyPartitionDetails.set(0, numPhysicalOutputs, true);
-    ByteString emptyPartitionsBytesString =
-        TezCommonUtils.compressByteArrayToByteString(
-            TezUtilsInternal.toByteArray(emptyPartitionDetails), deflater);
+    ByteString emptyPartitionsBytesString = TezCommonUtils.compressByteArrayToByteString(
+        TezUtilsInternal.toByteArray(emptyPartitionDetails), deflater);
     payloadBuilder.setEmptyPartitions(emptyPartitionsBytesString);
     DataMovementEventPayloadProto payloadProto = payloadBuilder.build();
     ByteBuffer dmePayload = payloadProto.toByteString().asReadOnlyByteBuffer();
 
     if (isCompositeEvent) {
-      CompositeDataMovementEvent cdme =
-          CompositeDataMovementEvent.create(0, numPhysicalOutputs, dmePayload);
+      CompositeDataMovementEvent cdme = CompositeDataMovementEvent.create(
+          0, numPhysicalOutputs, dmePayload);
       eventList.add(cdme);
     } else {
       DataMovementEvent dme = DataMovementEvent.create(0, dmePayload);
@@ -399,8 +381,7 @@ public class ShuffleUtils {
   }
 
   public static DataMovementEvent generateEmptyDataMovementEvent(int numPhysicalOutputs) throws IOException {
-    DataMovementEventPayloadProto.Builder payloadBuilder = DataMovementEventPayloadProto
-      .newBuilder();
+    DataMovementEventPayloadProto.Builder payloadBuilder = DataMovementEventPayloadProto.newBuilder();
 
     BitSet emptyPartitionDetails = new BitSet(numPhysicalOutputs);
     emptyPartitionDetails.set(0, numPhysicalOutputs, true);
@@ -446,8 +427,7 @@ public class ShuffleUtils {
     Preconditions.checkArgument(eventList != null, "EventList can't be null");
 
     if (finalMergeEnabled) {
-      Preconditions.checkArgument(isLastEvent, "Can not send multiple events when final merge is "
-          + "enabled");
+      Preconditions.checkArgument(isLastEvent, "Can not send multiple events when final merge is enabled");
     }
 
     if (LOG.isDebugEnabled()) {
@@ -539,15 +519,15 @@ public class ShuffleUtils {
    * @param sizes actual partition sizes
    */
   public static DetailedPartitionStatsProto getDetailedPartitionStatsForPhysicalOutput(long[] sizes) {
-    DetailedPartitionStatsProto.Builder builder =
-        DetailedPartitionStatsProto.newBuilder();
-    for (int i=0; i<sizes.length; i++) {
+    DetailedPartitionStatsProto.Builder builder = DetailedPartitionStatsProto.newBuilder();
+    for (int i = 0; i < sizes.length; i++) {
       // Round the size up. So 1 byte -> the value of sizeInMB == 1
-      // Throws IllegalArgumentException if value is greater than
-      // Integer.MAX_VALUE. That should be ok given Integer.MAX_VALUE * MB
-      // means PB.
-      int sizeInMb = Ints.checkedCast(ceil(sizes[i], MB));
-      builder.addSizeInMb(sizeInMb);
+      // Throws IllegalArgumentException if value is greater than Integer.MAX_VALUE.
+      // That should be ok given Integer.MAX_VALUE * MB means PB.
+      // --> revised to use KB with truncation
+      long sizeInKb = ceil(sizes[i], KB);
+      long adjustedSizeInKb = sizeInKb >= KB_THRESHOLD ? KB_THRESHOLD : sizeInKb;
+      builder.addSizeInMb((int)adjustedSizeInKb);
     }
     return builder.build();
   }
@@ -578,6 +558,7 @@ public class ShuffleUtils {
       sb.append("}");
       return sb;
     }
+
     /**
      * Log individual fetch complete event.
      * This log information would be used by tez-tool/perf-analzyer/shuffle tools for mining
@@ -594,14 +575,12 @@ public class ShuffleUtils {
     public void logIndividualFetchComplete(long millis, long bytesCompressed,
         long bytesDecompressed, String outputType, InputAttemptIdentifier srcAttemptIdentifier) {
 
+      // Unlike in Tez, we do not use fast math to avoid creating ThreadLocal formatters.
+
       if (activeLogger.isDebugEnabled()) {
         long wholeMBs = 0;
         long partialMBs = 0;
         millis = Math.max(1L, millis);
-        // fast math is done using integer math to avoid double to string conversion
-        // calculate B/s * 100 to preserve MBs precision to two decimal places
-        // multiply numerator by 100000 (2^5 * 5^5) and divide denominator by MB (2^20)
-        // simply fraction to protect ourselves from overflow by factoring out 2^5
         wholeMBs = (bytesCompressed * 3125) / (millis * 32768);
         partialMBs = wholeMBs % 100;
         wholeMBs /= 100;
@@ -620,7 +599,7 @@ public class ShuffleUtils {
         sb.append(", Rate=");
         sb.append(wholeMBs);
         sb.append(".");
-        MBPS_FAST_FORMAT.get().format(partialMBs, sb);
+        sb.append(partialMBs);
         sb.append(" MB/s");
         activeLogger.debug(sb.toString());
       } else {
@@ -630,18 +609,15 @@ public class ShuffleUtils {
         currentDecompressedSize = decompressedSize.addAndGet(bytesDecompressed);
         currentTotalTime = totalTime.addAndGet(millis);
         if (currentCount == 1000) {
-          logCount.set(0);
           compressedSize.set(0);
           decompressedSize.set(0);
           totalTime.set(0);
         }
         if (currentCount % 1000 == 0) {
-          double avgRate = currentTotalTime == 0 ? 0
-              : currentCompressedSize / (double)currentTotalTime / 1000 / 1024 / 1024;
-          aggregateLogger.info("Completed {} fetches, stats for last 1000 fetches: "
-              + "avg csize: {}, avg dsize: {}, avgTime: {}, avgRate: {}", currentCount,
-              currentCompressedSize / 1000, currentDecompressedSize / 1000, currentTotalTime / 1000,
-              MBPS_FORMAT.get().format(avgRate));
+          aggregateLogger.info("Completed {} fetches in total; Stats for last 1000 fetches: average csize: {}, average dsize: {}, average time: {}ms",
+              currentCount,
+              currentCompressedSize / 1000, currentDecompressedSize / 1000,
+              currentTotalTime / 1000);
         }
       }
     }
@@ -653,8 +629,9 @@ public class ShuffleUtils {
    * @param conf
    * @return HttpConnectionParams
    */
-  public static HttpConnectionParams getHttpConnectionParams(Configuration conf) {
-    return TezRuntimeUtils.getHttpConnectionParams(conf);
+  public static HttpConnectionParams getHttpConnectionParams(
+      Configuration conf, boolean compositeFetch) {
+    return TezRuntimeUtils.getHttpConnectionParams(conf, compositeFetch);
   }
 
   public static boolean isTezShuffleHandler(Configuration config) {
@@ -669,11 +646,60 @@ public class ShuffleUtils {
   }
 
   public static String adjustPathComponent(boolean compositeFetch, int dagIdentifier, String pathComponent) {
-    if(compositeFetch) {  // == isTezShuffleHandler
+    if (compositeFetch) {  // == isTezShuffleHandler
       // pathComponent includes ${containerId}/${vertexId}/ in its prefix
       return Constants.DAG_PREFIX + dagIdentifier + Path.SEPARATOR + pathComponent;
     } else {
       return Constants.TEZ_RUNTIME_TASK_OUTPUT_DIR + Path.SEPARATOR + pathComponent;
+    }
+  }
+
+  public static String getUniqueIdentifierSpillId(OutputContext outputContext, int spillId) {
+    return outputContext.getUniqueIdentifier() + "_" + spillId;
+  }
+
+  // spillId is not included in pathComponent
+  // only one of outputFilePath and byteArrayOutput is valid, and specifies the location of the output
+  // should be called only when using hadoop_shuffle (i.e., compositeFetch == true)
+  public static void writeToIndexPathCacheAndByteCache(
+      OutputContext outputContext,
+      @Nullable Path outputFilePath,
+      TezSpillRecord spillRecord,
+      @Nullable MultiByteArrayOutputStream byteArrayOutput) {
+    assert !(outputFilePath != null && byteArrayOutput != null);
+    String pathComponent = outputContext.getUniqueIdentifier();
+    String mapId = ShuffleUtils.expandPathComponent(outputContext, true, pathComponent);
+
+    IndexPathCache indexPathCache = outputContext.getIndexPathCache();
+    indexPathCache.add(mapId, outputFilePath, spillRecord.getByteBuffer());
+
+    if (byteArrayOutput != null) {
+      ConcurrentByteCache concurrentByteCache = outputContext.getConcurrentByteCache();
+      concurrentByteCache.add(mapId, byteArrayOutput);
+      LOG.info("Write to IndexPathCache and ByteCache: mapId={}, totalBytes={}", mapId, byteArrayOutput.getTotalBytes());
+    }
+  }
+
+  // spillId is appended to pathComponent
+  // only one of outputFilePath and byteArrayOutput is valid, and specifies the location of the output
+  // should be called only when using hadoop_shuffle (i.e., compositeFetch == true)
+  public static void writeSpillInfoToIndexPathCacheAndByteCache(
+      OutputContext outputContext,
+      int spillId,
+      @Nullable Path outputFilePath,
+      TezSpillRecord spillRecord,
+      @Nullable MultiByteArrayOutputStream byteArrayOutput) {
+    assert !(outputFilePath != null && byteArrayOutput != null);
+    String pathComponent = ShuffleUtils.getUniqueIdentifierSpillId(outputContext, spillId);
+    String mapId = ShuffleUtils.expandPathComponent(outputContext, true, pathComponent);
+
+    IndexPathCache indexPathCache = outputContext.getIndexPathCache();
+    indexPathCache.add(mapId, outputFilePath, spillRecord.getByteBuffer());
+
+    if (byteArrayOutput != null) {
+      ConcurrentByteCache concurrentByteCache = outputContext.getConcurrentByteCache();
+      concurrentByteCache.add(mapId, byteArrayOutput);
+      LOG.info("Write SpillInfo to IndexPathCache and ByteCache: mapId={}, totalBytes={}", mapId, byteArrayOutput.getTotalBytes());
     }
   }
 
@@ -686,5 +712,40 @@ public class ShuffleUtils {
       return pathComponent;
     }
   }
-}
 
+  public static TezSpillRecord getTezSpillRecord(
+      TaskContext taskContext,
+      String pathComponent,   // already in expanded form
+      Path finalIndexFile,
+      RawLocalFileSystem localFs) throws IOException {
+    IndexPathCache.MapOutputInfo mapOutputInfo = taskContext.getIndexPathCache().get(pathComponent);
+    if (mapOutputInfo != null) {
+      return new TezSpillRecord(mapOutputInfo.getSpillRecord());
+    } else {
+      // We may have to read back TezSpillRecord written on disk, e.g.,
+      // in order to retrieve partition statistics that are not yet reported.
+      return new TezSpillRecord(finalIndexFile, localFs);
+    }
+  }
+
+  public static AbstractMap.SimpleEntry<TezSpillRecord, Path> getTezSpillRecordInputFilePath(
+      TaskContext taskContext,
+      String pathComponent,   // already in expanded form
+      boolean compositeFetch, int dagId, Configuration conf,
+      LocalDirAllocator localDirAllocator,
+      RawLocalFileSystem localFs) throws IOException {
+    IndexPathCache.MapOutputInfo mapOutputInfo = taskContext.getIndexPathCache().get(pathComponent);
+    if (mapOutputInfo != null) {
+      return new AbstractMap.SimpleEntry<>(
+          new TezSpillRecord(mapOutputInfo.getSpillRecord()), mapOutputInfo.getMapOutputFilePath());
+    } else {
+      String inputFile = adjustPathComponent(compositeFetch, dagId, pathComponent) +
+        Path.SEPARATOR + Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING;
+      String indexFile = inputFile + Constants.TEZ_RUNTIME_TASK_OUTPUT_INDEX_SUFFIX_STRING;
+      Path indexFilePath = localDirAllocator.getLocalPathToRead(indexFile, conf);
+      return new AbstractMap.SimpleEntry<>(
+          new TezSpillRecord(indexFilePath, localFs),
+          localDirAllocator.getLocalPathToRead(inputFile, conf));
+    }
+  }
+}

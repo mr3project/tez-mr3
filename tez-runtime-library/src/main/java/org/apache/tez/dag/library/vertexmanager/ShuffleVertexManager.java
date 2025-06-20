@@ -619,8 +619,10 @@ public class ShuffleVertexManager extends ShuffleVertexManagerBase {
       } else {
         assert max > 0;
         for(int index = 0; index < currentParallelism; index++) {
-          int stat = entry.getValue().statsInMB[index];
-          currentStatsInMB[index] += autoParallelismMaxPercent * stat / max + autoParallelismMinPercent;
+          long stat = entry.getValue().statsInMB[index];
+          long incr = autoParallelismMaxPercent * stat / max + autoParallelismMinPercent;
+          long sum = (long)currentStatsInMB[index] + incr;
+          currentStatsInMB[index] = (int)(sum >= KB_THRESHOLD ? KB_THRESHOLD : sum);
         }
       }
     }
@@ -677,7 +679,7 @@ public class ShuffleVertexManager extends ShuffleVertexManagerBase {
         for(Map.Entry<String, SourceVertexInfo> entry : bipartiteItr) {
       entry.getValue().newDescriptor = descriptor;
     }
-    ReconfigVertexParams params = new ReconfigVertexParams(finalTaskParallelism, null);
+    ReconfigVertexParams params = new ReconfigVertexParams(finalTaskParallelism);
     return params;
   }
 

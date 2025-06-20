@@ -21,16 +21,14 @@ package org.apache.tez.runtime.library.common.task.local.output;
 import java.io.IOException;
 
 import org.apache.tez.common.Preconditions;
+import org.apache.tez.common.TezRuntimeFrameworkConfigs;
+import org.apache.tez.runtime.api.TezTaskOutput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
-import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.runtime.library.common.Constants;
-import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 
 /**
  * Manipulate the working area for the transient store for components in tez-runtime-library
@@ -38,32 +36,47 @@ import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
  * This class is used by Inputs and Outputs in tez-runtime-library to identify the directories
  * that they need to write to / read from for intermediate files.
  */
-@InterfaceAudience.Private
-@InterfaceStability.Unstable
-public class TezTaskOutputFiles extends TezTaskOutput {
-
-  private final String outputDir;
-
-  public TezTaskOutputFiles(Configuration conf, String uniqueId, int dagID,
-                            String containerId, int vertexId) {
-    super(conf, uniqueId, dagID, containerId);
-    this.outputDir =
-      ShuffleUtils.isTezShuffleHandler(conf) ? Constants.VERTEX_PREFIX + vertexId : Constants.TEZ_RUNTIME_TASK_OUTPUT_DIR;
-  }
+public class TezTaskOutputFiles implements TezTaskOutput {
 
   private static final Logger LOG = LoggerFactory.getLogger(TezTaskOutputFiles.class);
 
   private static final String SPILL_FILE_DIR_PATTERN = "%s_%d";
-
   private static final String SPILL_FILE_PATTERN = "%s_src_%d_spill_%d.out";
+
+  private final Configuration conf;
+  private final String uniqueId;
+  private final String outputDir;
+  private final String dagId;   // = dag_${dagId}/${containerId}/
+  private final boolean compositeFetch;
 
   /*
   Under YARN, this defaults to one or more of the local directories, along with the appId in the path.
   Note: The containerId is not part of this.
   ${yarnLocalDir}/usercache/${user}/appcache/${applicationId}. (Referred to as ${appDir} later in the docs
    */
-  private final LocalDirAllocator lDirAlloc =
-    new LocalDirAllocator(TezRuntimeFrameworkConfigs.LOCAL_DIRS);
+  private final LocalDirAllocator lDirAlloc = new LocalDirAllocator(TezRuntimeFrameworkConfigs.LOCAL_DIRS);;
+
+  /**
+   * @param conf     the configuration from which local-dirs will be picked up
+   * @param uniqueId a unique identifier for the specific input / output. This is expected to be
+   *                 unique for all the Inputs / Outputs within a container - i.e. even if the
+   *                 container is used for multiple tasks, this id should be unique for inputs /
+   *                 outputs spanning across tasks. This is also expected to be unique across all
+   *                 tasks for a vertex.
+   * @param dagID    DAG identifier for the specific job
+   */
+  public TezTaskOutputFiles(Configuration conf, String uniqueId, int dagID,
+                            String containerId, int vertexId,
+                            boolean compositeFetch) {
+    this.conf = conf;
+    this.uniqueId = uniqueId;
+    this.outputDir = compositeFetch ?
+        Constants.VERTEX_PREFIX + vertexId : Constants.TEZ_RUNTIME_TASK_OUTPUT_DIR;
+    this.dagId = compositeFetch ?
+        Constants.DAG_PREFIX + dagID + Path.SEPARATOR + containerId + Path.SEPARATOR :
+        Constants.DAG_PREFIX + dagID + Path.SEPARATOR;
+    this.compositeFetch = compositeFetch;
+  }
 
   /*
    * if service_id = mapreduce_shuffle  then "${appDir}/output/${uniqueId}"
@@ -73,9 +86,7 @@ public class TezTaskOutputFiles extends TezTaskOutput {
    */
   private Path getAttemptOutputDir() {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("getAttemptOutputDir: "
-          + this.outputDir + "/"
-          + uniqueId);
+      LOG.debug("getAttemptOutputDir: " + this.outputDir + "/" + uniqueId);
     }
     String dagPath = getDagOutputDir(this.outputDir);
     return new Path(dagPath, uniqueId);
@@ -141,12 +152,10 @@ public class TezTaskOutputFiles extends TezTaskOutput {
   @Override
   public Path getOutputFileForWriteInVolume(Path existing) {
     //Get hold attempt directory (${appDir}/output/)
-    Preconditions.checkArgument(existing.getParent().getParent() != null, "Parent directory's "
-        + "parent can not be null");
+    Preconditions.checkArgument(existing.getParent().getParent() != null, "Parent directory's parent can not be null");
     Path attemptDir = new Path(existing.getParent().getParent(), uniqueId);
     return new Path(attemptDir, Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING);
   }
-
 
   /**
    * Create a local output index file name.
@@ -165,8 +174,7 @@ public class TezTaskOutputFiles extends TezTaskOutput {
     Path attemptIndexOutput =
       new Path(getAttemptOutputDir(), Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING +
                                       Constants.TEZ_RUNTIME_TASK_OUTPUT_INDEX_SUFFIX_STRING);
-    return lDirAlloc.getLocalPathForWrite(attemptIndexOutput.toString(),
-        size, conf);
+    return lDirAlloc.getLocalPathForWrite(attemptIndexOutput.toString(), size, conf);
   }
 
   /**
@@ -188,9 +196,9 @@ public class TezTaskOutputFiles extends TezTaskOutput {
    */
   @Override
   public Path getOutputIndexFileForWriteInVolume(Path existing) {
-    //Get hold attempt directory (${appDir}/output/)
-    Preconditions.checkArgument(existing.getParent().getParent() != null, "Parent directory's "
-        + "parent can not be null");
+    // Get hold attempt directory (${appDir}/output/)
+    Preconditions.checkArgument(existing.getParent().getParent() != null,
+      "Parent directory's parent can not be null");
     Path attemptDir = new Path(existing.getParent().getParent(), uniqueId);
     return new Path(attemptDir, Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING
         + Constants.TEZ_RUNTIME_TASK_OUTPUT_INDEX_SUFFIX_STRING);
@@ -210,7 +218,7 @@ public class TezTaskOutputFiles extends TezTaskOutput {
   @Override
   public Path getSpillFileForWrite(int spillNumber, long size)
       throws IOException {
-    Preconditions.checkArgument(spillNumber >= 0, "Provide a valid spill number " + spillNumber);
+    Preconditions.checkArgument(spillNumber >= 0, "Provide a valid spill number {}", spillNumber);
     String dagPath = getDagOutputDir(this.outputDir);
     Path taskAttemptDir = new Path(dagPath,
         String.format(SPILL_FILE_DIR_PATTERN, uniqueId, spillNumber));
@@ -232,7 +240,7 @@ public class TezTaskOutputFiles extends TezTaskOutput {
   @Override
   public Path getSpillIndexFileForWrite(int spillNumber, long size)
       throws IOException {
-    Preconditions.checkArgument(spillNumber >= 0, "Provide a valid spill number " + spillNumber);
+    Preconditions.checkArgument(spillNumber >= 0, "Provide a valid spill number {}", spillNumber);
     String dagPath = getDagOutputDir(this.outputDir);
     Path taskAttemptDir = new Path(dagPath, String.format(
         SPILL_FILE_DIR_PATTERN, uniqueId, spillNumber));
@@ -280,6 +288,6 @@ public class TezTaskOutputFiles extends TezTaskOutput {
   }
 
   public String getDagOutputDir(String child) {
-    return ShuffleUtils.isTezShuffleHandler(conf) ? dagId.concat(child) : child;
+    return compositeFetch ? dagId.concat(child) : child;
   }
 }

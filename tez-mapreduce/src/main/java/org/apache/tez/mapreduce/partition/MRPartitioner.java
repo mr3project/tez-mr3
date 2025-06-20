@@ -20,7 +20,6 @@ package org.apache.tez.mapreduce.partition;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.util.ReflectionUtils;
@@ -34,7 +33,6 @@ import org.apache.tez.runtime.library.common.ConfigUtils;
  * with Map Reduce partitioners. 
  */
 @SuppressWarnings({ "rawtypes", "unchecked" })
-@Public
 public class MRPartitioner implements org.apache.tez.runtime.library.api.Partitioner {
 
   static final Logger LOG = LoggerFactory.getLogger(MRPartitioner.class);
@@ -69,12 +67,14 @@ public class MRPartitioner implements org.apache.tez.runtime.library.api.Partiti
     } else {
       newPartitioner = null;
       if (partitions > 1) {
+        // "mapred.partitioner.class" is set in DAGUtils.createConfiguration()
         Class<? extends org.apache.hadoop.mapred.Partitioner> clazz =
             (Class<? extends org.apache.hadoop.mapred.Partitioner>) conf.getClass(
                 "mapred.partitioner.class", org.apache.hadoop.mapred.lib.HashPartitioner.class);
         LOG.info("Using oldApi, MRpartitionerClass=" + clazz.getName());
+        // do not use 'new JobConf(conf)' because Partitioner is stateless in Hive-MR3
         oldPartitioner = (org.apache.hadoop.mapred.Partitioner) ReflectionUtils.newInstance(
-            clazz, new JobConf(conf));
+            clazz, null);
       } else {
         oldPartitioner = new org.apache.hadoop.mapred.Partitioner() {
           @Override

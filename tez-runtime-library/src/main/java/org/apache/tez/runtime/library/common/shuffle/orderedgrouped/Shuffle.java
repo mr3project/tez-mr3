@@ -27,16 +27,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
-
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.tez.runtime.api.TaskFailureType;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalDirAllocator;
@@ -66,8 +61,6 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
  * Usage: Create instance, setInitialMemoryAllocated(long), run()
  *
  */
-@InterfaceAudience.Private
-@InterfaceStability.Unstable
 public class Shuffle implements ExceptionReporter {
 
   private static final Logger LOG = LoggerFactory.getLogger(Shuffle.class);
@@ -75,9 +68,7 @@ public class Shuffle implements ExceptionReporter {
   private final InputContext inputContext;
 
   private final ShuffleInputEventHandlerOrderedGrouped eventHandler;
-  @VisibleForTesting
-  final ShuffleScheduler scheduler;
-  @VisibleForTesting
+  final ShuffleScheduler shuffleScheduler;
   final MergeManager merger;
 
   private final AtomicReference<Throwable> throwable = new AtomicReference<Throwable>();
@@ -102,7 +93,7 @@ public class Shuffle implements ExceptionReporter {
     this.inputContext = inputContext;
     this.srcNameTrimmed = TezUtilsInternal.cleanVertexName(inputContext.getSourceVertexName());
 
-    Configuration codecConf = ShuffleServer.getInstance().getCodecConf();
+    Configuration codecConf = ShuffleServer.getCodecConf(inputContext.peekShuffleServer(), conf);
     CompressionCodec codec = CodecUtils.getCodec(codecConf);
 
     boolean ifileReadAhead = conf.getBoolean(
@@ -121,11 +112,8 @@ public class Shuffle implements ExceptionReporter {
     LocalDirAllocator localDirAllocator =
         new LocalDirAllocator(TezRuntimeFrameworkConfigs.LOCAL_DIRS);
 
-    // TODO TEZ Get rid of Map / Reduce references.
-    TezCounter spilledRecordsCounter =
-        inputContext.getCounters().findCounter(TaskCounter.SPILLED_RECORDS);
-    TezCounter mergedMapOutputsCounter =
-        inputContext.getCounters().findCounter(TaskCounter.MERGED_MAP_OUTPUTS);
+    TezCounter spilledRecordsCounter = inputContext.getCounters().findCounter(TaskCounter.SPILLED_RECORDS);
+    TezCounter mergedMapOutputsCounter = inputContext.getCounters().findCounter(TaskCounter.MERGED_MAP_OUTPUTS);
 
     LOG.info("{}: Shuffle assigned with {} inputs, codec: {} , ifileReadAhead: {}",
         srcNameTrimmed, numInputs, codec == null ? "None" : codec.getClass().getName(), ifileReadAhead);
@@ -145,7 +133,7 @@ public class Shuffle implements ExceptionReporter {
         ifileReadAhead,
         ifileReadAheadLength);
 
-    scheduler = new ShuffleScheduler(
+    shuffleScheduler = new ShuffleScheduler(
         this.inputContext,
         conf,
         numInputs,
@@ -158,13 +146,13 @@ public class Shuffle implements ExceptionReporter {
     this.mergePhaseTime = inputContext.getCounters().findCounter(TaskCounter.MERGE_PHASE_TIME);
     this.shufflePhaseTime = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_PHASE_TIME);
 
-    eventHandler= new ShuffleInputEventHandlerOrderedGrouped(
-        inputContext,
-        scheduler,
-        ShuffleUtils.isTezShuffleHandler(conf));
+    boolean compositeFetch = inputContext.getFetcherConfig().compositeFetch;
+    eventHandler= new ShuffleInputEventHandlerOrderedGrouped(inputContext, shuffleScheduler, compositeFetch);
 
     ExecutorService rawExecutor = Executors.newFixedThreadPool(1, new ThreadFactoryBuilder()
-        .setDaemon(true).setNameFormat("ShuffleAndMergeRunner {" + srcNameTrimmed + "}").build());
+        .setDaemon(true)
+        .setNameFormat("ShuffleMerge " + srcNameTrimmed + "/" + inputContext.getUniqueIdentifier())
+        .build());
 
     executor = MoreExecutors.listeningDecorator(rawExecutor);
     runShuffleCallable = new RunShuffleCallable();
@@ -248,7 +236,8 @@ public class Shuffle implements ExceptionReporter {
   public void shutdown() {
     if (!isShutDown.getAndSet(true)) {
       // Interrupt so that the scheduler / merger sees this interrupt.
-      LOG.info("Shutting down Shuffle for source: " + srcNameTrimmed);
+      LOG.info("Shutting down Shuffle for shuffleClientId={}, source={}",
+          shuffleScheduler.getShuffleClientId(), srcNameTrimmed);
       runShuffleFuture.cancel(true);
       cleanupIgnoreErrors();
     }
@@ -261,7 +250,7 @@ public class Shuffle implements ExceptionReporter {
 
       if (!isShutDown.get()) {
         try {
-          scheduler.start();
+          shuffleScheduler.start();
         } catch (Throwable e) {
           throw new ShuffleError("Error during shuffle", e);
         } finally {
@@ -287,7 +276,7 @@ public class Shuffle implements ExceptionReporter {
       try {
         kvIter = merger.close(true);
       } catch (Throwable e) {
-        // Set the throwable so that future.get() sees the reported errror.
+        // Set the throwable so that future.get() sees the reported error.
         throwable.set(e);
         throw new ShuffleError("Error while doing final merge ", e);
       }
@@ -318,7 +307,7 @@ public class Shuffle implements ExceptionReporter {
 
   private void cleanupShuffleScheduler() throws InterruptedException {
     if (!schedulerClosed.getAndSet(true)) {
-      scheduler.close();
+      shuffleScheduler.close();
     }
   }
 
@@ -364,7 +353,6 @@ public class Shuffle implements ExceptionReporter {
 
   // the caller should not hold synchronized(ShuffleScheduler.this) because cleanupShuffleSchedulerIgnoreErrors()
   // may call ShuffleScheduler.close(), which may call Referee.join() while Referee is waiting for ShuffleScheduler.this.
-  @Private
   @Override
   public synchronized void reportException(Throwable t) {
     // RunShuffleCallable onFailure deals with ignoring errors on shutdown.
@@ -373,13 +361,11 @@ public class Shuffle implements ExceptionReporter {
           srcNameTrimmed, t.getMessage(), Thread.currentThread().getName());
       throwable.set(t);
       throwingThreadName = Thread.currentThread().getName();
-      // Notify the scheduler so that the reporting thread finds the 
-      // exception immediately.
+      // Notify the scheduler so that the reporting thread finds the exception immediately.
       cleanupShuffleSchedulerIgnoreErrors();
     }
   }
 
-  @Private
   @Override
   public void killSelf(Exception exception, String message) {
     synchronized (this) {
@@ -402,7 +388,6 @@ public class Shuffle implements ExceptionReporter {
     }
   }
 
-  @Private
   public static long getInitialMemoryRequirement(Configuration conf, long maxAvailableTaskMemory) {
     return MergeManager.getInitialMemoryRequirement(conf, maxAvailableTaskMemory);
   }

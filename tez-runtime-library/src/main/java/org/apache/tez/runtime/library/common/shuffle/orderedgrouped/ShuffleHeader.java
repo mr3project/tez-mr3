@@ -20,9 +20,8 @@ package org.apache.tez.runtime.library.common.shuffle.orderedgrouped;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
@@ -32,8 +31,6 @@ import org.apache.hadoop.io.WritableUtils;
  * deciphered by the Fetcher thread of Reduce task
  *
  */
-@InterfaceAudience.Private
-@InterfaceStability.Stable
 public class ShuffleHeader implements Writable {
   
   /** Header info of the shuffle http request/response */
@@ -51,9 +48,15 @@ public class ShuffleHeader implements Writable {
   long uncompressedLength;
   long compressedLength;
   int forReduce;
-  
-  public ShuffleHeader() { }
-  
+
+  private boolean compositeFetch;
+
+  // ShuffleHeader created by Fetcher before calling readFields()
+  public ShuffleHeader(boolean compositeFetch) {
+    this.compositeFetch = compositeFetch;
+  }
+
+  // ShuffleHeader created used by MR3 ShuffleHandler (but not by Hadoop shuffle service)
   public ShuffleHeader(String mapId, long compressedLength,
       long uncompressedLength, int forReduce) {
     this.mapId = mapId;
@@ -79,28 +82,46 @@ public class ShuffleHeader implements Writable {
   }
 
   public void readFields(DataInput in) throws IOException {
-    mapId = WritableUtils.readStringSafely(in, MAX_ID_LENGTH);
-    compressedLength = WritableUtils.readVLong(in);
-    uncompressedLength = WritableUtils.readVLong(in);
-    forReduce = WritableUtils.readVInt(in);
+    if (compositeFetch) {   // ShuffleHeader created by MR3 ShuffleHandler
+      int length = in.readInt();  // Cf. WritableUtils.readStringSafely() calls readVInt()
+      if (length < 0 || length > MAX_ID_LENGTH) {
+        throw new IllegalArgumentException("Encoded byte size for String was " + length +
+                                           ", which is outside of 0.." + MAX_ID_LENGTH + " range.");
+      }
+      byte [] bytes = new byte[length];
+      in.readFully(bytes, 0, length);
+      mapId = Text.decode(bytes);
+
+      compressedLength = in.readLong();
+      uncompressedLength = in.readLong();
+      forReduce = in.readInt();
+    } else {  // ShuffleHeader created by Hadoop shuffle service
+      mapId = WritableUtils.readStringSafely(in, MAX_ID_LENGTH);
+      compressedLength = WritableUtils.readVLong(in);
+      uncompressedLength = WritableUtils.readVLong(in);
+      forReduce = WritableUtils.readVInt(in);
+    }
   }
 
+  // called by MR3 ShuffleHandler (but not by Hadoop shuffle service)
+  // do not use WritableUtils.writeVLong/Int()
   public int writeLength() throws IOException {
-    int length = 0;
-    int mapIdLength = Text.encode(mapId).limit();
-    length += mapIdLength;
-
-    length += WritableUtils.getVIntSize(mapIdLength);
-    length += WritableUtils.getVIntSize(compressedLength);
-    length += WritableUtils.getVIntSize(uncompressedLength);
-    length += WritableUtils.getVIntSize(forReduce);
-
+    int length = Text.encode(mapId).limit();
+    length += 4 + 8 + 8 + 4;  // encoding of mapIdLength, compressedLength, uncompressedLength, forReduce
     return length;
   }
+
+  // called by MR3 ShuffleHandler (but not by Hadoop shuffle service)
+  // do not use WritableUtils.writeVLong/Int()
   public void write(DataOutput out) throws IOException {
-    Text.writeString(out, mapId);
-    WritableUtils.writeVLong(out, compressedLength);
-    WritableUtils.writeVLong(out, uncompressedLength);
-    WritableUtils.writeVInt(out, forReduce);
+    // Text.writeString(out, mapId);
+    ByteBuffer bytes = Text.encode(mapId);
+    int length = bytes.limit();
+    out.writeInt(length);
+    out.write(bytes.array(), 0, length);
+
+    out.writeLong(compressedLength);
+    out.writeLong(uncompressedLength);
+    out.writeInt(forReduce);
   }
 }

@@ -11,26 +11,36 @@
   See the License for the specific language governing permissions and
   limitations under the License. See accompanying LICENSE file.
 -->
+MR3
+===
+
+MR3 is a new execution engine for Hadoop and Kubernetes. Similar in spirit to
+MapReduce and Tez, it is a new execution engine with simpler design, better
+performance, and more features. MR3 serves as a framework for running jobs on
+Hadoop and Kubernetes. MR3 also supports standalone mode which does not require
+a resource manager such as Hadoop or Kubernetes.
+
+The main application of MR3 is Hive on MR3. With MR3 as the execution engine,
+the user can run Apache Hive not only on Hadoop but also directly on Kubernetes.
+By exploiting standalone mode supported by MR3, the user can run Apache Hive
+virtually in any type of cluster regardless of the availability of Hadoop or
+Kubernetes and the version of Java installed in the system.
+
+MR3 is implemented in Scala.
 
 Tez for MR3
 ==========
-Apache Tez modified to support MR3
 
-Apache Tez
-==========
+Tez for MR3 is a runtime library derived from Apache Tez and significantly modified
+to support MR3.
 
-Apache Tez is a generic data-processing pipeline engine envisioned as a low-level engine for higher abstractions
-such as Apache Hadoop Map-Reduce, Apache Pig, Apache Hive etc.
+* For the runtime library compatible with Apache Hive 4.0.0 on MR3,
+check out [branch `master4.0-java17`](https://github.com/mr3project/tez-mr3/tree/master4.0-java17).
 
-At its heart, tez is very simple and has just two components:
+For the full documentation on MR3 (including Quick Start Guide), please visit:
 
-*   The data-processing pipeline engine where-in one can plug-in input, processing and output implementations to 
-    perform arbitrary data-processing. Every 'task' in tez has the following:
-   -   Input to consume key/value pairs from.
-   -   Processor to process them.
-   -   Output to collect the processed key/value pairs.
+  https://mr3docs.datamonad.com/
 
+* [MR3 Slack](https://join.slack.com/t/mr3-help/shared_invite/zt-1wpqztk35-AN8JRDznTkvxFIjtvhmiNg)
+* [MR3 Google Group](https://groups.google.com/g/hive-mr3)
 
-*  A master for the data-processing application, where-by one can put together arbitrary data-processing 'tasks' 
-   described above into a task-DAG to process data as desired. 
-   The generic master is implemented as a Apache Hadoop YARN ApplicationMaster.

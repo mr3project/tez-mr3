@@ -26,7 +26,6 @@ import java.util.Set;
 
 import org.apache.tez.common.Preconditions;
 
-import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.RawComparator;
 import org.apache.hadoop.io.WritableComparable;
@@ -37,7 +36,6 @@ import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
-@InterfaceAudience.Private
 public class ConfigUtils {
 
   public static Class<? extends CompressionCodec> getIntermediateOutputCompressorClass(
@@ -130,7 +128,6 @@ public class ConfigUtils {
     return conf.getBoolean("mapred.mapper.new-api", false);
   }
 
-  @InterfaceAudience.Private
   public static Map<String, String> extractConfigurationMap(Map<String, String> confMap, Set<String> allowedKeys) {
     Preconditions.checkArgument(confMap != null, "ConfMap cannot be null");
     Preconditions.checkArgument(allowedKeys != null, "Valid key set cannot be empty");
@@ -143,7 +140,6 @@ public class ConfigUtils {
     return map;
   }
 
-  @InterfaceAudience.Private
   public static void addConfigMapToConfiguration(Configuration conf, Map<String, String> confMap) {
     Preconditions.checkArgument(conf != null, "Configuration cannot be null");
     Preconditions.checkArgument(confMap != null, "Configuration map cannot be null");
@@ -152,7 +148,6 @@ public class ConfigUtils {
     }
   }
 
-  @InterfaceAudience.Private
   public static Map<String, String> extractConfigurationMap(Map<String, String> confMap,
                                                             List<Set<String>> validKeySets,
                                                             List<String> allowedPrefixes) {
@@ -163,7 +158,6 @@ public class ConfigUtils {
     return extractConfigurationMapInternal(confMap.entrySet(), validKeySets, allowedPrefixes);
   }
 
-  @InterfaceAudience.Private
   public static Map<String, String> extractConfigurationMap(Configuration conf,
                                                             List<Set<String>> validKeySets,
                                                             List<String> allowedPrefixes) {
@@ -173,7 +167,6 @@ public class ConfigUtils {
     return extractConfigurationMapInternal(conf, validKeySets, allowedPrefixes);
   }
 
-  @InterfaceAudience.Private
   public static boolean doesKeyQualify(String key, List<Set<String>> validKeySets, List<String> allowedPrefixes) {
     Preconditions.checkArgument(key != null, "key cannot be null");
     Preconditions.checkArgument(validKeySets != null, "Valid key set cannot be empty");
@@ -191,7 +184,6 @@ public class ConfigUtils {
     return false;
   }
 
-  @InterfaceAudience.Private
   public static void mergeConfsWithExclusions(Configuration destConf, Map<String, String> srcConf, Set<String> excludedKeySet) {
     Preconditions.checkState(destConf != null, "Destination conf cannot be null");
     Preconditions.checkState(srcConf != null, "Source conf cannot be null");

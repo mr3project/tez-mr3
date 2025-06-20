@@ -25,8 +25,6 @@ import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.compress.CompressionCodec;
@@ -42,8 +40,6 @@ import org.apache.tez.runtime.library.common.shuffle.FetchedInput;
 import org.apache.tez.runtime.library.common.shuffle.FetchedInput.Type;
 import org.apache.tez.runtime.library.common.shuffle.MemoryFetchedInput;
 
-@Unstable
-@Private
 public class UnorderedKVReader<K, V> extends KeyValueReader {
 
   private static final Logger LOG = LoggerFactory.getLogger(UnorderedKVReader.class);
@@ -60,8 +56,7 @@ public class UnorderedKVReader<K, V> extends KeyValueReader {
 
   private final boolean ifileReadAhead;
   private final int ifileReadAheadLength;
-  private final int ifileBufferSize;
-  
+
   private final TezCounter inputRecordCounter;
   private final InputContext context;
   
@@ -78,7 +73,7 @@ public class UnorderedKVReader<K, V> extends KeyValueReader {
   private final AtomicLong totalFileBytes = new AtomicLong(0);
 
   public UnorderedKVReader(ShuffleManager shuffleManager, Configuration conf,
-      CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLength, int ifileBufferSize,
+      CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLength,
       TezCounter inputRecordCounter, InputContext context)
       throws IOException {
     this.shuffleManager = shuffleManager;
@@ -86,7 +81,6 @@ public class UnorderedKVReader<K, V> extends KeyValueReader {
     this.codec = codec;
     this.ifileReadAhead = ifileReadAhead;
     this.ifileReadAheadLength = ifileReadAheadLength;
-    this.ifileBufferSize = ifileBufferSize;
     this.inputRecordCounter = inputRecordCounter;
 
     this.keyClass = ConfigUtils.getIntermediateInputKeyClass(conf);
@@ -212,7 +206,7 @@ public class UnorderedKVReader<K, V> extends KeyValueReader {
     }
   }
 
-  public IFile.Reader openIFileReader(FetchedInput fetchedInput)
+  private IFile.Reader openIFileReader(FetchedInput fetchedInput)
       throws IOException {
     if (fetchedInput.getType() == Type.MEMORY) {
       MemoryFetchedInput mfi = (MemoryFetchedInput) fetchedInput;
@@ -221,8 +215,8 @@ public class UnorderedKVReader<K, V> extends KeyValueReader {
           mfi.getBytes(), 0, (int) mfi.getSize());
     } else {
       return new IFile.Reader(fetchedInput.getInputStream(),
-          fetchedInput.getSize(), codec, null, null, ifileReadAhead,
-          ifileReadAheadLength, ifileBufferSize, context);
+          fetchedInput.getSize(), codec, null, null,
+          ifileReadAhead, ifileReadAheadLength, context);
     }
   }
 }
