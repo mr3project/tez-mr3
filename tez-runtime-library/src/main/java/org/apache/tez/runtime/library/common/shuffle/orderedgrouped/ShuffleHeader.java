@@ -51,6 +51,10 @@ public class ShuffleHeader implements Writable {
 
   private boolean compositeFetch;
 
+  // For compiling TestShuffleHandler.java in Hive-MR3
+  public ShuffleHeader() {
+  }
+
   // ShuffleHeader created by Fetcher before calling readFields()
   public ShuffleHeader(boolean compositeFetch) {
     this.compositeFetch = compositeFetch;
