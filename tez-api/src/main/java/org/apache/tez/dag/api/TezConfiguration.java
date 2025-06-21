@@ -158,49 +158,6 @@ public class TezConfiguration extends Configuration {
   public static final int TEZ_AM_TASK_LISTENER_THREAD_COUNT_DEFAULT = 30;
 
   /**
-   * Int value. Configuration to limit the counters per dag (AppMaster and Task). This can be used
-   * to
-   * limit the amount of memory being used in the app master to store the
-   * counters. Expert level setting.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  public static final String TEZ_COUNTERS_MAX = TEZ_PREFIX + "counters.max";
-  public static final int TEZ_COUNTERS_MAX_DEFAULT = 1200;
-
-  /**
-   * Int value. Configuration to limit the number of counter groups for a DAG. This can be used to
-   * limit the amount of memory being used in the app master to store the
-   * counters. Expert level setting.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  public static final String TEZ_COUNTERS_MAX_GROUPS = TEZ_PREFIX + "counters.max.groups";
-  public static final int TEZ_COUNTERS_MAX_GROUPS_DEFAULT = 500;
-
-  /**
-   * Int value. Configuration to limit the length of counter names. This can be used to
-   * limit the amount of memory being used in the app master to store the
-   * counters. Expert level setting.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  public static final String TEZ_COUNTERS_COUNTER_NAME_MAX_LENGTH =
-      TEZ_PREFIX + "counters.counter-name.max-length";
-  public static final int TEZ_COUNTERS_COUNTER_NAME_MAX_LENGTH_DEFAULT = 64;
-
-  /**
-   * Int value. Configuration to limit the counter group names per app master. This can be used to
-   * limit the amount of memory being used in the app master to store the
-   * counters. Expert level setting.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  public static final String TEZ_COUNTERS_GROUP_NAME_MAX_LENGTH =
-      TEZ_PREFIX + "counters.group-name.max-length";
-  public static final int TEZ_COUNTERS_GROUP_NAME_MAX_LENGTH_DEFAULT = 256;
-
-  /**
    * Int value. Specifies the number of times the app master can be launched in order to recover 
    * from app master failure. Typically app master failures are non-recoverable. This parameter 
    * is for cases where the app master is not at fault but is lost due to system errors.
