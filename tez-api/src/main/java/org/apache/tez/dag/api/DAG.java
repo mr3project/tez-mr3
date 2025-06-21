@@ -17,19 +17,14 @@
  */
 package org.apache.tez.dag.api;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import org.apache.commons.collections4.BidiMap;
 import org.apache.commons.collections4.bidimap.DualLinkedHashBidiMap;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.yarn.api.records.LocalResource;
 import org.apache.tez.client.CallerContext;
-import org.apache.tez.common.TezCommonUtils;
 import org.apache.tez.common.security.DAGAccessControls;
 import org.apache.tez.dag.api.Vertex.VertexExecutionContext;
 
@@ -42,7 +37,6 @@ import java.util.*;
  * vertices. Vertices represent transformations of data and edges represent 
  * movement of data between vertices.
  */
-@Public
 public class DAG {
   
   final BidiMap<String, Vertex> vertices =
@@ -84,8 +78,7 @@ public class DAG {
    * @return {@link DAG}
    */
   public synchronized DAG addTaskLocalFiles(Map<String, LocalResource> localFiles) {
-    Objects.requireNonNull(localFiles);
-    TezCommonUtils.addAdditionalLocalResources(localFiles, commonTaskLocalFiles, "DAG " + getName());
+    // unused in MR3
     return this;
   }
   
@@ -169,7 +162,6 @@ public class DAG {
     return uv;
   }
 
-  @Private
   public synchronized Credentials getCredentials() {
     return this.credentials;
   }
@@ -188,7 +180,6 @@ public class DAG {
     return this;
   }
 
-  @Private
   public synchronized DAGAccessControls getDagAccessControls() {
     return dagAccessControls;
   }
@@ -223,12 +214,10 @@ public class DAG {
    * @return an unmodifiable list representing the URIs for which credentials
    *         are required.
    */
-  @Private
   public synchronized Collection<URI> getURIsForCredentials() {
     return Collections.unmodifiableCollection(urisForCredentials);
   }
   
-  @Private
   public synchronized Set<Vertex> getVertices() {
     return Collections.unmodifiableSet(this.vertices.values());
   }
@@ -328,23 +317,9 @@ public class DAG {
    * @param value the value for the property
    * @return the current DAG being constructed
    */
-  @InterfaceStability.Unstable
   public DAG setConf(String property, String value) {
-    TezConfiguration.validateProperty(property, Scope.DAG);
     dagConf.put(property, value);
     return this;
-  }
-
-  /**
-   * Set history log level for this DAG. This config overrides the default or one set at the session
-   * level.
-   *
-   * @param historyLogLevel The ATS history log level for this DAG.
-   *
-   * @return this DAG
-   */
-  public DAG setHistoryLogLevel(HistoryLogLevel historyLogLevel) {
-    return this.setConf(TezConfiguration.TEZ_HISTORY_LOGGING_LOGLEVEL, historyLogLevel.name());
   }
 
   /**
@@ -355,25 +330,19 @@ public class DAG {
    *
    * @return this DAG
    */
-  @Public
-  @InterfaceStability.Unstable
   public synchronized DAG setExecutionContext(VertexExecutionContext vertexExecutionContext) {
     this.defaultExecutionContext = vertexExecutionContext;
     return this;
   }
 
-  @Private
   VertexExecutionContext getDefaultExecutionContext() {
     return this.defaultExecutionContext;
   }
 
-  @Private
-  @VisibleForTesting
   public Map<String,String> getDagConf() {
     return dagConf;
   }
 
-  @Private
   public Map<String, LocalResource> getTaskLocalFiles() {
     return commonTaskLocalFiles;
   }

@@ -18,32 +18,12 @@
 
 package org.apache.tez.common.security;
 
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.tez.dag.api.TezConstants;
-
 /**
  * Access controls for the DAG
  */
-@Public
 public class DAGAccessControls {
 
-  private final Set<String> usersWithViewACLs;
-  private final Set<String> usersWithModifyACLs;
-  private final Set<String> groupsWithViewACLs;
-  private final Set<String> groupsWithModifyACLs;
-
-  public DAGAccessControls() {
-    this.usersWithViewACLs = new HashSet<String>();
-    this.usersWithModifyACLs = new HashSet<String>();
-    this.groupsWithViewACLs = new HashSet<String>();
-    this.groupsWithModifyACLs = new HashSet<String>();
-  }
-
+  // only for compiling Hive-MR3
   /**
    * Helper API to support YARN and MapReduce format for specifying users and groups.
    * Format supports a comma-separated list of users and groups with the users and groups separated
@@ -53,31 +33,5 @@ public class DAGAccessControls {
    * @param modifyACLsStr
    */
   public DAGAccessControls(String viewACLsStr, String modifyACLsStr) {
-    final Configuration conf = new Configuration(false);
-    conf.set(TezConstants.TEZ_DAG_VIEW_ACLS, (viewACLsStr != null ? viewACLsStr : ""));
-    conf.set(TezConstants.TEZ_DAG_MODIFY_ACLS, (modifyACLsStr != null ? modifyACLsStr : ""));
-    ACLConfigurationParser parser = new ACLConfigurationParser(conf, true);
-
-    this.usersWithViewACLs = new HashSet<String>();
-    this.usersWithModifyACLs = new HashSet<String>();
-    this.groupsWithViewACLs = new HashSet<String>();
-    this.groupsWithModifyACLs = new HashSet<String>();
-
-    Map<ACLType, Set<String>> allowedUsers = parser.getAllowedUsers();
-    Map<ACLType, Set<String>> allowedGroups = parser.getAllowedGroups();
-
-    if (allowedUsers.containsKey(ACLType.DAG_VIEW_ACL)) {
-      this.usersWithViewACLs.addAll(allowedUsers.get(ACLType.DAG_VIEW_ACL));
-    }
-    if (allowedUsers.containsKey(ACLType.DAG_MODIFY_ACL)) {
-      this.usersWithModifyACLs.addAll(allowedUsers.get(ACLType.DAG_MODIFY_ACL));
-    }
-    if (allowedGroups.containsKey(ACLType.DAG_VIEW_ACL)) {
-      this.groupsWithViewACLs.addAll(allowedGroups.get(ACLType.DAG_VIEW_ACL));
-    }
-    if (allowedGroups.containsKey(ACLType.DAG_MODIFY_ACL)) {
-      this.groupsWithModifyACLs.addAll(allowedGroups.get(ACLType.DAG_MODIFY_ACL));
-    }
-
   }
 }

@@ -157,16 +157,8 @@ public class PreWarmVertex extends Vertex {
       if (name == null) {
         name = "_PreWarm_";
       }
-      if (parallelism == 0) {
-        parallelism = conf.getInt(TezConfiguration.TEZ_AM_SESSION_MIN_HELD_CONTAINERS, -1);
-        if (parallelism == -1) {
-          throw new TezUncheckedException("Prewarm parallelism must be set or specified in conf via " 
-              + TezConfiguration.TEZ_AM_SESSION_MIN_HELD_CONTAINERS);
-        }
-      }
       if (proc == null) {
-        proc =
-            ProcessorDescriptor.create("org.apache.tez.runtime.library.processor.PreWarmProcessor");
+        proc = ProcessorDescriptor.create("org.apache.tez.runtime.library.processor.PreWarmProcessor");
       }
       
       return create(name, proc, parallelism, resource);

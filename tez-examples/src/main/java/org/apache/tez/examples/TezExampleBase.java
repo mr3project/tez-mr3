@@ -217,7 +217,6 @@ public abstract class TezExampleBase extends Configured implements Tool {
     }
     if (isLocalMode) {
       LOG.info("Running in local mode...");
-      tezConf.setBoolean(TezConfiguration.TEZ_LOCAL_MODE, true);
       tezConf.set("fs.defaultFS", "file:///");
       tezConf.setBoolean(
           TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH, true);

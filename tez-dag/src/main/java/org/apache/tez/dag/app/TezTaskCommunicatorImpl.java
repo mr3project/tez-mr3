@@ -153,10 +153,6 @@ public class TezTaskCommunicatorImpl extends TaskCommunicator {
           .setBindAddress("0.0.0.0")
           .setPort(0)
           .setInstance(taskUmbilical)
-          .setNumHandlers(
-              conf.getInt(TezConfiguration.TEZ_AM_TASK_LISTENER_THREAD_COUNT,
-                  TezConfiguration.TEZ_AM_TASK_LISTENER_THREAD_COUNT_DEFAULT))
-          .setPortRangeConfig(TezConfiguration.TEZ_AM_TASK_AM_PORT_RANGE)
           .setSecretManager(jobTokenSecretManager).build();
 
       // Enable service authorization?

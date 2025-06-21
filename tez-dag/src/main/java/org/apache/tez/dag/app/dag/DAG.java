@@ -18,23 +18,18 @@
 
 package org.apache.tez.dag.app.dag;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.api.records.LocalResource;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.tez.common.counters.TezCounters;
-import org.apache.tez.dag.api.TezException;
-import org.apache.tez.dag.api.client.StatusGetOpts;
 import org.apache.tez.dag.api.records.DAGProtos.DAGPlan;
-import org.apache.tez.common.security.ACLManager;
 import org.apache.tez.dag.records.TezDAGID;
 import org.apache.tez.dag.records.TezVertexID;
 import org.apache.tez.serviceplugins.api.DagInfo;
+
+import java.util.List;
+import java.util.Map;
 
 /**
  * Main interface to interact with the job.
@@ -78,8 +73,6 @@ public interface DAG extends DagInfo {
   boolean isComplete();
 
   UserGroupInformation getDagUGI();
-
-  ACLManager getACLManager();
 
   Map<String, TezVertexID> getVertexNameIDMapping();
 
