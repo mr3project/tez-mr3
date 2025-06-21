@@ -48,8 +48,6 @@ public class ExampleDriver {
           "A native Tez wordcount program that counts the words in the input files.");
       pgd.addClass("orderedwordcount", OrderedWordCount.class,
           "Word Count with words sorted on frequency");
-      pgd.addClass("simplesessionexample", SimpleSessionExample.class,
-          "Example to run multiple dags in a session");
       pgd.addClass("hashjoin", HashJoinExample.class,
           "Identify all occurences of lines in file1 which also occur in file2 using hash join");
       pgd.addClass("sortmergejoin", SortMergeJoinExample.class,

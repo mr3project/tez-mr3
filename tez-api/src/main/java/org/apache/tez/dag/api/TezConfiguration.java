@@ -110,19 +110,6 @@ public class TezConfiguration extends Configuration {
       + System.getProperty("user.name") + "/tez/staging";
 
   /**
-   * Boolean value. Execution mode for the Tez application. True implies session mode. If the client
-   * code is written according to best practices then the same code can execute in either mode based
-   * on this configuration. Session mode is more aggressive in reserving execution resources and is
-   * typically used for interactive applications where multiple DAGs are submitted in quick succession
-   * by the same user. For long running applications, one-off executions, batch jobs etc non-session 
-   * mode is recommended. If session mode is enabled then container reuse is recommended.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="boolean")
-  public static final String TEZ_AM_SESSION_MODE = TEZ_AM_PREFIX + "mode.session";
-  public static final boolean TEZ_AM_SESSION_MODE_DEFAULT = false;
-
-  /**
    * String value. Command line options provided during the launch of the Tez
    * AppMaster process. Its recommended to not set any Xmx or Xms in these launch opts so that
    * Tez can determine them automatically.
