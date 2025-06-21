@@ -94,15 +94,13 @@ public class TezRuntimeConfiguration {
    * this parameter.
    */
   @ConfigurationProperty(type = "integer")
-  public static final String
-      TEZ_RUNTIME_PIPELINED_SORTER_MIN_BLOCK_SIZE_IN_MB = TEZ_RUNTIME_PREFIX +
+  public static final String TEZ_RUNTIME_PIPELINED_SORTER_MIN_BLOCK_SIZE_IN_MB = TEZ_RUNTIME_PREFIX +
       "pipelined.sorter.min-block.size.in.mb";
   public static final int
       TEZ_RUNTIME_PIPELINED_SORTER_MIN_BLOCK_SIZE_IN_MB_DEFAULT = 2000;
 
   @ConfigurationProperty(type = "boolean")
-  public static final String
-      TEZ_RUNTIME_PIPELINED_SORTER_USE_SOFT_REFERENCE = TEZ_RUNTIME_PREFIX +
+  public static final String TEZ_RUNTIME_PIPELINED_SORTER_USE_SOFT_REFERENCE = TEZ_RUNTIME_PREFIX +
       "pipelined.sorter.use.soft.reference";
   public static final boolean
       TEZ_RUNTIME_PIPELINED_SORTER_USE_SOFT_REFERENCE_DEFAULT = false;
@@ -150,6 +148,14 @@ public class TezRuntimeConfiguration {
       0;
 
   /**
+   * Size of the buffer to use if not writing directly to disk.
+   */
+  @ConfigurationProperty(type = "integer")
+  public static final String TEZ_RUNTIME_UNORDERED_OUTPUT_BUFFER_SIZE_MB = TEZ_RUNTIME_PREFIX +
+    "unordered.output.buffer.size-mb";
+  public static final int TEZ_RUNTIME_UNORDERED_OUTPUT_BUFFER_SIZE_MB_DEFAULT = 100;
+
+  /**
    * Report partition statistics (e.g better scheduling in ShuffleVertexManager). TEZ-2496
    * This can be enabled/disabled at vertex level.
    * {@link org.apache.tez.runtime.library.api.TezRuntimeConfiguration.ReportPartitionStats}
@@ -162,22 +168,6 @@ public class TezRuntimeConfiguration {
       TEZ_RUNTIME_PREFIX + "report.partition.stats";
   public static final String TEZ_RUNTIME_REPORT_PARTITION_STATS_DEFAULT =
       ReportPartitionStats.MEMORY_OPTIMIZED.getType();
-
-  /**
-   * Size of the buffer to use if not writing directly to disk.
-   */
-  @ConfigurationProperty(type = "integer")
-  public static final String TEZ_RUNTIME_UNORDERED_OUTPUT_BUFFER_SIZE_MB = TEZ_RUNTIME_PREFIX +
-      "unordered.output.buffer.size-mb";
-  public static final int TEZ_RUNTIME_UNORDERED_OUTPUT_BUFFER_SIZE_MB_DEFAULT = 100;
-
-  /**
-   * Maximum size for individual buffers used in the UnsortedPartitionedOutput.
-   * This is only meant to be used by unit tests for now.
-   */
-  @ConfigurationProperty(type = "integer")
-  public static final String TEZ_RUNTIME_UNORDERED_OUTPUT_MAX_PER_BUFFER_SIZE_BYTES =
-      TEZ_RUNTIME_PREFIX + "unordered.output.max-per-buffer.size-bytes";
 
   /**
    * Specifies a partitioner class, which is used in Tez Runtime components
@@ -400,6 +390,14 @@ public class TezRuntimeConfiguration {
       "use.free.memory.fetched.input";
   public static final boolean TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT_DEFAULT = false;
 
+  // if set to true, automatically set:
+  //   1. tez.runtime.optimize.local.fetch = false
+  //   2. tez.runtime.optimize.local.fetch.ordered = false
+  @ConfigurationProperty(type = "boolean")
+  public static final String TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT = TEZ_RUNTIME_PREFIX +
+    "use.free.memory.writer.output";
+  public static final boolean TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT_DEFAULT = false;
+
   @ConfigurationProperty(type = "integer")
   public static final String TEZ_RUNTIME_SHUFFLE_SPECULATIVE_FETCH_WAIT_MILLIS = TEZ_RUNTIME_PREFIX +
       "shuffle.speculative.fetch.wait.millis";
@@ -420,27 +418,26 @@ public class TezRuntimeConfiguration {
       "shuffle.max.speculative.fetch.attempts";
   public static final int TEZ_RUNTIME_SHUFFLE_MAX_SPECULATIVE_FETCH_ATTEMPTS_DEFAULT = 2;
 
-  // if set to true, automatically set:
-  //   1. tez.runtime.optimize.local.fetch = false
-  //   2. tez.runtime.optimize.local.fetch.ordered = false
-  @ConfigurationProperty(type = "boolean")
-  public static final String TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT = TEZ_RUNTIME_PREFIX +
-      "use.free.memory.writer.output";
-  public static final boolean TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT_DEFAULT = false;
-
   static {
     tezRuntimeKeys.add(TEZ_RUNTIME_IFILE_READAHEAD);
     tezRuntimeKeys.add(TEZ_RUNTIME_IFILE_READAHEAD_BYTES);
     tezRuntimeKeys.add(TEZ_RUNTIME_IO_SORT_FACTOR);
     tezRuntimeKeys.add(TEZ_RUNTIME_IO_SORT_MB);
     tezRuntimeKeys.add(TEZ_RUNTIME_COMBINE_MIN_SPILLS);
-    tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SORTER_SORT_THREADS);
+
     tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SORTER_MIN_BLOCK_SIZE_IN_MB);
     tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SORTER_USE_SOFT_REFERENCE);
     tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SORTER_LAZY_ALLOCATE_MEMORY);
+    tezRuntimeKeys.add(TEZ_RUNTIME_SORTER_CLASS);
+    tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SORTER_SORT_THREADS);
+
+    tezRuntimeKeys.add(TEZ_RUNTIME_UNORDERED_PARTITIONED_KVWRITER_BUFFER_MERGE_PERCENT);
     tezRuntimeKeys.add(TEZ_RUNTIME_UNORDERED_OUTPUT_BUFFER_SIZE_MB);
+
+    tezRuntimeKeys.add(TEZ_RUNTIME_REPORT_PARTITION_STATS);
     tezRuntimeKeys.add(TEZ_RUNTIME_PARTITIONER_CLASS);
     tezRuntimeKeys.add(TEZ_RUNTIME_COMBINER_CLASS);
+
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_PARALLEL_COPIES);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_TOTAL_PARALLEL_COPIES);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_FETCH_MAX_TASK_OUTPUT_AT_ONCE);
@@ -459,8 +456,8 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_MERGE_PERCENT);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_MEMTOMEM_SEGMENTS);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_ENABLE_MEMTOMEM);
-    tezRuntimeKeys.add(TEZ_RUNTIME_REPORT_PARTITION_STATS);
     tezRuntimeKeys.add(TEZ_RUNTIME_INPUT_POST_MERGE_BUFFER_PERCENT);
+
     tezRuntimeKeys.add(TEZ_RUNTIME_INTERNAL_SORTER_CLASS);
     tezRuntimeKeys.add(TEZ_RUNTIME_KEY_COMPARATOR_CLASS);
     tezRuntimeKeys.add(TEZ_RUNTIME_KEY_CLASS);
@@ -468,23 +465,27 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_COMPRESS);
     tezRuntimeKeys.add(TEZ_RUNTIME_COMPRESS_CODEC);
     tezRuntimeKeys.add(TEZ_RUNTIME_KEY_SECONDARY_COMPARATOR_CLASS);
+
     tezRuntimeKeys.add(TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED);
-    tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED);
-    tezRuntimeKeys.add(TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT);
     tezRuntimeKeys.add(TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_ENABLED);
     tezRuntimeKeys.add(TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_MAX_SIZE);
-    tezRuntimeKeys.add(TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS);
+
     tezRuntimeKeys.add(TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH);
     tezRuntimeKeys.add(TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_ORDERED);
-    tezRuntimeKeys.add(TEZ_RUNTIME_SORTER_CLASS);
+
+    tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED);
+    tezRuntimeKeys.add(TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT);
+
     tezRuntimeKeys.add(TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT);
-    tezRuntimeKeys.add(TEZ_RUNTIME_UNORDERED_PARTITIONED_KVWRITER_BUFFER_MERGE_PERCENT);
+    tezRuntimeKeys.add(TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS);
+
     tezRuntimeKeys.add(TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT);
+    tezRuntimeKeys.add(TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT);
+
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_SPECULATIVE_FETCH_WAIT_MILLIS);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_THRESHOLD_MILLIS);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_RELEASE_MILLIS);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_MAX_SPECULATIVE_FETCH_ATTEMPTS);
-    tezRuntimeKeys.add(TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT);
 
     // Do not keep defaultConf as a static member because it holds a reference to ClassLoader
     // of the Thread that is active at the time of loading this class. The active Thread usually
@@ -537,24 +538,6 @@ public class TezRuntimeConfiguration {
   }
 
   public enum ReportPartitionStats {
-    @Deprecated
-    /**
-     * Don't report partition stats. It is the same as NONE.
-     * It is defined to maintain backward compatibility given
-     * Configuration @link{#TEZ_RUNTIME_REPORT_PARTITION_STATS} used
-     * to be boolean type.
-     */
-    DISABLED("false"),
-
-    @Deprecated
-    /**
-     * Report partition stats. It is the same as MEMORY_OPTIMIZED.
-     * It is defined to maintain backward compatibility given
-     * Configuration @link{#TEZ_RUNTIME_REPORT_PARTITION_STATS} used
-     * to be boolean type.
-     */
-    ENABLED("true"),
-
     /**
      * Don't report partition stats.
      */
@@ -582,8 +565,7 @@ public class TezRuntimeConfiguration {
     }
 
     public boolean isEnabled() {
-      return !equals(ReportPartitionStats.DISABLED) &&
-              !equals(ReportPartitionStats.NONE);
+      return !equals(ReportPartitionStats.NONE);
     }
 
     public boolean isPrecise() {
