@@ -56,6 +56,7 @@ public class OrderedGroupedKVInputConfig {
      * @return instance of the current builder
      */
     public T useLegacyInput();
+
     /**
      * Sets the buffer fraction, as a fraction of container size, to be used while fetching remote
      * data.
@@ -133,7 +134,6 @@ public class OrderedGroupedKVInputConfig {
     private final E edgeBuilder;
     private final OrderedGroupedKVInputConfig.Builder builder;
 
-
     SpecificBuilder(E edgeBuilder, OrderedGroupedKVInputConfig.Builder builder) {
       this.edgeBuilder = edgeBuilder;
       this.builder = builder;
@@ -184,7 +184,6 @@ public class OrderedGroupedKVInputConfig {
       builder.setCombiner(combinerClassName, combinerConf);
       return this;
     }
-
 
     @Override
     public SpecificBuilder<E> setAdditionalConfiguration(String key, String value) {
@@ -445,8 +444,7 @@ public class OrderedGroupedKVInputConfig {
                                   @Nullable Map<String, String> codecConf) {
       this.conf.setBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS, enabled);
       if (enabled && compressionCodec != null) {
-        this.conf
-            .set(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS_CODEC, compressionCodec);
+        this.conf.set(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS_CODEC, compressionCodec);
       }
       if (codecConf != null) {
         // Merging the confs for now. Change to be specific in the future.

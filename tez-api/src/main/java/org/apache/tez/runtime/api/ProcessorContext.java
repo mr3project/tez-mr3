@@ -115,4 +115,6 @@ public interface ProcessorContext extends TaskContext {
    * @throws InterruptedException
    */
   public boolean waitForAllInputsReady(Collection<Input> inputs, long timeoutMillis) throws InterruptedException;
+
+  public void setFetcherConfig(FetcherConfig fetcherConfig);
 }

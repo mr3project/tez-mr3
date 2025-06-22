@@ -129,7 +129,6 @@ public class ShuffleServer implements FetcherCallback {
   }
 
   private final TaskContext taskContext;
-  private final Configuration conf;
   private final int maxNumFetchers;
   private final String serverName;
 
@@ -173,7 +172,6 @@ public class ShuffleServer implements FetcherCallback {
       int numFetchers,
       String serverName) throws IOException {
     this.taskContext = taskContext;
-    this.conf = conf;
     this.maxNumFetchers = numFetchers;
     this.serverName = serverName;
 
@@ -183,7 +181,7 @@ public class ShuffleServer implements FetcherCallback {
         .setNameFormat("Fetcher" + " #%d")
         .build());
     this.fetcherExecutor = MoreExecutors.listeningDecorator(fetcherRawExecutor);
-    this.fetcherConfig = CodecUtils.constructFetcherConfig(conf, taskContext);
+    this.fetcherConfig = taskContext.getFetcherConfig();
 
     /**
      * Setting to very high val can lead to Http 400 error. Cap it to 75; every attempt id would
@@ -223,8 +221,6 @@ public class ShuffleServer implements FetcherCallback {
   }
 
   public void run() {
-    taskContext.setFetcherConfig(this.fetcherConfig);
-
     try {
       call();
       LOG.info("{} thread completed", serverName);
