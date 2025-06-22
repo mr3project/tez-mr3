@@ -53,130 +53,6 @@ public class OrderedPartitionedKVOutputConfig {
     PIPELINED
   }
 
-
-  /**
-   * Configure parameters which are specific to the Output.
-   */
-  public static interface SpecificConfigBuilder<T> extends BaseConfigBuilder<T> {
-    /**
-     * Set the buffer size to use when sort the output
-     *
-     * @param sortBufferSize the size of the buffer in MB
-     * @return instance of the current builder
-     */
-    public T setSortBufferSize(int sortBufferSize);
-
-
-    /**
-     * Configure the combiner class
-     *
-     * @param combinerClassName the combiner class name
-     * @return instance of the current builder
-     */
-    public T setCombiner(String combinerClassName);
-
-    /**
-     * Configure the combiner class and it's associated configuration (specified as key-value
-     * pairs). This method should only be used if the combiner requires some specific configuration.
-     * {@link #setCombiner(String)} is the preferred method for setting a combiner.
-     *
-     * @param combinerClassName the combiner class name
-     * @param combinerConf      the combiner configuration. This can be null, and otherwise
-     *                          is a {@link java.util.Map} of key-value pairs. The keys should
-     *                          be limited to the ones required by the combiner.
-     * @return instance of the current builder
-     */
-    public T setCombiner(String combinerClassName, @Nullable Map<String, String> combinerConf);
-
-    /**
-     * Configure the number of threads to be used by the sorter
-     *
-     * @param numThreads the number of threads
-     * @return instance of the current builder
-     */
-    public T setSorterNumThreads(int numThreads);
-
-    /**
-     * Configure which sorter implementation to be used
-     *
-     * @param sorterImpl Use an in-built sorter implementations.
-     * @return instance of the current builder
-     */
-    public T setSorter(SorterImpl sorterImpl);
-
-  }
-
-  @SuppressWarnings("rawtypes")
-  public static class SpecificBuilder<E extends HadoopKeyValuesBasedBaseEdgeConfig.Builder> implements
-      SpecificConfigBuilder<SpecificBuilder> {
-
-    private final E edgeBuilder;
-    private final Builder builder;
-
-    SpecificBuilder(E edgeBuilder, Builder builder) {
-      this.edgeBuilder = edgeBuilder;
-      this.builder = builder;
-    }
-
-    @Override
-    public SpecificBuilder<E> setSortBufferSize(int sortBufferSize) {
-      builder.setSortBufferSize(sortBufferSize);
-      return this;
-    }
-
-    public SpecificBuilder<E> setCombiner(String combinerClassName) {
-      return this.setCombiner(combinerClassName, null);
-    }
-
-    @Override
-    public SpecificBuilder<E> setCombiner(String combinerClassName, Map<String, String> combinerConf) {
-      builder.setCombiner(combinerClassName, combinerConf);
-      return this;
-    }
-
-    @Override
-    public SpecificBuilder<E> setSorterNumThreads(int numThreads) {
-      builder.setSorterNumThreads(numThreads);
-      return this;
-    }
-
-    @Override
-    public SpecificBuilder setSorter(SorterImpl sorterImpl) {
-      builder.setSorter(sorterImpl);
-      return this;
-    }
-
-
-    @Override
-    public SpecificBuilder<E> setAdditionalConfiguration(String key, String value) {
-      builder.setAdditionalConfiguration(key, value);
-      return this;
-    }
-
-    @Override
-    public SpecificBuilder<E> setAdditionalConfiguration(Map<String, String> confMap) {
-      builder.setAdditionalConfiguration(confMap);
-      return this;
-    }
-
-    @Override
-    public SpecificBuilder<E> setFromConfiguration(Configuration conf) {
-      builder.setFromConfiguration(conf);
-      return this;
-    }
-
-    @Override
-    public SpecificBuilder setFromConfigurationUnfiltered(
-        Configuration conf) {
-      builder.setFromConfigurationUnfiltered(conf);
-      return this;
-    }
-
-    public E done() {
-      return edgeBuilder;
-    }
-  }
-
   Configuration conf;
 
   OrderedPartitionedKVOutputConfig() {
@@ -219,7 +95,7 @@ public class OrderedPartitionedKVOutputConfig {
     return new Builder(keyClass, valueClass, partitionerClassName, partitionerConf);
   }
 
-  public static class Builder implements SpecificConfigBuilder<Builder> {
+  public static class Builder {
 
     private final Configuration conf = new Configuration(false);
 
@@ -275,18 +151,15 @@ public class OrderedPartitionedKVOutputConfig {
       return this;
     }
 
-    @Override
     public Builder setSortBufferSize(int sortBufferSize) {
       this.conf.setInt(TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB, sortBufferSize);
       return this;
     }
 
-    @Override
     public Builder setCombiner(String combinerClassName) {
       return this.setCombiner(combinerClassName, null);
     }
 
-    @Override
     public Builder setCombiner(String combinerClassName, Map<String, String> combinerConf) {
       this.conf.set(TezRuntimeConfiguration.TEZ_RUNTIME_COMBINER_CLASS, combinerClassName);
       if (combinerConf != null) {
@@ -297,13 +170,11 @@ public class OrderedPartitionedKVOutputConfig {
       return this;
     }
 
-    @Override
     public Builder setSorterNumThreads(int numThreads) {
       this.conf.setInt(TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_SORT_THREADS, numThreads);
       return this;
     }
 
-    @Override
     public Builder setSorter(SorterImpl sorterImpl) {
       Objects.requireNonNull(sorterImpl, "Sorter cannot be null");
       this.conf.set(TezRuntimeConfiguration.TEZ_RUNTIME_SORTER_CLASS,
@@ -313,7 +184,6 @@ public class OrderedPartitionedKVOutputConfig {
 
 
     @SuppressWarnings("unchecked")
-    @Override
     public Builder setAdditionalConfiguration(String key, String value) {
       Objects.requireNonNull(key, "Key cannot be null");
       if (ConfigUtils.doesKeyQualify(key,
@@ -330,7 +200,6 @@ public class OrderedPartitionedKVOutputConfig {
     }
 
     @SuppressWarnings("unchecked")
-    @Override
     public Builder setAdditionalConfiguration(Map<String, String> confMap) {
       Objects.requireNonNull(confMap, "ConfMap cannot be null");
       Map<String, String> map = ConfigUtils.extractConfigurationMap(confMap,
@@ -341,7 +210,6 @@ public class OrderedPartitionedKVOutputConfig {
     }
 
     @SuppressWarnings("unchecked")
-    @Override
     public Builder setFromConfiguration(Configuration conf) {
       // Maybe ensure this is the first call ? Otherwise this can end up overriding other parameters
       Preconditions.checkArgument(conf != null, "Configuration cannot be null");
@@ -349,15 +217,6 @@ public class OrderedPartitionedKVOutputConfig {
           Lists.newArrayList(OrderedPartitionedKVOutput.getConfigurationKeySet(),
               TezRuntimeConfiguration.getRuntimeAdditionalConfigKeySet()), TezRuntimeConfiguration.getAllowedPrefixes());
       ConfigUtils.addConfigMapToConfiguration(this.conf, map);
-      return this;
-    }
-
-    @SuppressWarnings("unchecked")
-    @Override
-    public Builder setFromConfigurationUnfiltered(Configuration conf) {
-      // Maybe ensure this is the first call ? Otherwise this can end up overriding other parameters
-      Preconditions.checkArgument(conf != null, "Configuration cannot be null");
-      ConfigUtils.mergeConfs(this.conf, conf);
       return this;
     }
 

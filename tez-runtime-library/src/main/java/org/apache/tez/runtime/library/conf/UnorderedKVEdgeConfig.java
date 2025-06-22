@@ -53,7 +53,6 @@ public class UnorderedKVEdgeConfig extends HadoopKeyValuesBasedBaseEdgeConfig {
       UnorderedKVInputConfig inputConfiguration) {
     this.outputConf = outputConfiguration;
     this.inputConf = inputConfiguration;
-
   }
 
   /**
@@ -149,17 +148,9 @@ public class UnorderedKVEdgeConfig extends HadoopKeyValuesBasedBaseEdgeConfig {
 
     private final UnorderedKVOutputConfig.Builder outputBuilder =
         new UnorderedKVOutputConfig.Builder();
-    private final UnorderedKVOutputConfig.SpecificBuilder<UnorderedKVEdgeConfig.Builder>
-        specificOutputBuilder =
-        new UnorderedKVOutputConfig.SpecificBuilder<UnorderedKVEdgeConfig.Builder>(
-            this, outputBuilder);
 
     private final UnorderedKVInputConfig.Builder inputBuilder =
         new UnorderedKVInputConfig.Builder();
-    private final UnorderedKVInputConfig.SpecificBuilder<UnorderedKVEdgeConfig.Builder>
-        specificInputBuilder =
-        new UnorderedKVInputConfig.SpecificBuilder<UnorderedKVEdgeConfig.Builder>(
-            this, inputBuilder);
 
     @InterfaceAudience.Private
     Builder(String keyClassName, String valueClassName) {
@@ -205,13 +196,6 @@ public class UnorderedKVEdgeConfig extends HadoopKeyValuesBasedBaseEdgeConfig {
       return this;
     }
 
-    @Override
-    public Builder setFromConfigurationUnfiltered(Configuration conf) {
-      outputBuilder.setFromConfigurationUnfiltered(conf);
-      inputBuilder.setFromConfigurationUnfiltered(conf);
-      return this;
-    }
-
     /**
      * Set serialization class responsible for providing serializer/deserializer for key/value and
      * the corresponding comparator class to be used as key comparator.
@@ -243,22 +227,6 @@ public class UnorderedKVEdgeConfig extends HadoopKeyValuesBasedBaseEdgeConfig {
       outputBuilder.setValueSerializationClass(serializationClassName, serializerConf);
       inputBuilder.setValueSerializationClass(serializationClassName, serializerConf);
       return this;
-    }
-
-    /**
-     * Configure the specific output
-     * @return a builder to configure the output
-     */
-    public UnorderedKVOutputConfig.SpecificBuilder<Builder> configureOutput() {
-      return specificOutputBuilder;
-    }
-
-    /**
-     * Configure the specific input
-     * @return a builder to configure the input
-     */
-    public UnorderedKVInputConfig.SpecificBuilder<Builder> configureInput() {
-      return specificInputBuilder;
     }
 
     /**

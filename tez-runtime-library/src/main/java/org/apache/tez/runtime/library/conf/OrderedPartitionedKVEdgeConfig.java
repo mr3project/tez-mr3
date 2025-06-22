@@ -148,17 +148,9 @@ public class OrderedPartitionedKVEdgeConfig
 
     private final OrderedPartitionedKVOutputConfig.Builder outputBuilder =
         new OrderedPartitionedKVOutputConfig.Builder();
-    private final OrderedPartitionedKVOutputConfig.SpecificBuilder<OrderedPartitionedKVEdgeConfig.Builder>
-        specificOutputBuilder =
-        new OrderedPartitionedKVOutputConfig.SpecificBuilder<OrderedPartitionedKVEdgeConfig.Builder>(
-            this, outputBuilder);
 
     private final OrderedGroupedKVInputConfig.Builder inputBuilder =
         new OrderedGroupedKVInputConfig.Builder();
-    private final OrderedGroupedKVInputConfig.SpecificBuilder<OrderedPartitionedKVEdgeConfig.Builder>
-        specificInputBuilder =
-        new OrderedGroupedKVInputConfig.SpecificBuilder<OrderedPartitionedKVEdgeConfig.Builder>(this,
-            inputBuilder);
 
     @InterfaceAudience.Private
     Builder(String keyClassName, String valueClassName, String partitionerClassName,
@@ -269,29 +261,6 @@ public class OrderedPartitionedKVEdgeConfig
       outputBuilder.setFromConfiguration(conf);
       inputBuilder.setFromConfiguration(conf);
       return this;
-    }
-
-    @Override
-    public Builder setFromConfigurationUnfiltered(Configuration conf) {
-      outputBuilder.setFromConfigurationUnfiltered(conf);
-      inputBuilder.setFromConfigurationUnfiltered(conf);
-      return this;
-    }
-
-    /**
-     * Configure the specific output
-     * @return a builder to configure the output
-     */
-    public OrderedPartitionedKVOutputConfig.SpecificBuilder<Builder> configureOutput() {
-      return specificOutputBuilder;
-    }
-
-    /**
-     * Configure the specific input
-     * @return a builder to configure the input
-     */
-    public OrderedGroupedKVInputConfig.SpecificBuilder<Builder> configureInput() {
-      return specificInputBuilder;
     }
 
     /**

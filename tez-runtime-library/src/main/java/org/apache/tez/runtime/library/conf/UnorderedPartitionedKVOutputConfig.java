@@ -44,67 +44,8 @@ import org.apache.tez.runtime.library.output.UnorderedPartitionedKVOutput;
  * {@link org.apache.tez.runtime.library.api.TezRuntimeConfiguration} will be used.
  */
 public class UnorderedPartitionedKVOutputConfig {
-  /**
-   * Configure parameters which are specific to the Output.
-   */
-  public static interface SpecificConfigBuilder<T> extends BaseConfigBuilder<T> {
-    /**
-     * Set the buffer size to use
-     *
-     * @param availableBufferSize the size of the buffer in MB
-     * @return instance of the current builder
-     */
-    public T setAvailableBufferSize(int availableBufferSize);
-  }
 
   @SuppressWarnings("rawtypes")
-  public static class SpecificBuilder<E extends HadoopKeyValuesBasedBaseEdgeConfig.Builder> implements
-      SpecificConfigBuilder<SpecificBuilder> {
-
-    private final E edgeBuilder;
-    private final Builder builder;
-
-    SpecificBuilder(E edgeBuilder, Builder builder) {
-      this.edgeBuilder = edgeBuilder;
-      this.builder = builder;
-    }
-
-    @Override
-    public SpecificBuilder<E> setAvailableBufferSize(int availableBufferSize) {
-      builder.setAvailableBufferSize(availableBufferSize);
-      return this;
-    }
-
-    @Override
-    public SpecificBuilder<E> setAdditionalConfiguration(String key, String value) {
-      builder.setAdditionalConfiguration(key, value);
-      return this;
-    }
-
-    @Override
-    public SpecificBuilder<E> setAdditionalConfiguration(Map<String, String> confMap) {
-      builder.setAdditionalConfiguration(confMap);
-      return this;
-    }
-
-    @Override
-    public SpecificBuilder<E> setFromConfiguration(Configuration conf) {
-      builder.setFromConfiguration(conf);
-      return this;
-    }
-
-    @Override
-    public SpecificBuilder setFromConfigurationUnfiltered(
-        Configuration conf) {
-      builder.setFromConfigurationUnfiltered(conf);
-      return this;
-    }
-
-    public E done() {
-      return edgeBuilder;
-    }
-  }
-
   Configuration conf;
 
   UnorderedPartitionedKVOutputConfig() {
@@ -147,7 +88,7 @@ public class UnorderedPartitionedKVOutputConfig {
     return new Builder(keyClass, valClass, partitionerClassName, partitionerConf);
   }
 
-  public static class Builder implements SpecificConfigBuilder<Builder> {
+  public static class Builder {
 
     private final Configuration conf = new Configuration(false);
 
@@ -202,7 +143,6 @@ public class UnorderedPartitionedKVOutputConfig {
       return this;
     }
 
-    @Override
     public Builder setAvailableBufferSize(int availableBufferSize) {
       this.conf
           .setInt(TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_OUTPUT_BUFFER_SIZE_MB, availableBufferSize);
@@ -210,7 +150,6 @@ public class UnorderedPartitionedKVOutputConfig {
     }
 
     @SuppressWarnings("unchecked")
-    @Override
     public Builder setAdditionalConfiguration(String key, String value) {
       Objects.requireNonNull(key, "Key cannot be null");
       if (ConfigUtils.doesKeyQualify(key,
@@ -227,7 +166,6 @@ public class UnorderedPartitionedKVOutputConfig {
     }
 
     @SuppressWarnings("unchecked")
-    @Override
     public Builder setAdditionalConfiguration(Map<String, String> confMap) {
       Objects.requireNonNull(confMap, "ConfMap cannot be null");
       Map<String, String> map = ConfigUtils.extractConfigurationMap(confMap,
@@ -238,7 +176,6 @@ public class UnorderedPartitionedKVOutputConfig {
     }
 
     @SuppressWarnings("unchecked")
-    @Override
     public Builder setFromConfiguration(Configuration conf) {
       // Maybe ensure this is the first call ? Otherwise this can end up overriding other parameters
       Preconditions.checkArgument(conf != null, "Configuration cannot be null");
@@ -246,15 +183,6 @@ public class UnorderedPartitionedKVOutputConfig {
           Lists.newArrayList(UnorderedPartitionedKVOutput.getConfigurationKeySet(),
               TezRuntimeConfiguration.getRuntimeAdditionalConfigKeySet()), TezRuntimeConfiguration.getAllowedPrefixes());
       ConfigUtils.addConfigMapToConfiguration(this.conf, map);
-      return this;
-    }
-
-    @SuppressWarnings("unchecked")
-    @Override
-    public Builder setFromConfigurationUnfiltered(Configuration conf) {
-      // Maybe ensure this is the first call ? Otherwise this can end up overriding other parameters
-      Preconditions.checkArgument(conf != null, "Configuration cannot be null");
-      ConfigUtils.mergeConfs(this.conf, conf);
       return this;
     }
 
