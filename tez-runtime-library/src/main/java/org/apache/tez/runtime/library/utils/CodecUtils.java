@@ -62,6 +62,7 @@ public final class CodecUtils {
   private CodecUtils() {
   }
 
+  // conf is specific to each RuntimeTask
   public static FetcherConfig constructFetcherConfig(
       Configuration conf, TaskContext taskContext) throws IOException {
     boolean ifileReadAhead = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD,

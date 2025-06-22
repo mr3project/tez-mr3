@@ -55,16 +55,6 @@ public class TezConfiguration extends Configuration {
   public static final String TEZ_AM_PREFIX = TEZ_PREFIX + "am.";
   public static final String TEZ_TASK_PREFIX = TEZ_PREFIX + "task.";
 
-  /**
-   * String value. Specifies the name of the shuffle auxiliary service.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty
-  public static final String TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID = TEZ_AM_PREFIX +
-      "shuffle.auxiliary-service.id";
-  public static final String TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT =
-      TezConstants.TEZ_SHUFFLE_HANDLER_SERVICE_ID;
-
   // read in Hive
   /**
    * String value. Specifies a directory where Tez can create temporary job artifacts.
@@ -141,62 +131,6 @@ public class TezConfiguration extends Configuration {
   public static final String TEZ_TASK_MAX_EVENTS_PER_HEARTBEAT = TEZ_TASK_PREFIX
       + "max-events-per-heartbeat";
   public static final int TEZ_TASK_MAX_EVENTS_PER_HEARTBEAT_DEFAULT = 500;
-
-  /**
-   * Whether to scale down memory requested by each component if the total
-   * exceeds the available JVM memory
-   */
-  @ConfigurationScope(Scope.VERTEX)
-  @ConfigurationProperty(type="boolean")
-  public static final String TEZ_TASK_SCALE_MEMORY_ENABLED = TEZ_TASK_PREFIX
-      + "scale.memory.enabled";
-  public static final boolean TEZ_TASK_SCALE_MEMORY_ENABLED_DEFAULT = true;
-
-  /**
-   * The allocator to use for initial memory allocation
-   */
-  @ConfigurationScope(Scope.VERTEX)
-  @ConfigurationProperty
-  public static final String TEZ_TASK_SCALE_MEMORY_ALLOCATOR_CLASS = TEZ_TASK_PREFIX
-      + "scale.memory.allocator.class";
-  public static final String TEZ_TASK_SCALE_MEMORY_ALLOCATOR_CLASS_DEFAULT =
-      "org.apache.tez.runtime.library.resources.WeightedScalingMemoryDistributor";
-
-  /**
-   * The fraction of the JVM memory which will not be considered for allocation.
-   * No defaults, since there are pre-existing defaults based on different scenarios.
-   */
-  @ConfigurationScope(Scope.VERTEX)
-  @ConfigurationProperty(type="double")
-  public static final String TEZ_TASK_SCALE_MEMORY_RESERVE_FRACTION = TEZ_TASK_PREFIX
-      + "scale.memory.reserve-fraction";
-  public static final double TEZ_TASK_SCALE_MEMORY_RESERVE_FRACTION_DEFAULT = 0.3d;
-
-  /**
-   * Fraction of available memory to reserve per input/output. This amount is
-   * removed from the total available pool before allocation and is for factoring in overheads.
-   */
-  @ConfigurationScope(Scope.VERTEX)
-  @ConfigurationProperty(type="float")
-  public static final String TEZ_TASK_SCALE_MEMORY_ADDITIONAL_RESERVATION_FRACTION_PER_IO =
-      TEZ_TASK_PREFIX + "scale.memory.additional-reservation.fraction.per-io";
-
-  /**
-   * Max cumulative total reservation for additional IOs.
-   */
-  @ConfigurationScope(Scope.VERTEX)
-  @ConfigurationProperty(type="float")
-  public static final String TEZ_TASK_SCALE_MEMORY_ADDITIONAL_RESERVATION_FRACTION_MAX =
-      TEZ_TASK_PREFIX + "scale.memory.additional-reservation.fraction.max";
-  /*
-   * Weighted ratios for individual component types in the RuntimeLibrary.
-   * e.g. PARTITIONED_UNSORTED_OUTPUT:0,UNSORTED_INPUT:1,UNSORTED_OUTPUT:0,SORTED_OUTPUT:2,
-   * SORTED_MERGED_INPUT:3,PROCESSOR:1,OTHER:1
-   */
-  @ConfigurationScope(Scope.VERTEX)
-  @ConfigurationProperty
-  public static final String TEZ_TASK_SCALE_MEMORY_WEIGHTED_RATIOS =
-      TEZ_TASK_PREFIX + "scale.memory.ratios";
 
   // read in Hive
   /**
@@ -297,6 +231,76 @@ process as
   @ConfigurationScope(Scope.AM)
   @ConfigurationProperty
   public static final String TEZ_AM_MODIFY_ACLS = TEZ_AM_PREFIX + "modify-acls";
+
+  //
+  // Tez configurations used by MR3
+  //
+
+  /**
+   * String value. Specifies the name of the shuffle auxiliary service.
+   */
+  @ConfigurationScope(Scope.AM)
+  @ConfigurationProperty
+  public static final String TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID = TEZ_AM_PREFIX +
+    "shuffle.auxiliary-service.id";
+  public static final String TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT =
+    TezConstants.TEZ_SHUFFLE_HANDLER_SERVICE_ID;
+
+  /**
+   * Whether to scale down memory requested by each component if the total
+   * exceeds the available JVM memory
+   */
+  @ConfigurationScope(Scope.VERTEX)
+  @ConfigurationProperty(type="boolean")
+  public static final String TEZ_TASK_SCALE_MEMORY_ENABLED = TEZ_TASK_PREFIX
+    + "scale.memory.enabled";
+  public static final boolean TEZ_TASK_SCALE_MEMORY_ENABLED_DEFAULT = true;
+
+  /**
+   * The allocator to use for initial memory allocation
+   */
+  @ConfigurationScope(Scope.VERTEX)
+  @ConfigurationProperty
+  public static final String TEZ_TASK_SCALE_MEMORY_ALLOCATOR_CLASS = TEZ_TASK_PREFIX
+    + "scale.memory.allocator.class";
+  public static final String TEZ_TASK_SCALE_MEMORY_ALLOCATOR_CLASS_DEFAULT =
+    "org.apache.tez.runtime.library.resources.WeightedScalingMemoryDistributor";
+
+  /**
+   * The fraction of the JVM memory which will not be considered for allocation.
+   * No defaults, since there are pre-existing defaults based on different scenarios.
+   */
+  @ConfigurationScope(Scope.VERTEX)
+  @ConfigurationProperty(type="double")
+  public static final String TEZ_TASK_SCALE_MEMORY_RESERVE_FRACTION = TEZ_TASK_PREFIX
+    + "scale.memory.reserve-fraction";
+  public static final double TEZ_TASK_SCALE_MEMORY_RESERVE_FRACTION_DEFAULT = 0.3d;
+
+  /**
+   * Fraction of available memory to reserve per input/output. This amount is
+   * removed from the total available pool before allocation and is for factoring in overheads.
+   */
+  @ConfigurationScope(Scope.VERTEX)
+  @ConfigurationProperty(type="float")
+  public static final String TEZ_TASK_SCALE_MEMORY_ADDITIONAL_RESERVATION_FRACTION_PER_IO =
+    TEZ_TASK_PREFIX + "scale.memory.additional-reservation.fraction.per-io";
+
+  /**
+   * Max cumulative total reservation for additional IOs.
+   */
+  @ConfigurationScope(Scope.VERTEX)
+  @ConfigurationProperty(type="float")
+  public static final String TEZ_TASK_SCALE_MEMORY_ADDITIONAL_RESERVATION_FRACTION_MAX =
+    TEZ_TASK_PREFIX + "scale.memory.additional-reservation.fraction.max";
+  /*
+   * Weighted ratios for individual component types in the RuntimeLibrary.
+   * e.g. PARTITIONED_UNSORTED_OUTPUT:0,UNSORTED_INPUT:1,UNSORTED_OUTPUT:0,SORTED_OUTPUT:2,
+   * SORTED_MERGED_INPUT:3,PROCESSOR:1,OTHER:1
+   */
+  @ConfigurationScope(Scope.VERTEX)
+  @ConfigurationProperty
+  public static final String TEZ_TASK_SCALE_MEMORY_WEIGHTED_RATIOS =
+    TEZ_TASK_PREFIX + "scale.memory.ratios";
 
   /**
    *  Comma-separated list of properties that MRReaderMapred should return (if present) when calling for config updates.

@@ -46,9 +46,9 @@ public class TezRuntimeConfiguration {
   private static final String TEZ_RUNTIME_PREFIX = "tez.runtime.";
 
   private static final Set<String> tezRuntimeKeys = new HashSet<String>();
-  private static Set<String> umnodifiableTezRuntimeKeySet;
+  private static final Set<String> umnodifiableTezRuntimeKeySet;
   private static final Set<String> otherKeys = new HashSet<String>();
-  private static Set<String> unmodifiableOtherKeySet;
+  private static final Set<String> unmodifiableOtherKeySet;
   private static final Map<String, String> tezRuntimeConfMap = new HashMap<String, String>();
   private static final Map<String, String> otherConfMap = new HashMap<String, String>();
 
