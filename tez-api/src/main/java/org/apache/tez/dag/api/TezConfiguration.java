@@ -219,25 +219,6 @@ process as
   // Tez configurations used by MR3
   //
 
-  // used in UtilsForConfTez.scala, MR3
-  /** Int value. The amount of memory in MB to be used by the AppMaster */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  // do not remove because MR3 test code (UtilsForConfTez) uses it
-  public static final String TEZ_AM_RESOURCE_MEMORY_MB =
-    TEZ_AM_PREFIX + "resource.memory.mb";
-  public static final int TEZ_AM_RESOURCE_MEMORY_MB_DEFAULT = 1024;
-
-  // used in UtilsForConfTez.scala, MR3
-  /** Int value. The amount of memory in MB to be used by tasks. This applies to all tasks across
-   * all vertices. Setting it to the same value for all tasks is helpful for container reuse and 
-   * thus good for performance typically. */
-  @ConfigurationScope(Scope.DAG)
-  @ConfigurationProperty(type="integer")
-  public static final String TEZ_TASK_RESOURCE_MEMORY_MB =
-    TEZ_TASK_PREFIX + "resource.memory.mb";
-  public static final int TEZ_TASK_RESOURCE_MEMORY_MB_DEFAULT = 1024;
-
   /**
    * String value. Specifies the name of the shuffle auxiliary service.
    */
