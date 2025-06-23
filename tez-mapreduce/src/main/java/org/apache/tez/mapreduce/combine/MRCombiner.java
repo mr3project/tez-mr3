@@ -23,7 +23,6 @@ import java.io.IOException;
 import org.apache.hadoop.mapred.JobConf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.RawComparator;
@@ -60,7 +59,6 @@ import org.apache.tez.runtime.library.common.sort.impl.IFile.Writer;
 /**
  * Implements a Map Reduce compatible combiner
  */
-@Public
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class MRCombiner implements Combiner {
 

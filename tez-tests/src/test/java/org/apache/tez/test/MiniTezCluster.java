@@ -98,10 +98,6 @@ public class MiniTezCluster extends MiniYARNCluster {
   @Override
   public void serviceInit(Configuration conf) throws Exception {
     conf.set(MRConfig.FRAMEWORK_NAME, MRConfig.YARN_TEZ_FRAMEWORK_NAME);
-    // Use libs from cluster since no build is available
-    conf.setBoolean(TezConfiguration.TEZ_USE_CLUSTER_HADOOP_LIBS, true);
-    // blacklisting disabled to prevent scheduling issues
-    conf.setBoolean(TezConfiguration.TEZ_AM_NODE_BLACKLISTING_ENABLED, false);
     if (conf.get(MRJobConfig.MR_AM_STAGING_DIR) == null) {
       conf.set(MRJobConfig.MR_AM_STAGING_DIR, new File(getTestWorkDir(),
           "apps_staging_dir" + Path.SEPARATOR).getAbsolutePath());
@@ -112,9 +108,7 @@ public class MiniTezCluster extends MiniYARNCluster {
       conf.setLong(YarnConfiguration.DEBUG_NM_DELETE_DELAY_SEC, 0l);
     }
 
-    maxTimeToWaitForAppsOnShutdown = conf.getLong(
-        TezConfiguration.TEZ_TEST_MINI_CLUSTER_APP_WAIT_ON_SHUTDOWN_SECS,
-        TezConfiguration.TEZ_TEST_MINI_CLUSTER_APP_WAIT_ON_SHUTDOWN_SECS_DEFAULT);
+    maxTimeToWaitForAppsOnShutdown = 30;  // use the hard-coded value originally in TezConfiguration.TEZ_TEST_MINI_CLUSTER_APP_WAIT_ON_SHUTDOWN_SECS
 
     File appJarLocalFile = new File(MiniTezCluster.APPJAR);
 

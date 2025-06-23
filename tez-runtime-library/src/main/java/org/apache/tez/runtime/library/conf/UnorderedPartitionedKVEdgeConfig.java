@@ -55,7 +55,6 @@ public class UnorderedPartitionedKVEdgeConfig
       UnorderedKVInputConfig inputConfiguration) {
     this.outputConf = outputConfiguration;
     this.inputConf = inputConfiguration;
-
   }
 
   /**
@@ -154,17 +153,9 @@ public class UnorderedPartitionedKVEdgeConfig
 
     private final UnorderedPartitionedKVOutputConfig.Builder outputBuilder =
         new UnorderedPartitionedKVOutputConfig.Builder();
-    private final UnorderedPartitionedKVOutputConfig.SpecificBuilder<UnorderedPartitionedKVEdgeConfig.Builder>
-        specificOutputBuilder =
-        new UnorderedPartitionedKVOutputConfig.SpecificBuilder<UnorderedPartitionedKVEdgeConfig.Builder>(
-            this, outputBuilder);
 
     private final UnorderedKVInputConfig.Builder inputBuilder =
         new UnorderedKVInputConfig.Builder();
-    private final UnorderedKVInputConfig.SpecificBuilder<UnorderedPartitionedKVEdgeConfig.Builder>
-        specificInputBuilder =
-        new UnorderedKVInputConfig.SpecificBuilder<UnorderedPartitionedKVEdgeConfig.Builder>(
-            this, inputBuilder);
 
     @InterfaceAudience.Private
     Builder(String keyClassName, String valueClassName, String partitionerClassName,
@@ -211,14 +202,6 @@ public class UnorderedPartitionedKVEdgeConfig
       return this;
     }
 
-    @Override
-    public Builder setFromConfigurationUnfiltered(
-        Configuration conf) {
-      outputBuilder.setFromConfigurationUnfiltered(conf);
-      inputBuilder.setFromConfigurationUnfiltered(conf);
-      return this;
-    }
-
     /**
      * Set serialization class responsible for providing serializer/deserializer for keys.
      *
@@ -248,23 +231,6 @@ public class UnorderedPartitionedKVEdgeConfig
       outputBuilder.setValueSerializationClass(serializationClassName, serializerConf);
       inputBuilder.setValueSerializationClass(serializationClassName, serializerConf);
       return this;
-    }
-
-    /**
-     * Configure the specific output
-     *
-     * @return a builder to configure the output
-     */
-    public UnorderedPartitionedKVOutputConfig.SpecificBuilder<Builder> configureOutput() {
-      return specificOutputBuilder;
-    }
-
-    /**
-     * Configure the specific input
-     * @return a builder to configure the input
-     */
-    public UnorderedKVInputConfig.SpecificBuilder<Builder> configureInput() {
-      return specificInputBuilder;
     }
 
     /**

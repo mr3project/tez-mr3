@@ -27,7 +27,6 @@ import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.yarn.api.records.LocalResource;
 import org.apache.hadoop.yarn.api.records.Resource;
-import org.apache.tez.common.TezCommonUtils;
 import org.apache.tez.dag.api.VertexGroup.GroupInfo;
 import org.apache.tez.runtime.api.LogicalIOProcessor;
 
@@ -152,13 +151,6 @@ public class Vertex {
 
   /**
    * Create a new vertex with the given name and parallelism. <br>
-   * The vertex task resource will be picked from configuration
-   * {@link TezConfiguration#TEZ_TASK_RESOURCE_MEMORY_MB} &
-   * {@link TezConfiguration#TEZ_TASK_RESOURCE_CPU_VCORES} Applications that
-   * want more control over their task resource specification may create their
-   * own logic to determine task resources and use
-   * {@link Vertex#Vertex(String, ProcessorDescriptor, int, Resource)} to create
-   * the Vertex.
    *
    * @param vertexName
    *          Name of the vertex
@@ -250,9 +242,7 @@ public class Vertex {
    * @return this Vertex
    */
   public Vertex addTaskLocalFiles(Map<String, LocalResource> localFiles) {
-    if (localFiles != null) {
-      TezCommonUtils.addAdditionalLocalResources(localFiles, taskLocalResources, "Vertex " + getName());
-    }
+    // unused in MR3
     return this;
   }
 
@@ -419,7 +409,6 @@ public class Vertex {
    * @return the current DAG being constructed
    */
   public Vertex setConf(String property, String value) {
-    TezConfiguration.validateProperty(property, Scope.VERTEX);
     this.vertexConf.put(property, value);
     return this;
   }

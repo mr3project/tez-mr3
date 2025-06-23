@@ -29,7 +29,6 @@ import java.util.zip.Deflater;
 
 import com.google.common.collect.Lists;
 
-import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.library.conf.OrderedPartitionedKVOutputConfig.SorterImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,7 +37,6 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.tez.common.TezCommonUtils;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
-import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.runtime.api.AbstractLogicalOutput;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.OutputContext;
@@ -74,15 +72,12 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
   boolean finalMergeEnabled;
   private boolean sendEmptyPartitionDetails;
 
-  private final String auxiliaryService;
-  private final boolean compositeFetch;
+  private String auxiliaryService;
+  private boolean compositeFetch;
 
   public OrderedPartitionedKVOutput(OutputContext outputContext, int numPhysicalOutputs) {
     super(outputContext, numPhysicalOutputs);
     deflater = TezCommonUtils.newBestCompressionDeflater();
-    FetcherConfig fetcherConfig = getContext().getFetcherConfig();
-    auxiliaryService = fetcherConfig.auxiliaryService;
-    compositeFetch = fetcherConfig.compositeFetch;
   }
 
   @Override
@@ -91,8 +86,7 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
     this.localFs = (RawLocalFileSystem) FileSystem.getLocal(conf).getRaw();
 
     // Initializing this parameter in this conf since it is used in multiple
-    // places (wherever LocalDirAllocator is used) - TezTaskOutputFiles,
-    // TezMerger, etc.
+    // places (wherever LocalDirAllocator is used) - TezTaskOutputFiles, TezMerger, etc.
     this.conf.setStrings(TezRuntimeFrameworkConfigs.LOCAL_DIRS, getContext().getWorkDirs());
     this.memoryUpdateCallbackHandler = new MemoryUpdateCallbackHandler();
     getContext().requestInitialMemory(
@@ -102,6 +96,9 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
     sendEmptyPartitionDetails = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED,
         TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED_DEFAULT);
+
+    auxiliaryService = ShuffleUtils.getTezShuffleHandlerServiceId(conf);
+    compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
 
     return Collections.emptyList();
   }
@@ -254,10 +251,6 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT);
-    confKeys.add(TezConfiguration.TEZ_COUNTERS_MAX);
-    confKeys.add(TezConfiguration.TEZ_COUNTERS_GROUP_NAME_MAX_LENGTH);
-    confKeys.add(TezConfiguration.TEZ_COUNTERS_COUNTER_NAME_MAX_LENGTH);
-    confKeys.add(TezConfiguration.TEZ_COUNTERS_MAX_GROUPS);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_SORTER_CLASS);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT);

@@ -43,43 +43,6 @@ import com.google.protobuf.ByteString;
 
 @Private
 public class TezCommonUtils {
-  private static final Logger LOG = LoggerFactory.getLogger(TezClient.class);
-
-  public static void addAdditionalLocalResources(Map<String, LocalResource> additionalLrs,
-      Map<String, LocalResource> originalLRs, String logContext) {
-    // TODO TEZ-1798. Handle contents of Tez archives for duplicate LocalResource checks
-    if (additionalLrs != null && !additionalLrs.isEmpty()) {
-      StringBuilder sb = new StringBuilder();
-      for (Map.Entry<String, LocalResource> lrEntry : additionalLrs.entrySet()) {
-        LocalResource originalLr = originalLRs.get(lrEntry.getKey());
-        if (originalLr != null) {
-          LocalResource additionalLr = lrEntry.getValue();
-          if (originalLr.getSize() != additionalLr.getSize()) {
-            throw new TezUncheckedException(
-                "Duplicate Resources found with different size for [" + logContext + "]: " + lrEntry.getKey() +
-                    " : " + "[" + additionalLr.getResource() + "=" + additionalLr.getSize() +
-                    "],[" + originalLr.getResource() + "=" + originalLr.getSize());
-          } else {
-            if (originalLr.getResource().equals(additionalLr.getResource())) {
-              sb.append("[").append(lrEntry.getKey()).append(" : Duplicate]");
-            } else {
-              sb.append("[").append(lrEntry.getKey()).append(" : DuplicateDifferentPath]");
-            }
-          }
-        }
-        // The LR either does not exist, or is an 'equivalent' dupe.
-        // Prefer the tez specified LR instead of the equivalent user specified LR for container reuse matching
-        originalLRs.put(lrEntry.getKey(), lrEntry.getValue());
-      }
-      String logString = sb.toString();
-      if (!logString.isEmpty()) {
-        LOG.warn("Found Resources Duplication in " + logContext + " after including resources from " +
-            TezConfiguration.TEZ_LIB_URIS + " and " + TezConfiguration.TEZ_AUX_URIS + ": " +
-            logString);
-      }
-    }
-  }
-
   private static final boolean NO_WRAP = true;
 
   @Private

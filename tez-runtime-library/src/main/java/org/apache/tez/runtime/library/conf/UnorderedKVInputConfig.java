@@ -45,104 +45,6 @@ import org.apache.tez.runtime.library.input.UnorderedKVInput;
  */
 public class UnorderedKVInputConfig {
 
-  /**
-   * Configure parameters which are specific to the Input.
-   */
-  public static interface SpecificConfigBuilder<T> extends BaseConfigBuilder<T> {
-
-    /**
-     * Sets the buffer fraction, as a fraction of container size, to be used while fetching remote
-     * data.
-     *
-     * @param shuffleBufferFraction fraction of container size
-     * @return instance of the current builder
-     */
-    public T setShuffleBufferFraction(float shuffleBufferFraction);
-
-    /**
-     * Sets a size limit on the maximum segment size to be shuffled to disk. This is a fraction of
-     * the shuffle buffer.
-     *
-     * @param maxSingleSegmentFraction fraction of memory determined by ShuffleBufferFraction
-     * @return instance of the current builder
-     */
-    public T setMaxSingleMemorySegmentFraction(float maxSingleSegmentFraction);
-
-    /**
-     * Configure the point at which in memory segments will be merged and written out to a single
-     * large disk segment. This is specified as a
-     * fraction of the shuffle buffer. </p> Has no affect at the moment.
-     *
-     * @param mergeFraction fraction of memory determined by ShuffleBufferFraction, which when
-     *                      filled, will
-     *                      trigger a merge
-     * @return instance of the current builder
-     */
-    public T setMergeFraction(float mergeFraction);
-
-  }
-
-  @SuppressWarnings("rawtypes")
-  public static class SpecificBuilder<E extends HadoopKeyValuesBasedBaseEdgeConfig.Builder> implements
-      SpecificConfigBuilder<SpecificBuilder> {
-
-    private final E edgeBuilder;
-    private final UnorderedKVInputConfig.Builder builder;
-
-
-    SpecificBuilder(E edgeBuilder, UnorderedKVInputConfig.Builder builder) {
-      this.edgeBuilder = edgeBuilder;
-      this.builder = builder;
-    }
-
-    @Override
-    public SpecificBuilder<E> setShuffleBufferFraction(float shuffleBufferFraction) {
-      builder.setShuffleBufferFraction(shuffleBufferFraction);
-      return this;
-    }
-
-    @Override
-    public SpecificBuilder<E> setMaxSingleMemorySegmentFraction(float maxSingleSegmentFraction) {
-      builder.setMaxSingleMemorySegmentFraction(maxSingleSegmentFraction);
-      return this;
-    }
-
-    @Override
-    public SpecificBuilder<E> setMergeFraction(float mergeFraction) {
-      builder.setMergeFraction(mergeFraction);
-      return this;
-    }
-
-    @Override
-    public SpecificBuilder<E> setAdditionalConfiguration(String key, String value) {
-      builder.setAdditionalConfiguration(key, value);
-      return this;
-    }
-
-    @Override
-    public SpecificBuilder<E> setAdditionalConfiguration(Map<String, String> confMap) {
-      builder.setAdditionalConfiguration(confMap);
-      return this;
-    }
-
-    @Override
-    public SpecificBuilder<E> setFromConfiguration(Configuration conf) {
-      builder.setFromConfiguration(conf);
-      return this;
-    }
-
-    @Override
-    public SpecificBuilder setFromConfigurationUnfiltered(Configuration conf) {
-      builder.setFromConfigurationUnfiltered(conf);
-      return this;
-    }
-
-    public E done() {
-      return edgeBuilder;
-    }
-
-  }
-
   Configuration conf;
 
   UnorderedKVInputConfig() {
@@ -180,7 +82,7 @@ public class UnorderedKVInputConfig {
     return new Builder(keyClass, valueClass);
   }
 
-  public static class Builder implements SpecificConfigBuilder<Builder> {
+  public static class Builder {
 
     private final Configuration conf = new Configuration(false);
 
@@ -218,28 +120,24 @@ public class UnorderedKVInputConfig {
       return this;
     }
 
-    @Override
     public Builder setShuffleBufferFraction(float shuffleBufferFraction) {
       this.conf.setFloat(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT,
           shuffleBufferFraction);
       return this;
     }
 
-    @Override
     public Builder setMaxSingleMemorySegmentFraction(float maxSingleSegmentFraction) {
       this.conf.setFloat(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MEMORY_LIMIT_PERCENT,
           maxSingleSegmentFraction);
       return this;
     }
 
-    @Override
     public Builder setMergeFraction(float mergeFraction) {
       this.conf.setFloat(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MERGE_PERCENT, mergeFraction);
       return this;
     }
 
     @SuppressWarnings("unchecked")
-    @Override
     public Builder setAdditionalConfiguration(String key, String value) {
       Objects.requireNonNull(key, "Key cannot be null");
       if (ConfigUtils.doesKeyQualify(key,
@@ -256,7 +154,6 @@ public class UnorderedKVInputConfig {
     }
 
     @SuppressWarnings("unchecked")
-    @Override
     public Builder setAdditionalConfiguration(Map<String, String> confMap) {
       Objects.requireNonNull(confMap, "ConfMap cannot be null");
       Map<String, String> map = ConfigUtils.extractConfigurationMap(confMap,
@@ -267,23 +164,13 @@ public class UnorderedKVInputConfig {
     }
 
     @SuppressWarnings("unchecked")
-    @Override
     public Builder setFromConfiguration(Configuration conf) {
       // Maybe ensure this is the first call ? Otherwise this can end up overriding other parameters
       Preconditions.checkArgument(conf != null, "Configuration cannot be null");
       Map<String, String> map = ConfigUtils.extractConfigurationMap(conf,
-          Lists.newArrayList(UnorderedKVInput.getConfigurationKeySet(),
-              TezRuntimeConfiguration.getRuntimeAdditionalConfigKeySet()), TezRuntimeConfiguration.getAllowedPrefixes());
+          UnorderedKVInput.getConfigurationKeySet(),
+          TezRuntimeConfiguration.getRuntimeAdditionalConfigKeySet(), TezRuntimeConfiguration.getAllowedPrefixes());
       ConfigUtils.addConfigMapToConfiguration(this.conf, map);
-      return this;
-    }
-
-    @SuppressWarnings("unchecked")
-    @Override
-    public Builder setFromConfigurationUnfiltered(Configuration conf) {
-      // Maybe ensure this is the first call ? Otherwise this can end up overriding other parameters
-      Preconditions.checkArgument(conf != null, "Configuration cannot be null");
-      ConfigUtils.mergeConfs(this.conf, conf);
       return this;
     }
 

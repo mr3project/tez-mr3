@@ -20,6 +20,7 @@ package org.apache.tez.runtime.library.common.shuffle;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.tez.common.Preconditions;
+import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
@@ -297,4 +298,8 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
 
   protected abstract boolean validateInputAttemptForPipelinedShuffle(
       InputAttemptIdentifier input, boolean registerShuffleInfoEvent);
+
+  public FetcherConfig getFetcherConfig() {
+    return inputContext.getFetcherConfig(this.conf);
+  }
 }

@@ -28,10 +28,10 @@ import java.util.Map;
 
 import com.google.common.collect.Maps;
 import org.apache.tez.runtime.api.Event;
-import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.OutputStatisticsReporter;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
+import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -250,9 +250,8 @@ public abstract class ExternalSorter {
     //     TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH,
     //     TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_DEFAULT);
 
-    FetcherConfig fetcherConfig = outputContext.getFetcherConfig();
-    this.auxiliaryService = fetcherConfig.auxiliaryService;
-    this.compositeFetch = fetcherConfig.compositeFetch;
+    this.auxiliaryService = ShuffleUtils.getTezShuffleHandlerServiceId(conf);
+    this.compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
 
     this.mapOutputFile = TezRuntimeUtils.instantiateTaskOutputManager(
         this.conf, outputContext, this.compositeFetch);

@@ -44,52 +44,6 @@ import org.apache.tez.runtime.library.output.UnorderedKVOutput;
  * {@link org.apache.tez.runtime.library.api.TezRuntimeConfiguration} will be used.
  */
 public class UnorderedKVOutputConfig {
-  /**
-   * Configure parameters which are specific to the Output.
-   */
-  public static interface SpecificConfigBuilder<T> extends BaseConfigBuilder<T> {
-  }
-
-  public static class SpecificBuilder<E extends HadoopKeyValuesBasedBaseEdgeConfig.Builder> implements
-      SpecificConfigBuilder<SpecificBuilder> {
-
-    private final E edgeBuilder;
-    private final Builder builder;
-
-    SpecificBuilder(E edgeBuilder, Builder builder) {
-      this.edgeBuilder = edgeBuilder;
-      this.builder = builder;
-    }
-
-    @Override
-    public SpecificBuilder<E> setAdditionalConfiguration(String key, String value) {
-      builder.setAdditionalConfiguration(key, value);
-      return this;
-    }
-
-    @Override
-    public SpecificBuilder<E> setAdditionalConfiguration(Map<String, String> confMap) {
-      builder.setAdditionalConfiguration(confMap);
-      return this;
-    }
-
-    @Override
-    public SpecificBuilder<E> setFromConfiguration(Configuration conf) {
-      builder.setFromConfiguration(conf);
-      return this;
-    }
-
-    @Override
-    public SpecificBuilder setFromConfigurationUnfiltered(
-        Configuration conf) {
-      builder.setFromConfigurationUnfiltered(conf);
-      return this;
-    }
-
-    public E done() {
-      return edgeBuilder;
-    }
-  }
 
   Configuration conf;
 
@@ -128,7 +82,7 @@ public class UnorderedKVOutputConfig {
     return new Builder(keyClass, valClass);
   }
 
-  public static class Builder implements SpecificConfigBuilder<Builder> {
+  public static class Builder {
 
     private final Configuration conf = new Configuration(false);
 
@@ -167,7 +121,6 @@ public class UnorderedKVOutputConfig {
     }
 
     @SuppressWarnings("unchecked")
-    @Override
     public Builder setAdditionalConfiguration(String key, String value) {
       Objects.requireNonNull(key, "Key cannot be null");
       if (ConfigUtils.doesKeyQualify(key,
@@ -184,7 +137,6 @@ public class UnorderedKVOutputConfig {
     }
 
     @SuppressWarnings("unchecked")
-    @Override
     public Builder setAdditionalConfiguration(Map<String, String> confMap) {
       Objects.requireNonNull(confMap, "ConfMap cannot be null");
       Map<String, String> map = ConfigUtils.extractConfigurationMap(confMap,
@@ -195,23 +147,13 @@ public class UnorderedKVOutputConfig {
     }
 
     @SuppressWarnings("unchecked")
-    @Override
     public Builder setFromConfiguration(Configuration conf) {
       // Maybe ensure this is the first call ? Otherwise this can end up overriding other parameters
       Preconditions.checkArgument(conf != null, "Configuration cannot be null");
       Map<String, String> map = ConfigUtils.extractConfigurationMap(conf,
-          Lists.newArrayList(UnorderedKVOutput.getConfigurationKeySet(),
-              TezRuntimeConfiguration.getRuntimeAdditionalConfigKeySet()), TezRuntimeConfiguration.getAllowedPrefixes());
+          UnorderedKVOutput.getConfigurationKeySet(),
+          TezRuntimeConfiguration.getRuntimeAdditionalConfigKeySet(), TezRuntimeConfiguration.getAllowedPrefixes());
       ConfigUtils.addConfigMapToConfiguration(this.conf, map);
-      return this;
-    }
-
-    @SuppressWarnings("unchecked")
-    @Override
-    public Builder setFromConfigurationUnfiltered(Configuration conf) {
-      // Maybe ensure this is the first call ? Otherwise this can end up overriding other parameters
-      Preconditions.checkArgument(conf != null, "Configuration cannot be null");
-      ConfigUtils.mergeConfs(this.conf, conf);
       return this;
     }
 

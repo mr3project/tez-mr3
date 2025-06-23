@@ -76,11 +76,10 @@ public class UnorderedKVInput extends AbstractLogicalInput {
 
   private boolean isClosed = false;
 
-  private final boolean compositeFetch;
+  private boolean compositeFetch;
 
   public UnorderedKVInput(InputContext inputContext, int numPhysicalInputs) {
     super(inputContext, numPhysicalInputs);
-    this.compositeFetch = inputContext.getFetcherConfig().compositeFetch;
   }
 
   @Override
@@ -88,22 +87,23 @@ public class UnorderedKVInput extends AbstractLogicalInput {
     Preconditions.checkArgument(getNumPhysicalInputs() != -1, "Number of Inputs has not been set");
     this.conf = getContext().getConfigurationFromUserPayload(true);
 
+    this.compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
+
     if (getNumPhysicalInputs() == 0) {
       getContext().requestInitialMemory(0l, null);
       isStarted.set(true);
       getContext().inputIsReady();
-      LOG.info("input fetch not required since there are 0 physical inputs for input vertex: "
-          + getContext().getSourceVertexName());
+      LOG.info("input fetch not required since there are 0 physical inputs for input vertex: {}",
+          getContext().getSourceVertexName());
       return Collections.emptyList();
     } else {
-      long initalMemReq = getInitialMemoryReq();
+      long initialMemReq = getInitialMemoryReq();
       memoryUpdateCallbackHandler = new MemoryUpdateCallbackHandler();
-      this.getContext().requestInitialMemory(initalMemReq, memoryUpdateCallbackHandler);
+      this.getContext().requestInitialMemory(initialMemReq, memoryUpdateCallbackHandler);
     }
 
     this.conf.setStrings(TezRuntimeFrameworkConfigs.LOCAL_DIRS, getContext().getWorkDirs());
-    this.inputRecordCounter = getContext().getCounters().findCounter(
-        TaskCounter.INPUT_RECORDS_PROCESSED);
+    this.inputRecordCounter = getContext().getCounters().findCounter(TaskCounter.INPUT_RECORDS_PROCESSED);
     return Collections.emptyList();
   }
 
@@ -258,14 +258,14 @@ public class UnorderedKVInput extends AbstractLogicalInput {
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_VALUE_CLASS);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS_CODEC);
-    confKeys.add(TezConfiguration.TEZ_COUNTERS_MAX);
-    confKeys.add(TezConfiguration.TEZ_COUNTERS_GROUP_NAME_MAX_LENGTH);
-    confKeys.add(TezConfiguration.TEZ_COUNTERS_COUNTER_NAME_MAX_LENGTH);
-    confKeys.add(TezConfiguration.TEZ_COUNTERS_MAX_GROUPS);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT);
     // include to be able to override TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT);
+    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_SPECULATIVE_FETCH_WAIT_MILLIS);
+    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_THRESHOLD_MILLIS);
+    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_RELEASE_MILLIS);
+    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MAX_SPECULATIVE_FETCH_ATTEMPTS);
   }
 
   public static Set<String> getConfigurationKeySet() {
