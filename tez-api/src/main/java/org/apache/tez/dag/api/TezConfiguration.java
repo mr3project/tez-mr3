@@ -79,23 +79,6 @@ public class TezConfiguration extends Configuration {
   public static final String TEZ_AM_LAUNCH_ENV = TEZ_AM_PREFIX + "launch.env";
   public static final String TEZ_AM_LAUNCH_ENV_DEFAULT = "";
 
-  // used in UtilsForConfTez.scala, MR3
-  /** Int value. The amount of memory in MB to be used by the AppMaster */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty(type="integer")
-  // do not remove because MR3 test code (UtilsForConfTez) uses it
-  public static final String TEZ_AM_RESOURCE_MEMORY_MB = TEZ_AM_PREFIX + "resource.memory.mb";
-  public static final int TEZ_AM_RESOURCE_MEMORY_MB_DEFAULT = 1024;
-
-  // used in UtilsForConfTez.scala, MR3
-  /** Int value. The amount of memory in MB to be used by tasks. This applies to all tasks across
-   * all vertices. Setting it to the same value for all tasks is helpful for container reuse and 
-   * thus good for performance typically. */
-  @ConfigurationScope(Scope.DAG)
-  @ConfigurationProperty(type="integer")
-  public static final String TEZ_TASK_RESOURCE_MEMORY_MB = TEZ_TASK_PREFIX + "resource.memory.mb";
-  public static final int TEZ_TASK_RESOURCE_MEMORY_MB_DEFAULT = 1024;
-
   // read in Hive
   /**
    * Int value. The maximum heartbeat interval, in milliseconds, between the app master and tasks.
@@ -104,8 +87,8 @@ public class TezConfiguration extends Configuration {
    */
   @ConfigurationScope(Scope.AM)
   @ConfigurationProperty(type="integer")
-  public static final String TEZ_TASK_AM_HEARTBEAT_INTERVAL_MS = TEZ_TASK_PREFIX
-      + "am.heartbeat.interval-ms.max";
+  public static final String TEZ_TASK_AM_HEARTBEAT_INTERVAL_MS =
+    TEZ_TASK_PREFIX + "am.heartbeat.interval-ms.max";
   public static final int TEZ_TASK_AM_HEARTBEAT_INTERVAL_MS_DEFAULT = 100;
 
   // read in Hive
@@ -116,8 +99,8 @@ public class TezConfiguration extends Configuration {
    */
   @ConfigurationScope(Scope.AM)
   @ConfigurationProperty(type="integer")
-  public static final String TEZ_TASK_AM_HEARTBEAT_COUNTER_INTERVAL_MS = TEZ_TASK_PREFIX
-      + "am.heartbeat.counter.interval-ms.max";
+  public static final String TEZ_TASK_AM_HEARTBEAT_COUNTER_INTERVAL_MS =
+    TEZ_TASK_PREFIX + "am.heartbeat.counter.interval-ms.max";
   public static final int TEZ_TASK_AM_HEARTBEAT_COUNTER_INTERVAL_MS_DEFAULT =
       4000;
 
@@ -128,8 +111,8 @@ public class TezConfiguration extends Configuration {
    */
   @ConfigurationScope(Scope.AM)
   @ConfigurationProperty(type="integer")
-  public static final String TEZ_TASK_MAX_EVENTS_PER_HEARTBEAT = TEZ_TASK_PREFIX
-      + "max-events-per-heartbeat";
+  public static final String TEZ_TASK_MAX_EVENTS_PER_HEARTBEAT =
+    TEZ_TASK_PREFIX + "max-events-per-heartbeat";
   public static final int TEZ_TASK_MAX_EVENTS_PER_HEARTBEAT_DEFAULT = 500;
 
   // read in Hive
@@ -141,7 +124,7 @@ public class TezConfiguration extends Configuration {
   @ConfigurationScope(Scope.AM)
   @ConfigurationProperty(type="integer")
   public static final String TEZ_AM_SESSION_MIN_HELD_CONTAINERS =
-      TEZ_AM_PREFIX + "session.min.held-containers";
+    TEZ_AM_PREFIX + "session.min.held-containers";
   public static final int TEZ_AM_SESSION_MIN_HELD_CONTAINERS_DEFAULT = 0;
 
   // read in Hive
@@ -236,13 +219,32 @@ process as
   // Tez configurations used by MR3
   //
 
+  // used in UtilsForConfTez.scala, MR3
+  /** Int value. The amount of memory in MB to be used by the AppMaster */
+  @ConfigurationScope(Scope.AM)
+  @ConfigurationProperty(type="integer")
+  // do not remove because MR3 test code (UtilsForConfTez) uses it
+  public static final String TEZ_AM_RESOURCE_MEMORY_MB =
+    TEZ_AM_PREFIX + "resource.memory.mb";
+  public static final int TEZ_AM_RESOURCE_MEMORY_MB_DEFAULT = 1024;
+
+  // used in UtilsForConfTez.scala, MR3
+  /** Int value. The amount of memory in MB to be used by tasks. This applies to all tasks across
+   * all vertices. Setting it to the same value for all tasks is helpful for container reuse and 
+   * thus good for performance typically. */
+  @ConfigurationScope(Scope.DAG)
+  @ConfigurationProperty(type="integer")
+  public static final String TEZ_TASK_RESOURCE_MEMORY_MB =
+    TEZ_TASK_PREFIX + "resource.memory.mb";
+  public static final int TEZ_TASK_RESOURCE_MEMORY_MB_DEFAULT = 1024;
+
   /**
    * String value. Specifies the name of the shuffle auxiliary service.
    */
   @ConfigurationScope(Scope.AM)
   @ConfigurationProperty
-  public static final String TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID = TEZ_AM_PREFIX +
-    "shuffle.auxiliary-service.id";
+  public static final String TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID =
+    TEZ_AM_PREFIX + "shuffle.auxiliary-service.id";
   public static final String TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT =
     TezConstants.TEZ_SHUFFLE_HANDLER_SERVICE_ID;
 
@@ -252,8 +254,8 @@ process as
    */
   @ConfigurationScope(Scope.VERTEX)
   @ConfigurationProperty(type="boolean")
-  public static final String TEZ_TASK_SCALE_MEMORY_ENABLED = TEZ_TASK_PREFIX
-    + "scale.memory.enabled";
+  public static final String TEZ_TASK_SCALE_MEMORY_ENABLED =
+    TEZ_TASK_PREFIX + "scale.memory.enabled";
   public static final boolean TEZ_TASK_SCALE_MEMORY_ENABLED_DEFAULT = true;
 
   /**
@@ -261,8 +263,8 @@ process as
    */
   @ConfigurationScope(Scope.VERTEX)
   @ConfigurationProperty
-  public static final String TEZ_TASK_SCALE_MEMORY_ALLOCATOR_CLASS = TEZ_TASK_PREFIX
-    + "scale.memory.allocator.class";
+  public static final String TEZ_TASK_SCALE_MEMORY_ALLOCATOR_CLASS =
+    TEZ_TASK_PREFIX + "scale.memory.allocator.class";
   public static final String TEZ_TASK_SCALE_MEMORY_ALLOCATOR_CLASS_DEFAULT =
     "org.apache.tez.runtime.library.resources.WeightedScalingMemoryDistributor";
 
@@ -272,8 +274,8 @@ process as
    */
   @ConfigurationScope(Scope.VERTEX)
   @ConfigurationProperty(type="double")
-  public static final String TEZ_TASK_SCALE_MEMORY_RESERVE_FRACTION = TEZ_TASK_PREFIX
-    + "scale.memory.reserve-fraction";
+  public static final String TEZ_TASK_SCALE_MEMORY_RESERVE_FRACTION =
+    TEZ_TASK_PREFIX + "scale.memory.reserve-fraction";
   public static final double TEZ_TASK_SCALE_MEMORY_RESERVE_FRACTION_DEFAULT = 0.3d;
 
   /**
@@ -292,6 +294,7 @@ process as
   @ConfigurationProperty(type="float")
   public static final String TEZ_TASK_SCALE_MEMORY_ADDITIONAL_RESERVATION_FRACTION_MAX =
     TEZ_TASK_PREFIX + "scale.memory.additional-reservation.fraction.max";
+
   /*
    * Weighted ratios for individual component types in the RuntimeLibrary.
    * e.g. PARTITIONED_UNSORTED_OUTPUT:0,UNSORTED_INPUT:1,UNSORTED_OUTPUT:0,SORTED_OUTPUT:2,
