@@ -165,6 +165,25 @@ public class ConfigUtils {
     return extractConfigurationMapInternal(conf, validKeySets, allowedPrefixes);
   }
 
+  public static Map<String, String> extractConfigurationMap(Configuration conf,
+                                                            Set<String> validKeySet1,
+                                                            Set<String> validKeySet2,
+                                                            List<String> allowedPrefixes) {
+    Map<String, String> localConfMap = new HashMap<String, String>();
+    for (Map.Entry<String, String> entry : conf) {
+      if (validKeySet1.contains(entry.getKey()) || validKeySet2.contains(entry.getKey())) {
+        localConfMap.put(entry.getKey(), entry.getValue());
+      } else {
+        for (String prefix : allowedPrefixes) {
+          if (entry.getKey().startsWith(prefix)) {
+            localConfMap.put(entry.getKey(), entry.getValue());
+          }
+        }
+      }
+    }
+    return localConfMap;
+  }
+
   public static boolean doesKeyQualify(String key, List<Set<String>> validKeySets, List<String> allowedPrefixes) {
     Preconditions.checkArgument(key != null, "key cannot be null");
     Preconditions.checkArgument(validKeySets != null, "Valid key set cannot be empty");
