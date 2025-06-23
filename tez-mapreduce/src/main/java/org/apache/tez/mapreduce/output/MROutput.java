@@ -28,14 +28,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.tez.common.Preconditions;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.mapreduce.lib.output.LazyOutputFormat;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -79,7 +77,6 @@ import org.apache.tez.runtime.library.api.KeyValueWriter;
  *
  * This class is not meant to be extended by external projects.
  */
-@Public
 public class MROutput extends AbstractLogicalOutput {
 
   /**
@@ -364,12 +361,9 @@ public class MROutput extends AbstractLogicalOutput {
 
   protected TezCounter outputRecordCounter;
 
-  @VisibleForTesting
   TaskAttemptContext newApiTaskAttemptContext;
-  @VisibleForTesting
   org.apache.hadoop.mapred.TaskAttemptContext oldApiTaskAttemptContext;
 
-  @VisibleForTesting
   boolean isMapperOutput;
 
   protected OutputCommitter committer;
@@ -412,8 +406,7 @@ public class MROutput extends AbstractLogicalOutput {
     jobConf.set(JobContext.TASK_ATTEMPT_ID, taskAttemptId.toString());
     jobConf.set(JobContext.TASK_ID, taskAttemptId.getTaskID().toString());
     jobConf.setBoolean(JobContext.TASK_ISMAP, isMapperOutput);
-    jobConf.setInt(JobContext.TASK_PARTITION,
-      taskAttemptId.getTaskID().getId());
+    jobConf.setInt(JobContext.TASK_PARTITION, taskAttemptId.getTaskID().getId());
     jobConf.set(JobContext.ID, taskAttemptId.getJobID().toString());
     
     String outputFormatClassName;

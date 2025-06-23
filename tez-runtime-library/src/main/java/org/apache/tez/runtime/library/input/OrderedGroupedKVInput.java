@@ -98,8 +98,8 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput {
       getContext().requestInitialMemory(0l, null);
       isStarted.set(true);
       getContext().inputIsReady();
-      LOG.info("input fetch not required since there are 0 physical inputs for input vertex: "
-          + getContext().getSourceVertexName());
+      LOG.info("input fetch not required since there are 0 physical inputs for input vertex: {}",
+          getContext().getSourceVertexName());
       return Collections.emptyList();
     }
 
@@ -109,10 +109,8 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput {
     getContext().requestInitialMemory(initialMemoryRequest, memoryUpdateCallbackHandler);
 
     this.inputKeyCounter = getContext().getCounters().findCounter(TaskCounter.REDUCE_INPUT_GROUPS);
-    this.inputValueCounter = getContext().getCounters().findCounter(
-        TaskCounter.REDUCE_INPUT_RECORDS);
-     this.shuffledInputs = getContext().getCounters().findCounter(
-        TaskCounter.NUM_SHUFFLED_INPUTS);
+    this.inputValueCounter = getContext().getCounters().findCounter( TaskCounter.REDUCE_INPUT_RECORDS);
+    this.shuffledInputs = getContext().getCounters().findCounter( TaskCounter.NUM_SHUFFLED_INPUTS);
     this.conf.setStrings(TezRuntimeFrameworkConfigs.LOCAL_DIRS, getContext().getWorkDirs());
 
     return Collections.emptyList();

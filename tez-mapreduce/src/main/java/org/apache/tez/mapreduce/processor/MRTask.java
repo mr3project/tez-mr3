@@ -33,7 +33,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalDirAllocator;
@@ -79,7 +78,6 @@ import org.apache.tez.runtime.api.ProcessorContext;
 import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.sort.impl.TezRawKeyValueIterator;
 
-@Private
 public abstract class MRTask extends AbstractLogicalIOProcessor {
 
   static final Logger LOG = LoggerFactory.getLogger(MRTask.class);
@@ -121,9 +119,7 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
 
   // TODO how to update progress
   @Override
-  public void initialize() throws IOException,
-  InterruptedException {
-
+  public void initialize() throws IOException, InterruptedException {
     processorContext = getContext();
     counters = processorContext.getCounters();
     this.taskAttemptId = new TaskAttemptID(
@@ -134,20 +130,13 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
             processorContext.getTaskIndex()),
         processorContext.getTaskAttemptNumber());
 
-    Configuration conf = processorContext.getConfigurationFromUserPayload(true);
-    if (conf instanceof JobConf) {
-      this.jobConf = (JobConf)conf;
-    } else {
-      this.jobConf = new JobConf(conf);
-    }
-    jobConf.set(Constants.TEZ_RUNTIME_TASK_ATTEMPT_ID,
-        taskAttemptId.toString());
-    jobConf.set(MRJobConfig.TASK_ATTEMPT_ID,
-      taskAttemptId.toString());
-    jobConf.setInt(MRJobConfig.APPLICATION_ATTEMPT_ID,
-        processorContext.getDAGAttemptNumber());
+    Configuration conf = processorContext.getConfigurationFromUserPayload(false);
+    this.jobConf = new JobConf(conf);
+    jobConf.set(Constants.TEZ_RUNTIME_TASK_ATTEMPT_ID, taskAttemptId.toString());
+    jobConf.set(MRJobConfig.TASK_ATTEMPT_ID, taskAttemptId.toString());
+    jobConf.setInt(MRJobConfig.APPLICATION_ATTEMPT_ID, processorContext.getDAGAttemptNumber());
 
-    LOG.info("MRTask.inited: taskAttemptId = " + taskAttemptId.toString());
+    LOG.info("MRTask.initialize(): taskAttemptId = " + taskAttemptId.toString());
 
     // TODO Post MRR
     // A single file per vertex will likely be a better solution. Does not
@@ -334,7 +323,6 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
     return this.jobConf;
   }
 
-  @Private
   public synchronized String getOutputName() {
     return "part-" + NUMBER_FORMAT.format(taskAttemptId.getTaskID().getId());
   }

@@ -93,18 +93,17 @@ public class UnorderedKVInput extends AbstractLogicalInput {
       getContext().requestInitialMemory(0l, null);
       isStarted.set(true);
       getContext().inputIsReady();
-      LOG.info("input fetch not required since there are 0 physical inputs for input vertex: "
-          + getContext().getSourceVertexName());
+      LOG.info("input fetch not required since there are 0 physical inputs for input vertex: {}",
+          getContext().getSourceVertexName());
       return Collections.emptyList();
     } else {
-      long initalMemReq = getInitialMemoryReq();
+      long initialMemReq = getInitialMemoryReq();
       memoryUpdateCallbackHandler = new MemoryUpdateCallbackHandler();
-      this.getContext().requestInitialMemory(initalMemReq, memoryUpdateCallbackHandler);
+      this.getContext().requestInitialMemory(initialMemReq, memoryUpdateCallbackHandler);
     }
 
     this.conf.setStrings(TezRuntimeFrameworkConfigs.LOCAL_DIRS, getContext().getWorkDirs());
-    this.inputRecordCounter = getContext().getCounters().findCounter(
-        TaskCounter.INPUT_RECORDS_PROCESSED);
+    this.inputRecordCounter = getContext().getCounters().findCounter(TaskCounter.INPUT_RECORDS_PROCESSED);
     return Collections.emptyList();
   }
 
