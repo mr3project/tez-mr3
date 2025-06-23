@@ -263,5 +263,5 @@ public interface TaskContext extends DecompressorPool {
   public IndexPathCache getIndexPathCache();
   public ConcurrentByteCache getConcurrentByteCache();
 
-  public FetcherConfig getFetcherConfig();
+  public FetcherConfig getFetcherConfig(Configuration conf);
 }

@@ -29,7 +29,6 @@ import java.util.zip.Deflater;
 
 import com.google.common.collect.Lists;
 
-import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.library.conf.OrderedPartitionedKVOutputConfig.SorterImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,7 +37,6 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.tez.common.TezCommonUtils;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
-import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.runtime.api.AbstractLogicalOutput;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.OutputContext;
@@ -80,7 +78,6 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
   public OrderedPartitionedKVOutput(OutputContext outputContext, int numPhysicalOutputs) {
     super(outputContext, numPhysicalOutputs);
     deflater = TezCommonUtils.newBestCompressionDeflater();
-    FetcherConfig fetcherConfig = getContext().getFetcherConfig();
   }
 
   @Override

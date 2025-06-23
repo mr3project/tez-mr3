@@ -300,6 +300,6 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
       InputAttemptIdentifier input, boolean registerShuffleInfoEvent);
 
   public FetcherConfig getFetcherConfig() {
-    return inputContext.getFetcherConfig();
+    return inputContext.getFetcherConfig(this.conf);
   }
 }
