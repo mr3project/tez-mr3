@@ -76,17 +76,18 @@ public class UnorderedKVInput extends AbstractLogicalInput {
 
   private boolean isClosed = false;
 
-  private final boolean compositeFetch;
+  private boolean compositeFetch;
 
   public UnorderedKVInput(InputContext inputContext, int numPhysicalInputs) {
     super(inputContext, numPhysicalInputs);
-    this.compositeFetch = inputContext.getFetcherConfig().compositeFetch;
   }
 
   @Override
   public synchronized List<Event> initialize() throws Exception {
     Preconditions.checkArgument(getNumPhysicalInputs() != -1, "Number of Inputs has not been set");
     this.conf = getContext().getConfigurationFromUserPayload(true);
+
+    this.compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
 
     if (getNumPhysicalInputs() == 0) {
       getContext().requestInitialMemory(0l, null);
@@ -262,6 +263,10 @@ public class UnorderedKVInput extends AbstractLogicalInput {
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT);
     // include to be able to override TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT);
+    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_SPECULATIVE_FETCH_WAIT_MILLIS);
+    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_THRESHOLD_MILLIS);
+    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_RELEASE_MILLIS);
+    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MAX_SPECULATIVE_FETCH_ATTEMPTS);
   }
 
   public static Set<String> getConfigurationKeySet() {

@@ -43,6 +43,7 @@ import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.security.JobTokenSecretManager;
 import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.FetcherConfig;
+import org.apache.tez.runtime.api.FetcherConfigCommon;
 import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.ConfigUtils;
@@ -63,38 +64,57 @@ public final class CodecUtils {
   }
 
   // conf is specific to each RuntimeTask
-  public static FetcherConfig constructFetcherConfig(
+  public static FetcherConfigCommon constructFetcherConfigCommon(
       Configuration conf, TaskContext taskContext) throws IOException {
-    boolean ifileReadAhead = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD,
-        TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_DEFAULT);
-    int ifileReadAheadLength =
-        ifileReadAhead ? conf.getInt(TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_BYTES,
-            TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_BYTES_DEFAULT) : 0;
+    Configuration codecConf = CodecUtils.reduceConfForCodec(conf);
 
     String auxiliaryService = ShuffleUtils.getTezShuffleHandlerServiceId(conf);
     SecretKey shuffleSecret = ShuffleUtils.getJobTokenSecretFromTokenBytes(
         taskContext.getServiceConsumerMetaData(auxiliaryService));
     JobTokenSecretManager jobTokenSecretMgr = new JobTokenSecretManager(shuffleSecret);
 
-    Configuration codecConf = CodecUtils.reduceConfForCodec(conf);
-
     boolean compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
-
     HttpConnectionParams httpConnectionParams = ShuffleUtils.getHttpConnectionParams(conf, compositeFetch);
+
     RawLocalFileSystem localFs = (RawLocalFileSystem) FileSystem.getLocal(conf).getRaw();
     LocalDirAllocator localDirAllocator = new LocalDirAllocator(TezRuntimeFrameworkConfigs.LOCAL_DIRS);
     String localHostName = taskContext.getExecutionContext().getHostName();
 
-    boolean localDiskFetchEnabled = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH,
+    boolean localDiskFetchEnabled = conf.getBoolean(
+        TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH,
         TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_DEFAULT);
-    boolean localDiskFetchOrderedEnabled = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_ORDERED,
-      TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_ORDERED_DEFAULT);
+    boolean localDiskFetchOrderedEnabled = conf.getBoolean(
+        TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_ORDERED,
+        TezRuntimeConfiguration.TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_ORDERED_DEFAULT);
     boolean verifyDiskChecksum = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_VERIFY_DISK_CHECKSUM,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_VERIFY_DISK_CHECKSUM_DEFAULT);
     boolean connectionFailAllInput = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_CONNECTION_FAIL_ALL_INPUT,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_CONNECTION_FAIL_ALL_INPUT_DEFAULT);
+
+    return new FetcherConfigCommon(
+        codecConf,
+        jobTokenSecretMgr,
+        httpConnectionParams,
+        localFs,
+        localDirAllocator,
+        localHostName,
+        localDiskFetchEnabled,
+        localDiskFetchOrderedEnabled,
+        verifyDiskChecksum,
+        compositeFetch,
+        connectionFailAllInput);
+  }
+
+  // conf is specific to each RuntimeTask
+  public static FetcherConfig constructFetcherConfig(Configuration conf) {
+    boolean ifileReadAhead = conf.getBoolean(
+        TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD,
+        TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_DEFAULT);
+    int ifileReadAheadLength = ifileReadAhead ? conf.getInt(
+        TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_BYTES,
+        TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_BYTES_DEFAULT) : 0;
 
     long speculativeExecutionWaitMillis = (long)conf.getInt(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_SPECULATIVE_FETCH_WAIT_MILLIS,
@@ -110,20 +130,8 @@ public final class CodecUtils {
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MAX_SPECULATIVE_FETCH_ATTEMPTS_DEFAULT);
 
     return new FetcherConfig(
-        codecConf,
         ifileReadAhead,
         ifileReadAheadLength,
-        jobTokenSecretMgr,
-        httpConnectionParams,
-        localFs,
-        localDirAllocator,
-        localHostName,
-        localDiskFetchEnabled,
-        localDiskFetchOrderedEnabled,
-        verifyDiskChecksum,
-        auxiliaryService,
-        compositeFetch,
-        connectionFailAllInput,
         speculativeExecutionWaitMillis,
         stuckFetcherThresholdMillis,
         stuckFetcherReleaseMillis,

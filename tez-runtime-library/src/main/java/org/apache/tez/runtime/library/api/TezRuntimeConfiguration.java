@@ -239,14 +239,6 @@ public class TezRuntimeConfiguration {
   public static final String TEZ_RUNTIME_VALUE_CLASS =
       TEZ_RUNTIME_PREFIX + "value.class";
 
-  @ConfigurationProperty(type = "boolean")
-  public static final String TEZ_RUNTIME_COMPRESS =
-      TEZ_RUNTIME_PREFIX + "compress";
-
-  @ConfigurationProperty
-  public static final String TEZ_RUNTIME_COMPRESS_CODEC =
-      TEZ_RUNTIME_PREFIX + "compress.codec";
-
   // TODO Move this key to MapReduce
   @ConfigurationProperty
   public static final String TEZ_RUNTIME_KEY_SECONDARY_COMPARATOR_CLASS =
@@ -336,6 +328,12 @@ public class TezRuntimeConfiguration {
   // Thus they are not added to tezRuntimeKeys[].
   //
 
+  @ConfigurationProperty(type = "boolean")
+  public static final String TEZ_RUNTIME_COMPRESS = TEZ_RUNTIME_PREFIX + "compress";
+
+  @ConfigurationProperty
+  public static final String TEZ_RUNTIME_COMPRESS_CODEC = TEZ_RUNTIME_PREFIX + "compress.codec";
+
   @ConfigurationProperty(type = "integer")
   public static final String TEZ_RUNTIME_SHUFFLE_TOTAL_PARALLEL_COPIES =
       TEZ_RUNTIME_PREFIX + "shuffle.total.parallel.copies";
@@ -361,6 +359,7 @@ public class TezRuntimeConfiguration {
       TEZ_RUNTIME_PREFIX + "shuffle.connection.fail.all.input";
   public static final boolean TEZ_RUNTIME_SHUFFLE_CONNECTION_FAIL_ALL_INPUT_DEFAULT = false;
 
+  // TODO: move to tezRuntimeKeys[]
   @ConfigurationProperty(type = "integer")
   public static final String TEZ_RUNTIME_SHUFFLE_CONNECT_TIMEOUT =
       TEZ_RUNTIME_PREFIX + "shuffle.connect.timeout";
@@ -428,6 +427,8 @@ public class TezRuntimeConfiguration {
   public static final long TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT = 10000;
 
   static {
+    // tezRuntimeKeys[] = sum of confKeys[] in:
+    //   OrderedGroupedKVInput, UnorderedKVInput, OrderedPartitionedKVOutput, UnorderedKVOutput, UnorderedPartitionedKVOuptut
     tezRuntimeKeys.add(TEZ_RUNTIME_IFILE_READAHEAD);
     tezRuntimeKeys.add(TEZ_RUNTIME_IFILE_READAHEAD_BYTES);
     tezRuntimeKeys.add(TEZ_RUNTIME_IO_SORT_FACTOR);
@@ -454,8 +455,6 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_KEY_COMPARATOR_CLASS);
     tezRuntimeKeys.add(TEZ_RUNTIME_KEY_CLASS);
     tezRuntimeKeys.add(TEZ_RUNTIME_VALUE_CLASS);
-    tezRuntimeKeys.add(TEZ_RUNTIME_COMPRESS);
-    tezRuntimeKeys.add(TEZ_RUNTIME_COMPRESS_CODEC);
     tezRuntimeKeys.add(TEZ_RUNTIME_KEY_SECONDARY_COMPARATOR_CLASS);
     tezRuntimeKeys.add(TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED);
     tezRuntimeKeys.add(TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_ENABLED);

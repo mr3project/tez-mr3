@@ -163,7 +163,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     this.spilledRecordsCounter = spilledRecordsCounter;
     this.mergedMapOutputsCounter = mergedMapOutputsCounter;
 
-    boolean compositeFetch = inputContext.getFetcherConfig().compositeFetch;
+    boolean compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
     this.mapOutputFile = new TezTaskOutputFiles(conf,
         inputContext.getUniqueIdentifier(),
         inputContext.getDagIdentifier(),

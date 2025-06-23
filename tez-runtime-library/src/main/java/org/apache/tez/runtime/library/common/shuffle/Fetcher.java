@@ -23,6 +23,7 @@ import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.http.BaseHttpConnection;
 import org.apache.tez.runtime.api.FetcherConfig;
+import org.apache.tez.runtime.api.FetcherConfigCommon;
 import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
@@ -46,7 +47,8 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
   protected final Configuration conf;
 
   protected final String applicationId;
-  protected final FetcherConfig fetcherConfig;
+  protected final FetcherConfigCommon fetcherConfigCommon;
+  public final FetcherConfig fetcherConfig;
   protected final TaskContext taskContext;
 
   public final InputHost inputHost;
@@ -122,6 +124,7 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
   public Fetcher(ShuffleServer fetcherCallback,
                  Configuration conf,
                  InputHost inputHost,
+                 FetcherConfigCommon fetcherConfigCommon,
                  FetcherConfig fetcherConfig,
                  TaskContext taskContext,
                  InputHost.PartitionToInputs pendingInputsSeq,
@@ -129,6 +132,7 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
     this.fetcherCallback = fetcherCallback;
     this.conf = conf;
     this.applicationId = taskContext.getApplicationId().toString();
+    this.fetcherConfigCommon = fetcherConfigCommon;
     this.fetcherConfig = fetcherConfig;
     this.taskContext = taskContext;
 

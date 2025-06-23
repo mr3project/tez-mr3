@@ -30,9 +30,9 @@ public class HttpConnectionParams {
 
   private final boolean skipVerifyRequest;
 
-  public HttpConnectionParams(boolean keepAlive, int keepAliveMaxConnections, int
-      connectionTimeout, int readTimeout, int bufferSize,
-      boolean sslShuffle, SSLFactory sslFactory, boolean skipVerifyRequest) {
+  public HttpConnectionParams(boolean keepAlive, int keepAliveMaxConnections,
+                              int connectionTimeout, int readTimeout, int bufferSize,
+                              boolean sslShuffle, SSLFactory sslFactory, boolean skipVerifyRequest) {
     this.keepAlive = keepAlive;
     this.keepAliveMaxConnections = keepAliveMaxConnections;
     this.connectionTimeout = connectionTimeout;

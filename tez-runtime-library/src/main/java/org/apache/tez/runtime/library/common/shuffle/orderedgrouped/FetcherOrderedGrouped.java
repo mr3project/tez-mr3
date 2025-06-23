@@ -35,6 +35,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.tez.runtime.api.FetcherConfig;
+import org.apache.tez.runtime.api.FetcherConfigCommon;
 import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
@@ -103,11 +104,12 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       Configuration conf,
       InputHost inputHost,
       InputHost.PartitionToInputs pendingInputsSeq,
+      FetcherConfigCommon fetcherConfigCommon,
       FetcherConfig fetcherConfig,
       TaskContext taskContext,
       int attempt,
       ShuffleScheduler shuffleScheduler) {
-    super(fetcherCallback, conf, inputHost, fetcherConfig, taskContext, pendingInputsSeq, attempt);
+    super(fetcherCallback, conf, inputHost, fetcherConfigCommon, fetcherConfig, taskContext, pendingInputsSeq, attempt);
 
     this.shuffleScheduler = shuffleScheduler;
     this.shuffleSchedulerId = shuffleScheduler.getShuffleClientId();
@@ -125,7 +127,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
   public FetcherOrderedGrouped createClone() {
     return new FetcherOrderedGrouped(
         fetcherCallback, conf, inputHost, pendingInputsSeq,
-        fetcherConfig, taskContext, this.attempt + 1, shuffleScheduler);
+        fetcherConfigCommon, fetcherConfig, taskContext, this.attempt + 1, shuffleScheduler);
   }
 
   public ShuffleClient<MapOutput> getShuffleClient() {
@@ -151,7 +153,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       codec = codecHolder.get();
       if (codec == null) {
         // clone codecConf because Decompressor uses locks on the Configuration object
-        Configuration codecConf = new Configuration(fetcherConfig.codecConf);
+        Configuration codecConf = new Configuration(fetcherConfigCommon.codecConf);
         CompressionCodec newCodec = CodecUtils.getCodec(codecConf);
         codec = newCodec;
         codecHolder.set(newCodec);
@@ -203,9 +205,9 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       // shuffleMemToMem == true: recommended for performance
       useLocalDiskFetch = false;
     } else {
-      if (fetcherConfig.localDiskFetchOrderedEnabled &&
-          host.equals(fetcherConfig.localHostName)) {
-        if (fetcherConfig.compositeFetch) {
+      if (fetcherConfigCommon.localDiskFetchOrderedEnabled &&
+          host.equals(fetcherConfigCommon.localHostName)) {
+        if (fetcherConfigCommon.compositeFetch) {
           // inspect 'first' to find the container where all inputs originate from
           CompositeInputAttemptIdentifier first = pendingInputsSeq.getInputs().get(0);
           // true if inputs originate from the current ContainerWorker
@@ -367,7 +369,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     boolean connectSucceeded = false;
     try {
       String finalHost;
-      boolean sslShuffle = fetcherConfig.httpConnectionParams.isSslShuffle();
+      boolean sslShuffle = fetcherConfigCommon.httpConnectionParams.isSslShuffle();
       if (sslShuffle) {
         // TODO: cache in host
         finalHost = InetAddress.getByName(host).getHostName();
@@ -378,16 +380,16 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       InputHost.PartitionRange range = pendingInputsSeq.getPartitionRange();
       StringBuilder baseURI = ShuffleUtils.constructBaseURIForShuffleHandler(finalHost,
           port, range, applicationId, shuffleScheduler.getDagIdentifier(),
-          fetcherConfig.httpConnectionParams.isSslShuffle());
+          fetcherConfigCommon.httpConnectionParams.isSslShuffle());
 
       Collection<CompositeInputAttemptIdentifier> inputsForPathComponents =
         pendingInputsSeq.getInputs().subList(currentIndex, pendingInputsSeq.getInputs().size());
       // inputsForPathComponents[] is a View, so do not update it
       URL url = ShuffleUtils.constructInputURL(baseURI.toString(), inputsForPathComponents,
-          fetcherConfig.httpConnectionParams.isKeepAlive());
+          fetcherConfigCommon.httpConnectionParams.isKeepAlive());
 
-      httpConnection = ShuffleUtils.getHttpConnection(url, fetcherConfig.httpConnectionParams,
-          logIdentifier, fetcherConfig.jobTokenSecretMgr);
+      httpConnection = ShuffleUtils.getHttpConnection(url, fetcherConfigCommon.httpConnectionParams,
+          logIdentifier, fetcherConfigCommon.jobTokenSecretMgr);
       connectSucceeded = httpConnection.connect();
     } catch (IOException | InterruptedException ie) {
       if (ie instanceof InterruptedException) {
@@ -400,11 +402,11 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         return new HashMap<>();
       }
       shuffleErrorCounterGroup.ioErrs.increment(1);
-      LOG.warn("{}: Failed to connect from {} to {} with index = {}", logIdentifier, fetcherConfig.localHostName,
+      LOG.warn("{}: Failed to connect from {} to {} with index = {}", logIdentifier, fetcherConfigCommon.localHostName,
         host, currentIndex, ie);
       shuffleErrorCounterGroup.connectionErrs.increment(1);
 
-      if (fetcherConfig.connectionFailAllInput) {
+      if (fetcherConfigCommon.connectionFailAllInput) {
         // no pending inputs && only failed inputs
         CompositeInputAttemptIdentifier[] failedFetches = buildInputSeqFromIndex(currentIndex);
         for (CompositeInputAttemptIdentifier failedFetch : failedFetches) {
@@ -449,12 +451,12 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       shuffleErrorCounterGroup.ioErrs.increment(1);
       if (!connectSucceeded) {
         LOG.warn("{}: Failed to connect from {} to {} with index = {}: {}",
-            logIdentifier, fetcherConfig.localHostName, host, currentIndex,
+            logIdentifier, fetcherConfigCommon.localHostName, host, currentIndex,
             ie.getClass().getName() + "/" + ie.getMessage());
         shuffleErrorCounterGroup.connectionErrs.increment(1);
       } else {
         LOG.warn("{}: Failed to verify reply after connecting from {} to {} with index = {}, informing ShuffleScheduler: {}",
-            logIdentifier, fetcherConfig.localHostName, host, currentIndex,
+            logIdentifier, fetcherConfigCommon.localHostName, host, currentIndex,
             ie.getClass().getName() + "/" + ie.getMessage());
       }
 
@@ -483,7 +485,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       long startTime = System.currentTimeMillis();
       int partitionCount = 1;   // single partition only when using Hadoop shuffle service
 
-      if (fetcherConfig.compositeFetch) {
+      if (fetcherConfigCommon.compositeFetch) {
         // Multiple partitions are fetched
         partitionCount = input.readInt();
       }
@@ -492,7 +494,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         MapOutputStat mapOutputStat = null;
         try {
           // Read the shuffle header
-          ShuffleHeader header = new ShuffleHeader(fetcherConfig.compositeFetch);
+          ShuffleHeader header = new ShuffleHeader(fetcherConfigCommon.compositeFetch);
           // TODO Review: Multiple header reads in case of status WAIT ?
           header.readFields(input);
           if (!header.mapId.startsWith(InputAttemptIdentifier.PATH_PREFIX_MR3) && !header.mapId.startsWith(InputAttemptIdentifier.PATH_PREFIX)) {
@@ -613,7 +615,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
           ShuffleUtils.shuffleToDisk(mapOutput.getDisk(), host,
               input, compressedLength, decompressedLength, LOG, mapOutput.getAttemptIdentifier(),
               fetcherConfig.ifileReadAhead, fetcherConfig.ifileReadAheadLength,
-              fetcherConfig.verifyDiskChecksum);
+              fetcherConfigCommon.verifyDiskChecksum);
         } else {
           throw new IOException("Unknown mapOutput type while fetching shuffle data:" +
               mapOutput.getType());
@@ -708,9 +710,9 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
           // pathComponent == srcAttemptId.getPathComponent(), so we compute spillRecord and inputFilePath only once
           if (spillRecord == null) {
             AbstractMap.SimpleEntry<TezSpillRecord, Path> pair = ShuffleUtils.getTezSpillRecordInputFilePath(
-                taskContext, pathComponent, fetcherConfig.compositeFetch,
+                taskContext, pathComponent, fetcherConfigCommon.compositeFetch,
                 shuffleScheduler.getDagIdentifier(), conf,
-                fetcherConfig.localDirAllocator, fetcherConfig.localFs);
+                fetcherConfigCommon.localDirAllocator, fetcherConfigCommon.localFs);
             spillRecord = pair.getKey();
             inputFilePath = pair.getValue();
           }
@@ -808,14 +810,14 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       retryStartTime = currentTime;
     }
 
-    if (currentTime - retryStartTime < fetcherConfig.httpConnectionParams.getReadTimeout()) {
+    if (currentTime - retryStartTime < fetcherConfigCommon.httpConnectionParams.getReadTimeout()) {
       LOG.warn("{}: Shuffle output from {} failed, retry it", logIdentifier, host);
       //retry connecting to the host
       return true;
     } else {
       // timeout, prepare to be failed.
       LOG.warn("{}: Timeout for copying MapOutput with retry on host {} after {} milliseconds",
-          logIdentifier, host, fetcherConfig.httpConnectionParams.getReadTimeout());
+          logIdentifier, host, fetcherConfigCommon.httpConnectionParams.getReadTimeout());
       return false;
     }
   }

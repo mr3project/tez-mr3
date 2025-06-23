@@ -27,6 +27,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.runtime.api.FetcherConfig;
+import org.apache.tez.runtime.api.FetcherConfigCommon;
 import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
@@ -73,7 +74,7 @@ public class ShuffleServer implements FetcherCallback {
   public static Configuration getCodecConf(Object instance, Configuration conf) {
     // clone because Decompressor uses locks on the Configuration object
     if (instance != null) {
-      return new Configuration(((ShuffleServer)instance).fetcherConfig.codecConf);
+      return new Configuration(((ShuffleServer)instance).fetcherConfigCommon.codecConf);
     } else {
       return new Configuration(conf);
     }
@@ -133,7 +134,7 @@ public class ShuffleServer implements FetcherCallback {
   private final String serverName;
 
   private final ListeningExecutorService fetcherExecutor;
-  private final FetcherConfig fetcherConfig;
+  private final FetcherConfigCommon fetcherConfigCommon;
 
   private final int maxTaskOutputAtOnce;
   private final RangesScheme rangesScheme;
@@ -158,9 +159,6 @@ public class ShuffleServer implements FetcherCallback {
 
   private final AtomicBoolean isShutdown = new AtomicBoolean(false);
 
-  private final int STUCK_FETCHER_THRESHOLD_MILLIS;
-  private final int STUCK_FETCHER_RELEASE_MILLIS;
-
   private final ExecutorService shutdownExecutor;
 
   private static final int LAUNCH_LOOP_WAIT_PERIOD_MILLIS = 1000;
@@ -181,7 +179,7 @@ public class ShuffleServer implements FetcherCallback {
         .setNameFormat("Fetcher" + " #%d")
         .build());
     this.fetcherExecutor = MoreExecutors.listeningDecorator(fetcherRawExecutor);
-    this.fetcherConfig = taskContext.getFetcherConfig();
+    this.fetcherConfigCommon = CodecUtils.constructFetcherConfigCommon(conf, taskContext);
 
     /**
      * Setting to very high val can lead to Http 400 error. Cap it to 75; every attempt id would
@@ -207,13 +205,10 @@ public class ShuffleServer implements FetcherCallback {
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MAX_INPUT_HOSTPORTS,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MAX_INPUT_HOSTPORTS_DEFAULT);
 
-    this.STUCK_FETCHER_THRESHOLD_MILLIS = fetcherConfig.stuckFetcherThresholdMillis;
-    this.STUCK_FETCHER_RELEASE_MILLIS = fetcherConfig.stuckFetcherReleaseMillis;
-
     this.shutdownExecutor = Executors.newSingleThreadExecutor();
 
-    LOG.info("{} Configuration: numFetchers={}, maxTaskOutputAtOnce={}, FetcherConfig={}, rangesScheme={}, maxNumInputHosts={}",
-        serverName, numFetchers, maxTaskOutputAtOnce, fetcherConfig, rangesScheme, maxNumInputHosts);
+    LOG.info("{} Configuration: numFetchers={}, maxTaskOutputAtOnce={}, FetcherConfigCommon={}, rangesScheme={}, maxNumInputHosts={}",
+        serverName, numFetchers, maxTaskOutputAtOnce, fetcherConfigCommon, rangesScheme, maxNumInputHosts);
   }
 
   public int getMaxTaskOutputAtOnce() {
@@ -258,6 +253,7 @@ public class ShuffleServer implements FetcherCallback {
         getShouldLaunchNewFetchers();
 
     existsFetcherToRetry = runningFetchers.stream().anyMatch(f -> {
+        FetcherConfig fetcherConfig = f.fetcherConfig;
         int state = f.getState();
         return
           (state == Fetcher.STATE_NORMAL || state == Fetcher.STATE_RECOVERED) &&
@@ -268,11 +264,14 @@ public class ShuffleServer implements FetcherCallback {
         f.getState() == Fetcher.STATE_STUCK &&
         f.getStage() == Fetcher.STAGE_FIRST_FETCHED);
 
-    existsFetcherFromStuckToSpeculative = runningFetchers.stream().anyMatch(f ->
+    existsFetcherFromStuckToSpeculative = runningFetchers.stream().anyMatch(f -> {
+      FetcherConfig fetcherConfig = f.fetcherConfig;
+      final int STUCK_FETCHER_RELEASE_MILLIS = fetcherConfig.stuckFetcherReleaseMillis;
+      return
         f.getState() == Fetcher.STATE_STUCK &&
         f.getStage() < Fetcher.STAGE_FIRST_FETCHED &&
-        (currentMillis - f.getStartMillis() >= STUCK_FETCHER_RELEASE_MILLIS)
-      );
+        (currentMillis - f.getStartMillis() >= STUCK_FETCHER_RELEASE_MILLIS);
+    });
 
     shouldCheckStuckFetcher = currentMillis > nextCheckStuckFetcherMillis;
   }
@@ -308,6 +307,7 @@ public class ShuffleServer implements FetcherCallback {
       if (existsFetcherToRetry) {
         // transition: from NORMAL/RECOVERED to RETRY
         runningFetchers.forEach(fetcher -> {
+          FetcherConfig fetcherConfig = fetcher.fetcherConfig;
           int state = fetcher.getState();
           long elapsed = currentMillis - fetcher.getStartMillis();
           if ((state == Fetcher.STATE_NORMAL || state == Fetcher.STATE_RECOVERED) &&
@@ -336,6 +336,8 @@ public class ShuffleServer implements FetcherCallback {
       if (existsFetcherFromStuckToSpeculative) {
         // try to transition: from STUCK to SPECULATIVE
         runningFetchers.forEach(fetcher -> {
+          FetcherConfig fetcherConfig = fetcher.fetcherConfig;
+          final int STUCK_FETCHER_RELEASE_MILLIS = fetcherConfig.stuckFetcherReleaseMillis;
           if (fetcher.getState() == Fetcher.STATE_STUCK &&
               fetcher.getStage() != Fetcher.STAGE_FIRST_FETCHED &&
               (currentMillis - fetcher.getStartMillis()) >= STUCK_FETCHER_RELEASE_MILLIS) {
@@ -351,6 +353,8 @@ public class ShuffleServer implements FetcherCallback {
       if (shouldCheckStuckFetcher) {
         // try to transition: from NORMAL with stage == INITIAL to STUCK
         runningFetchers.forEach(fetcher -> {
+          FetcherConfig fetcherConfig = fetcher.fetcherConfig;
+          final int STUCK_FETCHER_THRESHOLD_MILLIS = fetcherConfig.stuckFetcherThresholdMillis;
           if (fetcher.getState() == Fetcher.STATE_NORMAL) {
             long elapsed = currentMillis - fetcher.getStartMillis();
             if (elapsed > STUCK_FETCHER_THRESHOLD_MILLIS &&
@@ -423,6 +427,7 @@ public class ShuffleServer implements FetcherCallback {
 
   private void trySpeculativeFetcher(Fetcher<?> fetcher) {
     // create a speculative fetcher only if its ShuffleClient is still alive
+    FetcherConfig fetcherConfig = fetcher.fetcherConfig;
     if (fetcher.attempt < fetcherConfig.maxSpeculativeFetchAttempts &&
       shuffleClients.get(fetcher.getShuffleClient().getShuffleClientId()) != null) {
       Fetcher<?> speculativeFetcher = fetcher.createClone();
@@ -474,13 +479,14 @@ public class ShuffleServer implements FetcherCallback {
       return null;
     }
 
+    FetcherConfig fetcherConfig = shuffleClient.getFetcherConfig();
     if (shuffleClient instanceof ShuffleManager) {
       return new FetcherUnordered(this,
-          shuffleClient.conf, inputHost, pendingInputs, fetcherConfig, taskContext,
+          shuffleClient.conf, inputHost, pendingInputs, fetcherConfigCommon, fetcherConfig, taskContext,
           0, (ShuffleManager)shuffleClient);
     } else {
       return new FetcherOrderedGrouped(this,
-          shuffleClient.conf, inputHost, pendingInputs, fetcherConfig, taskContext,
+          shuffleClient.conf, inputHost, pendingInputs, fetcherConfigCommon, fetcherConfig, taskContext,
           0, (ShuffleScheduler)shuffleClient);
     }
   }

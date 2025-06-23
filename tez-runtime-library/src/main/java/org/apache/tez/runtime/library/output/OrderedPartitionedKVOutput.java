@@ -74,15 +74,13 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
   boolean finalMergeEnabled;
   private boolean sendEmptyPartitionDetails;
 
-  private final String auxiliaryService;
-  private final boolean compositeFetch;
+  private String auxiliaryService;
+  private boolean compositeFetch;
 
   public OrderedPartitionedKVOutput(OutputContext outputContext, int numPhysicalOutputs) {
     super(outputContext, numPhysicalOutputs);
     deflater = TezCommonUtils.newBestCompressionDeflater();
     FetcherConfig fetcherConfig = getContext().getFetcherConfig();
-    auxiliaryService = fetcherConfig.auxiliaryService;
-    compositeFetch = fetcherConfig.compositeFetch;
   }
 
   @Override
@@ -102,6 +100,9 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
     sendEmptyPartitionDetails = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED,
         TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED_DEFAULT);
+
+    auxiliaryService = ShuffleUtils.getTezShuffleHandlerServiceId(conf);
+    compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
 
     return Collections.emptyList();
   }

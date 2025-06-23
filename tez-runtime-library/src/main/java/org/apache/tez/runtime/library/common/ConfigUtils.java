@@ -108,8 +108,6 @@ public class ConfigUtils {
         WritableComparable.class), conf);
   }
 
-  
-  
   // TODO Fix name
   public static <V> RawComparator<V> getInputKeySecondaryGroupingComparator(
       Configuration conf) {

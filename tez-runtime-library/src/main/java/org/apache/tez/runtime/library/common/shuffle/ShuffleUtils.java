@@ -635,14 +635,15 @@ public class ShuffleUtils {
   }
 
   public static boolean isTezShuffleHandler(Configuration config) {
-    return config.get(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
-        TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT).
-        contains("tez");
+    return config.get(
+        TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
+        TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT).contains("tez");
   }
 
   public static String getTezShuffleHandlerServiceId(Configuration conf) {
-    return conf.get(TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
-          TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT);
+    return conf.get(
+        TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
+        TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT);
   }
 
   public static String adjustPathComponent(boolean compositeFetch, int dagIdentifier, String pathComponent) {
