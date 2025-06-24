@@ -1037,6 +1037,10 @@
           <exclusions>
             <exclusion>
               <groupId>org.apache.hadoop</groupId>
+              <artifactId>hadoop-cos</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.apache.hadoop</groupId>
               <artifactId>hadoop-aliyun</artifactId>
             </exclusion>
             <exclusion>
