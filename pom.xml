@@ -143,13 +143,6 @@
         <artifactId>tez-mapreduce</artifactId>
         <version>${project.version}</version>
       </dependency>
-      <!-- include TezMiniCluster from tez-tests/src/test/ -->
-      <dependency>
-        <groupId>org.apache.tez</groupId>
-        <artifactId>tez-tests</artifactId>
-        <version>${project.version}</version>
-        <type>test-jar</type>
-      </dependency>
       <dependency>
         <groupId>org.apache.tez</groupId>
         <artifactId>tez-examples</artifactId>
@@ -737,7 +730,6 @@
     <module>tez-runtime-internals</module>
     <module>tez-mapreduce</module>
     <module>tez-examples</module>
-    <module>tez-tests</module>
     <module>tez-dag</module>
     <module>tez-plugins</module>
     <module>tez-dist</module>
