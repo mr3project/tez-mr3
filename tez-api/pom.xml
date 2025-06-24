@@ -120,10 +120,6 @@
     </resources>
     <plugins>
       <plugin>
-        <groupId>org.apache.rat</groupId>
-        <artifactId>apache-rat-plugin</artifactId>
-      </plugin>
-      <plugin>
         <groupId>com.github.os72</groupId>
         <artifactId>protoc-jar-maven-plugin</artifactId>
         <version>${protoc.jar.version}</version>
@@ -224,8 +220,16 @@
               <artifactId>jackson-databind</artifactId>
             </exclusion>
             <exclusion>
-              <groupId>com.squareup.okhttp</groupId>
+              <groupId>com.squareup.okhttp3</groupId>
               <artifactId>okhttp</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.jetbrains.kotlin</groupId>
+              <artifactId>kotlin-stdlib</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.jetbrains.kotlin</groupId>
+              <artifactId>kotlin-stdlib-common</artifactId>
             </exclusion>
           </exclusions>
        </dependency>
