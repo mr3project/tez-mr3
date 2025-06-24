@@ -307,13 +307,6 @@
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
-        <artifactId>hadoop-common</artifactId>
-        <version>${hadoop.version}</version>
-        <type>test-jar</type>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-annotations</artifactId>
         <version>${hadoop.version}</version>
         <exclusions>
@@ -456,22 +449,8 @@
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
-        <artifactId>hadoop-yarn-common</artifactId>
-        <version>${hadoop.version}</version>
-        <type>test-jar</type>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-yarn-server-timeline-pluginstorage</artifactId>
         <version>${hadoop.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.hadoop</groupId>
-        <artifactId>hadoop-yarn-server-tests</artifactId>
-        <version>${hadoop.version}</version>
-        <type>test-jar</type>
-        <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
@@ -583,13 +562,6 @@
             <artifactId>hadoop-mapreduce-client-common</artifactId>
           </exclusion>
         </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.hadoop</groupId>
-        <artifactId>hadoop-mapreduce-client-jobclient</artifactId>
-        <scope>test</scope>
-        <type>test-jar</type>
-        <version>${hadoop.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
