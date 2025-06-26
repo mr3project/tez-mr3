@@ -18,15 +18,11 @@
 
 package org.apache.tez.runtime.common.resources;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configurable;
-
-
 
 /**
  * Used to balance memory requests before a task starts executing.
  */
-@Private
 public interface InitialMemoryAllocator extends Configurable {
 
   /**

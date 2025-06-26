@@ -29,7 +29,6 @@ import java.util.Objects;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.tez.common.ReflectionUtils;
 import org.apache.tez.dag.api.TezConfiguration;
@@ -47,7 +46,6 @@ import org.apache.tez.common.Preconditions;
 import com.google.common.collect.Iterables;
 
 // Not calling this a MemoryManager explicitly. Not yet anyway.
-@Private
 public class MemoryDistributor {
 
   private static final Logger LOG = LoggerFactory.getLogger(MemoryDistributor.class);
