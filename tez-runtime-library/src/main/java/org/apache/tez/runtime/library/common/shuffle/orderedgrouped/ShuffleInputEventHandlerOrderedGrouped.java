@@ -153,7 +153,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
       DataMovementEvent dmEvent, DataMovementEventPayloadProto shufflePayload, BitSet emptyPartitionsBitSet) {
     int partitionId = dmEvent.getSourceIndex();
     CompositeInputAttemptIdentifier srcAttemptIdentifier = constructInputAttemptIdentifier(
-        dmEvent.getTargetIndex(), 1, dmEvent.getVersion(), shufflePayload);
+        dmEvent.getTargetIndex(), 1, dmEvent.getVersion(), compositeFetch, shufflePayload);
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("DME srcIdx: " + partitionId + ", targetIdx: " + dmEvent.getTargetIndex()
@@ -189,7 +189,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
       BitSet emptyPartitionsBitSet) throws IOException {
     int partitionId = crdmEvent.getSourceIndex();
     CompositeInputAttemptIdentifier compositeInputAttemptIdentifier = constructInputAttemptIdentifier(
-        crdmEvent.getTargetIndex(), crdmEvent.getCount(), crdmEvent.getVersion(), shufflePayload);
+        crdmEvent.getTargetIndex(), crdmEvent.getCount(), crdmEvent.getVersion(), compositeFetch, shufflePayload);
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("DME srcIdx: " + partitionId + ", targetIdx: " + crdmEvent.getTargetIndex() + ", count:" + crdmEvent.getCount()
@@ -245,8 +245,14 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
    * @return CompositeInputAttemptIdentifier
    */
   private CompositeInputAttemptIdentifier constructInputAttemptIdentifier(int targetIndex, int targetIndexCount, int version,
+      boolean compositeFetch,
       DataMovementEventPayloadProto shufflePayload) {
-    String pathComponent = (shufflePayload.hasPathComponent()) ? StringInterner.intern(shufflePayload.getPathComponent()) : null;
+    String pathComponentRaw = (shufflePayload.hasPathComponent()) ? StringInterner.intern(shufflePayload.getPathComponent()) : null;
+    String pathComponent =
+        (pathComponentRaw == null || !compositeFetch) ? pathComponentRaw :
+        ShuffleUtils.buildExpandedPathComponent(
+            shufflePayload.getContainerId(), shufflePayload.getVertexId(), pathComponentRaw);
+
     CompositeInputAttemptIdentifier srcAttemptIdentifier = null;
     if (shufflePayload.hasSpillId()) {
       int spillEventId = shufflePayload.getSpillId();
@@ -259,6 +265,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
       srcAttemptIdentifier =
           new CompositeInputAttemptIdentifier(targetIndex, version, pathComponent, targetIndexCount);
     }
+
     return srcAttemptIdentifier;
   }
 }

@@ -22,15 +22,16 @@ option java_generate_equals_and_hash = true;
 
 message DataMovementEventPayloadProto {
   optional bytes empty_partitions = 1;
-  optional string host = 2;
-  optional int32 num_ports = 3;
-  repeated int32 ports = 4;
-  optional string path_component = 5;
-  optional DataProto data = 6;
-  optional bool last_event = 7; // Related to pipelined shuffle
-  optional int32 spill_id = 8; //  Related to pipelined shuffle.
-  optional int32 num_record = 9;
-  optional string containerId = 10;
+  optional string containerId = 2;
+  optional int32 vertex_id = 3;
+  optional string path_component = 4;   // not in expanded form
+  optional string host = 5;
+  optional int32 num_ports = 6;
+  repeated int32 ports = 7;
+  optional DataProto data = 8;
+  optional bool last_event = 9;   // Related to pipelined shuffle
+  optional int32 spill_id = 10;   //  Related to pipelined shuffle.
+  optional int32 num_record = 11;
 } 
 
 message DataProto {

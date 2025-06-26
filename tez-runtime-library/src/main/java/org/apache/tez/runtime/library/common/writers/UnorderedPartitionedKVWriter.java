@@ -950,18 +950,19 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
     if (emptyPartitions.cardinality() != numPartitions) {
       // Populate payload only if at least 1 partition has data
-      String host = outputContext.getExecutionContext().getHostName();
       String containerId = outputContext.getExecutionContext().getContainerId();
-      payloadBuilder.setHost(host);
+      int vertexId = outputContext.getTaskVertexIndex();
       payloadBuilder.setContainerId(containerId);
+      payloadBuilder.setVertexId(vertexId);
+      payloadBuilder.setPathComponent(pathComponent);
 
+      String host = outputContext.getExecutionContext().getHostName();
+      payloadBuilder.setHost(host);
       int[] shufflePorts = getShufflePort();
       payloadBuilder.setNumPorts(shufflePorts.length);
       for (int i = 0; i < shufflePorts.length; i++) {
         payloadBuilder.addPorts(shufflePorts[i]);
       }
-
-      payloadBuilder.setPathComponent(ShuffleUtils.expandPathComponent(outputContext, compositeFetch, pathComponent));
     }
 
     if (addSpillDetails) {

@@ -65,10 +65,6 @@ public class HostPort {
     return host;
   }
 
-  public String getContainerId() {
-    return containerId;
-  }
-
   public int getPort() {
     return port;
   }

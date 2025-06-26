@@ -89,10 +89,6 @@
      <artifactId>protobuf-java</artifactId>
     </dependency>
     <dependency>
-     <groupId>junit</groupId>
-     <artifactId>junit</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.scala-lang</groupId>
       <artifactId>scala-library</artifactId>
       <version>${scala.version}</version>
@@ -124,10 +120,6 @@
       </resource>
     </resources>
     <plugins>
-      <plugin>
-        <groupId>org.apache.rat</groupId>
-        <artifactId>apache-rat-plugin</artifactId>
-      </plugin>
       <plugin>
         <groupId>com.github.os72</groupId>
         <artifactId>protoc-jar-maven-plugin</artifactId>
@@ -202,8 +194,16 @@
               <artifactId>jackson-databind</artifactId>
             </exclusion>
             <exclusion>
-              <groupId>com.squareup.okhttp</groupId>
+              <groupId>com.squareup.okhttp3</groupId>
               <artifactId>okhttp</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.jetbrains.kotlin</groupId>
+              <artifactId>kotlin-stdlib</artifactId>
+            </exclusion>
+            <exclusion>
+              <groupId>org.jetbrains.kotlin</groupId>
+              <artifactId>kotlin-stdlib-common</artifactId>
             </exclusion>
           </exclusions>
        </dependency>

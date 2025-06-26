@@ -250,12 +250,14 @@ public class ShuffleUtils {
       sb.append("hasEmptyPartitions: ").append(dmProto.hasEmptyPartitions()).append(", ");
     }
     sb.append("host: " + dmProto.getHost()).append(", ");
+    sb.append("containerId: " + dmProto.getContainerId()).append(", ");
+    sb.append("vertexId: " + dmProto.getVertexId()).append(", ");
+    sb.append("pathComponent: " + dmProto.getPathComponent()).append(", ");
     int numPorts = dmProto.hasNumPorts() ? dmProto.getNumPorts() : 0;
     sb.append("ports: ");
     for (int i = 0; i < numPorts; i++) {
       sb.append(dmProto.getPorts(i)).append(", ");
     }
-    sb.append("pathComponent: " + dmProto.getPathComponent()).append(", ");
     sb.append("hasDataInEvent: " + dmProto.hasData());
     sb.append("]");
     return sb.toString();
@@ -306,19 +308,20 @@ public class ShuffleUtils {
     }
 
     if (!sendEmptyPartitionDetails || outputGenerated) {
-      String host = context.getExecutionContext().getHostName();
       String containerId = context.getExecutionContext().getContainerId();
-      payloadBuilder.setHost(host);
+      int vertexId = context.getTaskVertexIndex();
       payloadBuilder.setContainerId(containerId);
+      payloadBuilder.setVertexId(vertexId);
+      payloadBuilder.setPathComponent(pathComponent);
 
+      String host = context.getExecutionContext().getHostName();
+      payloadBuilder.setHost(host);
       ByteBuffer shuffleMetadata = context.getServiceProviderMetaData(auxiliaryService);
       int[] shufflePorts = ShuffleUtils.deserializeShuffleProviderMetaData(shuffleMetadata);
       payloadBuilder.setNumPorts(shufflePorts.length);  // shufflePorts[] can be empty
       for (int i = 0; i < shufflePorts.length; i++) {
         payloadBuilder.addPorts(shufflePorts[i]);
       }
-
-      payloadBuilder.setPathComponent(expandPathComponent(context, compositeFetch, pathComponent));
     }
 
     if (!finalMergeEnabled) {
@@ -704,14 +707,26 @@ public class ShuffleUtils {
     }
   }
 
-  public static String expandPathComponent(OutputContext context, boolean compositeFetch, String pathComponent) {
+  public static String expandPathComponent(
+      OutputContext context, boolean compositeFetch, String pathComponent) {
     if (compositeFetch) {
       String containerId = context.getExecutionContext().getContainerId();
       int vertexId = context.getTaskVertexIndex();
-      return containerId + Path.SEPARATOR + Constants.VERTEX_PREFIX + vertexId + Path.SEPARATOR + pathComponent;
+      return buildExpandedPathComponent(containerId, vertexId, pathComponent);
     } else {
       return pathComponent;
     }
+  }
+
+  public static String buildExpandedPathComponent(
+      String containerId, int vertexId, String pathComponent) {
+    StringBuilder sb = new StringBuilder();
+    sb.append(containerId);
+    sb.append(Path.SEPARATOR + Constants.VERTEX_PREFIX);
+    sb.append(vertexId);
+    sb.append(Path.SEPARATOR);
+    sb.append(pathComponent);
+    return sb.toString();
   }
 
   public static TezSpillRecord getTezSpillRecord(
