@@ -27,11 +27,13 @@ public class CompositeInputAttemptIdentifier {
 
   private final int inputIdentifierCount;
 
+  // pathComponent is in expanded form
   public CompositeInputAttemptIdentifier(
       int inputIdentifier, int attemptNumber, String pathComponent, int inputIdentifierCount) {
     this(inputIdentifier, attemptNumber, pathComponent, InputAttemptIdentifier.SPILL_INFO.FINAL_MERGE_ENABLED, -1, inputIdentifierCount);
   }
 
+  // pathComponent is in expanded form
   public CompositeInputAttemptIdentifier(
       int inputIdentifier, int attemptNumber, String pathComponent,
       InputAttemptIdentifier.SPILL_INFO fetchTypeInfo, int spillEventId,

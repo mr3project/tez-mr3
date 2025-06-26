@@ -31,7 +31,7 @@ public class InputAttemptIdentifier {
 
   private final int inputIdentifier;
   private final int attemptNumber;
-  private final String pathComponent;
+  private final String pathComponent;   // in expanded form
 
   public static final String PATH_PREFIX = "attempt";
   public static final String PATH_PREFIX_MR3 = com.datamonad.mr3.container.ContainerID$.MODULE$.prefixInContainerWorkerEnv();
@@ -50,12 +50,8 @@ public class InputAttemptIdentifier {
   private final byte fetchTypeInfo;
   private final int spillEventId;
 
-  public InputAttemptIdentifier(int inputIndex, int attemptNumber) {
-    this(inputIndex, attemptNumber, null);
-  }
-
-  public InputAttemptIdentifier(int inputIdentifier, int attemptNumber, String pathComponent) {
-    this(inputIdentifier, attemptNumber, pathComponent, SPILL_INFO.FINAL_MERGE_ENABLED, -1);
+  public InputAttemptIdentifier(int inputIdentifier, int attemptNumber) {
+    this(inputIdentifier, attemptNumber, null, SPILL_INFO.FINAL_MERGE_ENABLED, -1);
   }
 
   public InputAttemptIdentifier(int inputIdentifier, int attemptNumber, String pathComponent,
