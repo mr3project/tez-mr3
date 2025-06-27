@@ -115,21 +115,15 @@ public class WeightedScalingMemoryDistributor implements InitialMemoryAllocator 
     Preconditions.checkState(reserveFraction >= 0.0d && reserveFraction <= 1.0d);
     availableForAllocation = (long) (availableForAllocation - (reserveFraction * availableForAllocation));
 
-    long totalJvmMem = Runtime.getRuntime().maxMemory();
-    double ratio = totalRequested / (double) totalJvmMem;
-
     if (LOG.isDebugEnabled()) {
+      long totalJvmMem = Runtime.getRuntime().maxMemory();
+      double ratio = totalRequested / (double) totalJvmMem;
       LOG.debug("Scaling Requests. NumRequests: " + numRequests + ", numScaledRequests: "
           + numRequestsScaled + ", TotalRequested: " + totalRequested + ", TotalRequestedScaled: "
           + totalScaledRequest + ", TotalJVMHeap: " + totalJvmMem + ", TotalAvailable: "
           + availableForAllocation + ", TotalRequested/TotalJVMHeap:"
           + new DecimalFormat("0.00").format(ratio));
     }
-
-    int numInputRequestsScaled = 0;
-    int numOutputRequestsScaled = 0;
-    long totalInputAllocated = 0;
-    long totalOutputAllocated = 0;
 
     // Actual scaling
     List<Long> allocations = Lists.newArrayListWithCapacity(numRequests);
@@ -154,14 +148,6 @@ public class WeightedScalingMemoryDistributor implements InitialMemoryAllocator 
           LOG.debug("Scaling requested " + request.componentClassname + " of type "
               + request.requestType + " " + request.requestSize + "  to allocated: " + allocated);
         }
-      }
-
-      if (request.componentType == ComponentType.INPUT) {
-        numInputRequestsScaled += request.requestWeight;
-        totalInputAllocated += allocated;
-      } else if (request.componentType == ComponentType.OUTPUT) {
-        numOutputRequestsScaled += request.requestWeight;
-        totalOutputAllocated += allocated;
       }
     }
 
@@ -264,7 +250,6 @@ public class WeightedScalingMemoryDistributor implements InitialMemoryAllocator 
   }
 
   private double computeReservedFraction(int numTotalRequests) {
-
     double reserveFractionPerIo = conf.getDouble(
         TezConfiguration.TEZ_TASK_SCALE_MEMORY_ADDITIONAL_RESERVATION_FRACTION_PER_IO,
         RESERVATION_FRACTION_PER_IO);
@@ -280,7 +265,8 @@ public class WeightedScalingMemoryDistributor implements InitialMemoryAllocator 
           + maxAdditionalReserveFraction);
     }
 
-    double initialReserveFraction = conf.getDouble(TezConfiguration.TEZ_TASK_SCALE_MEMORY_RESERVE_FRACTION,
+    double initialReserveFraction = conf.getDouble(
+        TezConfiguration.TEZ_TASK_SCALE_MEMORY_RESERVE_FRACTION,
         TezConfiguration.TEZ_TASK_SCALE_MEMORY_RESERVE_FRACTION_DEFAULT);
     double additionalReserveFraction = Math.min(maxAdditionalReserveFraction, numTotalRequests
         * reserveFractionPerIo);

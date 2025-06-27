@@ -22,8 +22,6 @@ import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.tez.dag.api.TezConfiguration;
 
@@ -32,8 +30,6 @@ import org.apache.tez.common.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 
-@Public
-@Unstable
 public class ScalingAllocator implements InitialMemoryAllocator {
 
   private static final Logger LOG = LoggerFactory.getLogger(ScalingAllocator.class);
@@ -57,10 +53,12 @@ public class ScalingAllocator implements InitialMemoryAllocator {
     Preconditions.checkState(reserveFraction >= 0.0d && reserveFraction <= 1.0d);
     availableForAllocation = (long) (availableForAllocation - (reserveFraction * availableForAllocation));
 
-    long totalJvmMem = Runtime.getRuntime().maxMemory();
-    double ratio = totalRequested / (double) totalJvmMem;
-    LOG.info("Scaling Requests. TotalRequested: {}, TotalJVMHeap: {}, TotalAvailable: {}, TotalRequested/TotalJVMHeap: {}",
-        totalRequested, totalJvmMem, availableForAllocation, ratio);
+    if (LOG.isDebugEnabled()) {
+      long totalJvmMem = Runtime.getRuntime().maxMemory();
+      double ratio = totalRequested / (double) totalJvmMem;
+      LOG.debug("Scaling Requests. TotalRequested: {}, TotalJVMHeap: {}, TotalAvailable: {}, TotalRequested/TotalJVMHeap: {}",
+          totalRequested, totalJvmMem, availableForAllocation, ratio);
+    }
 
     if (totalRequested < availableForAllocation || totalRequested == 0) {
       // Not scaling up requests. Assuming things were setup correctly by
