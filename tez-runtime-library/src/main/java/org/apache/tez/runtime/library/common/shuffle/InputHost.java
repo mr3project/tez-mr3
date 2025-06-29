@@ -32,7 +32,6 @@ import java.util.stream.Collectors;
 
 import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
-import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -139,7 +138,9 @@ public class InputHost {
     synchronized (blockingFetchers) {
       boolean wasEmpty = blockingFetchers.isEmpty();
       if (!wasEmpty) {
-        blockingFetchers.remove(fetcher);  // fetcher may or may not be found in hostBlocked[]
+        boolean result = blockingFetchers.remove(fetcher);
+        assert result : "Fetcher must be found in blockingFetchers: " + fetcher.getFetcherIdentifier();
+
         boolean isEmpty = blockingFetchers.isEmpty();
         if (isEmpty) {
           int newNum = numHostBlocked.decrementAndGet();

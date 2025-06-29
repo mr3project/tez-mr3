@@ -20,7 +20,6 @@ package org.apache.tez.runtime.library.common.shuffle;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.http.BaseHttpConnection;
 import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.FetcherConfigCommon;
@@ -87,13 +86,14 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
   public static int STAGE_FIRST_FETCHED = 1;
   private volatile int stage = STAGE_INITIAL;
 
-  // accessed only from
+  // guard with synchronized(this)
   public static int STATE_NORMAL = 10;
   public static int STATE_STUCK = 11;
   public static int STATE_RECOVERED = 12;
   public static int STATE_SPECULATIVE = 13;
   public static int STATE_RETRY = 14;
-  private volatile int state = STATE_NORMAL;
+  public static int STATE_COMPLETED = 15;
+  private int state = STATE_NORMAL;
 
   // read by ShuffleServer
   public long getStartMillis() {
@@ -110,14 +110,67 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
     return stage;
   }
 
-  // set by ShuffleServer
-  public void setState(int newState) {
-    state = newState;
+  public boolean trySetStateRETRY() {
+    synchronized (this) {
+      if (state == Fetcher.STATE_NORMAL || state == Fetcher.STATE_RECOVERED) {
+        state = Fetcher.STATE_RETRY;
+        return true;
+      } else {
+        assert state == Fetcher.STATE_COMPLETED;
+        return false;
+      }
+    }
   }
 
-  // read by Fetcher
-  protected int getState() {
-    return state;
+  public boolean trySetStateRECOVERED() {
+    synchronized (this) {
+      if (state == Fetcher.STATE_STUCK) {
+        state = Fetcher.STATE_RECOVERED;
+        return true;
+      } else {
+        assert state == Fetcher.STATE_COMPLETED;
+        return false;
+      }
+    }
+  }
+
+  public boolean trySetStateSPECULATIVE() {
+    synchronized (this) {
+      if (state == Fetcher.STATE_STUCK) {
+        state = Fetcher.STATE_SPECULATIVE;
+        return true;
+      } else {
+        assert state == Fetcher.STATE_COMPLETED;
+        return false;
+      }
+    }
+  }
+
+  public boolean trySetStateSTUCKaddHostBlocked() {
+    synchronized (this) {
+      if (state == Fetcher.STATE_NORMAL) {
+        state = Fetcher.STATE_STUCK;
+        inputHost.addHostBlocked(this);
+        return true;
+      } else {
+        assert state == Fetcher.STATE_COMPLETED;
+        return false;
+      }
+    }
+  }
+
+  public boolean setStateCOMPLETED() {
+    synchronized (this) {
+      boolean result = state == Fetcher.STATE_STUCK;
+      state = Fetcher.STATE_COMPLETED;
+      return result;
+    }
+  }
+
+  public int getState() {
+    synchronized (this) {
+      return state;
+    }
   }
 
   public Fetcher(ShuffleServer fetcherCallback,
