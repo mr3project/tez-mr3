@@ -802,7 +802,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       retryStartTime = currentTime;
     }
 
-    if (currentTime - retryStartTime < fetcherConfigCommon.httpConnectionParams.getReadTimeout()) {
+    if ((currentTime - retryStartTime) - fetcherConfigCommon.httpConnectionParams.getReadTimeout() < 0) {
       LOG.warn("{}: Shuffle output failed to {}, retry it", logIdentifier, fetcherConfigCommon.localHostName);
       // retry connecting to the host
       return true;

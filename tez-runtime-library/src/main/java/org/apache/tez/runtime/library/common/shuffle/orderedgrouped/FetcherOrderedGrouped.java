@@ -810,7 +810,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       retryStartTime = currentTime;
     }
 
-    if (currentTime - retryStartTime < fetcherConfigCommon.httpConnectionParams.getReadTimeout()) {
+    if ((currentTime - retryStartTime) - fetcherConfigCommon.httpConnectionParams.getReadTimeout() < 0) {
       LOG.warn("{}: Shuffle output from {} failed, retry it", logIdentifier, host);
       //retry connecting to the host
       return true;
