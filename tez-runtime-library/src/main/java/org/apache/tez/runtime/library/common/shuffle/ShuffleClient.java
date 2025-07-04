@@ -127,7 +127,6 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
       int numInputs,
       String srcNameTrimmed) throws IOException {
     this.shuffleServer = (ShuffleServer)inputContext.getShuffleServer();
-    this.shuffleClientId = shuffleServer.register(this);
     this.inputContext = inputContext;
     this.conf = conf;
     this.srcNameTrimmed = srcNameTrimmed;
@@ -143,6 +142,8 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_PARALLEL_COPIES_DEFAULT);
 
     this.shuffleInfoEventsMap = new HashMap<Integer, ShuffleEventInfo>();
+
+    this.shuffleClientId = shuffleServer.register(this);
   }
 
   public int getNumInputs() {
