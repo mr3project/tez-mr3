@@ -237,26 +237,24 @@ public abstract class TezSplitGrouper {
             "Invalid max/min group lengths. Required min>0, max>=min. " +
                 " max: " + maxLengthPerGroup + " min: " + minLengthPerGroup);
       }
+      int newDesiredNumSplits = -1;
       if (lengthPerGroup > maxLengthPerGroup) {
         // splits too big to work. Need to override with max size.
-        int newDesiredNumSplits = (int)(totalLength/maxLengthPerGroup) + 1;
-        LOG.info("Desired splits: {} too small. Desired splitLength: {} Max splitLength: {} New desired splits: {} Total length: {} Original splits: {}",
-            desiredNumSplits, lengthPerGroup, maxLengthPerGroup, newDesiredNumSplits, totalLength, originalSplits.size());
-
-        desiredNumSplits = newDesiredNumSplits;
+        newDesiredNumSplits = (int)(totalLength/maxLengthPerGroup) + 1;
       } else if (lengthPerGroup < minLengthPerGroup) {
         // splits too small to work. Need to override with size.
-        int newDesiredNumSplits = (int)(totalLength/minLengthPerGroup) + 1;
-        /**
-         * This is a workaround for systems like S3 that pass the same
-         * fake hostname for all splits.
-         */
-        if (!allSplitsHaveLocalhost) {
-          desiredNumSplits = newDesiredNumSplits;
+        newDesiredNumSplits = (int)(totalLength/minLengthPerGroup) + 1;
+        if (allSplitsHaveLocalhost) {
+          // Workaround for systems like S3 that pass the same fake hostname for all splits.
+          LOG.info("Ignore {} configuration cause all splits seem to be on localhost.", TEZ_GROUPING_SPLIT_MIN_SIZE);
+          newDesiredNumSplits = desiredNumSplits;
         }
-
-        LOG.info("Desired splits: {} too large.  Desired splitLength: {} Min splitLength: {} New desired splits: {} Final desired splits: {} All splits have localhost: {} Total length: {} Original splits: {}",
-            desiredNumSplits, lengthPerGroup, minLengthPerGroup, newDesiredNumSplits, desiredNumSplits, allSplitsHaveLocalhost, totalLength, originalSplits.size());
+      }
+      if (newDesiredNumSplits != -1) {
+        LOG.info("Desired splitLength {} exceeds min/max bounds. Min splitLength: {} Max splitLength: {} Desired splits: {} New Desired splits: {} Total length: {} Original splits: {}",
+            lengthPerGroup, minLengthPerGroup, maxLengthPerGroup, desiredNumSplits,
+            newDesiredNumSplits, totalLength, originalSplits.size());
+        desiredNumSplits = newDesiredNumSplits;
       }
     }
 
