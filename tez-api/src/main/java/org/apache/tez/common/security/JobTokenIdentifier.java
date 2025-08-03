@@ -22,18 +22,15 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 
+// only for compiling Hive-MR3
 /**
  * The token identifier for job token
  */
-@InterfaceAudience.Private
-@InterfaceStability.Unstable
 public class JobTokenIdentifier extends TokenIdentifier {
   private Text jobid;
   public final static Text KIND_NAME = new Text("tez.job");
@@ -88,7 +85,6 @@ public class JobTokenIdentifier extends TokenIdentifier {
     jobid.write(out);
   }
 
-  @InterfaceAudience.Private
   public static class Renewer extends Token.TrivialRenewer {
     @Override
     protected Text getKind() {

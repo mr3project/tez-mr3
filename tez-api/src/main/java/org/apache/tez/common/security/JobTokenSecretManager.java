@@ -29,6 +29,7 @@ import javax.crypto.SecretKey;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.Token;
 
+// only for compiling Hive-MR3
 /**
  * SecretManager for job token. It can be used to cache generated job tokens.
  */

@@ -20,7 +20,6 @@ package org.apache.tez.common;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Map;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
 import java.util.zip.Inflater;
@@ -28,44 +27,31 @@ import java.util.zip.InflaterInputStream;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.ArrayUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.yarn.api.records.LocalResource;
-import org.apache.tez.client.TezClient;
 import org.apache.tez.common.security.JobTokenIdentifier;
-import org.apache.tez.dag.api.TezConfiguration;
-import org.apache.tez.dag.api.TezUncheckedException;
 
 import com.google.protobuf.ByteString;
 
-@Private
 public class TezCommonUtils {
   private static final boolean NO_WRAP = true;
 
-  @Private
   public static Deflater newBestCompressionDeflater() {
     return new Deflater(Deflater.BEST_COMPRESSION, NO_WRAP);
   }
 
-  @Private
   public static Deflater newBestSpeedDeflater() {
     return new Deflater(Deflater.BEST_SPEED, NO_WRAP);
   }
 
-  @Private
   public static Inflater newInflater() {
     return new Inflater(NO_WRAP);
   }
 
-  @Private
   public static ByteString compressByteArrayToByteString(byte[] inBytes) throws IOException {
     return compressByteArrayToByteString(inBytes, newBestCompressionDeflater());
   }
 
-  @Private
   public static ByteString compressByteArrayToByteString(byte[] inBytes, Deflater deflater) throws IOException {
     deflater.reset();
     ByteString.Output os = ByteString.newOutput();
@@ -83,7 +69,6 @@ public class TezCommonUtils {
     }
   }
 
-  @Private
   public static byte[] decompressByteStringToByteArray(ByteString byteString) throws IOException {
     Inflater inflater = newInflater();
     try {
@@ -93,7 +78,6 @@ public class TezCommonUtils {
     }
   }
 
-  @Private
   public static byte[] decompressByteStringToByteArray(ByteString byteString, Inflater inflater) throws IOException {
     inflater.reset();
     try (InflaterInputStream inflaterInputStream = new InflaterInputStream(byteString.newInput(), inflater)) {

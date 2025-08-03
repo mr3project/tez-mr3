@@ -24,8 +24,6 @@ import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -35,15 +33,13 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 
-
+// only for compiling Hive-MR3
 /**
  * This class provides user facing APIs for transferring secrets from
  * the job client to the tasks.
  * The secrets can be stored just before submission of jobs and read during
  * the task execution.  
  */
-@InterfaceAudience.Private
-@InterfaceStability.Unstable
 public class TokenCache {
   
   private static final Logger LOG = LoggerFactory.getLogger(TokenCache.class);
@@ -133,8 +129,7 @@ public class TokenCache {
    * store session specific token
    * @param t
    */
-  @InterfaceAudience.Private
-  public static void setSessionToken(Token<? extends TokenIdentifier> t, 
+  public static void setSessionToken(Token<? extends TokenIdentifier> t,
       Credentials credentials) {
     credentials.addToken(SESSION_TOKEN, t);
   }
@@ -143,7 +138,6 @@ public class TokenCache {
    * @return session token
    */
   @SuppressWarnings("unchecked")
-  @InterfaceAudience.Private
   public static Token<JobTokenIdentifier> getSessionToken(Credentials credentials) {
     Token<?> token = credentials.getToken(SESSION_TOKEN);
     if (token == null) {
@@ -157,7 +151,6 @@ public class TokenCache {
    * @param creds Credentials object to add new tokens to
    * @param tokenFilePath Location of tokens' binary file
    */
-  @InterfaceAudience.Private
   public static void mergeBinaryTokens(Credentials creds,
       Configuration conf, String tokenFilePath)
       throws IOException {
