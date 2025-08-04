@@ -109,13 +109,4 @@ public class ConcatenatedMergedKeyValuesInput extends MergedLogicalInput {
   public void setConstituentInputIsReady(Input input) {
     informInputReady();
   }
-
-  @Override
-  public float getProgress() throws ProgressFailedException, InterruptedException {
-    try {
-      return concatenatedMergedKeyValuesReader.getProgress();
-    } catch (IOException e) {
-      throw new ProgressFailedException("getProgress encountered IOException ", e);
-    }
-  }
 }

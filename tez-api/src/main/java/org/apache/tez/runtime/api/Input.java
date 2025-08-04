@@ -32,7 +32,6 @@ import org.apache.hadoop.classification.InterfaceAudience.Public;
 @Public
 public interface Input {
 
-
   /**
    * Start any processing that the Input may need to perform. It is the
    * responsibility of the Processor to start Inputs.

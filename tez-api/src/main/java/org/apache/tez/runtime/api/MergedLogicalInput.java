@@ -18,7 +18,6 @@
 
 package org.apache.tez.runtime.api;
 
-import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -41,7 +40,6 @@ import org.apache.hadoop.classification.InterfaceStability.Evolving;
 @Public
 @Evolving
 public abstract class MergedLogicalInput implements LogicalInput {
-
 
   private AtomicBoolean notifiedInputReady = new AtomicBoolean(false);
   private List<Input> inputs;
@@ -93,8 +91,4 @@ public abstract class MergedLogicalInput implements LogicalInput {
    * Used by the framework to inform the MergedInput that one of it's constituent Inputs is ready.
    */
   public abstract void setConstituentInputIsReady(Input input);
-
-  public float getProgress() throws ProgressFailedException, InterruptedException {
-    return 0.0f;
-  }
 }

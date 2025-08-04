@@ -26,7 +26,6 @@ import java.util.Map;
 import org.apache.tez.common.ProgressHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.RawComparator;
 import org.apache.hadoop.mapred.Counters.Counter;
@@ -55,7 +54,6 @@ import org.apache.tez.runtime.library.common.sort.impl.TezRawKeyValueIterator;
 import org.apache.tez.runtime.library.input.OrderedGroupedInputLegacy;
 import org.apache.tez.runtime.library.output.OrderedPartitionedKVOutput;
 
-@Private
 @SuppressWarnings({ "unchecked", "rawtypes" })
 public class ReduceProcessor extends MRTask {
 
@@ -75,7 +73,6 @@ public class ReduceProcessor extends MRTask {
   @Override
   public void handleEvents(List<Event> processorEvents) {
     // TODO Auto-generated method stub
-
   }
 
   public void close() throws IOException {
@@ -123,10 +120,8 @@ public class ReduceProcessor extends MRTask {
     RawComparator comparator = ConfigUtils.getInputKeySecondaryGroupingComparator(jobConf);
     LOG.info("Using keyClass={}, valueClass={}, comparator={}", keyClass, valueClass, comparator);
 
-    reduceInputKeyCounter =
-        mrReporter.getCounter(TaskCounter.REDUCE_INPUT_GROUPS);
-    reduceInputValueCounter =
-        mrReporter.getCounter(TaskCounter.REDUCE_INPUT_RECORDS);
+    reduceInputKeyCounter = mrReporter.getCounter(TaskCounter.REDUCE_INPUT_GROUPS);
+    reduceInputValueCounter = mrReporter.getCounter(TaskCounter.REDUCE_INPUT_RECORDS);
 
     // Sanity check
     if (!(in instanceof OrderedGroupedInputLegacy)) {

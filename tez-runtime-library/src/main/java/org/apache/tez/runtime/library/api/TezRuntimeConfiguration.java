@@ -171,8 +171,7 @@ public class TezRuntimeConfiguration {
       ReportPartitionStats.MEMORY_OPTIMIZED.getType();
 
   /**
-   * Specifies a partitioner class, which is used in Tez Runtime components
-   * like OnFileSortedOutput
+   * Specifies a partitioner class
    */
   @ConfigurationProperty
   public static final String TEZ_RUNTIME_PARTITIONER_CLASS =

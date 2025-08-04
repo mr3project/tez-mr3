@@ -125,7 +125,7 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
         TaskCounter.NUM_FAILED_SHUFFLE_INPUTS);
     this.bytesShuffledToDisk = inputContext.getCounters().findCounter(
         TaskCounter.SHUFFLE_BYTES_TO_DISK);
-    this.bytesShuffledToDiskDirect =  inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_DISK_DIRECT);
+    this.bytesShuffledToDiskDirect = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_DISK_DIRECT);
     this.bytesShuffledToMem = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_TO_MEM);
 
     // Counters used by Fetchers
