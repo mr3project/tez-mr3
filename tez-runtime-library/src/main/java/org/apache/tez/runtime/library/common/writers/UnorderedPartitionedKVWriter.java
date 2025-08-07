@@ -1555,14 +1555,22 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       }
 
       if (!pipelinedShuffle && isFinalMergeEnabled) {
-        synchronized(additionalSpillBytesWrittenCounter) {
-          additionalSpillBytesWrittenCounter.increment(result.spillSize);
+        if (!result.useFreeMemoryForOutput) {
+          synchronized(additionalSpillBytesWrittenCounter) {
+            additionalSpillBytesWrittenCounter.increment(result.spillSize);
+          }
         }
+        // TODO: update OUTPUT_BYTES_MEMORY
       } else {
-        synchronized(fileOutputBytesCounter) {
-          fileOutputBytesCounter.increment(indexFileSizeEstimate);
-          fileOutputBytesCounter.increment(result.spillSize);
+        if (!result.useFreeMemoryForOutput) {
+          synchronized(fileOutputBytesCounter) {
+            fileOutputBytesCounter.increment(result.spillSize);
+            if (writeSpillRecord) {
+              fileOutputBytesCounter.increment(indexFileSizeEstimate);
+            }
+          }
         }
+        // TODO: update OUTPUT_BYTES_MEMORY
       }
 
       spillLock.lock();
