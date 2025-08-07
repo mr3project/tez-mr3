@@ -753,10 +753,13 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       if (((IFile.FileBackedInMemIFileWriter) writer).isDataFlushedToDisk()) {
         this.finalOutPath = ((IFile.FileBackedInMemIFileWriter) writer).getOutputPath();
         ensureSpillFilePermissions(finalOutPath, rfs);
-        additionalSpillBytesWritternCounter.increment(writer.getCompressedLength());
+        // Do NOT increment additionalSpillBytesWrittenCounter because the spill is the final output,
+        // not an intermediate one.
+        // Instead the caller should update fileOutputBytesCounter.
       }
     }
 
+    // write != null iff. numPartitions == 1 && !pipelinedShuffle
     return (writer != null) && dataViaEventsEnabled
             && (writer.getCompressedLength() <= dataViaEventsMaxSize);
   }
@@ -812,7 +815,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       List<Event> events = Lists.newLinkedList();
       if (!pipelinedShuffle) {
         if (skipBuffers) {  // numPartitions == 1 && !pipelinedShuffle, and written directly to writer
-          writer.close();
+          writer.close();   // okay, the final data was written to either disk or memory
           long rawLen = writer.getRawLength();
           long compLen = writer.getCompressedLength();
 
@@ -829,19 +832,21 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
           if (outputRecordsCounter.getValue() > 0) {
             outputBytesWithOverheadCounter.increment(rawLen);
-            fileOutputBytesCounter.increment(compLen + indexFileSizeEstimate);
           }
           eventList.add(generateVMEvent());
 
           if (!canSendDataOverDME()) {
+            // okay, the final data was written to disk
             TezIndexRecord rec = new TezIndexRecord(0, rawLen, compLen);
             TezSpillRecord sr = new TezSpillRecord(1);
             sr.putIndex(rec, 0);
             if (writeSpillRecord) {
               finalIndexPath = outputFileHandler.getOutputIndexFileForWrite(indexFileSizeEstimate);
               sr.writeToFile(finalIndexPath, localFs);
+              fileOutputBytesCounter.increment(compLen + indexFileSizeEstimate);
             } else {
               ShuffleUtils.writeToIndexPathCacheAndByteCache(outputContext, finalOutPath, sr, null);
+              fileOutputBytesCounter.increment(compLen);
             }
           }
           eventList.add(generateDMEvent(false, -1, false,
@@ -1044,7 +1049,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         SpillResult spillResult = spillCallable.call();
 
         fileOutputBytesCounter.increment(spillResult.spillSize);
-        fileOutputBytesCounter.increment(indexFileSizeEstimate);
+        if (writeSpillRecord) {
+          // finalIndexPath is used, so add indexFileSizeEstimate
+          fileOutputBytesCounter.increment(indexFileSizeEstimate);
+        }
         return spillResult;
       } catch (Exception ex) {
         throw (ex instanceof IOException) ? (IOException)ex : new IOException(ex);
@@ -1290,8 +1298,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
               sizePerPartition[i] += writer.getRawLength();
             }
             writer.close();
-            synchronized (additionalSpillBytesWritternCounter) {
-              additionalSpillBytesWritternCounter.increment(writer.getCompressedLength());
+            synchronized (additionalSpillBytesWrittenCounter) {
+              additionalSpillBytesWrittenCounter.increment(writer.getCompressedLength());
             }
             TezIndexRecord indexRecord = new TezIndexRecord(recordStart, writer.getRawLength(),
                 writer.getCompressedLength());
@@ -1541,8 +1549,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       }
 
       if (!pipelinedShuffle && isFinalMergeEnabled) {
-        synchronized(additionalSpillBytesWritternCounter) {
-          additionalSpillBytesWritternCounter.increment(result.spillSize);
+        synchronized(additionalSpillBytesWrittenCounter) {
+          additionalSpillBytesWrittenCounter.increment(result.spillSize);
         }
       } else {
         synchronized(fileOutputBytesCounter) {
