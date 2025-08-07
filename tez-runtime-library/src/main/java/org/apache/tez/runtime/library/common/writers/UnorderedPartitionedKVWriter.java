@@ -238,7 +238,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     // useFreeMemoryWriterOutput = false if compositeFetch == false, i.e, when using mapreduce_shuffle
     this.useFreeMemoryWriterOutput = compositeFetch && conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT,
-        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT_DEFAULT);
+        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT_DEFAULT)
+        && !isFinalMergeEnabled;
 
     this.rfs = ((LocalFileSystem) FileSystem.getLocal(this.conf)).getRaw();
 
@@ -1052,7 +1053,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         // if we used free memory to store the spill, do not increment fileOutputBytesCounter
         if (!spillResult.useFreeMemoryForOutput) {
           fileOutputBytesCounter.increment(spillResult.spillSize);
-          // TODO: increment OUTPUT_BYTES_MEMORY
+        } else {
+          fileOutputBytesMemoryCounter.increment(spillResult.spillSize);
         }
         if (writeSpillRecord) {
           // finalIndexPath is used, so add indexFileSizeEstimate
@@ -1555,12 +1557,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       }
 
       if (!pipelinedShuffle && isFinalMergeEnabled) {
-        if (!result.useFreeMemoryForOutput) {
-          synchronized(additionalSpillBytesWrittenCounter) {
-            additionalSpillBytesWrittenCounter.increment(result.spillSize);
-          }
+        assert !result.useFreeMemoryForOutput;
+        synchronized(additionalSpillBytesWrittenCounter) {
+          additionalSpillBytesWrittenCounter.increment(result.spillSize);
         }
-        // TODO: update OUTPUT_BYTES_MEMORY
       } else {
         if (!result.useFreeMemoryForOutput) {
           synchronized(fileOutputBytesCounter) {
@@ -1569,8 +1569,12 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
               fileOutputBytesCounter.increment(indexFileSizeEstimate);
             }
           }
+        } else {
+          synchronized(fileOutputBytesMemoryCounter) {
+            fileOutputBytesMemoryCounter.increment(result.spillSize);
+            assert !writeSpillRecord;
+          }
         }
-        // TODO: update OUTPUT_BYTES_MEMORY
       }
 
       spillLock.lock();

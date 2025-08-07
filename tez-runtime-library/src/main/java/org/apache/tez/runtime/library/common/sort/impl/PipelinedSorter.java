@@ -105,7 +105,7 @@ public class PipelinedSorter extends ExternalSorter {
   private final ArrayList<TezSpillRecord> indexCacheList = new ArrayList<TezSpillRecord>();
 
   private final boolean pipelinedShuffle;
-  private final boolean finalMergeEnabled;
+  private final boolean isFinalMergeEnabled;
 
   private long currentAllocatableMemory;
   //Maintain a list of ByteBuffers
@@ -167,8 +167,8 @@ public class PipelinedSorter extends ExternalSorter {
     pipelinedShuffle = this.conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED,
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT);
-    // set finalMergeEnabled = !pipelinedShuffleConf unless set explicitly in tez-site.xml
-    finalMergeEnabled = conf.getBoolean(
+    // set isFinalMergeEnabled = !pipelinedShuffleConf unless set explicitly in tez-site.xml
+    isFinalMergeEnabled = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT,
         !pipelinedShuffle);
 
@@ -217,7 +217,7 @@ public class PipelinedSorter extends ExternalSorter {
       initialSetupLogLine.append(", useSoftReference=").append(useSoftReference);
       initialSetupLogLine.append(", minBlockSize=").append(MIN_BLOCK_SIZE);
       initialSetupLogLine.append(", initial BLOCK_SIZE=").append(buffers.get(0).capacity());
-      initialSetupLogLine.append(", finalMergeEnabled=").append(finalMergeEnabled);
+      initialSetupLogLine.append(", isFinalMergeEnabled=").append(isFinalMergeEnabled);
       initialSetupLogLine.append(", pipelinedShuffle=").append(pipelinedShuffle);
       initialSetupLogLine.append(", sendEmptyPartitions=").append(sendEmptyPartitionDetails);
       LOG.debug(initialSetupLogLine.toString());
@@ -246,7 +246,8 @@ public class PipelinedSorter extends ExternalSorter {
     // useFreeMemoryWriterOutput = false if compositeFetch == false, i.e, when using mapreduce_shuffle
     this.useFreeMemoryWriterOutput = compositeFetch && conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT,
-        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT_DEFAULT);
+        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT_DEFAULT)
+        && !isFinalMergeEnabled;
   }
 
   ByteBuffer allocateSpace() {
@@ -386,7 +387,7 @@ public class PipelinedSorter extends ExternalSorter {
   private void sendPipelinedShuffleEvents() throws IOException{
     List<Event> events = Lists.newLinkedList();
     String pathComponent = ShuffleUtils.getUniqueIdentifierSpillId(outputContext, numSpills - 1);
-    ShuffleUtils.generateEventOnSpill(events, finalMergeEnabled, false,
+    ShuffleUtils.generateEventOnSpill(events, isFinalMergeEnabled, false,
         outputContext, (numSpills - 1), indexCacheList.get(numSpills - 1),
         partitions, sendEmptyPartitionDetails, pathComponent, partitionStats,
         reportDetailedPartitionStats(), auxiliaryService, deflater,
@@ -476,7 +477,7 @@ public class PipelinedSorter extends ExternalSorter {
   }
 
   private void adjustSpillCounters(long rawLength, long compLength) {
-    if (!finalMergeEnabled) {
+    if (!isFinalMergeEnabled) {
       outputBytesWithOverheadCounter.increment(rawLength);
     } else {
       if (numSpills > 0) {
@@ -557,8 +558,8 @@ public class PipelinedSorter extends ExternalSorter {
       //TODO: honor cache limits
       indexCacheList.add(spillRec);
       ++numSpills;
-      if (!finalMergeEnabled) {
-          fileOutputByteCounter.increment(rfs.getFileStatus(outputFilePath).getLen());
+      if (!isFinalMergeEnabled) {
+          fileOutputBytesCounter.increment(rfs.getFileStatus(outputFilePath).getLen());
           // No final merge. Set the number of files offered via shuffle-handler
           numShuffleChunks.setValue(numSpills);
       }
@@ -603,6 +604,7 @@ public class PipelinedSorter extends ExternalSorter {
 
     FSDataOutputStream fsOutput = null;
     Compressor compressorExternal = null;
+    long sumPartLength = 0L;
     try {
       if (byteArrayOutput == null) {
         fsOutput = rfs.create(spillFileName, true, 4096);
@@ -651,11 +653,12 @@ public class PipelinedSorter extends ExternalSorter {
           partLength = writer.getCompressedLength();
         }
         adjustSpillCounters(rawLength, partLength);
+        sumPartLength += partLength;
 
         // record offsets
         final TezIndexRecord rec = new TezIndexRecord(segmentStart, rawLength, partLength);
         spillRec.putIndex(rec, i);
-        if (!finalMergeEnabled && reportPartitionStats()) {
+        if (!isFinalMergeEnabled && reportPartitionStats()) {
           partitionStats[i] += rawLength;
         }
       } // end of for loop
@@ -684,11 +687,12 @@ public class PipelinedSorter extends ExternalSorter {
     indexCacheList.add(spillRec);
     ++numSpills;
 
-    if (!finalMergeEnabled) {
+    if (!isFinalMergeEnabled) {
       // This spill is directly served to downstream tasks, so increment fileOutputByteCounter.
-      // TODO: increment OUTPUT_BYTES_MEMORY
       if (byteArrayOutput == null) {
-        fileOutputByteCounter.increment(rfs.getFileStatus(spillFileName).getLen());
+        fileOutputBytesCounter.increment(rfs.getFileStatus(spillFileName).getLen());
+      } else {
+        fileOutputBytesMemoryCounter.increment(sumPartLength);
       }
       // No final merge. Set the number of files offered via shuffle-handler
       numShuffleChunks.setValue(numSpills);
@@ -759,7 +763,7 @@ public class PipelinedSorter extends ExternalSorter {
         return;
       }
 
-      if (!finalMergeEnabled) {
+      if (!isFinalMergeEnabled) {
         // For pipelined shuffle, previous events are already sent. Just generate the last event alone
         int startIndex = (pipelinedShuffle) ? (numSpills - 1) : 0;
         int endIndex = numSpills;
@@ -767,7 +771,7 @@ public class PipelinedSorter extends ExternalSorter {
         for (int i = startIndex; i < endIndex; i++) {
           boolean isLastEvent = (i == numSpills - 1);
           String pathComponent = (outputContext.getUniqueIdentifier() + "_" + i);
-          ShuffleUtils.generateEventOnSpill(finalEvents, finalMergeEnabled, isLastEvent,
+          ShuffleUtils.generateEventOnSpill(finalEvents, isFinalMergeEnabled, isLastEvent,
               outputContext, i, indexCacheList.get(i), partitions,
               sendEmptyPartitionDetails, pathComponent, partitionStats,
               reportDetailedPartitionStats(), auxiliaryService, deflater,
@@ -780,7 +784,7 @@ public class PipelinedSorter extends ExternalSorter {
 
       numAdditionalSpills.increment(numSpills - 1);
 
-      // Now, finalMergeEnabled == true
+      // Now, isFinalMergeEnabled == true
       // So, we have to increment fileOutputByteCounter because spill() does not increment it.
 
       // In case final merge is required, the following code path is executed.
@@ -819,11 +823,10 @@ public class PipelinedSorter extends ExternalSorter {
         }
         numShuffleChunks.setValue(numSpills);
 
-        // TODO: finalOutputFile = spillFilePaths.get(0), but the output spill may have been written to memory.
-        // In this case, rfs.getFileStatus(finalOutputFile).getLen() should not be called.
-
+        // useFreeMemoryWriterOutput == false because isFinalMergeEnabled == true,
+        // so finalOutputFile was actually written to local disk.
         // finalOutputFile is be served to downstream tasks, so increment fileOutputByteCounter
-        fileOutputByteCounter.increment(rfs.getFileStatus(finalOutputFile).getLen());
+        fileOutputBytesCounter.increment(rfs.getFileStatus(finalOutputFile).getLen());
 
         // TODO: why are events not being sent here???
         return;
@@ -914,7 +917,7 @@ public class PipelinedSorter extends ExternalSorter {
 
       // finalOutputFile is the new file to be served to downstream tasks, so increment fileOutputByteCounter
       // Here, we do not use free memory to store the merged output.
-      fileOutputByteCounter.increment(rfs.getFileStatus(finalOutputFile).getLen());
+      fileOutputBytesCounter.increment(rfs.getFileStatus(finalOutputFile).getLen());
 
       if (writeSpillRecord) {
         spillRec.writeToFile(finalIndexFile, localFs);

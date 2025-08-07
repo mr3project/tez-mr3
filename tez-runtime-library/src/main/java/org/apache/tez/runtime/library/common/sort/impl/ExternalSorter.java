@@ -155,7 +155,8 @@ public abstract class ExternalSorter {
   protected final TezCounter outputBytesWithOverheadCounter;
   // Represents the size of the final output - which will be transmitted over
   // the wire (spills are not counted). Factors in compression if it is enabled.
-  protected final TezCounter fileOutputByteCounter;
+  protected final TezCounter fileOutputBytesCounter;
+  protected final TezCounter fileOutputBytesMemoryCounter;
   // Represents total number of records written to disk (includes spills. Min
   // value for this is equal to number of output records)
   protected final TezCounter spilledRecordsCounter;
@@ -225,7 +226,8 @@ public abstract class ExternalSorter {
     mapOutputByteCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_BYTES);
     mapOutputRecordCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_RECORDS);
     outputBytesWithOverheadCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_BYTES_WITH_OVERHEAD);
-    fileOutputByteCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_BYTES_PHYSICAL);
+    fileOutputBytesCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_BYTES_PHYSICAL);
+    fileOutputBytesMemoryCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_BYTES_MEMORY);
     spilledRecordsCounter = outputContext.getCounters().findCounter(TaskCounter.SPILLED_RECORDS);
     additionalSpillBytesWritten = outputContext.getCounters().findCounter(TaskCounter.ADDITIONAL_SPILLS_BYTES_WRITTEN);
     additionalSpillBytesRead = outputContext.getCounters().findCounter(TaskCounter.ADDITIONAL_SPILLS_BYTES_READ);
