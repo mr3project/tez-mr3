@@ -1206,6 +1206,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
             }
           }
           writer.close();
+          // written to local disk, so increment fileOutputBytesCounter
           fileOutputBytesCounter.increment(writer.getCompressedLength());
           TezIndexRecord indexRecord = new TezIndexRecord(segmentStart, writer.getRawLength(),
               writer.getCompressedLength());
@@ -1227,10 +1228,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
     if (writeSpillRecord) {
       finalSpillRecord.writeToFile(finalIndexPath, localFs);
+      fileOutputBytesCounter.increment(indexFileSizeEstimate);
     } else {
       ShuffleUtils.writeToIndexPathCacheAndByteCache(outputContext, finalOutPath, finalSpillRecord, null);
     }
-    fileOutputBytesCounter.increment(indexFileSizeEstimate);
     LOG.info("{}: Finished final spill after merging: {} spills", destNameTrimmed, numSpills.get());
   }
 
