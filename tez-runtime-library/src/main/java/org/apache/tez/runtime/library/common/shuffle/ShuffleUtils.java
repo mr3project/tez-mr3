@@ -686,7 +686,7 @@ public class ShuffleUtils {
 
   // spillId is appended to pathComponent
   // only one of outputFilePath and byteArrayOutput is valid, and specifies the location of the output
-  // should be called only when using hadoop_shuffle (i.e., compositeFetch == true)
+  // should be called only when using tez_shuffle (i.e., compositeFetch == true)
   public static void writeSpillInfoToIndexPathCacheAndByteCache(
       OutputContext outputContext,
       int spillId,

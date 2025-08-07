@@ -559,7 +559,7 @@ public class PipelinedSorter extends ExternalSorter {
       ++numSpills;
       if (!finalMergeEnabled) {
           fileOutputByteCounter.increment(rfs.getFileStatus(outputFilePath).getLen());
-          //No final merge. Set the number of files offered via shuffle-handler
+          // No final merge. Set the number of files offered via shuffle-handler
           numShuffleChunks.setValue(numSpills);
       }
       if (pipelinedShuffle) {
@@ -683,13 +683,17 @@ public class PipelinedSorter extends ExternalSorter {
     // TODO: honor cache limits
     indexCacheList.add(spillRec);
     ++numSpills;
+
     if (!finalMergeEnabled) {
+      // This spill is directly served to downstream tasks, so increment fileOutputByteCounter.
+      // TODO: increment OUTPUT_BYTES_MEMORY
       if (byteArrayOutput == null) {
         fileOutputByteCounter.increment(rfs.getFileStatus(spillFileName).getLen());
       }
       // No final merge. Set the number of files offered via shuffle-handler
       numShuffleChunks.setValue(numSpills);
     }
+
     return true;
   }
 
@@ -726,7 +730,7 @@ public class PipelinedSorter extends ExternalSorter {
       // force a spill in flush()
       // case 1: we want to force because of following scenarios:
       // we have no keys written, and flush got called
-      // we want atleast one spill(be it empty)
+      // we want at least one spill (be it empty)
       // case 2: in pipeline shuffle case, we have no way of
       // knowing the last key being written until flush is called
       // so for flush()->spill() we want to force spill so that
@@ -776,6 +780,9 @@ public class PipelinedSorter extends ExternalSorter {
 
       numAdditionalSpills.increment(numSpills - 1);
 
+      // Now, finalMergeEnabled == true
+      // So, we have to increment fileOutputByteCounter because spill() does not increment it.
+
       // In case final merge is required, the following code path is executed.
       if (numSpills == 1) {
         // TODO: someday be able to pass this directly to shuffle without writing to disk
@@ -811,6 +818,11 @@ public class PipelinedSorter extends ExternalSorter {
           }
         }
         numShuffleChunks.setValue(numSpills);
+
+        // TODO: finalOutputFile = spillFilePaths.get(0), but the output spill may have been written to memory.
+        // In this case, rfs.getFileStatus(finalOutputFile).getLen() should not be called.
+
+        // finalOutputFile is be served to downstream tasks, so increment fileOutputByteCounter
         fileOutputByteCounter.increment(rfs.getFileStatus(finalOutputFile).getLen());
 
         // TODO: why are events not being sent here???
@@ -899,6 +911,9 @@ public class PipelinedSorter extends ExternalSorter {
       }
 
       numShuffleChunks.setValue(1); //final merge has happened.
+
+      // finalOutputFile is the new file to be served to downstream tasks, so increment fileOutputByteCounter
+      // Here, we do not use free memory to store the merged output.
       fileOutputByteCounter.increment(rfs.getFileStatus(finalOutputFile).getLen());
 
       if (writeSpillRecord) {
