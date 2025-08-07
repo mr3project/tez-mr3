@@ -104,7 +104,7 @@ public class PipelinedSorter extends ExternalSorter {
 
   private final ArrayList<TezSpillRecord> indexCacheList = new ArrayList<TezSpillRecord>();
 
-  private final boolean pipelinedShuffle;
+  private final boolean isPipelinedShuffle;
   private final boolean isFinalMergeEnabled;
 
   private long currentAllocatableMemory;
@@ -164,13 +164,13 @@ public class PipelinedSorter extends ExternalSorter {
         .append(outputContext.getDestinationVertexName());
     partitionBits = bitcount(partitions)+1;
 
-    pipelinedShuffle = this.conf.getBoolean(
+    isPipelinedShuffle = this.conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED,
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT);
     // set isFinalMergeEnabled = !pipelinedShuffleConf unless set explicitly in tez-site.xml
     isFinalMergeEnabled = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT,
-        !pipelinedShuffle);
+        !isPipelinedShuffle);
 
     initialSetupLogLine.append(", UsingHashComparator=");
     // k/v serialization
@@ -218,7 +218,7 @@ public class PipelinedSorter extends ExternalSorter {
       initialSetupLogLine.append(", minBlockSize=").append(MIN_BLOCK_SIZE);
       initialSetupLogLine.append(", initial BLOCK_SIZE=").append(buffers.get(0).capacity());
       initialSetupLogLine.append(", isFinalMergeEnabled=").append(isFinalMergeEnabled);
-      initialSetupLogLine.append(", pipelinedShuffle=").append(pipelinedShuffle);
+      initialSetupLogLine.append(", pipelinedShuffle=").append(isPipelinedShuffle);
       initialSetupLogLine.append(", sendEmptyPartitions=").append(sendEmptyPartitionDetails);
       LOG.debug(initialSetupLogLine.toString());
     }
@@ -350,7 +350,7 @@ public class PipelinedSorter extends ExternalSorter {
       // sort in the same thread, do not wait for the thread pool
       merger.add(span.sort(sorter));
       boolean ret = spill(true);
-      if (pipelinedShuffle && ret) {
+      if (isPipelinedShuffle && ret) {
         sendPipelinedShuffleEvents();
       }
       // Use the next buffer
@@ -558,12 +558,15 @@ public class PipelinedSorter extends ExternalSorter {
       //TODO: honor cache limits
       indexCacheList.add(spillRec);
       ++numSpills;
-      if (!isFinalMergeEnabled) {
-          fileOutputBytesCounter.increment(rfs.getFileStatus(outputFilePath).getLen());
-          // No final merge. Set the number of files offered via shuffle-handler
-          numShuffleChunks.setValue(numSpills);
+
+      if (isPipelinedShuffle || !isFinalMergeEnabled) {
+        // This output file is directly served to downstream tasks, so increment fileOutputBytesCounter.
+        fileOutputBytesCounter.increment(rfs.getFileStatus(outputFilePath).getLen());
+        // No final merge. Set the number of files offered via shuffle-handler
+        numShuffleChunks.setValue(numSpills);
       }
-      if (pipelinedShuffle) {
+
+      if (isPipelinedShuffle) {
         sendPipelinedShuffleEvents();
       }
     } finally {
@@ -765,7 +768,7 @@ public class PipelinedSorter extends ExternalSorter {
 
       if (!isFinalMergeEnabled) {
         // For pipelined shuffle, previous events are already sent. Just generate the last event alone
-        int startIndex = (pipelinedShuffle) ? (numSpills - 1) : 0;
+        int startIndex = (isPipelinedShuffle) ? (numSpills - 1) : 0;
         int endIndex = numSpills;
 
         for (int i = startIndex; i < endIndex; i++) {
