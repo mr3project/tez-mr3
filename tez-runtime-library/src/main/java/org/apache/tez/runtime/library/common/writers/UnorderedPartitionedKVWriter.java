@@ -639,10 +639,11 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       try {
         if (byteArrayOutput == null) {
           fsOutput = rfs.create(spillPathDetails.outputFilePath);
+          ensureSpillFilePermissions(spillPathDetails.outputFilePath, rfs);
         } else {
           fsOutput = new FSDataOutputStream(byteArrayOutput, null);
+          // spillPathDetails.outputFilePath is not used
         }
-        ensureSpillFilePermissions(spillPathDetails.outputFilePath, rfs);
 
         LOG.info("Writing spill {} to {} (use in-memory buffers = {})",
             spillNumber, spillPathDetails.outputFilePath.toString(), canUseBuffers);
@@ -705,7 +706,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         }
       }
 
-      spillResult = new SpillResult(compressedLength, this.filledBuffers);
+      spillResult = new SpillResult(compressedLength, this.filledBuffers, canUseBuffers);
 
       // spillPathDetails.spillIndex can be -1 if spillIndex was not used in pathComponent
       handleSpillIndex(spillPathDetails, spillRecord, byteArrayOutput);
@@ -836,7 +837,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           eventList.add(generateVMEvent());
 
           if (!canSendDataOverDME()) {
-            // okay, the final data was written to disk
+            // the final data was written to disk, so increment fileOutputBytesCounter
             TezIndexRecord rec = new TezIndexRecord(0, rawLen, compLen);
             TezSpillRecord sr = new TezSpillRecord(1);
             sr.putIndex(rec, 0);
@@ -1048,7 +1049,11 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       try {
         SpillResult spillResult = spillCallable.call();
 
-        fileOutputBytesCounter.increment(spillResult.spillSize);
+        // if we used free memory to store the spill, do not increment fileOutputBytesCounter
+        if (!spillResult.useFreeMemoryForOutput) {
+          fileOutputBytesCounter.increment(spillResult.spillSize);
+          // TODO: increment OUTPUT_BYTES_MEMORY
+        }
         if (writeSpillRecord) {
           // finalIndexPath is used, so add indexFileSizeEstimate
           fileOutputBytesCounter.increment(indexFileSizeEstimate);
@@ -1590,10 +1595,12 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   private static class SpillResult {
     final long spillSize;
     final List<WrappedBuffer> filledBuffers;
+    final boolean useFreeMemoryForOutput;
 
-    SpillResult(long size, List<WrappedBuffer> filledBuffers) {
+    SpillResult(long size, List<WrappedBuffer> filledBuffers, boolean useFreeMemoryForOutput) {
       this.spillSize = size;
       this.filledBuffers = filledBuffers;
+      this.useFreeMemoryForOutput = useFreeMemoryForOutput;
     }
   }
 
