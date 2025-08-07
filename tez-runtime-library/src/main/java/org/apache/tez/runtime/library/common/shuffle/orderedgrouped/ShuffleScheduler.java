@@ -79,7 +79,7 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
   private final TezCounter failedShuffleCounter;
   private final TezCounter bytesShuffledToDisk;
   private final TezCounter bytesShuffledToDiskDirect;
-  private final TezCounter bytesShuffledToMem;
+  private final TezCounter bytesShuffledToMemory;
 
   private final ShuffleErrorCounterGroup shuffleErrorCounterGroup;
 
@@ -126,7 +126,7 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
     this.bytesShuffledToDisk = inputContext.getCounters().findCounter(
         TaskCounter.SHUFFLE_BYTES_TO_DISK);
     this.bytesShuffledToDiskDirect = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_DISK_DIRECT);
-    this.bytesShuffledToMem = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_TO_MEM);
+    this.bytesShuffledToMemory = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_TO_MEMORY);
 
     // Counters used by Fetchers
     TezCounter ioErrsCounter = inputContext.getCounters().findCounter(SHUFFLE_ERR_GRP_NAME,
@@ -223,7 +223,7 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
         } else if (output.getType() == Type.DISK_DIRECT) {
           bytesShuffledToDiskDirect.increment(bytesCompressed);
         } else {
-          bytesShuffledToMem.increment(bytesCompressed);
+          bytesShuffledToMemory.increment(bytesCompressed);
         }
         shuffledInputsCounter.increment(1);
       } else {

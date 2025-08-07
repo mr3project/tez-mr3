@@ -42,7 +42,6 @@ import org.apache.tez.runtime.library.common.shuffle.FetchedInput;
 import org.apache.tez.runtime.library.common.shuffle.FetchedInput.Type;
 import org.apache.tez.runtime.library.common.shuffle.FetchedInputAllocator;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleClient;
-import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 
 import org.apache.tez.common.Preconditions;
 import com.google.common.collect.Lists;
@@ -60,7 +59,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
   private final TezCounter bytesShuffledCounter;
   private final TezCounter decompressedDataSizeCounter;
   private final TezCounter bytesShuffledToDiskCounter;
-  private final TezCounter bytesShuffledToMemCounter;
+  private final TezCounter bytesShuffledToMemoryCounter;
   private final TezCounter bytesShuffledDirectDiskCounter;
   private final TezCounter shufflePhaseTime;
 
@@ -101,7 +100,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
     this.bytesShuffledCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES);
     this.decompressedDataSizeCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_DECOMPRESSED);
     this.bytesShuffledToDiskCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_TO_DISK);
-    this.bytesShuffledToMemCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_TO_MEM);
+    this.bytesShuffledToMemoryCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_TO_MEMORY);
     this.bytesShuffledDirectDiskCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_DISK_DIRECT);
     this.shufflePhaseTime = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_PHASE_TIME);
 
@@ -274,7 +273,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
       shuffledInputsCounter.increment(1);
       bytesShuffledCounter.increment(fetchedBytes);
       if (fetchedInput.getType() == Type.MEMORY) {
-        bytesShuffledToMemCounter.increment(fetchedBytes);
+        bytesShuffledToMemoryCounter.increment(fetchedBytes);
       } else if (fetchedInput.getType() == Type.DISK) {
         bytesShuffledToDiskCounter.increment(fetchedBytes);
       } else if (fetchedInput.getType() == Type.DISK_DIRECT) {
