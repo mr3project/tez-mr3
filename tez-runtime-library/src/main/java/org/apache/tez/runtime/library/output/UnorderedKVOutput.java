@@ -76,13 +76,12 @@ public class UnorderedKVOutput extends AbstractLogicalOutput {
 
     this.memoryUpdateCallbackHandler = new MemoryUpdateCallbackHandler();
 
-    boolean pipelinedShuffle = this.conf.getBoolean(TezRuntimeConfiguration
-        .TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED, TezRuntimeConfiguration
-        .TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT);
-
-    long memRequestSize = (pipelinedShuffle) ?
-        UnorderedPartitionedKVWriter.getInitialMemoryRequirement(conf, getContext()
-            .getTotalMemoryAvailableToTask()) : 0;
+    boolean isPipelinedShuffle = this.conf.getBoolean(
+        TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED,
+        TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT);
+    long memRequestSize = isPipelinedShuffle ?
+        UnorderedPartitionedKVWriter.getInitialMemoryRequirement(
+          conf, getContext().getTotalMemoryAvailableToTask()) : 0;
     getContext().requestInitialMemory(memRequestSize, memoryUpdateCallbackHandler);
     
     return Collections.emptyList();

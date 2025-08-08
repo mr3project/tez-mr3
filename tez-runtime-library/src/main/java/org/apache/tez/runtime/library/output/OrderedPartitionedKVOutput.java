@@ -68,8 +68,8 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
   private final AtomicBoolean isStarted = new AtomicBoolean(false);
   private final Deflater deflater;
 
-  boolean pipelinedShuffle;
-  boolean finalMergeEnabled;
+  boolean isPipelinedShuffle;
+  boolean isFinalMergeEnabled;
   private boolean sendEmptyPartitionDetails;
 
   private String auxiliaryService;
@@ -119,22 +119,13 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
             + ", validValues=" + Arrays.asList(SorterImpl.values()));
       }
 
-      pipelinedShuffle = conf.getBoolean(
+      isPipelinedShuffle = conf.getBoolean(
           TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED,
           TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT);
-      // set finalMergeEnabled = !pipelinedShuffleConf unless set explicitly in tez-site.xml
-      finalMergeEnabled = conf.getBoolean(
-          TezRuntimeConfiguration.TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT,
-          !pipelinedShuffle);
+      // We do not use TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT.
+      isFinalMergeEnabled = !this.isPipelinedShuffle;
 
-      if (pipelinedShuffle) {
-        if (finalMergeEnabled) {
-          LOG.info(getContext().getDestinationVertexName() + " disabling final merge as "
-              + TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED + " is enabled.");
-          finalMergeEnabled = false;
-          conf.setBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT, false);
-        }
-
+      if (isPipelinedShuffle) {
         Preconditions.checkArgument(sorterImpl.equals(SorterImpl.PIPELINED),
             TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED + "only works with PipelinedSorter.");
       }
@@ -195,7 +186,8 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
 
   private List<Event> generateEvents() throws IOException {
     List<Event> eventList = Lists.newLinkedList();
-    if (finalMergeEnabled && !pipelinedShuffle) {
+    if (!isPipelinedShuffle) {
+      assert isFinalMergeEnabled;
       if (!sorter.getFinalIndexComputed()) {
         // return an empty list because TezSpillRecord() throws NPE
         // this occurs when PipelinedSorter threads gets interrupted and LogicalOutput.close() is closed
@@ -212,7 +204,7 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
           getContext(), pathComponentExpanded, sorter.getFinalIndexFile(), localFs);
 
       boolean isLastEvent = true;
-      ShuffleUtils.generateEventOnSpill(eventList, finalMergeEnabled, isLastEvent,
+      ShuffleUtils.generateEventOnSpill(eventList, isFinalMergeEnabled, isLastEvent,
           getContext(), 0, tezSpillRecord,
           getNumPhysicalOutputs(), sendEmptyPartitionDetails, pathComponent,
           sorter.getPartitionStats(), sorter.reportDetailedPartitionStats(), auxiliaryService, deflater,

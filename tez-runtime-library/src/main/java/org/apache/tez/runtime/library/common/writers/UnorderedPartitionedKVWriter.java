@@ -207,14 +207,13 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     Preconditions.checkArgument(availableMemoryBytes >= 0, "availableMemory should be >= 0 bytes");
 
     this.destNameTrimmed = TezUtilsInternal.cleanVertexName(outputContext.getDestinationVertexName());
+
     this.isPipelinedShuffle = this.conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED,
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT);
-    // set isFinalMergeEnabled = !pipelinedShuffleConf unless set explicitly in tez-site.xml
-    this.isFinalMergeEnabled = conf.getBoolean(
-        TezRuntimeConfiguration.TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT,
-        !this.isPipelinedShuffle);
-    this.finalEvents = Lists.newLinkedList();
+    // We do not use TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT.
+    this.isFinalMergeEnabled = !this.isPipelinedShuffle;
+    this.finalEvents = this.isFinalMergeEnabled ? null : Lists.newLinkedList();
 
     this.dataViaEventsEnabled = conf.getBoolean(
        TezRuntimeConfiguration.TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_ENABLED,
@@ -1022,7 +1021,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   // inside close()
   private SpillResult finalSpill() throws IOException {
     if (currentBuffer.nextPosition == 0) {
-      if (isPipelinedShuffle || !isFinalMergeEnabled) {
+      if (isPipelinedShuffle) {
         List<Event> eventList = Lists.newLinkedList();
         eventList.add(ShuffleUtils.generateVMEvent(outputContext,
             reportPartitionStats() ? new long[numPartitions] : null,
@@ -1034,11 +1033,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           eventList.add(generateDMEvent(true, numSpills.get(), true,
               null, emptyPartitions));
         }
-        if (isPipelinedShuffle) {
-          outputContext.sendEvents(eventList);
-        } else if (!isFinalMergeEnabled) {
-          finalEvents.addAll(0, eventList);
-        }
+        outputContext.sendEvents(eventList);
       }
       return null;
     } else {
@@ -1482,9 +1477,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       BitSet emptyPartitions, long[] sizePerPartition,
       int spillNumber, boolean isFinalUpdate) {
     if (!isPipelinedShuffle) {
-      if (isFinalMergeEnabled) {
-        return;
-      }
+      assert isFinalMergeEnabled;
+      return;
     }
     List<Event> events = null;
     try {
@@ -1492,12 +1486,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           isFinalUpdate);
       LOG.info("{}: Adding spill event for spill (final update={}), spillId={}",
           destNameTrimmed, isFinalUpdate, spillNumber);
-      if (isPipelinedShuffle) {
-        // Send out an event for consuming.
-        outputContext.sendEvents(events);
-      } else if (!isFinalMergeEnabled) {
-        this.finalEvents.addAll(events);
-      }
+      // Send out an event for consuming.
+      outputContext.sendEvents(events);
     } catch (IOException e) {
       LOG.error(destNameTrimmed + ": Error in sending pipelined events", e);
       outputContext.reportFailure(TaskFailureType.NON_FATAL, e,

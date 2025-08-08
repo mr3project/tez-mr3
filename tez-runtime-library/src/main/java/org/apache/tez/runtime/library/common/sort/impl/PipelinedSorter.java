@@ -167,10 +167,8 @@ public class PipelinedSorter extends ExternalSorter {
     isPipelinedShuffle = this.conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED,
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT);
-    // set isFinalMergeEnabled = !pipelinedShuffleConf unless set explicitly in tez-site.xml
-    isFinalMergeEnabled = conf.getBoolean(
-        TezRuntimeConfiguration.TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT,
-        !isPipelinedShuffle);
+    // We do not use TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT.
+    isFinalMergeEnabled = !this.isPipelinedShuffle;
 
     initialSetupLogLine.append(", UsingHashComparator=");
     // k/v serialization
@@ -768,7 +766,8 @@ public class PipelinedSorter extends ExternalSorter {
 
       if (!isFinalMergeEnabled) {
         // For pipelined shuffle, previous events are already sent. Just generate the last event alone
-        int startIndex = (isPipelinedShuffle) ? (numSpills - 1) : 0;
+        assert isPipelinedShuffle;
+        int startIndex = numSpills - 1;
         int endIndex = numSpills;
 
         for (int i = startIndex; i < endIndex; i++) {
