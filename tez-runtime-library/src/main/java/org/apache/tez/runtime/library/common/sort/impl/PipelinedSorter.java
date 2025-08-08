@@ -75,11 +75,10 @@ public class PipelinedSorter extends ExternalSorter {
    * The size of each record in the index file for the map-outputs.
    */
   public static final int MAP_OUTPUT_INDEX_RECORD_LENGTH = 24;
-
   private final static int APPROX_HEADER_LENGTH = 150;
 
   private final int partitionBits;
-  
+
   private static final int PARTITION = 0;        // partition offset in acct
   private static final int KEYSTART = 1;         // key offset in acct
   private static final int VALSTART = 2;         // val offset in acct
@@ -87,35 +86,32 @@ public class PipelinedSorter extends ExternalSorter {
   private static final int NMETA = 4;            // num meta ints
   private static final int METASIZE = NMETA * 4; // size in bytes
 
-  private final int minSpillsForCombine;
-  private final ProxyComparator hasher;
-  // SortSpans  
-  private SortSpan span;
-
-  //total memory capacity allocated to sorter
-  private final long capacity;
-
-  //track buffer overflow recursively in all buffers
-  private int bufferOverflowRecursion;
-
-  // Merger
-  private final SpanMerger merger; 
-  private final ExecutorService sortmaster;
-
-  private final ArrayList<TezSpillRecord> indexCacheList = new ArrayList<TezSpillRecord>();
+  private final boolean lazyAllocateMem;
+  private final int MIN_BLOCK_SIZE;
+  private final boolean useSoftReference;
 
   private final boolean isPipelinedShuffle;
   private final boolean isFinalMergeEnabled;
 
+  private final int minSpillsForCombine;
+
+  private final ProxyComparator hasher;
+
   private long currentAllocatableMemory;
-  //Maintain a list of ByteBuffers
-  final List<ByteBuffer> buffers;
-  List<Integer> bufferUsage;
   final int maxNumberOfBlocks;
+  //total memory capacity allocated to sorter
+  private final long capacity;
+
+  // Maintain a list of ByteBuffers
+  final List<ByteBuffer> buffers;
+  final List<Integer> bufferUsage;
   private int bufferIndex = -1;
-  private final int MIN_BLOCK_SIZE;
-  private final boolean lazyAllocateMem;
-  private final boolean useSoftReference;
+
+  private SortSpan span;
+  // Merger
+  private final SpanMerger merger;
+  private final ExecutorService sortmaster;
+
   private final Deflater deflater;
 
   /**
@@ -128,21 +124,31 @@ public class PipelinedSorter extends ExternalSorter {
   private final long freeMemoryThreshold;
   private final boolean useFreeMemoryWriterOutput;  // use availableMemory as threshold
 
+  private final ArrayList<TezSpillRecord> indexCacheList = new ArrayList<TezSpillRecord>();
+
+  // track buffer overflow recursively in all buffers
+  private int bufferOverflowRecursion = 0;
+
   public PipelinedSorter(OutputContext outputContext, Configuration conf, int numOutputs,
       long initialMemoryAvailable) throws IOException {
     super(outputContext, conf, numOutputs, initialMemoryAvailable);
 
-    lazyAllocateMem = this.conf.getBoolean(
+    StringBuilder initialSetupLogLine = new StringBuilder("Setting up PipelinedSorter for ")
+      .append(outputContext.getDestinationVertexName());
+
+    this.partitionBits = bitcount(partitions) + 1;
+
+    this.lazyAllocateMem = this.conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_LAZY_ALLOCATE_MEMORY,
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_LAZY_ALLOCATE_MEMORY_DEFAULT);
 
-    if (lazyAllocateMem) {
+    if (this.lazyAllocateMem) {
       /**
        * When lazy-allocation is enabled, framework takes care of auto
        * allocating memory on need basis. Desirable block size is set to 256MB
        */
       // 256MB - 64 bytes. See comment for the 32MB allocation.
-      MIN_BLOCK_SIZE = ((256 << 20) - 64);
+      this.MIN_BLOCK_SIZE = ((256 << 20) - 64);
     } else {
       int minBlockSize = conf.getInt(
           TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_MIN_BLOCK_SIZE_IN_MB,
@@ -151,30 +157,28 @@ public class PipelinedSorter extends ExternalSorter {
           (minBlockSize > 0 && minBlockSize < 2047),
           "{}={} should be a positive value between 0 and 2047",
           TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_MIN_BLOCK_SIZE_IN_MB, minBlockSize);
-      MIN_BLOCK_SIZE = minBlockSize << 20;
+      this.MIN_BLOCK_SIZE = minBlockSize << 20;
     }
-
-    useSoftReference = this.conf.getBoolean(
+    this.useSoftReference = this.conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_USE_SOFT_REFERENCE,
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_USE_SOFT_REFERENCE_DEFAULT);
 
-    StringBuilder initialSetupLogLine = new StringBuilder("Setting up PipelinedSorter for ")
-        .append(outputContext.getDestinationVertexName());
-    partitionBits = bitcount(partitions)+1;
-
-    isPipelinedShuffle = this.conf.getBoolean(
+    this.isPipelinedShuffle = this.conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED,
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT);
     // We do not use TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT.
-    isFinalMergeEnabled = !this.isPipelinedShuffle;
+    this.isFinalMergeEnabled = !this.isPipelinedShuffle;
+
+    this.minSpillsForCombine = this.conf.getInt(
+        TezRuntimeConfiguration.TEZ_RUNTIME_COMBINE_MIN_SPILLS, 3);
 
     initialSetupLogLine.append(", UsingHashComparator=");
     // k/v serialization
     if (comparator instanceof ProxyComparator) {
-      hasher = (ProxyComparator)comparator;
+      this.hasher = (ProxyComparator)comparator;
       initialSetupLogLine.append(true);
     } else {
-      hasher = null;
+      this.hasher = null;
       initialSetupLogLine.append(false);
     }
 
@@ -193,14 +197,14 @@ public class PipelinedSorter extends ExternalSorter {
       availableMem -= size;
       numBlocks++;
     }
-    currentAllocatableMemory = maxMemLimit;
-    maxNumberOfBlocks = numBlocks;
-    capacity = totalCapacityWithoutMeta;
+    this.currentAllocatableMemory = maxMemLimit;
+    this.maxNumberOfBlocks = numBlocks;
+    this.capacity = totalCapacityWithoutMeta;
 
-    buffers = Lists.newArrayListWithCapacity(maxNumberOfBlocks);
-    bufferUsage = Lists.newArrayListWithCapacity(maxNumberOfBlocks);
+    this.buffers = Lists.newArrayListWithCapacity(maxNumberOfBlocks);
+    this.bufferUsage = Lists.newArrayListWithCapacity(maxNumberOfBlocks);
     allocateSpace();  // Allocate the first block
-    if (!lazyAllocateMem) {
+    if (!this.lazyAllocateMem) {
       // LOG.info("Pre allocating rest of memory buffers upfront");
       while (allocateSpace() != null);
     }
@@ -219,24 +223,24 @@ public class PipelinedSorter extends ExternalSorter {
       LOG.debug(initialSetupLogLine.toString());
     }
 
-    span = new SortSpan(buffers.get(bufferIndex), 1024 * 1024, 16, this.comparator);
-    merger = new SpanMerger(); // SpanIterators are comparable
+    this.span = new SortSpan(buffers.get(bufferIndex), 1024 * 1024, 16, this.comparator);
+    this.merger = new SpanMerger(); // SpanIterators are comparable
     final int sortThreads = this.conf.getInt(
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_SORT_THREADS,
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_SORT_THREADS_DEFAULT);
-    sortmaster = Executors.newFixedThreadPool(sortThreads,
+    this.sortmaster = Executors.newFixedThreadPool(sortThreads,
         new ThreadFactoryBuilder().setDaemon(true)
         .setNameFormat("Sorter {" + outputContext.getDestinationVertexName() + "} #%d")
         .build());
 
-    valSerializer.open(span.out);
-    keySerializer.open(span.out);
-    minSpillsForCombine = this.conf.getInt(TezRuntimeConfiguration.TEZ_RUNTIME_COMBINE_MIN_SPILLS, 3);
-    deflater = TezCommonUtils.newBestCompressionDeflater();
+    valSerializer.open(this.span.out);
+    keySerializer.open(this.span.out);
 
-    finalEvents = Lists.newLinkedList();
+    this.deflater = TezCommonUtils.newBestCompressionDeflater();
 
-    writeBuffer = IFile.allocateWriteBuffer();
+    this.finalEvents = Lists.newLinkedList();
+
+    this.writeBuffer = IFile.allocateWriteBuffer();
 
     this.freeMemoryThreshold = outputContext.getTotalMemoryAvailableToTask();
     // useFreeMemoryWriterOutput = false if compositeFetch == false, i.e, when using mapreduce_shuffle
@@ -457,7 +461,7 @@ public class PipelinedSorter extends ExternalSorter {
 
     int prefix = 0;
 
-    if(hasher != null) {
+    if (hasher != null) {
       prefix = hasher.getProxy(key);
     }
 
