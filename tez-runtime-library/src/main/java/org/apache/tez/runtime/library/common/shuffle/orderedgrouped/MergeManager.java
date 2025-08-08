@@ -176,7 +176,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     
     this.numDiskToDiskMerges = inputContext.getCounters().findCounter(TaskCounter.NUM_DISK_TO_DISK_MERGES);
     this.numMemToDiskMerges = inputContext.getCounters().findCounter(TaskCounter.NUM_MEM_TO_DISK_MERGES);
-    this.additionalSpillBytesWritten = inputContext.getCounters().findCounter(TaskCounter.ADDITIONAL_SPILLS_BYTES_WRITTEN);
+    this.additionalSpillBytesWritten = inputContext.getCounters().findCounter(TaskCounter.SPILL_BYTES_DISK);
     this.additionalSpillBytesRead = inputContext.getCounters().findCounter(TaskCounter.ADDITIONAL_SPILLS_BYTES_READ);
 
     this.cleanup = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT,
@@ -1085,15 +1085,12 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         // disk segments and this will be incremented by 1 (result of the 
         // memory segments merge). Since this total would still be 
         // <= io.sort.factor, we will not do any more intermediate merges,
-        // the merge of all these disk segments would be directly fed to the
-        // reduce method
+        // the merge of all these disk segments would be directly fed to the reduce method
         
         // must spill to disk, but can't retain in-mem for intermediate merge
-        // Can not use spill id in final merge as it would clobber with other files, hence using
-        // Integer.MAX_VALUE
-        final Path outputPath = 
-          mapOutputFile.getInputFileForWrite(srcTaskId, Integer.MAX_VALUE,
-              inMemToDiskBytes).suffix(Constants.MERGED_OUTPUT_PREFIX);
+        // Can not use spill id in final merge as it would clobber with other files, hence using Integer.MAX_VALUE
+        final Path outputPath = mapOutputFile.getInputFileForWrite(
+            srcTaskId, Integer.MAX_VALUE, inMemToDiskBytes).suffix(Constants.MERGED_OUTPUT_PREFIX);
         final TezRawKeyValueIterator rIter = TezMerger.merge(job, fs, serContext,
             memDiskSegments, numMemDiskSegments, tmpDir, comparator, progressable,
             spilledRecordsCounter, null, additionalSpillBytesRead, null, inputContext);

@@ -129,10 +129,12 @@ public abstract class ExternalSorter {
   // Represents the size of the final output - with any overheads introduced by
   // the storage/serialization mechanism. This is an uncompressed data size.
   protected final TezCounter outputBytesWithOverheadCounter;
+
   // Represents the size of the final output - which will be transmitted over
   // the wire (spills are not counted). Factors in compression if it is enabled.
   protected final TezCounter fileOutputBytesCounter;
   protected final TezCounter fileOutputBytesMemoryCounter;
+
   // Represents total number of records written to disk (includes spills. Min
   // value for this is equal to number of output records)
   protected final TezCounter spilledRecordsCounter;
@@ -242,7 +244,7 @@ public abstract class ExternalSorter {
     this.fileOutputBytesCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_BYTES_DISK);
     this.fileOutputBytesMemoryCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_BYTES_MEMORY);
     this.spilledRecordsCounter = outputContext.getCounters().findCounter(TaskCounter.SPILLED_RECORDS);
-    this.additionalSpillBytesWritten = outputContext.getCounters().findCounter(TaskCounter.ADDITIONAL_SPILLS_BYTES_WRITTEN);
+    this.additionalSpillBytesWritten = outputContext.getCounters().findCounter(TaskCounter.SPILL_BYTES_DISK);
     this.additionalSpillBytesRead = outputContext.getCounters().findCounter(TaskCounter.ADDITIONAL_SPILLS_BYTES_READ);
     this.numAdditionalSpills = outputContext.getCounters().findCounter(TaskCounter.ADDITIONAL_SPILL_COUNT);
     this.numShuffleChunks = outputContext.getCounters().findCounter(TaskCounter.SHUFFLE_CHUNK_COUNT);

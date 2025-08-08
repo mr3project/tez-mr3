@@ -93,6 +93,7 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
    */
   protected final TezCounter fileOutputBytesCounter;
   protected final TezCounter fileOutputBytesMemoryCounter;
+
   /**
    * Represents the additional records written to disk due to spills. Does not
    * count the final write to disk.
@@ -142,7 +143,7 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
     fileOutputBytesCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_BYTES_DISK);
     fileOutputBytesMemoryCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_BYTES_MEMORY);
     spilledRecordsCounter = outputContext.getCounters().findCounter(TaskCounter.SPILLED_RECORDS);
-    additionalSpillBytesWrittenCounter = outputContext.getCounters().findCounter(TaskCounter.ADDITIONAL_SPILLS_BYTES_WRITTEN);
+    additionalSpillBytesWrittenCounter = outputContext.getCounters().findCounter(TaskCounter.SPILL_BYTES_DISK);
     additionalSpillBytesReadCounter = outputContext.getCounters().findCounter(TaskCounter.ADDITIONAL_SPILLS_BYTES_READ);
     numAdditionalSpillsCounter = outputContext.getCounters().findCounter(TaskCounter.ADDITIONAL_SPILL_COUNT);
     dataViaEventSize = outputContext.getCounters().findCounter(TaskCounter.DATA_BYTES_VIA_EVENT);
