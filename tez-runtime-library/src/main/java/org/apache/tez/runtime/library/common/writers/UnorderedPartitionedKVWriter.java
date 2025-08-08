@@ -158,11 +158,6 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   final ReportPartitionStats reportPartitionStats;
   private final long[] sizePerPartition;
 
-  /**
-   * Represents final number of records written (spills are not counted)
-   */
-  protected final TezCounter outputLargeRecordsCounter;
-
   private final long indexFileSizeEstimate;
 
   private long localOutputRecordBytesCounter = 0;
@@ -306,9 +301,6 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         TezRuntimeConfiguration.TEZ_RUNTIME_REPORT_PARTITION_STATS,
         TezRuntimeConfiguration.TEZ_RUNTIME_REPORT_PARTITION_STATS_DEFAULT));
     sizePerPartition = (reportPartitionStats.isEnabled()) ? new long[numPartitions] : null;
-
-    outputLargeRecordsCounter = outputContext.getCounters().findCounter(
-        TaskCounter.OUTPUT_LARGE_RECORDS);
 
     indexFileSizeEstimate = numPartitions * Constants.MAP_OUTPUT_INDEX_RECORD_LENGTH;
 

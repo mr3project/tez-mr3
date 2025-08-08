@@ -121,11 +121,10 @@ public abstract class ExternalSorter {
   // update only if writeSpillRecord == true
   protected final Map<Integer, Path> spillFileIndexPaths;
 
-  // Counters
-  // Represents final deserialized size of output (spills are not counted)
-  protected final TezCounter mapOutputByteCounter;
   // Represents final number of records written (spills are not counted)
-  protected final TezCounter mapOutputRecordCounter;
+  protected final TezCounter outputRecordsCounter;
+  // Represents final deserialized size of output (spills are not counted)
+  protected final TezCounter outputRecordBytesCounter;
   // Represents the size of the final output - with any overheads introduced by
   // the storage/serialization mechanism. This is an uncompressed data size.
   protected final TezCounter outputBytesWithOverheadCounter;
@@ -142,10 +141,10 @@ public abstract class ExternalSorter {
   // final output data is not considered. (This will be 0 if there's no
   // additional spills. Compressed size - so may not represent the size in the
   // sort buffer)
-  protected final TezCounter additionalSpillBytesWritten;
-  protected final TezCounter additionalSpillBytesRead;
+  protected final TezCounter additionalSpillBytesWrittenCounter;
+  protected final TezCounter additionalSpillBytesReadCounter;
   // Number of spills written & consumed by the same task to generate the final file
-  protected final TezCounter numAdditionalSpills;
+  protected final TezCounter numAdditionalSpillsCounter;
 
   // Number of files offered via shuffle-handler to consumers.
   // TODO: restore when numShuffleChunks is useful for analysis
@@ -239,16 +238,17 @@ public abstract class ExternalSorter {
     this.spillFilePaths = Maps.newHashMap();
     this.spillFileIndexPaths = this.writeSpillRecord ? Maps.newHashMap() : null;
 
-    // counters
-    this.mapOutputByteCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_BYTES);
-    this.mapOutputRecordCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_RECORDS);
+    this.outputRecordsCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_RECORDS);
+    this.outputRecordBytesCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_BYTES);
     this.outputBytesWithOverheadCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_BYTES_WITH_OVERHEAD);
+
     this.fileOutputBytesCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_BYTES_DISK);
     this.fileOutputBytesMemoryCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_BYTES_MEMORY);
+
     this.spilledRecordsCounter = outputContext.getCounters().findCounter(TaskCounter.SPILLED_RECORDS);
-    this.additionalSpillBytesWritten = outputContext.getCounters().findCounter(TaskCounter.SPILL_BYTES_DISK);
-    this.additionalSpillBytesRead = outputContext.getCounters().findCounter(TaskCounter.ADDITIONAL_SPILLS_BYTES_READ);
-    this.numAdditionalSpills = outputContext.getCounters().findCounter(TaskCounter.ADDITIONAL_SPILL_COUNT);
+    this.additionalSpillBytesWrittenCounter = outputContext.getCounters().findCounter(TaskCounter.SPILL_BYTES_DISK);
+    this.additionalSpillBytesReadCounter = outputContext.getCounters().findCounter(TaskCounter.SPILLS_BYTES_READ_ADDITIONAL);
+    this.numAdditionalSpillsCounter = outputContext.getCounters().findCounter(TaskCounter.SPILL_COUNT_ADDITIONAL);
 
     // this.numShuffleChunks = outputContext.getCounters().findCounter(TaskCounter.SHUFFLE_CHUNK_COUNT);
 

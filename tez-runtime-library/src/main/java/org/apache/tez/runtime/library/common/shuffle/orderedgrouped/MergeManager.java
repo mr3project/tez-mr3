@@ -177,7 +177,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     this.numDiskToDiskMerges = inputContext.getCounters().findCounter(TaskCounter.NUM_DISK_TO_DISK_MERGES);
     this.numMemToDiskMerges = inputContext.getCounters().findCounter(TaskCounter.NUM_MEM_TO_DISK_MERGES);
     this.additionalSpillBytesWritten = inputContext.getCounters().findCounter(TaskCounter.SPILL_BYTES_DISK);
-    this.additionalSpillBytesRead = inputContext.getCounters().findCounter(TaskCounter.ADDITIONAL_SPILLS_BYTES_READ);
+    this.additionalSpillBytesRead = inputContext.getCounters().findCounter(TaskCounter.SPILLS_BYTES_READ_ADDITIONAL);
 
     this.cleanup = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT,
         TezRuntimeConfiguration.TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT_DEFAULT);

@@ -72,18 +72,20 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
   protected final int ifileReadAheadLength;
 
   /**
-   * Represents the serialized size of the output records. Does not consider
-   * overheads from the buffer meta-information, storage format, or compression
-   * if it is enabled.
-   */
-  protected final TezCounter outputRecordBytesCounter;
-  /**
    * Represents final number of records written (spills are not counted)
    */
   protected final TezCounter outputRecordsCounter;
   /**
-   * Represents the size of the final output - with any overheads introduced by
-   * meta-information.
+   * Represents final number of records written (spills are not counted)
+   */
+  protected final TezCounter outputLargeRecordsCounter;
+  /**
+   * Represents the serialized size of the output records. Does not consider
+   * overheads from the buffer meta-information, storage format, or compression if it is enabled.
+   */
+  protected final TezCounter outputRecordBytesCounter;
+  /**
+   * Represents the size of the final output - with any overheads introduced by meta-information.
    */
   protected final TezCounter outputBytesWithOverheadCounter;
   
@@ -137,15 +139,19 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
     keySerializer = keySerialization.getSerializer(keyClass);
     valSerializer = valSerialization.getSerializer(valClass);
     
-    outputRecordBytesCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_BYTES);
     outputRecordsCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_RECORDS);
+    outputLargeRecordsCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_LARGE_RECORDS);
+    outputRecordBytesCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_BYTES);
     outputBytesWithOverheadCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_BYTES_WITH_OVERHEAD);
+
     fileOutputBytesCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_BYTES_DISK);
     fileOutputBytesMemoryCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_BYTES_MEMORY);
+
     spilledRecordsCounter = outputContext.getCounters().findCounter(TaskCounter.SPILLED_RECORDS);
     additionalSpillBytesWrittenCounter = outputContext.getCounters().findCounter(TaskCounter.SPILL_BYTES_DISK);
-    additionalSpillBytesReadCounter = outputContext.getCounters().findCounter(TaskCounter.ADDITIONAL_SPILLS_BYTES_READ);
-    numAdditionalSpillsCounter = outputContext.getCounters().findCounter(TaskCounter.ADDITIONAL_SPILL_COUNT);
+    additionalSpillBytesReadCounter = outputContext.getCounters().findCounter(TaskCounter.SPILLS_BYTES_READ_ADDITIONAL);
+    numAdditionalSpillsCounter = outputContext.getCounters().findCounter(TaskCounter.SPILL_COUNT_ADDITIONAL);
+
     dataViaEventSize = outputContext.getCounters().findCounter(TaskCounter.DATA_BYTES_VIA_EVENT);
 
     // compression

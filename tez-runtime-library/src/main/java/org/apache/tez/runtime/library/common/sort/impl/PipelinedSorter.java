@@ -472,8 +472,8 @@ public class PipelinedSorter extends ExternalSorter {
     span.kvmeta.put(keystart);
     span.kvmeta.put(valstart);
     span.kvmeta.put(valend - valstart);
-    mapOutputRecordCounter.increment(1);
-    mapOutputByteCounter.increment(valend - keystart);
+    outputRecordsCounter.increment(1);
+    outputRecordBytesCounter.increment(valend - keystart);
   }
 
   private void adjustSpillCounters(long rawLength, long compLength) {
@@ -481,7 +481,7 @@ public class PipelinedSorter extends ExternalSorter {
       outputBytesWithOverheadCounter.increment(rawLength);
     } else {
       if (numSpills > 0) {
-        additionalSpillBytesWritten.increment(compLength);
+        additionalSpillBytesWrittenCounter.increment(compLength);
         // Reset the value will be set during the final merge.
         outputBytesWithOverheadCounter.setValue(0);
       } else {
@@ -524,8 +524,8 @@ public class PipelinedSorter extends ExternalSorter {
           if (i == partition) {
             final long recordStart = out.getPos();
             writer.append(key, value);
-            mapOutputRecordCounter.increment(1);
-            mapOutputByteCounter.increment(out.getPos() - recordStart);
+            outputRecordsCounter.increment(1);
+            outputRecordBytesCounter.increment(out.getPos() - recordStart);
           }
           long rawLength = 0;
           long partLength = 0;
@@ -783,7 +783,7 @@ public class PipelinedSorter extends ExternalSorter {
         return;
       }
 
-      numAdditionalSpills.increment(numSpills - 1);
+      numAdditionalSpillsCounter.increment(numSpills - 1);
 
       // Now, isFinalMergeEnabled == true
       // So, we have to increment fileOutputByteCounter because spill() does not increment it.
@@ -879,7 +879,7 @@ public class PipelinedSorter extends ExternalSorter {
             new Path(uniqueIdentifier),
             (RawComparator) ConfigUtils.getIntermediateOutputKeyComparator(conf),
             progressable, sortSegments, true,
-            null, spilledRecordsCounter, additionalSpillBytesRead,
+            null, spilledRecordsCounter, additionalSpillBytesReadCounter,
             null, merger.needsRLE(), outputContext); // Not using any Progress in TezMerger. Should just work.
         //write merged output to disk
         long segmentStart = finalOut.getPos();
@@ -1140,7 +1140,7 @@ public class PipelinedSorter extends ExternalSorter {
         if (isDebugEnabled) {
           LOG.debug("{}, counter:{}",
               String.format(outputContext.getDestinationVertexName() + ": New Span%d.length = %d, perItem = %d", newSpan.index, newSpan.length(), perItem),
-              mapOutputRecordCounter.getValue());
+              outputRecordsCounter.getValue());
         }
         return newSpan;
       }
@@ -1171,7 +1171,7 @@ public class PipelinedSorter extends ExternalSorter {
         ByteBuffer space = allocateSpace();
         if (space != null) {
           LOG.info("{}: Getting memory from next block in the list, recordsWritten={}",
-              outputContext.getDestinationVertexName(), mapOutputRecordCounter.getValue());
+              outputContext.getDestinationVertexName(), outputRecordsCounter.getValue());
           reinit = true;
           return space;
         }
