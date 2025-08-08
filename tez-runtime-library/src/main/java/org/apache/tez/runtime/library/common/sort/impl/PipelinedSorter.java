@@ -128,8 +128,6 @@ public class PipelinedSorter extends ExternalSorter {
   private final long freeMemoryThreshold;
   private final boolean useFreeMemoryWriterOutput;  // use availableMemory as threshold
 
-  // TODO Set additional counters - total bytes written, spills etc.
-
   public PipelinedSorter(OutputContext outputContext, Configuration conf, int numOutputs,
       long initialMemoryAvailable) throws IOException {
     super(outputContext, conf, numOutputs, initialMemoryAvailable);
@@ -557,14 +555,11 @@ public class PipelinedSorter extends ExternalSorter {
       indexCacheList.add(spillRec);
       ++numSpills;
 
-      if (isPipelinedShuffle || !isFinalMergeEnabled) {
+      if (isPipelinedShuffle) {
         // This output file is directly served to downstream tasks, so increment fileOutputBytesCounter.
         fileOutputBytesCounter.increment(rfs.getFileStatus(outputFilePath).getLen());
         // No final merge. Set the number of files offered via shuffle-handler
         numShuffleChunks.setValue(numSpills);
-      }
-
-      if (isPipelinedShuffle) {
         sendPipelinedShuffleEvents();
       }
     } finally {

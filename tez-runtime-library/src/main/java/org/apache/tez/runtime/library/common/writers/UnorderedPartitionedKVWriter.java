@@ -1097,7 +1097,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
     int finalSpillIndex;
     boolean indexComputed = false;   // true if TezSpillRecord is effectively computed (i.e., indexFilePath set)
-    if (!isPipelinedShuffle && isFinalMergeEnabled) {
+    if (!isPipelinedShuffle) {
       if (isFinalSpill) {
         outputFilePath = outputFileHandler.getOutputFileForWrite(spillSize);
         finalOutPath = outputFilePath;
@@ -1283,7 +1283,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       out = rfs.create(outPath);
       ensureSpillFilePermissions(outPath, rfs);
       BitSet emptyPartitions = null;
-      if (isPipelinedShuffle || !isFinalMergeEnabled) {
+      if (isPipelinedShuffle) {
         emptyPartitions = new BitSet(numPartitions);
       }
       for (int i = 0; i < numPartitions; i++) {
@@ -1325,7 +1325,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       // spillPathDetails.spillIndex is never -1
       handleSpillIndex(spillPathDetails, spillRecord, null);
 
-      if (isPipelinedShuffle || !isFinalMergeEnabled) {
+      if (isPipelinedShuffle) {
         // This output file is directly served to downstream tasks, so increment fileOutputBytesCounter.
         fileOutputBytesCounter.increment(rfs.getFileStatus(spillPathDetails.outputFilePath).getLen());
       }
@@ -1552,7 +1552,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         outputContext.reportFailure(TaskFailureType.NON_FATAL, e, "Failure while attempting to reset buffer after spill");
       }
 
-      if (!isPipelinedShuffle && isFinalMergeEnabled) {
+      if (!isPipelinedShuffle) {
         assert !result.useFreeMemoryForOutput;
         synchronized(additionalSpillBytesWrittenCounter) {
           additionalSpillBytesWrittenCounter.increment(result.spillSize);
