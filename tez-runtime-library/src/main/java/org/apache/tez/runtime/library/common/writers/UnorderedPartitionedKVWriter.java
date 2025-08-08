@@ -1302,8 +1302,11 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
               sizePerPartition[i] += writer.getRawLength();
             }
             writer.close();
-            synchronized (additionalSpillBytesWrittenCounter) {
-              additionalSpillBytesWrittenCounter.increment(writer.getCompressedLength());
+            if (!isPipelinedShuffle) {
+              // this is an intermediate spill, so increment additionalSpillBytesWrittenCounter.
+              synchronized (additionalSpillBytesWrittenCounter) {
+                additionalSpillBytesWrittenCounter.increment(writer.getCompressedLength());
+              }
             }
             TezIndexRecord indexRecord = new TezIndexRecord(recordStart, writer.getRawLength(),
                 writer.getCompressedLength());
@@ -1555,9 +1558,11 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       if (!isPipelinedShuffle) {
         assert !result.useFreeMemoryForOutput;
         synchronized(additionalSpillBytesWrittenCounter) {
+          // isFinalMergeEnabled == true, so this is counted as an intermediate spill
           additionalSpillBytesWrittenCounter.increment(result.spillSize);
         }
       } else {
+        // isFinalMergeEnabled == false, so this is directly served to downstream tasks
         if (!result.useFreeMemoryForOutput) {
           synchronized(fileOutputBytesCounter) {
             fileOutputBytesCounter.increment(result.spillSize);
