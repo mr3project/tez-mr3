@@ -563,7 +563,7 @@ public class PipelinedSorter extends ExternalSorter {
         // This output file is directly served to downstream tasks, so increment fileOutputBytesCounter.
         fileOutputBytesCounter.increment(rfs.getFileStatus(outputFilePath).getLen());
         // No final merge. Set the number of files offered via shuffle-handler
-        numShuffleChunks.setValue(numSpills);
+        // numShuffleChunks.setValue(numSpills);
         sendPipelinedShuffleEvents();
       }
     } finally {
@@ -695,7 +695,7 @@ public class PipelinedSorter extends ExternalSorter {
         fileOutputBytesMemoryCounter.increment(sumPartLength);
       }
       // No final merge. Set the number of files offered via shuffle-handler
-      numShuffleChunks.setValue(numSpills);
+      // numShuffleChunks.setValue(numSpills);
     }
 
     return true;
@@ -822,7 +822,7 @@ public class PipelinedSorter extends ExternalSorter {
             partitionStats[i] += spillRecord.getIndex(i).getRawLength();
           }
         }
-        numShuffleChunks.setValue(numSpills);
+        // numShuffleChunks.setValue(numSpills);
 
         // useFreeMemoryWriterOutput == false because isFinalMergeEnabled == true,
         // so finalOutputFile was actually written to local disk.
@@ -914,7 +914,7 @@ public class PipelinedSorter extends ExternalSorter {
         }
       }
 
-      numShuffleChunks.setValue(1); //final merge has happened.
+      // numShuffleChunks.setValue(1); // final merge has happened.
 
       // finalOutputFile is the new file to be served to downstream tasks, so increment fileOutputByteCounter
       // Here, we do not use free memory to store the merged output.

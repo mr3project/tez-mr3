@@ -146,8 +146,10 @@ public abstract class ExternalSorter {
   protected final TezCounter additionalSpillBytesRead;
   // Number of spills written & consumed by the same task to generate the final file
   protected final TezCounter numAdditionalSpills;
+
   // Number of files offered via shuffle-handler to consumers.
-  protected final TezCounter numShuffleChunks;
+  // TODO: restore when numShuffleChunks is useful for analysis
+  // protected final TezCounter numShuffleChunks;
 
   protected Path finalOutputFile;
   // null if writeSpillRecord == false
@@ -247,7 +249,8 @@ public abstract class ExternalSorter {
     this.additionalSpillBytesWritten = outputContext.getCounters().findCounter(TaskCounter.SPILL_BYTES_DISK);
     this.additionalSpillBytesRead = outputContext.getCounters().findCounter(TaskCounter.ADDITIONAL_SPILLS_BYTES_READ);
     this.numAdditionalSpills = outputContext.getCounters().findCounter(TaskCounter.ADDITIONAL_SPILL_COUNT);
-    this.numShuffleChunks = outputContext.getCounters().findCounter(TaskCounter.SHUFFLE_CHUNK_COUNT);
+
+    // this.numShuffleChunks = outputContext.getCounters().findCounter(TaskCounter.SHUFFLE_CHUNK_COUNT);
 
     finalIndexComputed = false;
   }
