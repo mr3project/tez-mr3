@@ -466,7 +466,7 @@ public class MRInput extends MRInputBase {
         if (useNewApi) {
           org.apache.hadoop.mapreduce.InputSplit newInputSplit = MRInputUtils
               .getNewSplitDetailsFromDisk(splitMetaInfo, jobConf, getContext().getCounters()
-                  .findCounter(TaskCounter.SPLIT_RAW_BYTES));
+                  .findCounter(TaskCounter.INPUT_SPLIT_RAW_BYTES));
           try {
             splitLength = newInputSplit.getLength();
           } catch (InterruptedException e) {
@@ -479,7 +479,7 @@ public class MRInput extends MRInputBase {
         } else {
           org.apache.hadoop.mapred.InputSplit oldInputSplit = MRInputUtils
               .getOldSplitDetailsFromDisk(splitMetaInfo, jobConf, getContext().getCounters()
-                  .findCounter(TaskCounter.SPLIT_RAW_BYTES));
+                  .findCounter(TaskCounter.INPUT_SPLIT_RAW_BYTES));
           splitLength = oldInputSplit.getLength();
           mrReader =
               new MRReaderMapred(jobConf, oldInputSplit, getContext().getCounters(),

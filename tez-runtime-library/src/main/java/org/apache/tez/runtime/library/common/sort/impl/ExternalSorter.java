@@ -134,13 +134,12 @@ public abstract class ExternalSorter {
   protected final TezCounter fileOutputBytesCounter;
   protected final TezCounter fileOutputBytesMemoryCounter;
 
-  // Represents total number of records written to disk (includes spills. Min
-  // value for this is equal to number of output records)
+  // Represents total number of records written to disk, including spills.
+  // Min value for this is equal to number of output records.
   protected final TezCounter spilledRecordsCounter;
   // Bytes written as a result of additional spills. The single spill for the
   // final output data is not considered. (This will be 0 if there's no
-  // additional spills. Compressed size - so may not represent the size in the
-  // sort buffer)
+  // additional spills. Compressed size - so may not represent the size in the sort buffer)
   protected final TezCounter additionalSpillBytesWrittenCounter;
   protected final TezCounter additionalSpillBytesReadCounter;
   // Number of spills written & consumed by the same task to generate the final file

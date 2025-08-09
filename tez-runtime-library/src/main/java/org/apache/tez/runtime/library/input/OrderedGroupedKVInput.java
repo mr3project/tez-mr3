@@ -36,7 +36,6 @@ import org.apache.hadoop.io.RawComparator;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.counters.TaskCounter;
 import org.apache.tez.common.counters.TezCounter;
-import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.dag.api.TezException;
 import org.apache.tez.runtime.api.AbstractLogicalInput;
 import org.apache.tez.runtime.api.Event;
@@ -80,7 +79,7 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput {
 
   private TezCounter inputKeyCounter;
   private TezCounter inputValueCounter;
-  private TezCounter shuffledInputs;
+  private TezCounter shuffleInputs;
 
   private final AtomicBoolean isStarted = new AtomicBoolean(false);
 
@@ -110,7 +109,7 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput {
 
     this.inputKeyCounter = getContext().getCounters().findCounter(TaskCounter.REDUCE_INPUT_GROUPS);
     this.inputValueCounter = getContext().getCounters().findCounter(TaskCounter.REDUCE_INPUT_RECORDS);
-    this.shuffledInputs = getContext().getCounters().findCounter(TaskCounter.NUM_SHUFFLED_INPUTS);
+    this.shuffleInputs = getContext().getCounters().findCounter(TaskCounter.NUM_SHUFFLE_INPUTS);
     this.conf.setStrings(TezRuntimeFrameworkConfigs.LOCAL_DIRS, getContext().getWorkDirs());
 
     return Collections.emptyList();
@@ -265,7 +264,7 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput {
     int totalInputs = getNumPhysicalInputs();
     if (totalInputs != 0) {
       synchronized (this) {
-        return ((0.5f) * this.shuffledInputs.getValue() / totalInputs) +
+        return ((0.5f) * this.shuffleInputs.getValue() / totalInputs) +
             ((rawIter != null) ?
              ((0.5f) * rawIter.getProgress().getProgress()) : 0.0f);
       }

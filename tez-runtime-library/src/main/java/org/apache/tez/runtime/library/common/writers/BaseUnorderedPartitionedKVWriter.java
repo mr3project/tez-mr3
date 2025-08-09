@@ -117,7 +117,7 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
   /**
    * Represents the number of bytes that is transmitted via the event.
    */
-  protected final TezCounter dataViaEventSize;
+  protected final TezCounter shuffleDataViaEventSize;
 
   @SuppressWarnings("unchecked")
   public BaseUnorderedPartitionedKVWriter(OutputContext outputContext, Configuration conf, int numOutputs) {
@@ -152,7 +152,7 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
     additionalSpillBytesReadCounter = outputContext.getCounters().findCounter(TaskCounter.SPILLS_BYTES_READ_ADDITIONAL);
     numAdditionalSpillsCounter = outputContext.getCounters().findCounter(TaskCounter.SPILL_COUNT_ADDITIONAL);
 
-    dataViaEventSize = outputContext.getCounters().findCounter(TaskCounter.DATA_BYTES_VIA_EVENT);
+    shuffleDataViaEventSize = outputContext.getCounters().findCounter(TaskCounter.SHUFFLE_DATA_BYTES_VIA_EVENT);
 
     // compression
     try {

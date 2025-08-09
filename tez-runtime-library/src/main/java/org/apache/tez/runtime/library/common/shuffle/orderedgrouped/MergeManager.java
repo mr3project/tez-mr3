@@ -174,8 +174,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     this.localFS = localFS;
     this.rfs = ((LocalFileSystem)localFS).getRaw();
     
-    this.numDiskToDiskMerges = inputContext.getCounters().findCounter(TaskCounter.NUM_DISK_TO_DISK_MERGES);
-    this.numMemToDiskMerges = inputContext.getCounters().findCounter(TaskCounter.NUM_MEM_TO_DISK_MERGES);
+    this.numDiskToDiskMerges = inputContext.getCounters().findCounter(TaskCounter.MERGE_NUM_DISK_TO_DISK_MERGES);
+    this.numMemToDiskMerges = inputContext.getCounters().findCounter(TaskCounter.MERGE_NUM_MEM_TO_DISK_MERGES);
     this.additionalSpillBytesWritten = inputContext.getCounters().findCounter(TaskCounter.SPILL_BYTES_DISK);
     this.additionalSpillBytesRead = inputContext.getCounters().findCounter(TaskCounter.SPILLS_BYTES_READ_ADDITIONAL);
 

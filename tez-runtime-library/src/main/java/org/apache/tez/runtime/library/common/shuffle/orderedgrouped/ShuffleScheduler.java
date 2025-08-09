@@ -72,11 +72,13 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
   }
   private final static String SHUFFLE_ERR_GRP_NAME = "Shuffle Errors";
 
-  private final TezCounter shuffledInputsCounter;
-  private final TezCounter skippedInputCounter;
+  private final TezCounter shuffleInputsCounter;
+  private final TezCounter shuffleSkippedInputCounter;
+  private final TezCounter shuffleFailedInputsCounter;
+
   private final TezCounter reduceShuffleBytes;
   private final TezCounter reduceBytesDecompressed;
-  private final TezCounter failedShuffleCounter;
+
   private final TezCounter bytesShuffledToDisk;
   private final TezCounter bytesShuffledToDiskDirect;
   private final TezCounter bytesShuffledToMemory;
@@ -115,16 +117,14 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
 
     remainingMaps = new AtomicInteger(numInputs);
 
-    // Counters used by the ShuffleScheduler
-    this.shuffledInputsCounter = inputContext.getCounters().findCounter(
-        TaskCounter.NUM_SHUFFLED_INPUTS);
+    this.shuffleInputsCounter = inputContext.getCounters().findCounter(TaskCounter.NUM_SHUFFLE_INPUTS);
+    this.shuffleSkippedInputCounter = inputContext.getCounters().findCounter(TaskCounter.NUM_SHUFFLE_SKIPPED_INPUTS);
+    this.shuffleFailedInputsCounter = inputContext.getCounters().findCounter(TaskCounter.NUM_SHUFFLE_FAILED_INPUTS);
+
     this.reduceShuffleBytes = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES);
-    this.reduceBytesDecompressed = inputContext.getCounters().findCounter(
-        TaskCounter.SHUFFLE_BYTES_DECOMPRESSED);
-    this.failedShuffleCounter = inputContext.getCounters().findCounter(
-        TaskCounter.NUM_FAILED_SHUFFLE_INPUTS);
-    this.bytesShuffledToDisk = inputContext.getCounters().findCounter(
-        TaskCounter.SHUFFLE_BYTES_DISK);
+    this.reduceBytesDecompressed = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_DECOMPRESSED);
+
+    this.bytesShuffledToDisk = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_DISK);
     this.bytesShuffledToDiskDirect = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_DISK_DIRECT);
     this.bytesShuffledToMemory = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_MEMORY);
 
@@ -145,8 +145,6 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
         badIdErrsCounter, wrongMapErrsCounter, connectionErrsCounter, wrongReduceErrsCounter);
 
     this.startTime = startTime;
-
-    this.skippedInputCounter = inputContext.getCounters().findCounter(TaskCounter.NUM_SKIPPED_INPUTS);
 
     LOG.info("ShuffleScheduler for {}/{}: shuffleClientId={}, numInputs={}",
       inputContext.getUniqueIdentifier(), srcNameTrimmed, shuffleClientId, numInputs);
@@ -225,11 +223,11 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
         } else {
           bytesShuffledToMemory.increment(bytesCompressed);
         }
-        shuffledInputsCounter.increment(1);
+        shuffleInputsCounter.increment(1);
       } else {
         // Output null implies that a physical input completion is being
         // registered without needing to fetch data
-        skippedInputCounter.increment(1);
+        shuffleSkippedInputCounter.increment(1);
       }
 
       /**
@@ -329,7 +327,7 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
 
   public void fetchFailed(CompositeInputAttemptIdentifier srcAttemptIdentifier,
                           boolean readFailed, boolean connectFailed) {
-    failedShuffleCounter.increment(1);
+    shuffleFailedInputsCounter.increment(1);
 
     if (isInputFinished(srcAttemptIdentifier.getInputIdentifier())) {
       LOG.warn("Ordered fetch failed for {}, but input already completed: InputIdentifier={}",

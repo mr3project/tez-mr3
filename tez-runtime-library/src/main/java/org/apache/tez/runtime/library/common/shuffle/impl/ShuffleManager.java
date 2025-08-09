@@ -54,13 +54,17 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
   private final FetchedInputAllocator inputManager;
 
   private final TezCounter approximateInputRecords;
-  private final TezCounter shuffledInputsCounter;
-  private final TezCounter failedShufflesCounter;
+
+  private final TezCounter shuffleInputsCounter;
+  private final TezCounter shuffleFailedInputsCounter;
+
   private final TezCounter bytesShuffledCounter;
   private final TezCounter decompressedDataSizeCounter;
+
   private final TezCounter bytesShuffledToDiskCounter;
-  private final TezCounter bytesShuffledToMemoryCounter;
   private final TezCounter bytesShuffledDirectDiskCounter;
+  private final TezCounter bytesShuffledToMemoryCounter;
+
   private final TezCounter shufflePhaseTime;
 
   private final long startTime;
@@ -95,13 +99,17 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
     this.inputManager = inputAllocator;
 
     this.approximateInputRecords = inputContext.getCounters().findCounter(TaskCounter.APPROXIMATE_INPUT_RECORDS);
-    this.shuffledInputsCounter = inputContext.getCounters().findCounter(TaskCounter.NUM_SHUFFLED_INPUTS);
-    this.failedShufflesCounter = inputContext.getCounters().findCounter(TaskCounter.NUM_FAILED_SHUFFLE_INPUTS);
+
+    this.shuffleInputsCounter = inputContext.getCounters().findCounter(TaskCounter.NUM_SHUFFLE_INPUTS);
+    this.shuffleFailedInputsCounter = inputContext.getCounters().findCounter(TaskCounter.NUM_SHUFFLE_FAILED_INPUTS);
+
     this.bytesShuffledCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES);
     this.decompressedDataSizeCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_DECOMPRESSED);
+
     this.bytesShuffledToDiskCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_DISK);
-    this.bytesShuffledToMemoryCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_MEMORY);
     this.bytesShuffledDirectDiskCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_DISK_DIRECT);
+    this.bytesShuffledToMemoryCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_MEMORY);
+
     this.shufflePhaseTime = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_PHASE_TIME);
 
     this.startTime = System.currentTimeMillis();
@@ -270,7 +278,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
       // Processing counters for completed and commit fetches only. Need
       // additional counters for excessive fetches - which primarily comes
       // in after speculation or retries.
-      shuffledInputsCounter.increment(1);
+      shuffleInputsCounter.increment(1);
       bytesShuffledCounter.increment(fetchedBytes);
       if (fetchedInput.getType() == Type.MEMORY) {
         bytesShuffledToMemoryCounter.increment(fetchedBytes);
@@ -378,7 +386,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
       CompositeInputAttemptIdentifier srcAttemptIdentifier, boolean readFailed, boolean connectFailed) {
     assert !readFailed;   // ignore in ShuffleManager
     final int inputIdentifier = srcAttemptIdentifier.getInputIdentifier();
-    failedShufflesCounter.increment(1);
+    shuffleFailedInputsCounter.increment(1);
 
     synchronized (completedInputSet) {
       boolean isCompleted = completedInputSet.get(inputIdentifier);

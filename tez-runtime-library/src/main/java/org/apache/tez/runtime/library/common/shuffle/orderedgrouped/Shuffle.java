@@ -113,7 +113,7 @@ public class Shuffle implements ExceptionReporter {
         new LocalDirAllocator(TezRuntimeFrameworkConfigs.LOCAL_DIRS);
 
     TezCounter spilledRecordsCounter = inputContext.getCounters().findCounter(TaskCounter.SPILLED_RECORDS);
-    TezCounter mergedMapOutputsCounter = inputContext.getCounters().findCounter(TaskCounter.MERGED_MAP_OUTPUTS);
+    TezCounter mergedMapOutputsCounter = inputContext.getCounters().findCounter(TaskCounter.MERGE_NUM_MAP_OUTPUTS);
 
     LOG.info("{}: Shuffle assigned with {} inputs, codec: {} , ifileReadAhead: {}",
         srcNameTrimmed, numInputs, codec == null ? "None" : codec.getClass().getName(), ifileReadAhead);

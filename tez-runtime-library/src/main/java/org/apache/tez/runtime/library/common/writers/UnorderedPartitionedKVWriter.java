@@ -58,7 +58,6 @@ import org.apache.hadoop.io.compress.Compressor;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.tez.common.TezCommonUtils;
 import org.apache.tez.common.TezUtilsInternal;
-import org.apache.tez.common.counters.TaskCounter;
 import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.common.io.NonSyncDataOutputStream;
 import org.apache.tez.runtime.api.Event;
@@ -978,7 +977,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       dataProtoBuilder.setCompressedLength((int)this.writer.getCompressedLength());
       payloadBuilder.setData(dataProtoBuilder.build());
 
-      this.dataViaEventSize.increment(this.writer.getCompressedLength());
+      this.shuffleDataViaEventSize.increment(this.writer.getCompressedLength());
       if (LOG.isDebugEnabled()) {
         LOG.debug("payload packed in DME, dataSize: " + this.writer.getCompressedLength());
       }
