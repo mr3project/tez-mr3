@@ -246,7 +246,7 @@ public abstract class ExternalSorter {
 
     this.spilledRecordsCounter = outputContext.getCounters().findCounter(TaskCounter.SPILLED_RECORDS);
     this.additionalSpillBytesWrittenCounter = outputContext.getCounters().findCounter(TaskCounter.SPILL_BYTES_DISK);
-    this.additionalSpillBytesReadCounter = outputContext.getCounters().findCounter(TaskCounter.SPILLS_BYTES_READ_ADDITIONAL);
+    this.additionalSpillBytesReadCounter = outputContext.getCounters().findCounter(TaskCounter.SPILL_BYTES_READ_ADDITIONAL);
     this.numAdditionalSpillsCounter = outputContext.getCounters().findCounter(TaskCounter.SPILL_COUNT_ADDITIONAL);
 
     // this.numShuffleChunks = outputContext.getCounters().findCounter(TaskCounter.SHUFFLE_CHUNK_COUNT);

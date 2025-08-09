@@ -149,7 +149,7 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
 
     spilledRecordsCounter = outputContext.getCounters().findCounter(TaskCounter.SPILLED_RECORDS);
     additionalSpillBytesWrittenCounter = outputContext.getCounters().findCounter(TaskCounter.SPILL_BYTES_DISK);
-    additionalSpillBytesReadCounter = outputContext.getCounters().findCounter(TaskCounter.SPILLS_BYTES_READ_ADDITIONAL);
+    additionalSpillBytesReadCounter = outputContext.getCounters().findCounter(TaskCounter.SPILL_BYTES_READ_ADDITIONAL);
     numAdditionalSpillsCounter = outputContext.getCounters().findCounter(TaskCounter.SPILL_COUNT_ADDITIONAL);
 
     shuffleDataViaEventSize = outputContext.getCounters().findCounter(TaskCounter.SHUFFLE_DATA_BYTES_VIA_EVENT);
