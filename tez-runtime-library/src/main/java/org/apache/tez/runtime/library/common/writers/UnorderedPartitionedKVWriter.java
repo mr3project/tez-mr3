@@ -668,7 +668,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
             }
             if (writer != null) {
               if (numRecordsCounter != null) {
-                // TezCounter is not thread-safe; Since numRecordsCounter would be updated from
+                // TezCounter (from TaskCounter) is not thread-safe; Since numRecordsCounter would be updated from
                 // multiple threads, it is good to synchronize it when incrementing it for correctness.
                 synchronized (numRecordsCounter) {
                   numRecordsCounter.increment(numRecords);
