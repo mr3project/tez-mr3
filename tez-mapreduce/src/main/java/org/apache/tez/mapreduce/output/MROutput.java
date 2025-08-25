@@ -562,9 +562,6 @@ public class MROutput extends AbstractLogicalOutput {
   public synchronized List<Event> close() throws IOException {
     flush();
     LOG.info(getContext().getDestinationVertexName() + " closed");
-    long outputRecords = getContext().getCounters()
-        .findCounter(TaskCounter.OUTPUT_RECORDS).getValue();
-    getContext().getStatisticsReporter().reportItemsProcessed(outputRecords);
 
     return null;
   }

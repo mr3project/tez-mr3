@@ -216,13 +216,6 @@ public class UnorderedKVInput extends AbstractLogicalInput {
       this.shuffleManager.shutdown();
     }
     
-    long dataSize = getContext().getCounters()
-        .findCounter(TaskCounter.SHUFFLE_BYTES_DECOMPRESSED).getValue();
-    getContext().getStatisticsReporter().reportDataSize(dataSize);
-    long inputRecords = getContext().getCounters()
-        .findCounter(TaskCounter.INPUT_RECORDS_PROCESSED).getValue();
-    getContext().getStatisticsReporter().reportItemsProcessed(inputRecords);
-
     isClosed = true;
 
     return null;

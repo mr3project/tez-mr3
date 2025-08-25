@@ -46,13 +46,6 @@ public interface InputContext extends TaskContext {
    * This method can be invoked multiple times.
    */
   public void inputIsReady();
-  
-  /**
-   * Get an {@link InputStatisticsReporter} for this {@link Input} that can
-   * be used to report statistics like data size
-   * @return {@link InputStatisticsReporter}
-   */
-  public InputStatisticsReporter getStatisticsReporter();
 
   public boolean getScheduledOnHost();
 }

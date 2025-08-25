@@ -28,7 +28,6 @@ import javax.annotation.Nullable;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.tez.dag.api.event.VertexState;
 import org.apache.tez.runtime.api.InputSpecUpdate;
-import org.apache.tez.runtime.api.VertexStatistics;
 import org.apache.tez.runtime.api.events.CustomProcessorEvent;
 import org.apache.tez.runtime.api.events.InputDataInformationEvent;
 

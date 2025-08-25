@@ -40,13 +40,6 @@ public interface OutputContext extends TaskContext {
    * @return index
    */
   public int getOutputIndex();
-  
-  /**
-   * Get an {@link OutputStatisticsReporter} for this {@link Output} that can
-   * be used to report statistics like data size
-   * @return {@link OutputStatisticsReporter}
-   */
-  public OutputStatisticsReporter getStatisticsReporter();
 
   public String getDAGID();
 }

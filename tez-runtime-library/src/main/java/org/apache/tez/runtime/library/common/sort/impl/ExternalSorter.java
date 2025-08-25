@@ -82,7 +82,6 @@ public abstract class ExternalSorter {
   protected final RawLocalFileSystem localFs;
   protected final FileSystem rfs;
 
-  protected final OutputStatisticsReporter statsReporter;
   // How partition stats should be reported.
   final ReportPartitionStats reportPartitionStats;
   // uncompressed size for each partition
@@ -163,7 +162,6 @@ public abstract class ExternalSorter {
     this.localFs = (RawLocalFileSystem) FileSystem.getLocal(conf).getRaw();
     this.rfs = ((LocalFileSystem)FileSystem.getLocal(this.conf)).getRaw();
 
-    this.statsReporter = outputContext.getStatisticsReporter();
     this.reportPartitionStats = ReportPartitionStats.fromString(
         conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_REPORT_PARTITION_STATS,
         TezRuntimeConfiguration.TEZ_RUNTIME_REPORT_PARTITION_STATS_DEFAULT));
@@ -259,7 +257,6 @@ public abstract class ExternalSorter {
       spillFileIndexPaths.clear();
     }
     spillFilePaths.clear();
-    reportStatistics();
     return Collections.emptyList();
   }
 
@@ -391,15 +388,6 @@ public abstract class ExternalSorter {
 
   protected boolean reportPartitionStats() {
     return (partitionStats != null);
-  }
-
-  protected synchronized void reportStatistics() {
-    // This works for non-started outputs since new counters will be created with an initial value of 0
-    long outputSize = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_BYTES).getValue();
-    statsReporter.reportDataSize(outputSize);
-    long outputRecords = outputContext.getCounters()
-        .findCounter(TaskCounter.OUTPUT_RECORDS).getValue();
-    statsReporter.reportItemsProcessed(outputRecords);
   }
 
   public boolean reportDetailedPartitionStats() {

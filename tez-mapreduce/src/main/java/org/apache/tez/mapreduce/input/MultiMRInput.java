@@ -212,10 +212,6 @@ public class MultiMRInput extends MRInputBase {
     for (MRReader reader : readers) {
       reader.close();
     }
-    long inputRecords = getContext().getCounters()
-        .findCounter(TaskCounter.INPUT_RECORDS_PROCESSED).getValue();
-    getContext().getStatisticsReporter().reportItemsProcessed(inputRecords);
-
     return null;
   }
 
