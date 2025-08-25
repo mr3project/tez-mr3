@@ -120,8 +120,8 @@ public class ReduceProcessor extends MRTask {
     RawComparator comparator = ConfigUtils.getInputKeySecondaryGroupingComparator(jobConf);
     LOG.info("Using keyClass={}, valueClass={}, comparator={}", keyClass, valueClass, comparator);
 
-    reduceInputKeyCounter = mrReporter.getCounter(TaskCounter.REDUCE_INPUT_GROUPS);
-    reduceInputValueCounter = mrReporter.getCounter(TaskCounter.REDUCE_INPUT_RECORDS);
+    reduceInputKeyCounter = mrReporter.getCounter(TaskCounter.INPUT_GROUPS_ORDERED);
+    reduceInputValueCounter = mrReporter.getCounter(TaskCounter.INPUT_RECORDS_ORDERED);
 
     // Sanity check
     if (!(in instanceof OrderedGroupedInputLegacy)) {

@@ -102,7 +102,7 @@ public class UnorderedKVInput extends AbstractLogicalInput {
     }
 
     this.conf.setStrings(TezRuntimeFrameworkConfigs.LOCAL_DIRS, getContext().getWorkDirs());
-    this.inputRecordCounter = getContext().getCounters().findCounter(TaskCounter.INPUT_RECORDS_PROCESSED);
+    this.inputRecordCounter = getContext().getCounters().findCounter(TaskCounter.INPUT_RECORDS);
     return Collections.emptyList();
   }
 

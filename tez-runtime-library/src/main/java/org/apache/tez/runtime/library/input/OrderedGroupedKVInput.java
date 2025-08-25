@@ -107,8 +107,8 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput {
     this.memoryUpdateCallbackHandler = new MemoryUpdateCallbackHandler();
     getContext().requestInitialMemory(initialMemoryRequest, memoryUpdateCallbackHandler);
 
-    this.inputKeyCounter = getContext().getCounters().findCounter(TaskCounter.REDUCE_INPUT_GROUPS);
-    this.inputValueCounter = getContext().getCounters().findCounter(TaskCounter.REDUCE_INPUT_RECORDS);
+    this.inputKeyCounter = getContext().getCounters().findCounter(TaskCounter.INPUT_GROUPS_ORDERED);
+    this.inputValueCounter = getContext().getCounters().findCounter(TaskCounter.INPUT_RECORDS_ORDERED);
     this.shuffleInputs = getContext().getCounters().findCounter(TaskCounter.NUM_SHUFFLE_INPUTS);
     this.conf.setStrings(TezRuntimeFrameworkConfigs.LOCAL_DIRS, getContext().getWorkDirs());
 

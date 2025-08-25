@@ -96,7 +96,7 @@ public abstract class MRInputBase extends AbstractLogicalInput {
     jobConf.setBoolean(MRInput.TEZ_MR3_SCHEDULED_ON_HOST, getContext().getScheduledOnHost());
 
     this.inputRecordCounter = getContext().getCounters().findCounter(
-        TaskCounter.INPUT_RECORDS_PROCESSED);
+        TaskCounter.INPUT_RECORDS);
 
     return null;
   }
