@@ -93,18 +93,6 @@ public interface VertexManagerPluginContext {
    * @return Map of destination vertex name and edge property
    */
   public Map<String, EdgeProperty> getOutputVertexEdgeProperties();
-  
-  /**
-   * Get a {@link VertexStatistics} object to find out execution statistics
-   * about the given {@link Vertex}.
-   * <br>This only provides point in time values for statistics (completed tasks)
-   * and must be called again to get updated values.
-   *
-   * @param vertexName
-   *          Name of the {@link Vertex}
-   * @return {@link VertexStatistics} for the given vertex
-   */
-  public VertexStatistics getVertexStatistics(String vertexName);
 
   /**
    * Get the name of the vertex
