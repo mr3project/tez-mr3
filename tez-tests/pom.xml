@@ -27,31 +27,12 @@
   <dependencies>
     <dependency>
       <groupId>org.apache.tez</groupId>
-      <artifactId>tez-api</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.tez</groupId>
       <artifactId>tez-mapreduce</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-common</artifactId>
-      <scope>test</scope>
-      <type>test-jar</type>
-      <exclusions>
-        <exclusion>
-          <groupId>com.fasterxml.jackson.core</groupId>
-          <artifactId>jackson-databind</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.fasterxml.jackson.core</groupId>
-          <artifactId>jackson-core</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdfs</artifactId>
+      <version>${hadoop.version}</version>
       <scope>test</scope>
       <type>test-jar</type>
       <exclusions>
@@ -68,26 +49,13 @@
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-yarn-server-tests</artifactId>
-      <scope>test</scope>
-      <type>test-jar</type>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-mapreduce-client-jobclient</artifactId>
+      <version>${hadoop.version}</version>
       <scope>test</scope>
       <type>test-jar</type>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-mapreduce-client-shuffle</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.google.guava</groupId>
-      <artifactId>guava</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-api</artifactId>
     </dependency>
   </dependencies>
 
@@ -98,17 +66,11 @@
         <artifactId>maven-jar-plugin</artifactId>
         <executions>
           <execution>
-            <id>default-jar</id>
+            <id>tests-jar</id>
+            <phase>package</phase>
             <goals>
-              <goal>jar</goal>
+              <goal>test-jar</goal>
             </goals>
-            <configuration>
-              <archive>
-                <manifest>
-                  <mainClass>org.apache.tez.mapreduce.examples.ExampleDriver</mainClass>
-                </manifest>
-              </archive>
-            </configuration>
           </execution>
         </executions>
       </plugin>
