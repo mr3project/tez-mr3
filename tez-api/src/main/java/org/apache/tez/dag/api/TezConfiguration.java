@@ -18,7 +18,6 @@
 
 package org.apache.tez.dag.api;
 
-import org.apache.tez.common.annotation.ConfigurationClass;
 import org.apache.tez.common.annotation.ConfigurationProperty;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.records.LocalResource;
@@ -30,7 +29,6 @@ import org.apache.hadoop.yarn.api.records.LocalResource;
  * @see <a href="../../../../../configs/TezConfiguration.html">Detailed Configuration Information</a>
  * @see <a href="../../../../../configs/tez-default-template.xml">XML-based Config Template</a>
  */
-@ConfigurationClass(templateFileName = "tez-default-template.xml")
 public class TezConfiguration extends Configuration {
 
   public final static String TEZ_SITE_XML = "tez-site.xml";

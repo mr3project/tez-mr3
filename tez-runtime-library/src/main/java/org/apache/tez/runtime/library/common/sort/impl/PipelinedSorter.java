@@ -242,7 +242,9 @@ public class PipelinedSorter extends ExternalSorter {
 
     this.writeBuffer = IFile.allocateWriteBuffer();
 
-    this.freeMemoryThreshold = outputContext.getTotalMemoryAvailableToTask();
+    this.freeMemoryThreshold = 1024L * 1024L * conf.getInt(
+        TezRuntimeConfiguration.TEZ_RUNTIME_FREE_MEMORY_WRITER_OUTPUT_THRESHOLD_MB,
+        TezRuntimeConfiguration.TEZ_RUNTIME_FREE_MEMORY_WRITER_OUTPUT_THRESHOLD_MB_DEFAULT);
     // useFreeMemoryWriterOutput = false if compositeFetch == false, i.e, when using mapreduce_shuffle
     this.useFreeMemoryWriterOutput = compositeFetch && conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT,
