@@ -26,9 +26,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.tez.common.annotation.ConfigurationClass;
 import org.apache.tez.common.annotation.ConfigurationProperty;
-import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.runtime.library.conf.OrderedPartitionedKVOutputConfig.SorterImpl;
 
 /**
@@ -36,11 +34,7 @@ import org.apache.tez.runtime.library.conf.OrderedPartitionedKVOutputConfig.Sort
  * <p/>
  * Note for developers: Whenever a new key is added to this file, it must also be added to the set of
  * known tezRuntimeKeys.
- * @see <a href="../../../../../../configs/TezRuntimeConfiguration.html">Detailed Configuration Information</a>
- * @see <a href="../../../../../configs/tez-runtime-default-template.xml">XML-based Config Template</a>
  */
-
-@ConfigurationClass(templateFileName = "tez-runtime-default-template.xml")
 public class TezRuntimeConfiguration {
 
   private static final String TEZ_RUNTIME_PREFIX = "tez.runtime.";
@@ -142,7 +136,7 @@ public class TezRuntimeConfiguration {
    * Integer value. Percentage of buffer to be filled before we spill to disk. Default value is 0,
    * which will spill for every buffer.
    */
-  @ConfigurationProperty(type="int")
+  @ConfigurationProperty(type = "integer")
   public static final String TEZ_RUNTIME_UNORDERED_PARTITIONED_KVWRITER_BUFFER_MERGE_PERCENT =
       TEZ_RUNTIME_PREFIX + "unordered-partitioned-kvwriter.buffer-merge-percent";
   public static final int TEZ_RUNTIME_UNORDERED_PARTITIONED_KVWRITER_BUFFER_MERGE_PERCENT_DEFAULT =
@@ -300,6 +294,11 @@ public class TezRuntimeConfiguration {
   public static final String TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT =
       TEZ_RUNTIME_PREFIX + "use.free.memory.writer.output";
   public static final boolean TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT_DEFAULT = false;
+
+  @ConfigurationProperty(type = "integer")
+  public static final String TEZ_RUNTIME_FREE_MEMORY_WRITER_OUTPUT_THRESHOLD_MB =
+      TEZ_RUNTIME_PREFIX + "free.memory.writer.output.threshold.mb";
+  public static final int TEZ_RUNTIME_FREE_MEMORY_WRITER_OUTPUT_THRESHOLD_MB_DEFAULT = 6 * 1024;
 
   @ConfigurationProperty(type = "integer")
   public static final String TEZ_RUNTIME_SHUFFLE_SPECULATIVE_FETCH_WAIT_MILLIS =
@@ -463,6 +462,7 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT);
     tezRuntimeKeys.add(TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT);
     tezRuntimeKeys.add(TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT);
+    tezRuntimeKeys.add(TEZ_RUNTIME_FREE_MEMORY_WRITER_OUTPUT_THRESHOLD_MB);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_SPECULATIVE_FETCH_WAIT_MILLIS);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_THRESHOLD_MILLIS);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_RELEASE_MILLIS);
