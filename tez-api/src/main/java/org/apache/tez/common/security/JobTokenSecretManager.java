@@ -26,6 +26,7 @@ import java.util.TreeMap;
 import javax.crypto.Mac;
 import javax.crypto.SecretKey;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.Token;
 
@@ -69,14 +70,15 @@ public class JobTokenSecretManager extends SecretManager<JobTokenIdentifier> {
     }
   }
 
-  /**
-   * Default constructor
-   */
   public JobTokenSecretManager() {
-    this(null);
+    this(null, null);
   }
 
-  public JobTokenSecretManager(SecretKey key) {
+  public JobTokenSecretManager(Configuration conf) {
+    this(null, conf);
+  }
+
+  public JobTokenSecretManager(SecretKey key, Configuration conf) {
     this.masterKey = (key == null) ? generateSecret() : key;
     this.currentJobTokens = new TreeMap<String, SecretKey>();
     try {
