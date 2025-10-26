@@ -67,7 +67,6 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.tez.common.TezCommonUtils;
 import org.apache.tez.common.TezUtilsInternal;
 import org.apache.tez.common.counters.TaskCounter;
-import org.apache.tez.common.security.JobTokenIdentifier;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.OutputContext;
 import org.apache.tez.runtime.api.events.CompositeDataMovementEvent;
@@ -80,6 +79,7 @@ import org.apache.tez.runtime.library.shuffle.impl.ShuffleUserPayloads;
 import org.apache.tez.runtime.library.shuffle.impl.ShuffleUserPayloads.DataMovementEventPayloadProto;
 import org.apache.tez.runtime.library.shuffle.impl.ShuffleUserPayloads.DetailedPartitionStatsProto;
 
+import com.datamonad.mr3.common.security.JobTokenIdentifier;
 import com.datamonad.mr3.common.security.JobTokenSecretManager;
 
 public class ShuffleUtils {
@@ -104,7 +104,10 @@ public class ShuffleUtils {
 
   public static ByteBuffer convertJobTokenToBytes(
       Token<JobTokenIdentifier> jobToken) throws IOException {
-    return TezCommonUtils.convertJobTokenToBytes(jobToken);
+    DataOutputBuffer dob = new DataOutputBuffer();
+    jobToken.write(dob);
+    ByteBuffer bb = ByteBuffer.wrap(dob.getData(), 0, dob.getLength());
+    return bb;
   }
 
   public static int[] deserializeShuffleProviderMetaData(ByteBuffer meta)
