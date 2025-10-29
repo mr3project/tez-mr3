@@ -30,6 +30,7 @@ import org.apache.tez.common.security.JobTokenIdentifier;
  * Look through tokens to find the first job token that matches the service
  * and return it.
  */
+// used by llap-common and llap-tez in Hive-MR3
 public class JobTokenSelector implements TokenSelector<JobTokenIdentifier> {
 
   @SuppressWarnings("unchecked")

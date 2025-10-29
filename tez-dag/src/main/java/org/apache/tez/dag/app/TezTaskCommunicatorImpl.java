@@ -49,7 +49,6 @@ import org.apache.tez.serviceplugins.api.TaskCommunicator;
 import org.apache.tez.serviceplugins.api.TaskCommunicatorContext;
 import org.apache.tez.serviceplugins.api.TaskHeartbeatRequest;
 import org.apache.tez.serviceplugins.api.TaskHeartbeatResponse;
-import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.dag.api.TezException;
 import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.dag.api.event.VertexStateUpdate;

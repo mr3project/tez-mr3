@@ -85,7 +85,7 @@ public class TezCommonUtils {
     }
   }
 
-  // called from hive.llap.daemon.impl.TaskRunnerCallable
+  // called from hive.llap.daemon.impl.TaskRunnerCallable in llap-server
   // do NOT use for MR3 because it uses tez.common.security.JobTokenIdentifier
   public static ByteBuffer convertJobTokenToBytes(
       Token<JobTokenIdentifier> jobToken) throws IOException {
