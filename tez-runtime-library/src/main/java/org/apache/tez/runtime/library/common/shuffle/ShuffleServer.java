@@ -608,6 +608,10 @@ public class ShuffleServer implements FetcherCallback {
       return;
     }
 
+    if (fetcher != null) {
+      fetcher.isFailed = true;
+    }
+
     if (inputHost != null) {
       if (inputHost.containsInput(shuffleClientId, partitionRange, srcAttemptIdentifier)) {
         // This can happen if some speculative fetcher finds 'mapOutput.getType() == Type.WAIT' and
@@ -618,13 +622,21 @@ public class ShuffleServer implements FetcherCallback {
       }
 
       if (fetcher != null) {
-        boolean existsConcurrentFetcher = runningFetchers.stream().anyMatch(f -> {
-          return f != fetcher &&
+        // existsConcurrentNotFailedFetcher is correctly computed because Fetcher.isFailed is volatile.
+        // For the last Fetcher setting isFailed to true:
+        //   - existsConcurrentNotFailedFetcher is false.
+        //   - so, shuffleClient.fetchFailed() is guaranteed to be called.
+        // If any Fetcher eventually succeeds:
+        //   - its isFailed is never set to true.
+        //   - so, existsConcurrentNotFailedFetcher is never true while it is in runningFetchers[].
+        //   - by the time it is removed from runningFetchers[], ShuffleClient.fetchSucceeded() is called.
+        boolean existsConcurrentNotFailedFetcher = runningFetchers.stream().anyMatch(f -> {
+          return f != fetcher && !f.isFailed &&
             f.inputHost.getHostPort().equals(inputHost.getHostPort()) &&  // redundant, but for quick filtering
             f.containsInputAttemptIdentifier(srcAttemptIdentifier);
         });
-        if (existsConcurrentFetcher) {
-          LOG.info("Do not fail {} of {} because another fetcher is running",
+        if (existsConcurrentNotFailedFetcher) {
+          LOG.info("Do not fail {} of {} because another fetcher (not failed yet) is running",
               srcAttemptIdentifier, fetcher);
           return;
         }

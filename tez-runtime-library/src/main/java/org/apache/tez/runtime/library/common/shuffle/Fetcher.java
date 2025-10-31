@@ -95,6 +95,9 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
   public static int STATE_COMPLETED = 15;
   private int state = STATE_NORMAL;
 
+  // used only in ShuffleServer.fetchFailed()
+  public volatile boolean isFailed = false;
+
   // read by ShuffleServer
   public long getStartMillis() {
     return startMillis;
