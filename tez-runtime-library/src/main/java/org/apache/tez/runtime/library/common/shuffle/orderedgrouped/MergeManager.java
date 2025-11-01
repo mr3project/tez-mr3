@@ -433,14 +433,17 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
           LOG.debug("Creating MemoryMapOutput in free memory: {}, {}, CommitMemory={}",
               usedMemory, currentFreeMemory, commitMemory);
         }
+        // usedMemoryForMergeManager = 0 because this MemoryMapOutput should not contribute to usedMemory
+        return unconditionalReserve(srcAttemptIdentifier, 0L, requestedSize, true);
       } else {
         // Allow the in-memory shuffle to progress
         if (LOG.isDebugEnabled()) {
           LOG.debug("Creating MemoryMapOutput: {}, {}, CommitMemory={}",
               usedMemory, memoryLimit, commitMemory);
         }
+        // usedMemoryForMergeManager == requestedSize
+        return unconditionalReserve(srcAttemptIdentifier, requestedSize, requestedSize, true);
       }
-      return unconditionalReserve(srcAttemptIdentifier, requestedSize, true);
     }
   }
 
@@ -449,10 +452,12 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
    */
   private synchronized MapOutput unconditionalReserve(
       InputAttemptIdentifier srcAttemptIdentifier,
+      long usedMemoryForMergeManager,
       long requestedSize,
       boolean primaryMapOutput) {
-    usedMemory += requestedSize;
-    return MapOutput.createMemoryMapOutput(srcAttemptIdentifier, this, (int) requestedSize, primaryMapOutput);
+    usedMemory += usedMemoryForMergeManager;
+    return MapOutput.createMemoryMapOutput(
+        srcAttemptIdentifier, this, usedMemoryForMergeManager, requestedSize, primaryMapOutput);
   }
 
   @Override
@@ -466,11 +471,10 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   }
 
   @Override
-  public synchronized void releaseCommittedMemory(long size) {
-    commitMemory -= size;
-    unreserve(size);
+  public synchronized void releaseCommittedMemory(long commitSize, long usedMemoryForMergeManager) {
+    commitMemory -= commitSize;
+    unreserve(usedMemoryForMergeManager);
   }
-
 
   @Override
   public synchronized void closeInMemoryFile(MapOutput mapOutput) { 
@@ -687,7 +691,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
           } else {
             mergeOutputSize += mo.getSize();
             IFile.Reader reader = new InMemoryReader(MergeManager.this,
-                mo.getAttemptIdentifier(), mo.getMemory(), 0, mo.getMemory().length);
+                mo.getAttemptIdentifier(), mo.getMemory(), 0, mo.getMemory().length,
+                (int)mo.getUsedMemoryForMergeManager());
             inMemorySegments.add(new Segment(reader,
                 (mo.isPrimaryMapOutput() ? mergedMapOutputsCounter : null)));
             lastAddedMapOutput = mo;
@@ -709,7 +714,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
           return;
         }
 
-        mergedMapOutputs = unconditionalReserve(dummyMapId, mergeOutputSize, false);
+        // usedMemoryForMergeManager == mergeOutputSize
+        mergedMapOutputs = unconditionalReserve(dummyMapId, mergeOutputSize, mergeOutputSize, false);
       }
 
       int noInMemorySegments = inMemorySegments.size();
@@ -1000,11 +1006,10 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       totalSize += size;
       fullSize -= size;
       IFile.Reader reader = new InMemoryReader(MergeManager.this, 
-                                                   mo.getAttemptIdentifier(),
-                                                   data, 0, (int)size);
+          mo.getAttemptIdentifier(), data, 0, (int)size,
+          (int)mo.getUsedMemoryForMergeManager());
       inMemorySegments.add(new Segment(reader,
-                                            (mo.isPrimaryMapOutput() ? 
-                                            mergedMapOutputsCounter : null)));
+          (mo.isPrimaryMapOutput() ? mergedMapOutputsCounter : null)));
     }
     // Bulk remove removed in-memory map outputs efficiently
     inMemoryMapOutputs.subList(0, inMemoryMapOutputsOffset).clear();

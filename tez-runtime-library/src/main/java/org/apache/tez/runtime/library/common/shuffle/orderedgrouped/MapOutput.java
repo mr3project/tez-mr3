@@ -84,9 +84,11 @@ public abstract class MapOutput implements ShuffleInput {
   }
 
   public static MapOutput createMemoryMapOutput(InputAttemptIdentifier attemptIdentifier,
-                                                FetchedInputAllocatorOrderedGrouped callback, int size,
+                                                FetchedInputAllocatorOrderedGrouped callback,
+                                                long usedMemoryForMergeManger,
+                                                long size,
                                                 boolean primaryMapOutput)  {
-    return new InMemoryMapOutput(attemptIdentifier, callback, size, primaryMapOutput);
+    return new InMemoryMapOutput(attemptIdentifier, callback, usedMemoryForMergeManger, size, primaryMapOutput);
   }
 
   public static MapOutput createWaitMapOutput(InputAttemptIdentifier attemptIdentifier) {
@@ -130,6 +132,10 @@ public abstract class MapOutput implements ShuffleInput {
 
   public long getSize() {
     return -1;
+  }
+
+  public long getUsedMemoryForMergeManager() {
+    return 0;
   }
 
   public void commit() throws IOException {
@@ -247,12 +253,15 @@ public abstract class MapOutput implements ShuffleInput {
   }
 
   private static class InMemoryMapOutput extends MapOutput {
-    private byte[] byteArray;
+    private final byte[] byteArray;
+    private final long usedMemoryForMergeManger;
     private InMemoryMapOutput(InputAttemptIdentifier attemptIdentifier,
                               FetchedInputAllocatorOrderedGrouped callback,
+                              long usedMemoryForMergeManger,
                               long size, boolean primaryMapOutput) {
       super(attemptIdentifier, callback, primaryMapOutput);
       this.byteArray = new byte[(int)size];
+      this.usedMemoryForMergeManger = usedMemoryForMergeManger;
     }
 
     @Override
@@ -266,13 +275,18 @@ public abstract class MapOutput implements ShuffleInput {
     }
 
     @Override
+    public long getUsedMemoryForMergeManager() {
+      return usedMemoryForMergeManger;
+    }
+
+    @Override
     public void commit() throws IOException {
       callback.closeInMemoryFile(this);
     }
 
     @Override
     public void abort() {
-      callback.unreserve(byteArray.length);
+      callback.unreserve(usedMemoryForMergeManger);
     }
 
     @Override
