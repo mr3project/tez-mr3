@@ -161,9 +161,10 @@ public class InMemoryReader extends Reader {
   private final ByteArrayDataInput memDataIn;
   private final int start;
   private final int length;
+  private final int usedMemoryForMergeManager;
 
   public InMemoryReader(MergeManager merger, InputAttemptIdentifier taskAttemptId,
-                        byte[] data, int start, int length)
+                        byte[] data, int start, int length, int usedMemoryForMergeManager)
       throws IOException {
     super(null, length - start, null, null, null, false, 0, null);
     this.merger = merger;
@@ -174,6 +175,8 @@ public class InMemoryReader extends Reader {
     this.memDataIn = new ByteArrayDataInput(buffer, start, length);
     this.start = start;
     this.length = length;
+
+    this.usedMemoryForMergeManager = usedMemoryForMergeManager;
   }
 
   @Override
@@ -280,7 +283,7 @@ public class InMemoryReader extends Reader {
     buffer = null;
     // Inform the MergeManager
     if (merger != null) {
-      merger.releaseCommittedMemory(bufferSize);
+      merger.releaseCommittedMemory(bufferSize, usedMemoryForMergeManager);
     }
   }
 }
