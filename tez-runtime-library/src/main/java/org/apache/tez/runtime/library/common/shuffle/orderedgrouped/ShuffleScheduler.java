@@ -219,8 +219,8 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
       boolean killInPipelined = cr.killInPipelined;
 
       if (output != null && !commitAndRegister) {
-        LOG.error("MapOutput should not be commited: new={}, current={}",
-            srcAttemptIdentifier, shuffleInfoEventsMap.get(inputIdentifier));
+        LOG.error("MapOutput should not be commited: new={}, current={}, killInPipelined={}",
+            srcAttemptIdentifier, shuffleInfoEventsMap.get(inputIdentifier), killInPipelined);
       }
 
       if (output != null) {

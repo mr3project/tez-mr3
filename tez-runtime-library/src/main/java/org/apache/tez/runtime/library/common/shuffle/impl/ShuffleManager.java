@@ -257,6 +257,16 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
     synchronized (completedInputSet) {
       boolean isCompleted = completedInputSet.get(inputIdentifier);
       if (!isCompleted) {
+        synchronized (shuffleInfoEventsMap) {
+          CommitRegister cr = checkCommitRegister(srcAttemptIdentifier);
+          boolean commitAndRegister = cr.commitAndRegister;
+          boolean killInPipelined = cr.killInPipelined;
+          if (!commitAndRegister) {
+            LOG.error("MapOutput should not be commited: new={}, current={}, killInPipelined={}",
+                srcAttemptIdentifier, shuffleInfoEventsMap.get(inputIdentifier), killInPipelined);
+          }
+        }
+
         fetchedInput.commit();
         if (!srcAttemptIdentifier.canRetrieveInputInChunks()) {
           registerCompletedInput(fetchedInput);
