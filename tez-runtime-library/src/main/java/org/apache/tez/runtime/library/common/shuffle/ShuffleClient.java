@@ -154,6 +154,18 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
     return logIdentifier;
   }
 
+  protected void setInputFinished(int inputIndex) {
+    synchronized(completedInputSet) {
+      completedInputSet.set(inputIndex, true);
+    }
+  }
+
+  protected boolean isInputFinished(int inputIndex) {
+    synchronized (completedInputSet) {
+      return completedInputSet.get(inputIndex);
+    }
+  }
+
   // inside ShuffleServer.call() thread
   protected boolean cleanInputHostForConstructFetcher(InputHost.PartitionToInputs pendingInputs) {
     // safe to update pendingInputs because we are running in ShuffleServer.call() thread
@@ -286,6 +298,49 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
     synchronized (lock) {
       return numPartitionRanges > 0 && numFetchers < maxNumFetchers;
     }
+  }
+
+  // return value of checkCommitRegister()
+  static public class CommitRegister {
+    public final boolean commitAndRegister;
+    public final boolean killInPipelined;
+    public CommitRegister(
+        boolean commitAndRegister,
+        boolean killInPipelined) {
+      this.commitAndRegister = commitAndRegister;
+      this.killInPipelined = killInPipelined;
+    }
+  }
+
+  // Invariant: shuffleInfoEventsMap[] is already guarded
+  protected CommitRegister checkCommitRegister(InputAttemptIdentifier srcAttemptIdentifier) {
+    int inputIdentifier = srcAttemptIdentifier.getInputIdentifier();
+    // assert !isInputFinished(inputIdentifier);
+
+    // non-pipelined: MapOutput output is the entire data, so commit
+    // pipelined: check if the spill is new and should be committed
+    boolean isPipelined = srcAttemptIdentifier.canRetrieveInputInChunks();
+    boolean commitAndRegister;
+    boolean killBecauseDifferentSpillAttemptInPipelined = false;
+    if (!isPipelined) {
+      commitAndRegister = true;
+    } else {
+      ShuffleEventInfo eventInfo = shuffleInfoEventsMap.get(inputIdentifier);
+      if (eventInfo == null) {  // this is the first spill fetched successfully
+        commitAndRegister = true;
+      } else {
+        int attemptNum = srcAttemptIdentifier.getAttemptNumber();
+        if (attemptNum == eventInfo.attemptNum) {
+          boolean isAlreadyProcessed = eventInfo.getEventsProcessed().get(srcAttemptIdentifier.getSpillEventId());
+          commitAndRegister = !isAlreadyProcessed;
+        } else {
+          commitAndRegister = false;
+          killBecauseDifferentSpillAttemptInPipelined = true;
+        }
+      }
+    }
+
+    return new CommitRegister(commitAndRegister, killBecauseDifferentSpillAttemptInPipelined);
   }
 
   public abstract void fetchSucceeded(

@@ -210,8 +210,19 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
       long bytesCompressed,
       long bytesDecompressed,
       long copyDuration) throws IOException {
+    int inputIdentifier = srcAttemptIdentifier.getInputIdentifier();
 
-    if (!isInputFinished(srcAttemptIdentifier.getInputIdentifier())) {
+    if (!isInputFinished(inputIdentifier)) {
+      // guard shuffleInfoEventsMap[], already covered by this.synchronized
+      CommitRegister cr = checkCommitRegister(srcAttemptIdentifier);
+      boolean commitAndRegister = cr.commitAndRegister;
+      boolean killInPipelined = cr.killInPipelined;
+
+      if (output != null && !commitAndRegister) {
+        LOG.error("MapOutput should not be commited: new={}, current={}",
+            srcAttemptIdentifier, shuffleInfoEventsMap.get(inputIdentifier));
+      }
+
       if (output != null) {
         output.commit();
         fetchStatsLogger.logIndividualFetchComplete(copyDuration, bytesCompressed, bytesDecompressed,
@@ -260,8 +271,8 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
       // input is already finished. duplicate fetch.
       LOG.warn("Duplicate fetch of ordered input for {} ({} remaining): {}",
           inputContext.getUniqueIdentifier(), remainingMaps.get(), srcAttemptIdentifier);
-      // free the resource - especially memory
 
+      // free the resource - especially memory
       // If the src does not generate data, output will be null.
       if (output != null) {
         output.abort();
@@ -344,7 +355,7 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
     assert readFailed ^ connectFailed;
     assert shouldInformAM;
     if (shouldInformAM) {
-      informAM(srcAttemptIdentifier);
+      informAM(srcAttemptIdentifier);   // send InputReadErrorEvent only, without killing TaskAttempt
     }
 
     // unlike in the original implementation, we do not check the number of fetch failures for srcAttemptIdentifier
@@ -448,18 +459,6 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
       s.append(", numInputs=" + numInputs);
       s.append(", transfer rate (KB/s) = " + transferRate);
       LOG.info(s.toString());
-    }
-  }
-
-  private void setInputFinished(int inputIndex) {
-    synchronized(completedInputSet) {
-      completedInputSet.set(inputIndex, true);
-    }
-  }
-
-  private boolean isInputFinished(int inputIndex) {
-    synchronized (completedInputSet) {
-      return completedInputSet.get(inputIndex);
     }
   }
 }

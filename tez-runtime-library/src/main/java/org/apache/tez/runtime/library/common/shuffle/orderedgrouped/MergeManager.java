@@ -425,7 +425,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         }
         // Check if we can find free memory in the current ContainerWorker
         long currentFreeMemory = Runtime.getRuntime().freeMemory();
-        if (currentFreeMemory < freeMemoryThreshold){
+        if (currentFreeMemory < freeMemoryThreshold) {
           // this ContainerWorker is busy serving Tasks, so do not borrow
           return stallShuffle;
         }
