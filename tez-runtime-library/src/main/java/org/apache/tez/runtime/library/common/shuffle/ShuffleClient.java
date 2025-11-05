@@ -313,6 +313,7 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
   }
 
   // Invariant: shuffleInfoEventsMap[] is already guarded
+  // The result of checkCommitRegister() is valid only while shuffleInfoEventsMap[] is guarded.
   protected CommitRegister checkCommitRegister(InputAttemptIdentifier srcAttemptIdentifier) {
     int inputIdentifier = srcAttemptIdentifier.getInputIdentifier();
     // assert !isInputFinished(inputIdentifier);

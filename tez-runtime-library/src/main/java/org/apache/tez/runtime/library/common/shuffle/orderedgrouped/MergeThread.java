@@ -91,7 +91,7 @@ abstract class MergeThread<T> extends Thread {
       if (shuffleSchedulerThread != null && !shuffleSchedulerThread.isAlive()) {
         return;
       }
-      wait(5000);
+      wait(5000);   // TODO: adjust
     }
   }
 

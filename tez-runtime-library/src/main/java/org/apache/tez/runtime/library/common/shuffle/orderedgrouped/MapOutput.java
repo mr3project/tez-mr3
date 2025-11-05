@@ -254,6 +254,8 @@ public abstract class MapOutput implements ShuffleInput {
 
   private static class InMemoryMapOutput extends MapOutput {
     private final byte[] byteArray;
+    // if usedMemoryForMergeManger == 0, we can think of InMemoryMapOutput as a special case of DiskMapOutput
+    // Invariant: usedMemoryForMergeManger has already been added to MergeManager.usedMemory.
     private final long usedMemoryForMergeManger;
     private InMemoryMapOutput(InputAttemptIdentifier attemptIdentifier,
                               FetchedInputAllocatorOrderedGrouped callback,
@@ -262,6 +264,7 @@ public abstract class MapOutput implements ShuffleInput {
       super(attemptIdentifier, callback, primaryMapOutput);
       this.byteArray = new byte[(int)size];
       this.usedMemoryForMergeManger = usedMemoryForMergeManger;
+      assert usedMemoryForMergeManger == size || usedMemoryForMergeManger == 0L;
     }
 
     @Override

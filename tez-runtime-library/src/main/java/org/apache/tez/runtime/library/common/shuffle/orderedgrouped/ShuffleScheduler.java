@@ -214,6 +214,7 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
 
     if (!isInputFinished(inputIdentifier)) {
       // guard shuffleInfoEventsMap[], already covered by this.synchronized
+      // The result of checkCommitRegister() is valid in this.synchronized, so inside fetchSucceeded()
       CommitRegister cr = checkCommitRegister(srcAttemptIdentifier);
       boolean commitAndRegister = cr.commitAndRegister;
       boolean killInPipelined = cr.killInPipelined;

@@ -214,7 +214,7 @@ public class TezRuntimeConfiguration {
   @ConfigurationProperty(type = "float")
   public static final String TEZ_RUNTIME_INPUT_POST_MERGE_BUFFER_PERCENT =
       TEZ_RUNTIME_PREFIX + "task.input.post-merge.buffer.percent";
-  public static final float TEZ_RUNTIME_INPUT_BUFFER_PERCENT_DEFAULT = 0.0f;
+  public static final float TEZ_RUNTIME_INPUT_BUFFER_PERCENT_DEFAULT = 0.9f;
 
   @ConfigurationProperty
   public static final String TEZ_RUNTIME_INTERNAL_SORTER_CLASS =

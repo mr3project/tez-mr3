@@ -99,8 +99,24 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   
   private final long memoryLimit;
   final long postMergeMemLimit;
+
+  // Lifecycle of InMemoryOutput:
+  // - create InMemoryOutput, increase usedMemory
+  // - 1. InMemoryOutput.commit()
+  //      --> closeInMemoryFile()
+  //      --> InMemoryReader
+  //      --> releaseCommittedMemory()
+  // - 2. InMemoryOutput.abort()
+
+  // MergeManager’s internal memory budget for controlling fetching
+  // increases at the time of creating InMemoryMapOutput
+  // guard with synchronized (this), or synchronized (manager) inside MergeThread
   private long usedMemory;
+  // Merge decisions depend on committed sizes (commitMemory >= mergeThreshold).
+  // increases when InMemoryMapOutput is accepted as valid input
+  // guard with synchronized (this), or synchronized (manager) inside MergeThread
   private long commitMemory;
+
   private final int ioSortFactor;
   private final long maxSingleShuffleLimit;
 
@@ -376,7 +392,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
   public synchronized void waitForShuffleToMergeMemory() throws InterruptedException {
     long startTime = System.currentTimeMillis();
-    while(usedMemory > memoryLimit) {
+    while (usedMemory > memoryLimit) {
       wait();
     }
     if (LOG.isDebugEnabled()) {
@@ -434,6 +450,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
               usedMemory, currentFreeMemory, commitMemory);
         }
         // usedMemoryForMergeManager = 0 because this MemoryMapOutput should not contribute to usedMemory
+        // So, we can think of this InMemoryMapOut as a special case of DiskMapOutput.
         return unconditionalReserve(srcAttemptIdentifier, 0L, requestedSize, true);
       } else {
         // Allow the in-memory shuffle to progress
@@ -450,6 +467,9 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   /**
    * Unconditional Reserve is used by the Memory-to-Memory thread
    */
+  // InMemoryMapOutput must call unreserve(), either
+  //   directly from InMemoryOutput.abort() or
+  //   indirectly via releaseCommittedMemory() after closeInMemoryFile() is called from InMemoryOutput.commit().
   private synchronized MapOutput unconditionalReserve(
       InputAttemptIdentifier srcAttemptIdentifier,
       long usedMemoryForMergeManager,
@@ -462,6 +482,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
   @Override
   public synchronized void unreserve(long size) {
+    assert usedMemory >= size;
     usedMemory -= size;
     if (LOG.isDebugEnabled()) {
       LOG.debug("Notifying unreserve : size=" + size + ", commitMemory=" + commitMemory + ", usedMemory=" + usedMemory
@@ -472,6 +493,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
   @Override
   public synchronized void releaseCommittedMemory(long commitSize, long usedMemoryForMergeManager) {
+    assert usedMemoryForMergeManager == commitSize || usedMemoryForMergeManager == 0L;
+    assert commitMemory >= commitSize;
     commitMemory -= commitSize;
     unreserve(usedMemoryForMergeManager);
   }
@@ -638,7 +661,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       }
       fs.delete(path, true);
     } catch (IOException e) {
-      LOG.info("Error in deleting " + path);
+      LOG.warn("Error in deleting {}", path);
     }
   }
 
@@ -677,8 +700,12 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
         Iterator<MapOutput> it = inputs.iterator();
         MapOutput lastAddedMapOutput = null;
-        while(it.hasNext() && !Thread.currentThread().isInterrupted()) {
+        while (it.hasNext() && !Thread.currentThread().isInterrupted()) {
           MapOutput mo = it.next();
+          // We have to use mo.getSize(), not mo.getUsedMemoryForMergeManager(), because
+          // we will create a buffer big enough to hold the sum of the actual sizes of all selected inputs.
+          // Adding manager.getUsedMemory() is okay because
+          // the guard is about whether we can safely charge the new merged buffer under the budget.
           if ((mergeOutputSize + mo.getSize() + manager.getUsedMemory()) > memoryLimit) {
             //Search for smaller segments that can fit into existing mem
             if (LOG.isDebugEnabled()) {
@@ -855,12 +882,11 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     }
 
     @Override
-    public void cleanup(List<MapOutput> inputs, boolean deleteData)
-        throws IOException, InterruptedException {
+    public void cleanup(List<MapOutput> inputs, boolean deleteData) {
       if (deleteData) {
-        //Additional check at task level
+        // Additional check at task level
         if (cleanup) {
-          LOG.info("Try deleting stale data");
+          LOG.info("Try deleting stale data: {}, {}", outputPath, tmpDir);
           MergeManager.cleanup(localFS, outputPath);
           MergeManager.cleanup(localFS, tmpDir);
         }
@@ -974,12 +1000,11 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     }
 
     @Override
-    public void cleanup(List<FileChunk> inputs, boolean deleteData) throws IOException,
-        InterruptedException {
+    public void cleanup(List<FileChunk> inputs, boolean deleteData) throws IOException, InterruptedException {
       if (deleteData) {
-        //Additional check at task level
+        // Additional check at task level
         if (cleanup) {
-          LOG.info("Try deleting stale data");
+          LOG.info("Try deleting stale data: {}, {}", outputPath, tmpDir);
           MergeManager.cleanup(localFS, inputs);
           MergeManager.cleanup(localFS, outputPath);
           MergeManager.cleanup(localFS, tmpDir);
@@ -1090,10 +1115,10 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         // disk segments and this will be incremented by 1 (result of the 
         // memory segments merge). Since this total would still be 
         // <= io.sort.factor, we will not do any more intermediate merges,
-        // the merge of all these disk segments would be directly fed to the reduce method
+        // the merge of all these disk segments would be directly fed to the reduce method.
         
         // must spill to disk, but can't retain in-mem for intermediate merge
-        // Can not use spill id in final merge as it would clobber with other files, hence using Integer.MAX_VALUE
+        // Cannot use spill id in final merge as it would clobber with other files, hence using Integer.MAX_VALUE
         final Path outputPath = mapOutputFile.getInputFileForWrite(
             srcTaskId, Integer.MAX_VALUE, inMemToDiskBytes).suffix(Constants.MERGED_OUTPUT_PREFIX);
         final TezRawKeyValueIterator rIter = TezMerger.merge(job, fs, serContext,
