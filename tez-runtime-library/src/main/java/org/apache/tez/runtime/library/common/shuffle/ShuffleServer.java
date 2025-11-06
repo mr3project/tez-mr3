@@ -609,7 +609,7 @@ public class ShuffleServer implements FetcherCallback {
     }
 
     if (fetcher != null) {
-      fetcher.isFailed = true;
+      fetcher.isFailed = true;  // for computing existsConcurrentNotFailedFetcher correctly below
     }
 
     if (inputHost != null) {

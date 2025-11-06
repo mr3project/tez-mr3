@@ -155,7 +155,7 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
   }
 
   protected void setInputFinished(int inputIndex) {
-    synchronized(completedInputSet) {
+    synchronized (completedInputSet) {
       completedInputSet.set(inputIndex, true);
     }
   }
@@ -207,7 +207,7 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
       }
 
       // use input.getInput() for quick checking
-      if (!validateInputAttemptForPipelinedShuffle(input.getInput(), false)) {
+      if (!validateInputAttemptForPipelinedShuffle(input.getInput())) {
         inputIter.remove();   // no need to fetch for input, so remove
         removedAnyInput = true;
       }
@@ -302,17 +302,24 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
 
   // return value of checkCommitRegister()
   static public class CommitRegister {
+    // Invariants:
+    //   !(!isPipelined) || commitAndRegister
+    //   !(isPipelined && commitAndRegister) || !killInPipelined
+    //   !(isPipelined && killInPipelined) || !commitAndRegister
+    public final boolean isPipelined;
     public final boolean commitAndRegister;
-    public final boolean killInPipelined;
+    public final boolean killInPipelined;   // == killBecauseDifferentSpillAttemptInPipelined
     public CommitRegister(
+        boolean isPipelined,
         boolean commitAndRegister,
         boolean killInPipelined) {
+      this.isPipelined = isPipelined;
       this.commitAndRegister = commitAndRegister;
       this.killInPipelined = killInPipelined;
     }
   }
 
-  // Invariant: shuffleInfoEventsMap[] is already guarded
+  // Invariant: shuffleInfoEventsMap[] is guarded
   // The result of checkCommitRegister() is valid only while shuffleInfoEventsMap[] is guarded.
   protected CommitRegister checkCommitRegister(InputAttemptIdentifier srcAttemptIdentifier) {
     int inputIdentifier = srcAttemptIdentifier.getInputIdentifier();
@@ -341,8 +348,31 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
       }
     }
 
-    return new CommitRegister(commitAndRegister, killBecauseDifferentSpillAttemptInPipelined);
+    return new CommitRegister(isPipelined, commitAndRegister, killBecauseDifferentSpillAttemptInPipelined);
   }
+
+  // Invariant: shuffleInfoEventsMap[] is guarded
+  // Invariant: input.canRetrieveInputInChunks() == true
+  protected boolean validateInputAttemptForPipelinedShuffleCommon(
+      InputAttemptIdentifier input) {
+    int inputIdentifier = input.getInputIdentifier();
+    ShuffleEventInfo eventInfo = shuffleInfoEventsMap.get(inputIdentifier);
+
+    if (eventInfo != null && input.getAttemptNumber() != eventInfo.attemptNum) {
+      IOException exception = new IOException(
+        "Unordered: Previous attempt's data could have been already merged to memory/disk outputs: " + input
+          + ", currentAttemptNum=" + eventInfo.attemptNum
+          + ", eventsProcessed=" + eventInfo.getEventsProcessed()
+          + ", newAttemptNum=" + input.getAttemptNumber());
+      String message = "Killing self as previous attempt data could have been consumed";
+      killSelf(exception, message);
+      return false;
+    }
+
+    return true;
+  }
+
+  protected abstract void killSelf(Exception exception, String message);
 
   public abstract void fetchSucceeded(
       InputAttemptIdentifier srcAttemptIdentifier,
@@ -353,8 +383,7 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
       CompositeInputAttemptIdentifier srcAttemptIdentifier,
       boolean readFailed, boolean connectFailed);
 
-  protected abstract boolean validateInputAttemptForPipelinedShuffle(
-      InputAttemptIdentifier input, boolean registerShuffleInfoEvent);
+  protected abstract boolean validateInputAttemptForPipelinedShuffle(InputAttemptIdentifier input);
 
   public FetcherConfig getFetcherConfig() {
     return inputContext.getFetcherConfig(this.conf);

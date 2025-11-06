@@ -197,7 +197,7 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
       String hostName, String containerId, int port, int partitionId, CompositeInputAttemptIdentifier srcAttempt) {
     // Note: this check is optional.
     // use srcAttempt.getInput() for quick checking
-    if (!validateInputAttemptForPipelinedShuffle(srcAttempt.getInput(), false)) {
+    if (!validateInputAttemptForPipelinedShuffle(srcAttempt.getInput())) {
       return;
     }
 
@@ -216,41 +216,60 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
       // guard shuffleInfoEventsMap[], already covered by this.synchronized
       // The result of checkCommitRegister() is valid in this.synchronized, so inside fetchSucceeded()
       CommitRegister cr = checkCommitRegister(srcAttemptIdentifier);
+      boolean isPipelined = cr.isPipelined;
       boolean commitAndRegister = cr.commitAndRegister;
-      boolean killInPipelined = cr.killInPipelined;
+      boolean killInPipelined = cr.killInPipelined;   // killBecauseDifferentSpillAttemptInPipelined
+      assert !(!isPipelined) || commitAndRegister;
+      assert !(isPipelined && commitAndRegister) || !killInPipelined;
+      assert !(isPipelined && killInPipelined) || !commitAndRegister;
 
-      if (output != null && !commitAndRegister) {
-        LOG.error("MapOutput should not be commited: new={}, current={}, killInPipelined={}",
-            srcAttemptIdentifier, shuffleInfoEventsMap.get(inputIdentifier), killInPipelined);
-      }
-
+      // 1. call output.commit() or output.abort() if necessary
+      // consider commitAndRegister only
       if (output != null) {
-        output.commit();
-        fetchStatsLogger.logIndividualFetchComplete(copyDuration, bytesCompressed, bytesDecompressed,
-            output.getType().toString(), srcAttemptIdentifier);
-        if (output.getType() == Type.DISK) {
-          bytesShuffledToDisk.increment(bytesCompressed);
-        } else if (output.getType() == Type.DISK_DIRECT) {
-          bytesShuffledToDiskDirect.increment(bytesCompressed);
+        if (commitAndRegister) {
+          output.commit();
+          fetchStatsLogger.logIndividualFetchComplete(copyDuration, bytesCompressed, bytesDecompressed,
+              output.getType().toString(), srcAttemptIdentifier);
+          if (output.getType() == Type.DISK) {
+            bytesShuffledToDisk.increment(bytesCompressed);
+          } else if (output.getType() == Type.DISK_DIRECT) {
+            bytesShuffledToDiskDirect.increment(bytesCompressed);
+          } else {
+            bytesShuffledToMemory.increment(bytesCompressed);
+          }
+          shuffleInputsCounter.increment(1);
         } else {
-          bytesShuffledToMemory.increment(bytesCompressed);
+          LOG.warn("Duplicate fetch of ordered input for {} ({} remaining): {}",
+            inputContext.getUniqueIdentifier(), remainingMaps.get(), srcAttemptIdentifier);
+          output.abort();
         }
-        shuffleInputsCounter.increment(1);
       } else {
+        // cannot call output.commit()/abort()
         // Output null implies that a physical input completion is being
         // registered without needing to fetch data
         shuffleSkippedInputCounter.increment(1);
       }
 
-      /**
-       * In case of pipelined shuffle, it is quite possible that fetchers pulled the FINAL_UPDATE
-       * spill in advance due to smaller output size.  In such scenarios, we need to wait until
-       * we retrieve all spill details to claim success.
-       */
-      if (!srcAttemptIdentifier.canRetrieveInputInChunks()) {
+      // 2. register completed input if necessary
+      // consider isPipelined, commitAndRegister, killInPipelined
+      if (!isPipelined) {
+        // commitAndRegister == true
         registerCompletedInput(srcAttemptIdentifier);
       } else {
-        registerCompletedInputForPipelinedShuffle(srcAttemptIdentifier);
+        if (commitAndRegister) {
+          // killInPipelined == false
+          registerCompletedInputForPipelinedShuffle(srcAttemptIdentifier);
+        } else {
+          if (!killInPipelined) {
+            LOG.info("Ordered spill already processed for {} (remaining={}): {}",
+                inputContext.getUniqueIdentifier(), remainingMaps.get(), srcAttemptIdentifier);
+          } else {
+            String message = "Killing self as previous attempt ordered data could have been consumed in pipelined shuffling";
+            IOException exception = new IOException(
+                message + ": " + inputContext.getUniqueIdentifier() + ", " + srcAttemptIdentifier);
+            killSelf(exception, message);
+          }
+        }
       }
 
       if (remainingMaps.get() == 0) {
@@ -266,11 +285,11 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
 
       if (LOG.isDebugEnabled()) {
         LOG.debug("Source done for {} ({} remaining): {}",
-          inputContext.getUniqueIdentifier(), remainingMaps.get(), srcAttemptIdentifier);
+            inputContext.getUniqueIdentifier(), remainingMaps.get(), srcAttemptIdentifier);
       }
     } else {
       // input is already finished. duplicate fetch.
-      LOG.warn("Duplicate fetch of ordered input for {} ({} remaining): {}",
+      LOG.warn("Fetch of ordered input after completion for {} ({} remaining): {}",
           inputContext.getUniqueIdentifier(), remainingMaps.get(), srcAttemptIdentifier);
 
       // free the resource - especially memory
@@ -279,45 +298,31 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
         output.abort();
       }
     }
-    // TODO NEWTEZ Should this be releasing the output, if not committed ? Possible memory leak in case of speculation.
   }
 
-  // Invariant: inside synchronized(this)
+  // inside synchronized (this)
   private void registerCompletedInput(InputAttemptIdentifier srcAttemptIdentifier) {
     remainingMaps.decrementAndGet();
     setInputFinished(srcAttemptIdentifier.getInputIdentifier());
     numFetchedSpills++;
   }
 
-  // Invariant: inside synchronized(this)
+  // inside synchronized (this), covering synchronize (shuffleInfoEventsMap)
   private void registerCompletedInputForPipelinedShuffle(
       InputAttemptIdentifier srcAttemptIdentifier) {
-    // corresponds to ShuffleManager.registerCompletedInputForPipelinedShuffle()
-
-    if (isObsoleteInputAttemptIdentifier(srcAttemptIdentifier)) {
-      LOG.info("Do not register obsolete input for {}: {}", inputContext.getUniqueIdentifier(), srcAttemptIdentifier);
-      return;
-    }
-
-    // Allow only one task attempt to proceed.
-    if (!validateInputAttemptForPipelinedShuffle(srcAttemptIdentifier, true)) {
-      return;
-    }
+    // The input has been successfully fetched for inputIdentifier + spillId, so srcAttemptIdentifier can be obsolete.
+    // srcAttemptIdentifier is already validated.
 
     int inputIdentifier = srcAttemptIdentifier.getInputIdentifier();
     boolean eventInfoIsDone;
-    // synchronized (shuffleInfoEventsMap) {  // covered by this.synchronized
     ShuffleEventInfo eventInfo = shuffleInfoEventsMap.get(inputIdentifier);
-    assert eventInfo != null;
-
-    // What if the same spill was already processed by speculative fetchers?
-    boolean isAlreadyProcessed = eventInfo.getEventsProcessed().get(srcAttemptIdentifier.getSpillEventId());
-    if (isAlreadyProcessed) {
-      LOG.info("Spill already processed for {} (remaining={}): {}",
-          inputContext.getUniqueIdentifier(), remainingMaps.get(), srcAttemptIdentifier);
-      return;
+    if (eventInfo == null) {
+      eventInfo = new ShuffleEventInfo(srcAttemptIdentifier);
+      shuffleInfoEventsMap.put(inputIdentifier, eventInfo);
     }
 
+    // spill not processed yet, so register
+    assert !eventInfo.getEventsProcessed().get(srcAttemptIdentifier.getSpillEventId());
     eventInfo.spillProcessed(srcAttemptIdentifier.getSpillEventId());
     numFetchedSpills++;
     if (srcAttemptIdentifier.getFetchTypeInfo() == InputAttemptIdentifier.SPILL_INFO.FINAL_UPDATE) {
@@ -327,11 +332,6 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
     eventInfoIsDone = eventInfo.isDone();
     if (eventInfoIsDone) {
       shuffleInfoEventsMap.remove(inputIdentifier);
-    }
-    // }
-
-    // check if we downloaded all spills pertaining to this InputAttemptIdentifier
-    if (eventInfoIsDone) {
       remainingMaps.decrementAndGet();
       setInputFinished(inputIdentifier);
     }
@@ -339,42 +339,41 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
 
   public void fetchFailed(CompositeInputAttemptIdentifier srcAttemptIdentifier,
                           boolean readFailed, boolean connectFailed) {
+    int inputIdentifier = srcAttemptIdentifier.getInputIdentifier();
     shuffleFailedInputsCounter.increment(1);
 
-    if (isInputFinished(srcAttemptIdentifier.getInputIdentifier())) {
+    if (isInputFinished(inputIdentifier)) {
       LOG.warn("Ordered fetch failed for {}, but input already completed: InputIdentifier={}",
         shuffleClientId, srcAttemptIdentifier);
       return;
     }
 
     if (isObsoleteInputAttemptIdentifier(srcAttemptIdentifier)) {
-      LOG.info("Do not report obsolete input: {}", srcAttemptIdentifier);
+      LOG.info("Do not report obsolete ordered input: {}", srcAttemptIdentifier);
       return;
     }
 
     boolean shouldInformAM = readFailed || connectFailed;
-    assert readFailed ^ connectFailed;
-    assert shouldInformAM;
+    assert shouldInformAM && (readFailed ^ connectFailed);
     if (shouldInformAM) {
       informAM(srcAttemptIdentifier);   // send InputReadErrorEvent only, without killing TaskAttempt
     }
 
-    // unlike in the original implementation, we do not check the number of fetch failures for srcAttemptIdentifier
-    // and fail the current TaskAttempt immediately
+    // Unlike in the original implementation, we do not check the number of fetch failures for srcAttemptIdentifier
+    // and fail the current TaskAttempt immediately.
     if (srcAttemptIdentifier.canRetrieveInputInChunks()) {
       synchronized (this) {
-        int inputIdentifier = srcAttemptIdentifier.getInputIdentifier();
         ShuffleEventInfo eventInfo = shuffleInfoEventsMap.get(inputIdentifier);
-
         if (eventInfo != null && srcAttemptIdentifier.getAttemptNumber() == eventInfo.attemptNum) {
-          // some spills with the same attempt number have been downloaded, so this TaskAttempt cannot succeed
+          // Some spills with the same attempt number have been downloaded, so this TaskAttempt cannot succeed.
+          // ShuffleServer.fetchFailed already verified !existsConcurrentNotFailedFetcher, so we should kill here.
           exceptionReporter.reportException(new TezUncheckedException("Failed to fetch input " + srcAttemptIdentifier));
         } else {
           LOG.warn("Ordered fetch failed, but do not kill yet because no spill has been downloaded yet: {}", srcAttemptIdentifier);
         }
       }
     } else {
-      LOG.warn("Ordered fetch failed, but do not kill (not pipelined): {}", srcAttemptIdentifier);
+      LOG.warn("Ordered fetch failed, but do not kill (non-pipelined): {}", srcAttemptIdentifier);
     }
   }
 
@@ -410,38 +409,20 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
     return shuffleErrorCounterGroup;
   }
 
-  // can run in ShuffleServer.call() thread, ShuffleInputEventHandler thread, Fetcher thread
-  protected synchronized boolean validateInputAttemptForPipelinedShuffle(
-      InputAttemptIdentifier input, boolean registerShuffleInfoEvent) {
-    // For pipelined shuffle
-    // TODO: TEZ-2132 for error handling. As of now, fail fast if there is a different attempt
-    if (input.canRetrieveInputInChunks()) {
-      // synchronized (shuffleInfoEventsMap) {  // covered by this.synchronized
-        int inputIdentifier = input.getInputIdentifier();
-        ShuffleEventInfo eventInfo = shuffleInfoEventsMap.get(inputIdentifier);
-
-        if (eventInfo != null && input.getAttemptNumber() != eventInfo.attemptNum) {
-          IOException exception = new IOException("Previous event already got scheduled for " +
-              input + ". Previous attempt's data could have been already merged "
-              + "to memory/disk outputs.  Killing (self) this task early."
-              + " currentAttemptNum=" + eventInfo.attemptNum
-              + ", eventsProcessed=" + eventInfo.getEventsProcessed()
-              + ", newAttemptNum=" + input.getAttemptNumber());
-          String message = "Killing self as previous attempt data could have been consumed";
-          killSelf(exception, message);
-          return false;
-        }
-
-        if (eventInfo == null && registerShuffleInfoEvent) {
-          shuffleInfoEventsMap.put(inputIdentifier, new ShuffleEventInfo(input));
-        }
-      // }
+  // can run in ShuffleServer.call() thread, ShuffleInputEventHandler thread
+  protected boolean validateInputAttemptForPipelinedShuffle(InputAttemptIdentifier input) {
+    if (input.canRetrieveInputInChunks()) {   // for pipelined shuffle only
+      // synchronized (this) covers synchronized (shuffleInfoEventsMap)
+      synchronized (this) {
+        return validateInputAttemptForPipelinedShuffleCommon(input);
+      }
+    } else {
+      return true;
     }
-
-    return true;
   }
 
-  private void killSelf(Exception exception, String message) {
+  @Override
+  protected void killSelf(Exception exception, String message) {
     LOG.error(message, exception);
     exceptionReporter.killSelf(exception, message);
   }
