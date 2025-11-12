@@ -21,7 +21,6 @@ package org.apache.tez.runtime.library.common.shuffle;
 import java.io.IOException;
 
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
-import org.apache.tez.runtime.library.common.shuffle.FetchedInput.Type;
 
 public interface FetchedInputAllocator {
 

@@ -66,7 +66,9 @@ public abstract class MapOutput implements ShuffleInput {
     Path outputPath = mapOutputFile.getInputFileForWrite(
         attemptIdentifier.getInputIdentifier(), attemptIdentifier.getSpillEventId(), size);
     // Files are not clobbered due to the id being appended to the outputPath in the tmpPath,
-    // otherwise fetches for the same task but from different attempts would clobber each other.
+    // Otherwise fetches for the same task but from different attempts would clobber each other.
+    // tmpOutputPath is always unique because fetcher is unique (obtained from Fetcher.fetcherIdGen),
+    // so no additional logic is necessary for speculative fetchers.
     Path tmpOutputPath = outputPath.suffix(String.valueOf(fetcher));
     long offset = 0;
 

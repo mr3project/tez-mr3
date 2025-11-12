@@ -58,7 +58,7 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
   protected final int minPartition;
   protected final int maxPartition;
 
-  public final int attempt;   // 0, 1, 2, ...
+  public final int attempt;   // speculative fetching attempt: 0, 1, 2, ...
 
   //
   // fields set during the execution of call()

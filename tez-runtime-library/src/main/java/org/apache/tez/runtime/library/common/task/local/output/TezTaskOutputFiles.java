@@ -185,12 +185,10 @@ public class TezTaskOutputFiles implements TezTaskOutput {
    * ${appDir}/output/${uniqueId}/file.out.index
    * e.g.
    * existing:
-   * application_1424502260528_0119/output/attempt_1424502260528_0119_1_07_000058_0_10012_0/file
-   * .out.index
+   * application_1424502260528_0119/output/attempt_1424502260528_0119_1_07_000058_0_10012_0/file.out.index
    *
    * returnValue:
-   * application_1424502260528_0119/output/attempt_1424502260528_0119_1_07_000058_0_10012/file
-   * .out.index
+   * application_1424502260528_0119/output/attempt_1424502260528_0119_1_07_000058_0_10012/file.out.index
    *
    * The structure of this file name is critical, to be served by the MapReduce ShuffleHandler.
    */

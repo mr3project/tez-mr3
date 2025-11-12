@@ -248,7 +248,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
           // 1. call fetchedInput.commit() or fetchecInput.abort() if necessary
           // consider commitAndRegister only
           if (commitAndRegister) {
-            fetchedInput.commit();
+            fetchedInput.commit();  // may fail with IOException
             updateStats = true;
           } else {
             LOG.warn("Duplicate fetch of unordered input for {} ({}/{} completed): {}",
