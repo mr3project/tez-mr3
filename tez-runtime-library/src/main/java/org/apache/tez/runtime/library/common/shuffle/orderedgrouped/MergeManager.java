@@ -449,17 +449,30 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
           LOG.debug("Creating MemoryMapOutput in free memory: {}, {}, CommitMemory={}",
               usedMemory, currentFreeMemory, commitMemory);
         }
-        // usedMemoryForMergeManager = 0 because this MemoryMapOutput should not contribute to usedMemory
-        // So, we can think of this InMemoryMapOut as a special case of DiskMapOutput.
-        return unconditionalReserve(srcAttemptIdentifier, 0L, requestedSize, true);
+        try {
+          // usedMemoryForMergeManager = 0 because this MemoryMapOutput should not contribute to usedMemory
+          return unconditionalReserve(srcAttemptIdentifier, 0L, requestedSize, true);
+        } catch (OutOfMemoryError oom) {
+          LOG.error("Failed to created MemoryMapOutput, stalling instead: {}, {}",
+            this.usedMemory, requestedSize, oom);
+          return stallShuffle;
+        }
       } else {
         // Allow the in-memory shuffle to progress
         if (LOG.isDebugEnabled()) {
           LOG.debug("Creating MemoryMapOutput: {}, {}, CommitMemory={}",
               usedMemory, memoryLimit, commitMemory);
         }
-        // usedMemoryForMergeManager == requestedSize
-        return unconditionalReserve(srcAttemptIdentifier, requestedSize, requestedSize, true);
+        try {
+          // usedMemoryForMergeManager == requestedSize
+          return unconditionalReserve(srcAttemptIdentifier, requestedSize, requestedSize, true);
+        } catch (OutOfMemoryError oom) {
+          LOG.error("Failed to created MemoryMapOutput, returning DiskMapOutput instead: {}, {}",
+            this.usedMemory, requestedSize, oom);
+          // TODO: can we return stallShuffle without stalling all Fetchers?
+          return MapOutput.createDiskMapOutput(srcAttemptIdentifier, this, compressedLength, conf,
+            fetcher, true, mapOutputFile);
+        }
       }
     }
   }
@@ -475,9 +488,11 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       long usedMemoryForMergeManager,
       long requestedSize,
       boolean primaryMapOutput) {
-    usedMemory += usedMemoryForMergeManager;
-    return MapOutput.createMemoryMapOutput(
+    // createMemoryMapOutput() may throw OOM, so increase usedMemory only if successful
+    MapOutput result = MapOutput.createMemoryMapOutput(
         srcAttemptIdentifier, this, usedMemoryForMergeManager, requestedSize, primaryMapOutput);
+    usedMemory += usedMemoryForMergeManager;
+    return result;
   }
 
   @Override

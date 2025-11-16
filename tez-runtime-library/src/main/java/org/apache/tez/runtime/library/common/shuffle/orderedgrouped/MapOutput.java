@@ -85,6 +85,7 @@ public abstract class MapOutput implements ShuffleInput {
     return new DiskDirectMapOutput(attemptIdentifier, callback, size, path, offset, primaryMapOutput);
   }
 
+  // may throw OutOfMemoryError
   public static MapOutput createMemoryMapOutput(InputAttemptIdentifier attemptIdentifier,
                                                 FetchedInputAllocatorOrderedGrouped callback,
                                                 long usedMemoryForMergeManger,

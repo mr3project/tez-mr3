@@ -130,17 +130,22 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
             inputAttemptIdentifier, this, conf,
             fileNameAllocator);
       }
-      this.usedMemory += actualSize;
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Creating MemoryFetchedInput in free memory: {}, {}, {}", this.usedMemory, actualSize, currentFreeMemory);
-      }
-    } else {
+    }
+
+    try {
+      // MemoryFetchedInput may throw OOM, so increase usedMemory only if successful
+      MemoryFetchedInput result = new MemoryFetchedInput(actualSize, inputAttemptIdentifier, this);
       this.usedMemory += actualSize;
       if (LOG.isDebugEnabled()) {
         LOG.debug("Creating MemoryFetchedInput: {}, {}", this.usedMemory, actualSize);
       }
+      return result;
+    } catch (OutOfMemoryError oom) {
+      LOG.error("Failed to created MemoryFetchedInput, returning DiskFetchedInput instead: {}, {}",
+          this.usedMemory, actualSize, oom);
+      return new DiskFetchedInput(compressedSize,
+        inputAttemptIdentifier, this, conf, fileNameAllocator);
     }
-    return new MemoryFetchedInput(actualSize, inputAttemptIdentifier, this);
   }
 
   @Override

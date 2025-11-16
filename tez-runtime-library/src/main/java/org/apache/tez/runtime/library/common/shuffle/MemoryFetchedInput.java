@@ -31,6 +31,7 @@ public class MemoryFetchedInput extends FetchedInput {
 
   private byte[] byteArray;
 
+  // may throw OutOfMemoryError
   public MemoryFetchedInput(long actualSize,
       InputAttemptIdentifier inputAttemptIdentifier,
       FetchedInputCallback callbackHandler) {
