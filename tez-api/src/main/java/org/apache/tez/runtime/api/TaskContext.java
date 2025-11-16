@@ -130,18 +130,10 @@ public interface TaskContext extends DecompressorPool {
    * to report errors which can be handled locally in the TaskAttempt. A new TaskAttempt will be launched
    * depending upon how many retries are available for the task.
    *
-   * @deprecated Replaced by {@link #reportFailure(TaskFailureType, Throwable, String)} (FailureType, Throwable, String)}
-   *
-   * Note: To maintain compatibility, even though this method is named 'fatalError' - this method
-   * operates as {@link #reportFailure(TaskFailureType, Throwable, String)}
-   * with the TaskFailureType set to {@link TaskFailureType#NON_FATAL}.
-   *
    * @param exception an exception representing the error
    * @param message a diagnostic message which may be associated with the error
    */
-  @Deprecated
   public void fatalError(@Nullable Throwable exception, @Nullable String message);
-
 
   /**
    * Report an error to the framework. This will cause the entire task to be terminated.

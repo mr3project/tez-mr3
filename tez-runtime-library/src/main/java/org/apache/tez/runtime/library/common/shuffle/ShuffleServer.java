@@ -745,20 +745,20 @@ public class ShuffleServer implements FetcherCallback {
       }
     }
 
+    // onFailure() means that Fetcher thread itself failed, e.g., due to OutOfMemoryError.
+    // It does not mean that Fetcher failed, e.g., due to IOException, in which case
+    // onSuccess() is called (because Fetcher thread itself succeeded).
+    // We have to terminate ShuffleServer because InputAttemptIdentifier associated with
+    // Fetcher cannot be recovered.
+    // In Tez, this is not a problem because each Fetcher belongs to a specific TaskAttempt.
+    // In MR3, we have to terminate ShuffleServer because Fetchers are shared by all TaskAttempts.
     @Override
     public void onFailure(Throwable t) {
       // Unsuccessful - the fetcher may not have shutdown correctly. Try shutting it down.
       fetcher.shutdown(true);   // disconnect = true and do not reuse HTTPConnection
-      if (isShutdown.get()) {
-        if (isDebugEnabled) {
-          LOG.debug("Already shutdown. Ignoring error from fetcher: ", t);
-        }
-      } else {
-        LOG.error("Fetcher failed with error: ", t);
-        // TODO: originally in ordered
-        //  - exceptionReporter.reportException(t);
-        doBookKeepingForFetcherComplete();
-      }
+      LOG.error("Fetcher failed with error: ", t);
+      doBookKeepingForFetcherComplete();
+      shutdown();
     }
   }
 }
