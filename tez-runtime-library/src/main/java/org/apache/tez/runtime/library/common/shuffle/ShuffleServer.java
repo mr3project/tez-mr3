@@ -221,17 +221,17 @@ public class ShuffleServer implements FetcherCallback {
     return maxTaskOutputAtOnce;
   }
 
-  public void run() throws Throwable {
+  public void run() {
     try {
       call();
       LOG.info("{} thread completed", serverName);
     } catch (InterruptedException ex) {
       LOG.error("{} finished, isShutdown = {}. Ignoring: ", serverName, isShutdown.get(), ex);
-    } finally {
-      synchronized (throwableLock) {
-        if (throwableFromFetcherOnFailure != null) {
-          throw throwableFromFetcherOnFailure;
-        }
+    }
+
+    synchronized (throwableLock) {
+      if (throwableFromFetcherOnFailure != null) {
+        throw new TezUncheckedException(throwableFromFetcherOnFailure);
       }
     }
   }
