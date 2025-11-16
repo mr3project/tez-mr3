@@ -159,6 +159,12 @@ public class ShuffleServer implements FetcherCallback {
 
   private final AtomicBoolean isShutdown = new AtomicBoolean(false);
 
+  private final Object throwableLock = new Object();
+  // Throwable (ex. OutOfMemoryError) from onFailure() should be re-thrown so that
+  // the DaemonTaskAttempt running ShuffleServer reports failure to MR3 DAGAppMaster.
+  // In this way, we can terminate the current ContainerWorker.
+  private Throwable throwableFromFetcherOnFailure = null;
+
   private final ExecutorService shutdownExecutor;
 
   private static final int LAUNCH_LOOP_WAIT_PERIOD_MILLIS = 1000;
@@ -215,15 +221,17 @@ public class ShuffleServer implements FetcherCallback {
     return maxTaskOutputAtOnce;
   }
 
-  public void run() {
+  public void run() throws Throwable {
     try {
       call();
       LOG.info("{} thread completed", serverName);
-    } catch (Throwable th) {
-      if (isShutdown.get()) {
-        LOG.error("{} already shutdown. Ignoring error: ", serverName, th);
-      } else {
-        LOG.error("{} failed with error: ", serverName, th);
+    } catch (InterruptedException ex) {
+      LOG.error("{} finished, isShutdown = {}. Ignoring: ", serverName, isShutdown.get(), ex);
+    } finally {
+      synchronized (throwableLock) {
+        if (throwableFromFetcherOnFailure != null) {
+          throw throwableFromFetcherOnFailure;
+        }
       }
     }
   }
@@ -276,7 +284,7 @@ public class ShuffleServer implements FetcherCallback {
     shouldCheckStuckFetcher = currentMillis > nextCheckStuckFetcherMillis;
   }
 
-  private void call() throws Exception {
+  private void call() throws InterruptedException {
     long initialMillis = System.currentTimeMillis();
     nextCheckStuckFetcherMillis = initialMillis + CHECK_STUCK_FETCHER_PERIOD_MILLIS;
     while (!isShutdown.get()) {
@@ -402,13 +410,13 @@ public class ShuffleServer implements FetcherCallback {
           InputHost inputHost;
           try {
             inputHost = peekInputHost.takeFromPendingHosts(pendingHosts);
-          } catch (InterruptedException e) {
+          } catch (InterruptedException ex) {
             if (isShutdown.get()) {
               LOG.info("Interrupted and has been shutdown, breaking out of the loop");
               Thread.currentThread().interrupt();
               break;
             } else {
-              throw e;
+              throw ex;
             }
           }
 
@@ -758,6 +766,15 @@ public class ShuffleServer implements FetcherCallback {
       fetcher.shutdown(true);   // disconnect = true and do not reuse HTTPConnection
       LOG.error("Fetcher failed with error: ", t);
       doBookKeepingForFetcherComplete();
+
+      // We should fail DaemonTaskAttempt ShuffleServerDaemonProcessor so that MR3 terminates
+      // the current ContainerWorker.
+      synchronized (throwableLock) {
+        if (throwableFromFetcherOnFailure == null) {
+          throwableFromFetcherOnFailure = t;
+        }
+      }
+
       shutdown();
     }
   }
