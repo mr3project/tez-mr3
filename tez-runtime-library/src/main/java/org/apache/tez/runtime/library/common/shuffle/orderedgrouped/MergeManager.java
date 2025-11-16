@@ -756,8 +756,12 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
           return;
         }
 
-        // usedMemoryForMergeManager == mergeOutputSize
-        mergedMapOutputs = unconditionalReserve(dummyMapId, mergeOutputSize, mergeOutputSize, false);
+        try {
+          // usedMemoryForMergeManager == mergeOutputSize
+          mergedMapOutputs = unconditionalReserve(dummyMapId, mergeOutputSize, mergeOutputSize, false);
+        } catch (OutOfMemoryError err) {
+          throw new IOException("Cannot perform merging in MemoryToMemoryMerger - do not use Memory-to-Memory merging", err);
+        }
       }
 
       int noInMemorySegments = inMemorySegments.size();
