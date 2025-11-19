@@ -20,6 +20,7 @@ package org.apache.tez.runtime.api;
 
 import java.io.IOException;
 import java.util.Collection;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 
@@ -115,4 +116,6 @@ public interface ProcessorContext extends TaskContext {
    * @throws InterruptedException
    */
   public boolean waitForAllInputsReady(Collection<Input> inputs, long timeoutMillis) throws InterruptedException;
+
+  public AtomicInteger getNumActiveShuffleRequests();
 }
