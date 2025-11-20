@@ -117,5 +117,6 @@ public interface ProcessorContext extends TaskContext {
    */
   public boolean waitForAllInputsReady(Collection<Input> inputs, long timeoutMillis) throws InterruptedException;
 
-  public AtomicInteger getNumActiveShuffleRequests();
+  public void incrementNumActiveShuffleRequests();
+  public void decrementNumActiveShuffleRequests();
 }
