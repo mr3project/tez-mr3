@@ -156,7 +156,7 @@ public class TezRuntimeUtils {
     return new TezTaskOutputFiles(conf,
         outputContext.getUniqueIdentifier(),
         outputContext.getDagIdentifier(),
-        outputContext.getExecutionContext().getContainerId(),
+        outputContext.getExecutionContext().getEnvContainerId(),
         outputContext.getTaskVertexIndex(),
         isCompositeFetch);
   }

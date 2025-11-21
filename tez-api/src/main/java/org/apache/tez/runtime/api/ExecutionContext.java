@@ -30,5 +30,5 @@ public interface ExecutionContext {
   // null if physicalHost == hostName
   public String getPhysicalHost();
 
-  public String getContainerId();
+  public String getEnvContainerId();
 }

@@ -308,7 +308,7 @@ public class ShuffleUtils {
     }
 
     if (!sendEmptyPartitionDetails || outputGenerated) {
-      String containerId = context.getExecutionContext().getContainerId();
+      String containerId = context.getExecutionContext().getEnvContainerId();
       int vertexId = context.getTaskVertexIndex();
       payloadBuilder.setContainerId(containerId);
       payloadBuilder.setVertexId(vertexId);
@@ -710,7 +710,7 @@ public class ShuffleUtils {
   public static String expandPathComponent(
       OutputContext context, boolean compositeFetch, String pathComponent) {
     if (compositeFetch) {
-      String containerId = context.getExecutionContext().getContainerId();
+      String containerId = context.getExecutionContext().getEnvContainerId();
       int vertexId = context.getTaskVertexIndex();
       return buildExpandedPathComponent(containerId, vertexId, pathComponent);
     } else {

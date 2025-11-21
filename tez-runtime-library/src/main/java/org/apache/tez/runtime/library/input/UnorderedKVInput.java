@@ -131,7 +131,7 @@ public class UnorderedKVInput extends AbstractLogicalInput {
           inputContext.getDagIdentifier(), conf,
           inputContext.getTotalMemoryAvailableToTask(),
           memoryUpdateCallbackHandler.getMemoryAssigned(),
-          inputContext.getExecutionContext().getContainerId(),
+          inputContext.getExecutionContext().getEnvContainerId(),
           inputContext.getTaskVertexIndex(), compositeFetch);
 
       String srcNameTrimmed = TezUtilsInternal.cleanVertexName(inputContext.getSourceVertexName());

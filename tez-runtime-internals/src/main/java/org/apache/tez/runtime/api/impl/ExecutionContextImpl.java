@@ -20,12 +20,12 @@ public class ExecutionContextImpl implements ExecutionContext {
 
   private final String hostname;
   private final String physicalHost;
-  private final String containerId;
+  private final String envContainerId;   // Environment.CONTAINER_ID, not ContainerID.toString
 
-  public ExecutionContextImpl(String hostname, String physicalHost, String containerId) {
+  public ExecutionContextImpl(String hostname, String physicalHost, String envContainerId) {
     this.hostname = hostname;
     this.physicalHost = physicalHost;
-    this.containerId = containerId;
+    this.envContainerId = envContainerId;
   }
 
   @Override
@@ -39,7 +39,7 @@ public class ExecutionContextImpl implements ExecutionContext {
   }
 
   @Override
-  public String getContainerId() {
-    return containerId;
+  public String getEnvContainerId() {
+    return envContainerId;
   }
 }
