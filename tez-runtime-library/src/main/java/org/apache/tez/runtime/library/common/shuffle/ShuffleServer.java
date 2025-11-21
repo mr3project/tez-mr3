@@ -345,7 +345,9 @@ public class ShuffleServer implements FetcherCallback {
             if (result) {
               // There is a slight chance that this fetcher is in COMPLETED.
               // This is not a problem because the resul of the new speculative fetcher is ignored.
-              LOG.warn("Fetcher to RETRY: {} in {}ms", fetcher.getFetcherIdentifier(), elapsed);
+              LOG.warn("Fetcher to RETRY: {} in {}ms, {}",
+                  fetcher.getFetcherIdentifier(), elapsed,
+                  fetcher.inputHost.getHostPort().getEnvContainerId());
               trySpeculativeFetcher(fetcher);
             }
           }
@@ -383,8 +385,9 @@ public class ShuffleServer implements FetcherCallback {
             if (result) {
               // This thread is responsible for calling removeHostBlocked().
               removeHostBlocked(fetcher);
-              LOG.warn("Fetcher STUCK to SPECULATIVE: {} in stage {}",
-                  fetcher.getFetcherIdentifier(), fetcher.getStage());
+              LOG.warn("Fetcher STUCK to SPECULATIVE: {} in stage {}, {}",
+                  fetcher.getFetcherIdentifier(), fetcher.getStage(),
+                  fetcher.inputHost.getHostPort().getEnvContainerId());
               trySpeculativeFetcher(fetcher);
             }
           }
