@@ -24,7 +24,7 @@ public class HostPort {
 
   // Since containerId decides a unique host, use containerId in equals() and hashCode().
   private final String host;
-  private final String containerId;
+  private final String containerId;   // envContainerId
   private final int port;
 
   public HostPort(String host, String containerId, int port) {
@@ -63,6 +63,10 @@ public class HostPort {
 
   public String getHost() {
     return host;
+  }
+
+  public String getEnvContainerId() {
+    return containerId;
   }
 
   public int getPort() {

@@ -28,7 +28,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.FetcherConfigCommon;
-import org.apache.tez.runtime.api.TaskContext;
+import org.apache.tez.runtime.api.ProcessorContext;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
@@ -44,6 +44,7 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
@@ -64,7 +65,7 @@ public class ShuffleServer implements FetcherCallback {
   private final boolean isDebugEnabled = LOG.isDebugEnabled();
 
   public static ShuffleServer createInstance(
-      TaskContext context, Configuration conf) throws IOException {
+    ProcessorContext context, Configuration conf) throws IOException {
     int numFetchers = conf.getInt(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_TOTAL_PARALLEL_COPIES,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_TOTAL_PARALLEL_COPIES_DEFAULT);
@@ -129,7 +130,7 @@ public class ShuffleServer implements FetcherCallback {
     SCHEME_MAX
   }
 
-  private final TaskContext taskContext;
+  private final ProcessorContext taskContext;
   private final int maxNumFetchers;
   private final String serverName;
 
@@ -171,7 +172,7 @@ public class ShuffleServer implements FetcherCallback {
   private static final int CHECK_STUCK_FETCHER_PERIOD_MILLIS = 250;
 
   public ShuffleServer(
-      TaskContext taskContext,
+      ProcessorContext taskContext,
       Configuration conf,
       int numFetchers,
       String serverName) throws IOException {
@@ -237,6 +238,7 @@ public class ShuffleServer implements FetcherCallback {
   }
 
   // variables local to call()
+  private List<String> envContainerIdsToBlockFetching;
   private boolean shouldLaunchNewFetchers;
   private boolean existsFetcherToRetry;
   private boolean existsFetcherFromStuckToRecovered;
@@ -244,10 +246,15 @@ public class ShuffleServer implements FetcherCallback {
   private long nextCheckStuckFetcherMillis;
   private boolean shouldCheckStuckFetcher;
 
+  private boolean isBlockedFetching(InputHost p) {
+    return envContainerIdsToBlockFetching.contains(p.getHostPort().getEnvContainerId());
+  }
+
   private boolean getShouldLaunchNewFetchers() {
     return
       !pendingHosts.isEmpty() &&
       pendingHosts.stream().anyMatch(p ->
+          !isBlockedFetching(p) &&
           p.isHostNormal() &&
           p.hasFetcherToLaunch(shuffleClients));
   }
@@ -255,12 +262,17 @@ public class ShuffleServer implements FetcherCallback {
   private void updateLoopConditions() {
     final long currentMillis = System.currentTimeMillis();
 
+    envContainerIdsToBlockFetching = taskContext.getEnvContainerIdsToBlockFetching();
+
     int currentNumFetchers = runningFetchers.size();
     shouldLaunchNewFetchers =
         currentNumFetchers < maxNumFetchers &&
         getShouldLaunchNewFetchers();
 
     existsFetcherToRetry = runningFetchers.stream().anyMatch(f -> {
+        if (isBlockedFetching(f.inputHost)) {
+          return false;
+        }
         FetcherConfig fetcherConfig = f.fetcherConfig;
         int state = f.getState();
         return
@@ -273,6 +285,9 @@ public class ShuffleServer implements FetcherCallback {
         f.getStage() == Fetcher.STAGE_FIRST_FETCHED);
 
     existsFetcherFromStuckToSpeculative = runningFetchers.stream().anyMatch(f -> {
+      if (isBlockedFetching(f.inputHost)) {
+        return false;
+      }
       FetcherConfig fetcherConfig = f.fetcherConfig;
       final int STUCK_FETCHER_RELEASE_MILLIS = fetcherConfig.stuckFetcherReleaseMillis;
       return
@@ -315,6 +330,9 @@ public class ShuffleServer implements FetcherCallback {
       if (existsFetcherToRetry) {
         // transition: from NORMAL/RECOVERED to RETRY
         runningFetchers.forEach(fetcher -> {
+          if (isBlockedFetching(fetcher.inputHost)) {
+            return;
+          }
           FetcherConfig fetcherConfig = fetcher.fetcherConfig;
           int state = fetcher.getState();
           long elapsed = currentMillis - fetcher.getStartMillis();
@@ -353,6 +371,9 @@ public class ShuffleServer implements FetcherCallback {
       if (existsFetcherFromStuckToSpeculative) {
         // try to transition: from STUCK to SPECULATIVE
         runningFetchers.forEach(fetcher -> {
+          if (isBlockedFetching(fetcher.inputHost)) {
+            return;
+          }
           FetcherConfig fetcherConfig = fetcher.fetcherConfig;
           final int STUCK_FETCHER_RELEASE_MILLIS = fetcherConfig.stuckFetcherReleaseMillis;
           if (fetcher.getState() == Fetcher.STATE_STUCK &&
@@ -420,7 +441,7 @@ public class ShuffleServer implements FetcherCallback {
             }
           }
 
-          if (inputHost.isHostNormal()) {
+          if (!isBlockedFetching(inputHost) && inputHost.isHostNormal()) {
             Fetcher<?> fetcher = constructFetcherForHost(inputHost);
             // even when fetcher == null, inputHost may still have inputs if 'ShuffleClient == null'
             if (fetcher != null) {
