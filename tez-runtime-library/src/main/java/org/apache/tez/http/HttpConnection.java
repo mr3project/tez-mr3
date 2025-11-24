@@ -196,6 +196,10 @@ public class HttpConnection extends BaseHttpConnection {
 
   @Override
   public void validate() throws IOException {
+    HttpURLConnection connection = this.connection;
+    if (connection == null) {
+      throw new IOException("Connection already cleaned up");
+    }
     int rc = connection.getResponseCode();
     if (rc != HttpURLConnection.HTTP_OK) {
       throw new IOException("Got invalid response code " + rc + " from " + url
