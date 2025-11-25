@@ -89,6 +89,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
   //   - consume FetcherInput after calling completedInputs.take() in UnorderedKVReader.next() thread
   //   - after calling completedInputs.add(), ShuffleInputEventHandler/Fetcher threads never update FetchedInput
   // endOfInputMarker is added at the end as End of Input message
+  // Except for endOfInputMarker, all FetchedInputs are in State.COMMITTED.
   private final BlockingQueue<FetchedInput> completedInputs;
   private static final FetchedInput endOfInputMarker = new NullFetchedInput(null);
 

@@ -35,7 +35,9 @@ public abstract class FetchedInput implements ShuffleInput {
     DISK,
     DISK_DIRECT
   }
-  
+
+  // 1. PENDING --> COMMITTED --> FREED (never used)
+  // 2. PENDING --> ABORTED (never used)
   protected static enum State {
     PENDING, COMMITTED, ABORTED, FREED
   }
