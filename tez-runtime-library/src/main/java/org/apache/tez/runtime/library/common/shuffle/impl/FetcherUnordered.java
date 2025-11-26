@@ -693,8 +693,9 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         compressedLength = mapOutputStat.compressedLength;
         // TODO TEZ-957. handle IOException here when Broadcast has better error checking
         {
-          fetchedInput = shuffleManager.getInputManager().allocate(decompressedLength,
-              compressedLength, srcAttemptId);
+          long currentSizeOfMemoryCompletedInputs = shuffleManager.getTotalSizeOfMemoryCompletedInputs();
+          fetchedInput = shuffleManager.getInputManager().allocate(
+              decompressedLength, compressedLength, srcAttemptId, currentSizeOfMemoryCompletedInputs);
         }
         // No concept of WAIT at the moment.
         // // Check if we can shuffle *now* ...

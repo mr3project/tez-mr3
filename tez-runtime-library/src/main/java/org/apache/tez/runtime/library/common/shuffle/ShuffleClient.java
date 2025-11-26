@@ -294,6 +294,7 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
 
   // if true, we should scan pending InputHosts in ShuffleServer
   // if false, no need to consider this ShuffleClient for now
+  // called only from ShuffleServer.call() thread
   public boolean shouldScanPendingInputs() {
     synchronized (lock) {
       return numPartitionRanges > 0 && numFetchers < maxNumFetchers;

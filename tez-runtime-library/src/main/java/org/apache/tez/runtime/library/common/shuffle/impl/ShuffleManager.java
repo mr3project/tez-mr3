@@ -41,6 +41,7 @@ import org.apache.tez.runtime.library.common.TezRuntimeUtils;
 import org.apache.tez.runtime.library.common.shuffle.FetchedInput;
 import org.apache.tez.runtime.library.common.shuffle.FetchedInput.Type;
 import org.apache.tez.runtime.library.common.shuffle.FetchedInputAllocator;
+import org.apache.tez.runtime.library.common.shuffle.MemoryFetchedInput;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleClient;
 
 import org.apache.tez.common.Preconditions;
@@ -92,6 +93,10 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
   // Except for endOfInputMarker, all FetchedInputs are in State.COMMITTED.
   private final BlockingQueue<FetchedInput> completedInputs;
   private static final FetchedInput endOfInputMarker = new NullFetchedInput(null);
+
+  // sum of the sizes of all MemoryFetchedInput in completedInputs[]
+  // guard with synchronized(completedInputs)
+  private long totalSizeOfMemoryCompletedfInputs = 0L;
 
   public ShuffleManager(InputContext inputContext, Configuration conf, int numInputs,
       FetchedInputAllocator inputAllocator, String srcNameTrimmed) throws IOException {
@@ -360,9 +365,13 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
     }
   }
 
+  // inside synchronized (completedInputSet)
   private void maybeInformInputReady(FetchedInput fetchedInput) {
     if (!(fetchedInput instanceof NullFetchedInput)) {
       completedInputs.add(fetchedInput);
+      if (fetchedInput instanceof MemoryFetchedInput) {
+        totalSizeOfMemoryCompletedfInputs += fetchedInput.getSize();
+      }
     }
     if (!inputReadyNotificationSent.getAndSet(true)) {
       // TODO Should eventually be controlled by Inputs which are processing the data.
@@ -464,6 +473,13 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
     // block until next input or End of Input message
     // the only place where completedInputs.take() is called
     FetchedInput fetchedInput = completedInputs.take();
+
+    if (fetchedInput instanceof MemoryFetchedInput) {
+      synchronized (completedInputSet) {
+        totalSizeOfMemoryCompletedfInputs -= fetchedInput.getSize();
+      }
+    }
+
     if (fetchedInput == endOfInputMarker) {   // reference equality
       fetchedInput = null;
     }
@@ -476,6 +492,12 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
 
   public float getNumCompletedInputsFloat() {
     return numCompletedInputs.floatValue();
+  }
+
+  public long getTotalSizeOfMemoryCompletedInputs() {
+    synchronized (completedInputSet) {
+      return totalSizeOfMemoryCompletedfInputs;
+    }
   }
 
   /////////////////// End of methods for walking the available inputs

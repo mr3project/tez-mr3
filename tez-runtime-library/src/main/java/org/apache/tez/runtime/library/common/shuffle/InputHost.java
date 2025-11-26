@@ -158,6 +158,7 @@ public class InputHost {
   }
 
   // should be consistent with clearAndGetOnePartitionRange()
+  // called only from ShuffleServer.call() thread
   public synchronized boolean hasFetcherToLaunch(ConcurrentMap<Long, ShuffleClient<?>> shuffleClients) {
     assert hasPendingInput;   // because we remove from pendingHosts[] only later in ShuffleServer.call()
     return
@@ -231,6 +232,7 @@ public class InputHost {
     }
   }
 
+  // called only from ShuffleServer.call() thread
   public synchronized PartitionToInputs clearAndGetOnePartitionRange(
       ConcurrentMap<Long, ShuffleClient<?>> shuffleClients,
       int maxTaskOutputAtOnce,
@@ -286,6 +288,7 @@ public class InputHost {
     return ret;
   }
 
+  // called only from ShuffleServer.call() thread
   private ShuffleClient getFirstShuffleClient(
       ConcurrentMap<Long, ShuffleClient<?>> shuffleClients) {
     Iterator<Map.Entry<Long, Map<PartitionRange, List<CompositeInputAttemptIdentifier>>>> iterator =
@@ -311,6 +314,7 @@ public class InputHost {
     return null;
   }
 
+  // called only from ShuffleServer.call() thread
   private ShuffleClient getMaxSizeShuffleClient(
       ConcurrentMap<Long, ShuffleClient<?>> shuffleClients) {
     int maxCount = Integer.MIN_VALUE;

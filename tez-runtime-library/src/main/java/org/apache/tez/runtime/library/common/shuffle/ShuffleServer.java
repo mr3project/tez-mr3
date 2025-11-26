@@ -250,6 +250,7 @@ public class ShuffleServer implements FetcherCallback {
     return envContainerIdsToBlockFetching.contains(p.getHostPort().getEnvContainerId());
   }
 
+  // called only from ShuffleServer.call() thread
   private boolean getShouldLaunchNewFetchers() {
     return
       !pendingHosts.isEmpty() &&
@@ -420,14 +421,15 @@ public class ShuffleServer implements FetcherCallback {
       if (shouldLaunchNewFetchers) {
         // speculative Fetcher may have been launched and some Fetcher may been finished,
         // so we cannot reuse currentNumFetchers in updateLoopConditions()
-        int initialNumFetchers = runningFetchers.size();
-        int maxFetchersToRun = maxNumFetchers - initialNumFetchers;
+        final int maxFetchersToRun = maxNumFetchers - runningFetchers.size();
 
+        // do NOT keep checking 'runningFetchers.size() < maxNumFetchers' because we have to check
+        // other conditions (e.g. existsFetcherToRetry) and cannot stay indefinitely in this loop
         int numNewFetchers = 0;
         InputHost peekInputHost = pendingHosts.peek();
-        while (getShouldLaunchNewFetchers() &&
-               numNewFetchers < maxFetchersToRun &&
-               peekInputHost != null) {
+        while (numNewFetchers < maxFetchersToRun &&
+               peekInputHost != null &&
+               getShouldLaunchNewFetchers()) {
           // for every ShuffleClient,
           //   1. 'numPartitionRanges > 0' remains the same until the current thread consumes existing inputs
           //   2. 'numFetchers < maxNumFetchers' remains the same until the current thread creates new Fetchers
@@ -499,6 +501,7 @@ public class ShuffleServer implements FetcherCallback {
     Futures.addCallback(future, new FetchFutureCallback(fetcher));
   }
 
+  // called only from ShuffleServer.call() thread
   private Fetcher<?> constructFetcherForHost(InputHost inputHost) {
     InputHost.PartitionToInputs pendingInputs = inputHost.clearAndGetOnePartitionRange(
         shuffleClients, maxTaskOutputAtOnce, rangesScheme);

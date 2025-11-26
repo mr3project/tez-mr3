@@ -56,6 +56,7 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
 
   private final boolean useFreeMemoryFetchedInput;
   private final long freeMemoryThreshold;
+  private final long maxTaskAvailableMemory;
 
   public SimpleFetchedInputAllocator(String srcNameTrimmed,
                                      String uniqueIdentifier, int dagID,
@@ -89,8 +90,10 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
     this.freeMemoryThreshold = maxTaskAvailableMemory;
     // TODO: introduce a factor for freeMemoryThreshold (e.g. 0.5)
 
-    LOG.info("{}: memoryLimit={}, maxSingleMemoryShuffle={}",
-        srcNameTrimmed, this.memoryLimit, this.maxSingleMemoryShuffle);
+    this.maxTaskAvailableMemory = maxTaskAvailableMemory;
+
+    LOG.info("{}: memoryLimit={}, maxSingleMemoryShuffle={}, maxTaskAvailableMemory={}",
+        srcNameTrimmed, this.memoryLimit, this.maxSingleMemoryShuffle, maxTaskAvailableMemory);
   }
 
   public static long getInitialMemoryReq(Configuration conf, long maxAvailableTaskMemory) {
@@ -108,7 +111,8 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
 
   @Override
   public synchronized FetchedInput allocate(long actualSize, long compressedSize,
-      InputAttemptIdentifier inputAttemptIdentifier) throws IOException {
+      InputAttemptIdentifier inputAttemptIdentifier,
+      long currentSizeOfMemoryCompletedInputs) throws IOException {
     if (actualSize > maxSingleMemoryShuffle) {
       LOG.info("Creating DiskFetchedInput: {} > maxSingleMemoryShuffle", actualSize);
       return new DiskFetchedInput(compressedSize,
@@ -121,9 +125,13 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
         return new DiskFetchedInput(compressedSize,
             inputAttemptIdentifier, this, conf, fileNameAllocator);
       }
-      // Check if we can find free memory in the current ContainerWorker.
+
+      // Check if we can borrow from free memory in the current ContainerWorker.
+      // Even when we have enough free memory, do not use more memory than maxTaskAvailableMemory
+      // for storing MemoryFetchedInput.
       long currentFreeMemory = Runtime.getRuntime().freeMemory();
-      if (currentFreeMemory < freeMemoryThreshold) {
+      if (currentFreeMemory < freeMemoryThreshold ||
+          currentSizeOfMemoryCompletedInputs + actualSize > maxTaskAvailableMemory) {
         // this ContainerWorker is busy serving Tasks, so do not borrow
         LOG.info("Creating DiskFetchedInput: {}, {} < freeMemoryThreshold", actualSize, currentFreeMemory);
         return new DiskFetchedInput(compressedSize,
