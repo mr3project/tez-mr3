@@ -444,7 +444,11 @@ public class ShuffleServer implements FetcherCallback {
             }
           }
 
-          if (!isBlockedFetching(inputHost) && inputHost.isHostNormal()) {
+          // inputHost.hasFetcherToLaunch() is just an optimization and thus optional because
+          // constructFetcherForHost() eventually calls ShuffleClient.shouldScanPendingInputs().
+          if (!isBlockedFetching(inputHost) &&
+              inputHost.isHostNormal() &&
+              inputHost.hasFetcherToLaunch(shuffleClients)) {
             Fetcher<?> fetcher = constructFetcherForHost(inputHost);
             // even when fetcher == null, inputHost may still have inputs if 'ShuffleClient == null'
             if (fetcher != null) {
