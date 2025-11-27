@@ -23,14 +23,12 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 
-@Private
 public abstract class FetchedInput implements ShuffleInput {
   
   public static enum Type {
-    WAIT, // TODO NEWTEZ Implement this, only if required.
+    WAIT,
     MEMORY,
     DISK,
     DISK_DIRECT
@@ -164,5 +162,45 @@ public abstract class FetchedInput implements ShuffleInput {
     if (id != other.id)
       return false;
     return true;
+  }
+
+  public static FetchedInput createWaitFetchedInput(InputAttemptIdentifier attemptIdentifier) {
+    return new WaitFetchedInput(attemptIdentifier);
+  }
+
+  private static class WaitFetchedInput extends FetchedInput {
+    private WaitFetchedInput(InputAttemptIdentifier inputAttemptIdentifier) {
+      super(inputAttemptIdentifier, null);
+    }
+
+    public Type getType() {
+      return Type.WAIT;
+    }
+
+    @Override
+    public void commit() throws IOException {
+      throw new IOException("Cannot commit FetchedInput of type WAIT!");
+    }
+
+    @Override
+    public void abort() throws IOException {
+      throw new IllegalArgumentException("Cannot commit FetchedInput of type WAIT!");
+    }
+
+    public OutputStream getOutputStream() throws IOException {
+      throw new IllegalArgumentException("Cannot get OutputStream of type WAIT!");
+    }
+
+    public InputStream getInputStream() throws IOException {
+      throw new IllegalArgumentException("Cannot get InputStream of type WAIT!");
+    }
+
+    public long getSize() {
+      throw new IllegalArgumentException("Cannot get size of type WAIT!");
+    }
+
+    public void free() {
+      throw new IllegalArgumentException("Cannot free type WAIT!");
+    }
   }
 }

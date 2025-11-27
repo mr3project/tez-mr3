@@ -509,7 +509,6 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
 
   /////////////////// End of methods for walking the available inputs
 
-
   /**
    * Fake input that is added to the completed input list in case an input does not have any data.
    *

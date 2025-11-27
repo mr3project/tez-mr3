@@ -26,6 +26,6 @@ public interface FetchedInputAllocator {
 
   FetchedInput allocate(long actualSize, long compresedSize,
       InputAttemptIdentifier inputAttemptIdentifier,
-      long currentSizeOfMemoryCompletedInputs) throws IOException;
+      long currentSizeOfMemoryCompletedInputs, boolean isFromShufflePayload) throws IOException;
   
 }

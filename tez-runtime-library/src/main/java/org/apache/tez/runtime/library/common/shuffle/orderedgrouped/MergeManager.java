@@ -306,7 +306,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT,
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT_DEFAULT);
     this.freeMemoryThreshold = inputContext.getTotalMemoryAvailableToTask();
-    // TODO: introduce a factor for freeMemoryThreshold (e.g. 0.5)
   }
 
   void setupParentThread(Thread shuffleSchedulerThread) {
