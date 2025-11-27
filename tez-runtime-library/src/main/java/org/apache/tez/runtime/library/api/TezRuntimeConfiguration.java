@@ -350,7 +350,7 @@ public class TezRuntimeConfiguration {
   // "first", "max" - used in ShuffleServer
   public static final String TEZ_RUNTIME_SHUFFLE_RANGES_SCHEME =
       TEZ_RUNTIME_PREFIX + "shuffle.ranges.scheme";
-  public static final String TEZ_RUNTIME_SHUFFLE_RANGES_SCHEME_DEFAULT = "first";
+  public static final String TEZ_RUNTIME_SHUFFLE_RANGES_SCHEME_DEFAULT = "priority";
 
   @ConfigurationProperty(type = "boolean")
   public static final String TEZ_RUNTIME_SHUFFLE_CONNECTION_FAIL_ALL_INPUT =

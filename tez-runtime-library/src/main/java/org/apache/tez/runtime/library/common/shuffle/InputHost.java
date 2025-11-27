@@ -32,6 +32,8 @@ import java.util.stream.Collectors;
 
 import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
+import org.apache.tez.runtime.library.common.shuffle.impl.ShuffleManager;
+import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.ShuffleScheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -188,6 +190,7 @@ public class InputHost {
 
   // partitionId == output partition in DME (DataMovementEvent.sourceIndex)
   // partitionId != srcAttempt.inputIdentifier
+  // checkForDuplicate == true iff fetching srcAttempt previously failed
   public synchronized void addKnownInput(
       ShuffleClient<?> shuffleClient,
       int partitionId, int partitionCount, CompositeInputAttemptIdentifier srcAttempt,
@@ -248,7 +251,9 @@ public class InputHost {
     }
 
     ShuffleClient<?> shuffleClient = null;
-    if (rangesScheme == RangesScheme.SCHEME_FIRST) {
+    if (rangesScheme == RangesScheme.SCHEME_PRIORITY) {
+      shuffleClient = getPriorityShuffleClient(shuffleClients);
+    } else if (rangesScheme == RangesScheme.SCHEME_FIRST) {
       shuffleClient = getFirstShuffleClient(shuffleClients);
     } else {
       shuffleClient = getMaxSizeShuffleClient(shuffleClients);
@@ -286,6 +291,61 @@ public class InputHost {
       LOG.debug("InputHost returns for the next fetcher: {}", ret);
     }
     return ret;
+  }
+
+  // called only from ShuffleServer.call() thread
+  private ShuffleClient getPriorityShuffleClient(
+      ConcurrentMap<Long, ShuffleClient<?>> shuffleClients) {
+    ShuffleScheduler ssFirst = null;                          // priority: second
+    ShuffleManager smNotReadyNoMemoryFetchedInput = null;     // priority: third
+    ShuffleManager smNotReadyWithMemoryFetchedInput = null;   // priority: last
+
+    Iterator<Map.Entry<Long, Map<PartitionRange, List<CompositeInputAttemptIdentifier>>>> iterator =
+        partitionToInputs.entrySet().iterator();
+    while (iterator.hasNext()) {
+      Map.Entry<Long, Map<PartitionRange, List<CompositeInputAttemptIdentifier>>> entry = iterator.next();
+      Long shuffleClientId = entry.getKey();
+      Map<PartitionRange, List<CompositeInputAttemptIdentifier>> partitionMap = entry.getValue();
+      assert !partitionMap.isEmpty();   // invariant on partitionToInputs[]
+
+      ShuffleClient<?> shuffleClient = shuffleClients.get(shuffleClientId);
+      if (shuffleClient == null) {
+        iterator.remove();
+        continue;
+      }
+
+      if (shuffleClient instanceof ShuffleManager) {
+        ShuffleManager sm = (ShuffleManager)shuffleClient;
+        if (sm.getNumCallsGetNextInput() > 0) {
+          return sm;  // priority: highest - LogicalInput is ready to consume FetchedInputs in ShuffleManager
+        }
+        // sm: not ready to consume input
+        if (sm.getTotalSizeOfMemoryCompletedInputs() == 0L) {
+          if (smNotReadyNoMemoryFetchedInput == null) {
+            smNotReadyNoMemoryFetchedInput = sm;
+          }
+          continue;
+        } else {
+          if (smNotReadyWithMemoryFetchedInput == null) {
+            smNotReadyWithMemoryFetchedInput = sm;
+          }
+          continue;
+        }
+      }
+
+      if (shuffleClient instanceof ShuffleScheduler) {
+        ShuffleScheduler ss = (ShuffleScheduler)shuffleClient;
+        if (ssFirst == null) {
+          ssFirst = ss;
+        }
+        continue;
+      }
+    }
+
+    if (ssFirst != null) { return ssFirst; }
+    if (smNotReadyNoMemoryFetchedInput != null) { return smNotReadyNoMemoryFetchedInput; }
+    if (smNotReadyWithMemoryFetchedInput != null) { return smNotReadyWithMemoryFetchedInput; }
+    return null;
   }
 
   // called only from ShuffleServer.call() thread

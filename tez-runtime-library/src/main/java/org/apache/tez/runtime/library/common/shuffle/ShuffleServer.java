@@ -126,6 +126,7 @@ public class ShuffleServer implements FetcherCallback {
   }
 
   public static enum RangesScheme {
+    SCHEME_PRIORITY,
     SCHEME_FIRST,
     SCHEME_MAX
   }
@@ -199,7 +200,10 @@ public class ShuffleServer implements FetcherCallback {
     String scheme = conf.get(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_RANGES_SCHEME,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_RANGES_SCHEME_DEFAULT);
-    this.rangesScheme = scheme.equalsIgnoreCase("max") ? RangesScheme.SCHEME_MAX : RangesScheme.SCHEME_FIRST;
+    this.rangesScheme =
+        scheme.equalsIgnoreCase("first") ? RangesScheme.SCHEME_FIRST :
+        scheme.equalsIgnoreCase("max") ? RangesScheme.SCHEME_MAX :
+        RangesScheme.SCHEME_PRIORITY;
 
     knownSrcHosts = new ConcurrentHashMap<HostPort, InputHost>();
 

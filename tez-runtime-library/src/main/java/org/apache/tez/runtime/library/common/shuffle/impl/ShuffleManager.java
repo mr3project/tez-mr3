@@ -96,7 +96,8 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
 
   // sum of the sizes of all MemoryFetchedInput in completedInputs[]
   // guard with synchronized(completedInputs)
-  private long totalSizeOfMemoryCompletedfInputs = 0L;
+  private long totalSizeOfMemoryCompletedInputs = 0L;
+  private AtomicInteger numCallsGetNextInput = new AtomicInteger(0);
 
   public ShuffleManager(InputContext inputContext, Configuration conf, int numInputs,
       FetchedInputAllocator inputAllocator, String srcNameTrimmed) throws IOException {
@@ -370,7 +371,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
     if (!(fetchedInput instanceof NullFetchedInput)) {
       completedInputs.add(fetchedInput);
       if (fetchedInput instanceof MemoryFetchedInput) {
-        totalSizeOfMemoryCompletedfInputs += fetchedInput.getSize();
+        totalSizeOfMemoryCompletedInputs += fetchedInput.getSize();
       }
     }
     if (!inputReadyNotificationSent.getAndSet(true)) {
@@ -470,13 +471,15 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
    *         but more may become available.
    */
   public FetchedInput getNextInput() throws InterruptedException {
+    numCallsGetNextInput.incrementAndGet();
+
     // block until next input or End of Input message
     // the only place where completedInputs.take() is called
     FetchedInput fetchedInput = completedInputs.take();
 
     if (fetchedInput instanceof MemoryFetchedInput) {
       synchronized (completedInputSet) {
-        totalSizeOfMemoryCompletedfInputs -= fetchedInput.getSize();
+        totalSizeOfMemoryCompletedInputs -= fetchedInput.getSize();
       }
     }
 
@@ -484,6 +487,10 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
       fetchedInput = null;
     }
     return fetchedInput;
+  }
+
+  public int getNumCallsGetNextInput() {
+    return numCallsGetNextInput.get();
   }
 
   public int getNumInputs() {
@@ -496,7 +503,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
 
   public long getTotalSizeOfMemoryCompletedInputs() {
     synchronized (completedInputSet) {
-      return totalSizeOfMemoryCompletedfInputs;
+      return totalSizeOfMemoryCompletedInputs;
     }
   }
 
