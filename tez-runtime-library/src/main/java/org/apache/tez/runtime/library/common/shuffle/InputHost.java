@@ -313,6 +313,9 @@ public class InputHost {
         iterator.remove();
         continue;
       }
+      if (!shuffleClient.shouldScanPendingInputs()) {
+        continue;
+      }
 
       if (shuffleClient instanceof ShuffleManager) {
         ShuffleManager sm = (ShuffleManager)shuffleClient;
