@@ -24,8 +24,8 @@ import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 
 public interface FetchedInputAllocator {
 
-  FetchedInput allocate(long actualSize, long compresedSize,
+  FetchedInput allocate(long actualSize, long compressedSize,
       InputAttemptIdentifier inputAttemptIdentifier,
-      long currentSizeOfMemoryCompletedInputs, boolean isFromShufflePayload) throws IOException;
+      boolean isFromShufflePayload) throws IOException;
   
 }

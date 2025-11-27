@@ -697,10 +697,8 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         compressedLength = mapOutputStat.compressedLength;
         // TODO TEZ-957. handle IOException here when Broadcast has better error checking
         {
-          long currentSizeOfMemoryCompletedInputs = shuffleManager.getTotalSizeOfMemoryCompletedInputs();
           fetchedInput = shuffleManager.getInputManager().allocate(
-              decompressedLength, compressedLength, srcAttemptId,
-              currentSizeOfMemoryCompletedInputs, false);
+              decompressedLength, compressedLength, srcAttemptId, false);
         }
         if (fetchedInput.getType() == Type.WAIT) {
           if (isDebugEnabled) {
