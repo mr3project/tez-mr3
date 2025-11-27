@@ -322,26 +322,19 @@ public class InputHost {
         if (sm.getNumCallsGetNextInput() > 0) {
           return sm;  // priority: highest - LogicalInput is ready to consume FetchedInputs in ShuffleManager
         }
-        // sm: not ready to consume input
-        if (sm.getTotalSizeOfMemoryCompletedInputs() == 0L) {
-          if (smNotReadyNoMemoryFetchedInput == null) {
+        // ShuffleManager: not ready to consume input
+        if (smNotReadyNoMemoryFetchedInput == null) {
+          if (sm.getTotalSizeOfMemoryCompletedInputs() == 0L) {
             smNotReadyNoMemoryFetchedInput = sm;
-          }
-          continue;
-        } else {
-          if (smNotReadyWithMemoryFetchedInput == null) {
+          } else if (smNotReadyWithMemoryFetchedInput == null) {
             smNotReadyWithMemoryFetchedInput = sm;
           }
-          continue;
-        }
-      }
-
-      if (shuffleClient instanceof ShuffleScheduler) {
-        ShuffleScheduler ss = (ShuffleScheduler)shuffleClient;
-        if (ssFirst == null) {
-          ssFirst = ss;
         }
         continue;
+      }
+
+      if (ssFirst == null) {
+        ssFirst = (ShuffleScheduler)shuffleClient;
       }
     }
 
