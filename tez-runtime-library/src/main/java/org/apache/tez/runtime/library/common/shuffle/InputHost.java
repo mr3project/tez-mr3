@@ -190,7 +190,7 @@ public class InputHost {
 
   // partitionId == output partition in DME (DataMovementEvent.sourceIndex)
   // partitionId != srcAttempt.inputIdentifier
-  // checkForDuplicate == true iff fetching srcAttempt previously failed
+  // checkForDuplicate == true iff fetching srcAttempt previously failed or got stalled
   public synchronized void addKnownInput(
       ShuffleClient<?> shuffleClient,
       int partitionId, int partitionCount, CompositeInputAttemptIdentifier srcAttempt,
@@ -217,8 +217,11 @@ public class InputHost {
         LOG.warn("ShuffleClient {} / PartitionMap {} already contains {}, so skip adding",
             shuffleClientId, partitionRange, srcAttempt);
       } else {
-        LOG.info("ShuffleClient {} / PartitionMap {} adds as pending input: {}",
-            shuffleClientId, partitionRange, srcAttempt);
+        // use LOG.debug because this is very common when TEZ_RUNTIME_SHUFFLE_UNORDERED_MEMORY_STREAMING == true
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("ShuffleClient {} / PartitionMap {} adds as pending input: {}",
+              shuffleClientId, partitionRange, srcAttempt);
+        }
         inputs.add(srcAttempt);
       }
     } else {
