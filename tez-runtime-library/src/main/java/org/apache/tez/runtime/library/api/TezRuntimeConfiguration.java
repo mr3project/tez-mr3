@@ -287,6 +287,11 @@ public class TezRuntimeConfiguration {
       TEZ_RUNTIME_PREFIX + "use.free.memory.fetched.input";
   public static final boolean TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT_DEFAULT = false;
 
+  @ConfigurationProperty(type = "float")
+  public static final String TEZ_RUNTIME_FREE_MEMORY_FACTOR_FOR_FETCHED_INPUT =
+    TEZ_RUNTIME_PREFIX + "free.memory.factor.for.fetched.input";
+  public static final float TEZ_RUNTIME_FREE_MEMORY_FACTOR_FOR_FETCHED_INPUT_DEFAULT = 1.0f;
+
   @ConfigurationProperty(type = "boolean")
   public static final String TEZ_RUNTIME_SHUFFLE_UNORDERED_MEMORY_STREAMING =
       TEZ_RUNTIME_PREFIX + "shuffle.unordered.memory.streaming";
@@ -466,6 +471,7 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT);
     tezRuntimeKeys.add(TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT);
     tezRuntimeKeys.add(TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT);
+    tezRuntimeKeys.add(TEZ_RUNTIME_FREE_MEMORY_FACTOR_FOR_FETCHED_INPUT);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_UNORDERED_MEMORY_STREAMING);
     tezRuntimeKeys.add(TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT);
     tezRuntimeKeys.add(TEZ_RUNTIME_FREE_MEMORY_WRITER_OUTPUT_THRESHOLD_MB);

@@ -207,7 +207,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       this.ifileReadAheadLength = 0;
     }
 
-    // Figure out initial memory req start
     final float maxInMemCopyUse = conf.getFloat(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT_DEFAULT);
@@ -217,8 +216,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
           maxInMemCopyUse);
     }
 
-    // Allow unit tests to fix Runtime memory
-    long memLimit = (long)(inputContext.getTotalMemoryAvailableToTask() * maxInMemCopyUse);
+    long maxTaskAvailableMemory = inputContext.getTotalMemoryAvailableToTask();
+    long memLimit = (long)(maxTaskAvailableMemory * maxInMemCopyUse);
 
     float maxRedPer = conf.getFloat(
         TezRuntimeConfiguration.TEZ_RUNTIME_INPUT_POST_MERGE_BUFFER_PERCENT,
@@ -226,8 +225,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     if (maxRedPer > 1.0 || maxRedPer < 0.0) {
       throw new TezUncheckedException(TezRuntimeConfiguration.TEZ_RUNTIME_INPUT_POST_MERGE_BUFFER_PERCENT + maxRedPer);
     }
-
-    long maxTaskAvailableMemory = inputContext.getTotalMemoryAvailableToTask();
     long maxRedBuffer = (long)(maxTaskAvailableMemory * maxRedPer);
 
     if (memoryAssigned < memLimit) {
@@ -246,18 +243,18 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_FACTOR,
         TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_FACTOR_DEFAULT);
     
-    final float singleShuffleMemoryLimitPercent = conf.getFloat(
+    final float maxSingleShuffleMemoryLimitPercent = conf.getFloat(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MEMORY_LIMIT_PERCENT,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MEMORY_LIMIT_PERCENT_DEFAULT);
-    if (singleShuffleMemoryLimitPercent <= 0.0f
-        || singleShuffleMemoryLimitPercent > 1.0f) {
+    if (maxSingleShuffleMemoryLimitPercent <= 0.0f
+        || maxSingleShuffleMemoryLimitPercent > 1.0f) {
       throw new IllegalArgumentException("Invalid value for "
           + TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MEMORY_LIMIT_PERCENT + ": "
-          + singleShuffleMemoryLimitPercent);
+          + maxSingleShuffleMemoryLimitPercent);
     }
 
     //TODO: Cap it to MAX_VALUE until MapOutput starts supporting > 2 GB
-    this.maxSingleShuffleLimit = (long) Math.min((memoryLimit * singleShuffleMemoryLimitPercent), Integer.MAX_VALUE);
+    this.maxSingleShuffleLimit = (long) Math.min((memoryLimit * maxSingleShuffleMemoryLimitPercent), Integer.MAX_VALUE);
     this.memToMemMergeOutputsThreshold = conf.getInt(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MEMTOMEM_SEGMENTS, ioSortFactor);
     this.mergeThreshold = (long)(this.memoryLimit * conf.getFloat(
@@ -298,7 +295,16 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT,
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT_DEFAULT);
     this.freeMemoryThreshold = maxTaskAvailableMemory;  // TODO: factor
-    this.freeMemoryLimit = maxTaskAvailableMemory;      // TODO: factor
+
+    final float freeMemoryFactor = conf.getFloat(
+        TezRuntimeConfiguration.TEZ_RUNTIME_FREE_MEMORY_FACTOR_FOR_FETCHED_INPUT,
+        TezRuntimeConfiguration.TEZ_RUNTIME_FREE_MEMORY_FACTOR_FOR_FETCHED_INPUT_DEFAULT);
+    if (freeMemoryFactor <= 0.0f) {
+      throw new IllegalArgumentException("Invalid value for "
+        + TezRuntimeConfiguration.TEZ_RUNTIME_FREE_MEMORY_FACTOR_FOR_FETCHED_INPUT + ": "
+        + freeMemoryFactor);
+    }
+    this.freeMemoryLimit = (long)(maxTaskAvailableMemory * freeMemoryFactor);
   }
 
   void setupParentThread(Thread shuffleSchedulerThread) {
@@ -814,7 +820,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     
     @Override
     public void merge(List<MapOutput> inputs) throws IOException, InterruptedException {
-      if (inputs == null || inputs.size() == 0) {
+      if (inputs == null || inputs.isEmpty()) {
         return;
       }
 

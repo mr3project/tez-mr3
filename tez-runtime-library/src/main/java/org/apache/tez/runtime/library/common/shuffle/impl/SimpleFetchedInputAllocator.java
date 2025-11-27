@@ -88,7 +88,16 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT,
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT_DEFAULT);
     this.freeMemoryThreshold = maxTaskAvailableMemory;  // TODO: factor
-    this.freeMemoryLimit = maxTaskAvailableMemory;      // TODO: factor
+
+    final float freeMemoryFactor = conf.getFloat(
+        TezRuntimeConfiguration.TEZ_RUNTIME_FREE_MEMORY_FACTOR_FOR_FETCHED_INPUT,
+        TezRuntimeConfiguration.TEZ_RUNTIME_FREE_MEMORY_FACTOR_FOR_FETCHED_INPUT_DEFAULT);
+    if (freeMemoryFactor <= 0.0f) {
+      throw new IllegalArgumentException("Invalid value for "
+          + TezRuntimeConfiguration.TEZ_RUNTIME_FREE_MEMORY_FACTOR_FOR_FETCHED_INPUT + ": "
+          + freeMemoryFactor);
+    }
+    this.freeMemoryLimit = (long)(maxTaskAvailableMemory * freeMemoryFactor);
 
     this.shuffleMemoryStreaming = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_UNORDERED_MEMORY_STREAMING,
