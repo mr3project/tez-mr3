@@ -299,9 +299,18 @@ public class InputHost {
   // called only from ShuffleServer.call() thread
   private ShuffleClient getPriorityShuffleClient(
       ConcurrentMap<Long, ShuffleClient<?>> shuffleClients) {
-    ShuffleScheduler ssFirst = null;                          // priority: second
-    ShuffleManager smNotReadyNoMemoryFetchedInput = null;     // priority: third
-    ShuffleManager smNotReadyWithMemoryFetchedInput = null;   // priority: last
+    // consider ShuffleManager over ShuffleScheduler because ShuffleManager can consume input as soon as it is ready
+    // Priority buckets:
+    // 1. ready SM with no MemoryFetchedInput (returned immediately in loop)
+    // 2. ready SM with smallest MemoryFetchedInput
+    // 3. ShuffleScheduler
+    // 4. not-ready SM with no MemoryFetchedInput
+    // 5. not-ready SM with MemoryFetchedInput
+    ShuffleManager smReadyWithMemory = null;      // priority: 2
+    long minSizeSmReadyWithMemory = Long.MAX_VALUE;
+    ShuffleScheduler ssFirst = null;              // priority: 3
+    ShuffleManager smNotReadyNoMemory = null;     // priority: 4
+    ShuffleManager smNotReadyWithMemory = null;   // priority: 5
 
     Iterator<Map.Entry<Long, Map<PartitionRange, List<CompositeInputAttemptIdentifier>>>> iterator =
         partitionToInputs.entrySet().iterator();
@@ -322,15 +331,32 @@ public class InputHost {
 
       if (shuffleClient instanceof ShuffleManager) {
         ShuffleManager sm = (ShuffleManager)shuffleClient;
-        if (sm.getNumCallsGetNextInput() > 0) {
-          return sm;  // priority: highest - LogicalInput is ready to consume FetchedInputs in ShuffleManager
+        if (sm.getNumCallsGetNextInput() > 0L) {
+          long size = sm.getTotalSizeOfMemoryCompletedInputs();
+          if (size == 0L) {
+            return sm;  // priority: highest - LogicalInput is ready to consume FetchedInputs in ShuffleManager
+          } else if (size < minSizeSmReadyWithMemory) {
+            // update because we have found ShuffleManager with smaller size
+            smReadyWithMemory = sm;
+            minSizeSmReadyWithMemory = size;
+          }
+          // smReadyWithMemory != null
+          continue;   // because we may find another ShuffleManager with smaller size
         }
-        // ShuffleManager: not ready to consume input
-        if (smNotReadyNoMemoryFetchedInput == null) {
+
+        // ShuffleManager sm: not ready to consume input
+        if (smReadyWithMemory != null) {
+          // any ready SM with memory beats all not-ready SMs
+          continue;
+        }
+
+        // if smNotReadyNoMemory != null, no need to consider sm
+        // 4) and 5): record first not-ready/no-memory, or if none, the first not-ready/with-memory
+        if (smNotReadyNoMemory == null) {
           if (sm.getTotalSizeOfMemoryCompletedInputs() == 0L) {
-            smNotReadyNoMemoryFetchedInput = sm;
-          } else if (smNotReadyWithMemoryFetchedInput == null) {
-            smNotReadyWithMemoryFetchedInput = sm;
+            smNotReadyNoMemory = sm;
+          } else if (smNotReadyWithMemory == null) {
+            smNotReadyWithMemory = sm;
           }
         }
         continue;
@@ -341,9 +367,10 @@ public class InputHost {
       }
     }
 
+    if (smReadyWithMemory != null) { return smReadyWithMemory; }
     if (ssFirst != null) { return ssFirst; }
-    if (smNotReadyNoMemoryFetchedInput != null) { return smNotReadyNoMemoryFetchedInput; }
-    if (smNotReadyWithMemoryFetchedInput != null) { return smNotReadyWithMemoryFetchedInput; }
+    if (smNotReadyNoMemory != null) { return smNotReadyNoMemory; }
+    if (smNotReadyWithMemory != null) { return smNotReadyWithMemory; }
     return null;
   }
 
