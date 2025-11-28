@@ -256,12 +256,14 @@ public class ShuffleServer implements FetcherCallback {
 
   // called only from ShuffleServer.call() thread
   private boolean getShouldLaunchNewFetchers() {
-    return
-      !pendingHosts.isEmpty() &&
-      pendingHosts.stream().anyMatch(p ->
-          !isBlockedFetching(p) &&
-          p.isHostNormal() &&
-          p.hasFetcherToLaunch(shuffleClients));
+    for (InputHost p: pendingHosts) {
+      if (!isBlockedFetching(p)
+          && p.isHostNormal()
+          && p.hasFetcherToLaunch(shuffleClients)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private void updateLoopConditions() {

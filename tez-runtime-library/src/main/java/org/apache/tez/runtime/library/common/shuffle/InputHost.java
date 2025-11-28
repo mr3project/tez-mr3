@@ -163,12 +163,13 @@ public class InputHost {
   // called only from ShuffleServer.call() thread
   public synchronized boolean hasFetcherToLaunch(ConcurrentMap<Long, ShuffleClient<?>> shuffleClients) {
     assert hasPendingInput;   // because we remove from pendingHosts[] only later in ShuffleServer.call()
-    return
-      !partitionToInputs.isEmpty() &&
-      partitionToInputs.keySet().stream().anyMatch(id -> {
-          ShuffleClient<?> shuffleClient = shuffleClients.get(id);
-          return shuffleClient != null && shuffleClient.shouldScanPendingInputs();
-      });
+    for (Long id: partitionToInputs.keySet()) {
+      ShuffleClient<?> shuffleClient = shuffleClients.get(id);
+      if (shuffleClient != null && shuffleClient.shouldScanPendingInputs()) {
+        return true;
+      }
+    }
+    return false;
   }
 
   public synchronized InputHost takeFromPendingHosts(
