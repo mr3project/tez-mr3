@@ -429,8 +429,12 @@ public class ShuffleServer implements FetcherCallback {
         // so we cannot reuse currentNumFetchers in updateLoopConditions()
         final int maxFetchersToRun = maxNumFetchers - runningFetchers.size();
 
-        // do NOT keep checking 'runningFetchers.size() < maxNumFetchers' because we have to check
-        // other conditions (e.g. existsFetcherToRetry) and cannot stay indefinitely in this loop
+        // Do NOT keep checking 'runningFetchers.size() < maxNumFetchers' because we have to check
+        // other conditions (e.g. existsFetcherToRetry) and cannot stay indefinitely in this loop.
+        //
+        // Calling getShouldLaunchNewFetchers() is semantically sound, but it is computationally intensive.
+        // However, experiments show that this is the right approach (probably because of the high frequency of
+        // adding and removing Fetchers). For an optimized version (without clear advantage), see commit aa631fd34f.
         int numNewFetchers = 0;
         InputHost peekInputHost = pendingHosts.peek();
         while (numNewFetchers < maxFetchersToRun &&
@@ -452,11 +456,10 @@ public class ShuffleServer implements FetcherCallback {
             }
           }
 
-          // inputHost.hasFetcherToLaunch() is just an optimization and thus optional because
-          // constructFetcherForHost() eventually calls ShuffleClient.shouldScanPendingInputs().
+          // Optionally, inputHost.hasFetcherToLaunch() can be called as an optimization.
+          // Cf. constructFetcherForHost() eventually calls ShuffleClient.shouldScanPendingInputs().
           if (!isBlockedFetching(inputHost) &&
-              inputHost.isHostNormal() &&
-              inputHost.hasFetcherToLaunch(shuffleClients)) {
+              inputHost.isHostNormal()) {
             Fetcher<?> fetcher = constructFetcherForHost(inputHost);
             // even when fetcher == null, inputHost may still have inputs if 'ShuffleClient == null'
             if (fetcher != null) {
