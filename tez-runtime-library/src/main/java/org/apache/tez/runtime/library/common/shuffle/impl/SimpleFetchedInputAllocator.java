@@ -20,7 +20,6 @@ package org.apache.tez.runtime.library.common.shuffle.impl;
 
 import java.io.IOException;
 
-import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -47,8 +46,7 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
 
   private final TezTaskOutputFiles fileNameAllocator;
 
-  // Configuration parameters
-  private final long memoryLimit;
+  private final long memoryLimit;   // memory assigned to this LogicalInput
   private final long maxSingleMemoryShuffle;
 
   private final String srcNameTrimmed;
@@ -56,7 +54,10 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
   private volatile long usedMemory = 0;
 
   private final boolean useFreeMemoryFetchedInput;
-  private final long freeMemoryThreshold;
+  private final long freeMemoryThreshold;   // minimum size of free memory for useFreeMemoryFetchedInput
+  private final long freeMemoryLimit;       // free memory that can be assigned to this LogicalInput
+
+  private final boolean shuffleMemoryStreaming;
 
   public SimpleFetchedInputAllocator(String srcNameTrimmed,
                                      String uniqueIdentifier, int dagID,
@@ -81,17 +82,29 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
           + maxSingleShuffleMemoryPercent);
     }
     // TODO: currently we must cap to MAX_VALUE because MemoryFetchedInput cannot handle > 2 GB
-    this.maxSingleMemoryShuffle = (long) Math.min((memoryLimit * maxSingleShuffleMemoryPercent),
-        Integer.MAX_VALUE);
+    this.maxSingleMemoryShuffle = (long) Math.min((memoryLimit * maxSingleShuffleMemoryPercent), Integer.MAX_VALUE);
 
     this.useFreeMemoryFetchedInput = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT,
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT_DEFAULT);
-    this.freeMemoryThreshold = maxTaskAvailableMemory;
-    // TODO: introduce a factor for freeMemoryThreshold (e.g. 0.5)
+    this.freeMemoryThreshold = maxTaskAvailableMemory;  // TODO: factor
 
-    LOG.info("{}: memoryLimit={}, maxSingleMemoryShuffle={}",
-        srcNameTrimmed, this.memoryLimit, this.maxSingleMemoryShuffle);
+    final float freeMemoryFactor = conf.getFloat(
+        TezRuntimeConfiguration.TEZ_RUNTIME_FREE_MEMORY_FACTOR_FOR_FETCHED_INPUT,
+        TezRuntimeConfiguration.TEZ_RUNTIME_FREE_MEMORY_FACTOR_FOR_FETCHED_INPUT_DEFAULT);
+    if (freeMemoryFactor <= 0.0f) {
+      throw new IllegalArgumentException("Invalid value for "
+          + TezRuntimeConfiguration.TEZ_RUNTIME_FREE_MEMORY_FACTOR_FOR_FETCHED_INPUT + ": "
+          + freeMemoryFactor);
+    }
+    this.freeMemoryLimit = (long)(maxTaskAvailableMemory * freeMemoryFactor);
+
+    this.shuffleMemoryStreaming = conf.getBoolean(
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_UNORDERED_MEMORY_STREAMING,
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_UNORDERED_MEMORY_STREAMING_DEFAULT);
+
+    LOG.info("{}: memoryLimit={}, maxSingleMemoryShuffle={}, freeMemoryLimit={}, shuffleMemoryStreaming={}",
+        srcNameTrimmed, memoryLimit, maxSingleMemoryShuffle, freeMemoryLimit, shuffleMemoryStreaming);
   }
 
   public static long getInitialMemoryReq(Configuration conf, long maxAvailableTaskMemory) {
@@ -103,45 +116,67 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
           + TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT + ": "
           + maxInMemCopyUse);
     }
-    long memReq = (long)(Math.min(maxAvailableTaskMemory, Integer.MAX_VALUE) * maxInMemCopyUse);
-    return memReq;
+    return (long)(Math.min(maxAvailableTaskMemory, Integer.MAX_VALUE) * maxInMemCopyUse);
   }
+
+  final private FetchedInput stallShuffle = FetchedInput.createWaitFetchedInput(null);
 
   @Override
   public synchronized FetchedInput allocate(long actualSize, long compressedSize,
-      InputAttemptIdentifier inputAttemptIdentifier) throws IOException {
+      InputAttemptIdentifier inputAttemptIdentifier,
+      boolean isFromShufflePayload) throws IOException {
     if (actualSize > maxSingleMemoryShuffle) {
-      LOG.info("Creating DiskFetchedInput: {} > maxSingleMemoryShuffle", actualSize);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Creating DiskFetchedInput: {} > maxSingleMemoryShuffle", actualSize);
+      }
       return new DiskFetchedInput(compressedSize,
           inputAttemptIdentifier, this, conf, fileNameAllocator);
     }
-    if (this.usedMemory + actualSize > this.memoryLimit) {
+
+    if (!isFromShufflePayload && this.usedMemory + actualSize > memoryLimit) {
       // This Task has used up all its memory (memoryLimit).
       if (!useFreeMemoryFetchedInput) {
-        LOG.info("Creating DiskFetchedInput: {} + {} > memoryLimit", this.usedMemory, actualSize);
+        if (shuffleMemoryStreaming) {
+          return stallShuffle;
+        }
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Creating DiskFetchedInput: {} + {} > memoryLimit", this.usedMemory, actualSize);
+        }
         return new DiskFetchedInput(compressedSize,
             inputAttemptIdentifier, this, conf, fileNameAllocator);
       }
-      // Check if we can find free memory in the current ContainerWorker.
+
+      // check if we can borrow from free memory in the current ContainerWorker
+      // Even when we have enough free memory, do not use more memory than freMemoryLimit
+      // for storing MemoryFetchedInput.
       long currentFreeMemory = Runtime.getRuntime().freeMemory();
-      if (currentFreeMemory < freeMemoryThreshold) {
-        // this ContainerWorker is busy serving Tasks, so do not borrow
-        LOG.info("Creating DiskFetchedInput: {}, {} < freeMemoryThreshold", actualSize, currentFreeMemory);
+      if (currentFreeMemory < freeMemoryThreshold ||
+          this.usedMemory + actualSize > freeMemoryLimit) {
+        if (shuffleMemoryStreaming) {
+          return stallShuffle;
+        }
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Creating DiskFetchedInput: {}, {} < freeMemoryThreshold", actualSize, currentFreeMemory);
+        }
         return new DiskFetchedInput(compressedSize,
-            inputAttemptIdentifier, this, conf,
-            fileNameAllocator);
+            inputAttemptIdentifier, this, conf, fileNameAllocator);
       }
-      this.usedMemory += actualSize;
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Creating MemoryFetchedInput in free memory: {}, {}, {}", this.usedMemory, actualSize, currentFreeMemory);
-      }
-    } else {
+    }
+
+    try {
+      // MemoryFetchedInput may throw OOM, so increase usedMemory only if successful
+      MemoryFetchedInput result = new MemoryFetchedInput(actualSize, inputAttemptIdentifier, this);
       this.usedMemory += actualSize;
       if (LOG.isDebugEnabled()) {
         LOG.debug("Creating MemoryFetchedInput: {}, {}", this.usedMemory, actualSize);
       }
+      return result;
+    } catch (OutOfMemoryError oom) {
+      LOG.error("Failed to created MemoryFetchedInput, returning DiskFetchedInput instead: {}, {}",
+          this.usedMemory, actualSize, oom);
+      return new DiskFetchedInput(compressedSize,
+          inputAttemptIdentifier, this, conf, fileNameAllocator);
     }
-    return new MemoryFetchedInput(actualSize, inputAttemptIdentifier, this);
   }
 
   @Override
@@ -184,7 +219,7 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
   private synchronized void unreserve(long size) {
     this.usedMemory -= size;
     if (LOG.isDebugEnabled()) {
-      LOG.debug(srcNameTrimmed + ": " + "Used memory after freeing " + size  + " : " + usedMemory);
+      LOG.debug(srcNameTrimmed + ": " + "Used memory after freeing " + size  + " : " + this.usedMemory);
     }
   }
 

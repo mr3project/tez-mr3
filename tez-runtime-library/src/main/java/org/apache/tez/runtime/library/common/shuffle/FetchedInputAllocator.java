@@ -21,11 +21,11 @@ package org.apache.tez.runtime.library.common.shuffle;
 import java.io.IOException;
 
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
-import org.apache.tez.runtime.library.common.shuffle.FetchedInput.Type;
 
 public interface FetchedInputAllocator {
 
-  FetchedInput allocate(long actualSize, long compresedSize,
-      InputAttemptIdentifier inputAttemptIdentifier) throws IOException;
+  FetchedInput allocate(long actualSize, long compressedSize,
+      InputAttemptIdentifier inputAttemptIdentifier,
+      boolean isFromShufflePayload) throws IOException;
   
 }

@@ -81,7 +81,7 @@ public class HttpConnection extends BaseHttpConnection {
     encHash = SecureShuffleUtils.hashFromString(msgToEncode, jobTokenSecretMgr);
   }
 
-  private void setupConnection() throws IOException {
+  private HttpURLConnection setupConnection() throws IOException {
     connection = (HttpURLConnection) url.openConnection();
     if (httpConnParams.isSslShuffle()) {
       //Configure for SSL
@@ -103,6 +103,8 @@ public class HttpConnection extends BaseHttpConnection {
         ShuffleHeader.DEFAULT_HTTP_HEADER_NAME);
     connection.addRequestProperty(ShuffleHeader.HTTP_HEADER_VERSION,
         ShuffleHeader.DEFAULT_HTTP_HEADER_VERSION);
+
+    return connection;
   }
 
   /**
@@ -126,8 +128,11 @@ public class HttpConnection extends BaseHttpConnection {
    * @throws IOException upon connection failure
    */
   private boolean connect(int connectionTimeout) throws IOException {
+    // In rare cases when ShuffleServer is shut down, this.connection can be set to null in cleanup().
+    // So we use a local variable connection to avoid NullPointerException.
+    HttpURLConnection connection = this.connection;
     if (connection == null) {
-      setupConnection();
+      connection = setupConnection();
     }
     int unit = 0;
     if (connectionTimeout < 0) {
@@ -191,6 +196,10 @@ public class HttpConnection extends BaseHttpConnection {
 
   @Override
   public void validate() throws IOException {
+    HttpURLConnection connection = this.connection;
+    if (connection == null) {
+      throw new IOException("Connection already cleaned up");
+    }
     int rc = connection.getResponseCode();
     if (rc != HttpURLConnection.HTTP_OK) {
       throw new IOException("Got invalid response code " + rc + " from " + url

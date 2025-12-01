@@ -50,7 +50,7 @@ public class FetcherConfigCommon {
 
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append(", httpConnectionParams=");
+    sb.append("[httpConnectionParams=");
     sb.append(httpConnectionParams);
     sb.append(", localDiskFetchEnabled=");
     sb.append(localDiskFetchEnabled);

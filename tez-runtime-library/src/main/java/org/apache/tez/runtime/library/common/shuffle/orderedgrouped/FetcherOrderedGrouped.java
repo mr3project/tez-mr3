@@ -212,7 +212,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
           CompositeInputAttemptIdentifier first = pendingInputsSeq.getInputs().get(0);
           // true if inputs originate from the current ContainerWorker
           useLocalDiskFetch = first.getPathComponent().startsWith(
-              taskContext.getExecutionContext().getContainerId());
+              taskContext.getExecutionContext().getEnvContainerId());
         } else {
           useLocalDiskFetch = true;
         }

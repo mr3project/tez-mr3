@@ -31,6 +31,7 @@ public class MemoryFetchedInput extends FetchedInput {
 
   private byte[] byteArray;
 
+  // may throw OutOfMemoryError
   public MemoryFetchedInput(long actualSize,
       InputAttemptIdentifier inputAttemptIdentifier,
       FetchedInputCallback callbackHandler) {
@@ -77,22 +78,20 @@ public class MemoryFetchedInput extends FetchedInput {
   public void abort() {
     if (isState(State.PENDING)) {
       setState(State.ABORTED);
-      notifyFetchFailure();
+      notifyFetchFailure();   // eventually calls allocator.cleanup()
+      this.byteArray = null;  // because this FetchedInput is never used again
     }
   }
   
   @Override
   public void free() {
-    Preconditions.checkState(
-        isState(State.COMMITTED) || isState(State.ABORTED),
-        "FetchedInput can only be freed after it is committed or aborted");
-    if (isState(State.COMMITTED)) { // ABORTED would have already called cleanup
-      setState(State.FREED);
-      notifyFreedResource();
-      // Set this to null AFTER notifyFreedResource() so that getSize()
-      // returns the correct size
-      this.byteArray = null;
-    }
+    Preconditions.checkState(isState(State.COMMITTED),
+        "FetchedInput can only be freed after it is committed. If aborted, it is never added to completedInputs[].");
+    setState(State.FREED);
+    notifyFreedResource();   // eventually calls allocator.cleanup()
+    // Set this to null AFTER notifyFreedResource() so that getSize()
+    // returns the correct size
+    this.byteArray = null;
   }
 
   @Override

@@ -214,7 +214,7 @@ public class TezRuntimeConfiguration {
   @ConfigurationProperty(type = "float")
   public static final String TEZ_RUNTIME_INPUT_POST_MERGE_BUFFER_PERCENT =
       TEZ_RUNTIME_PREFIX + "task.input.post-merge.buffer.percent";
-  public static final float TEZ_RUNTIME_INPUT_BUFFER_PERCENT_DEFAULT = 0.0f;
+  public static final float TEZ_RUNTIME_INPUT_BUFFER_PERCENT_DEFAULT = 0.9f;
 
   @ConfigurationProperty
   public static final String TEZ_RUNTIME_INTERNAL_SORTER_CLASS =
@@ -287,6 +287,16 @@ public class TezRuntimeConfiguration {
       TEZ_RUNTIME_PREFIX + "use.free.memory.fetched.input";
   public static final boolean TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT_DEFAULT = false;
 
+  @ConfigurationProperty(type = "float")
+  public static final String TEZ_RUNTIME_FREE_MEMORY_FACTOR_FOR_FETCHED_INPUT =
+    TEZ_RUNTIME_PREFIX + "free.memory.factor.for.fetched.input";
+  public static final float TEZ_RUNTIME_FREE_MEMORY_FACTOR_FOR_FETCHED_INPUT_DEFAULT = 1.0f;
+
+  @ConfigurationProperty(type = "boolean")
+  public static final String TEZ_RUNTIME_SHUFFLE_UNORDERED_MEMORY_STREAMING =
+      TEZ_RUNTIME_PREFIX + "shuffle.unordered.memory.streaming";
+  public static final boolean TEZ_RUNTIME_SHUFFLE_UNORDERED_MEMORY_STREAMING_DEFAULT = false;
+
   // if set to true, automatically set:
   //   1. tez.runtime.optimize.local.fetch = false
   //   2. tez.runtime.optimize.local.fetch.ordered = false
@@ -350,7 +360,7 @@ public class TezRuntimeConfiguration {
   // "first", "max" - used in ShuffleServer
   public static final String TEZ_RUNTIME_SHUFFLE_RANGES_SCHEME =
       TEZ_RUNTIME_PREFIX + "shuffle.ranges.scheme";
-  public static final String TEZ_RUNTIME_SHUFFLE_RANGES_SCHEME_DEFAULT = "first";
+  public static final String TEZ_RUNTIME_SHUFFLE_RANGES_SCHEME_DEFAULT = "priority";
 
   @ConfigurationProperty(type = "boolean")
   public static final String TEZ_RUNTIME_SHUFFLE_CONNECTION_FAIL_ALL_INPUT =
@@ -461,6 +471,8 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT);
     tezRuntimeKeys.add(TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT);
     tezRuntimeKeys.add(TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT);
+    tezRuntimeKeys.add(TEZ_RUNTIME_FREE_MEMORY_FACTOR_FOR_FETCHED_INPUT);
+    tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_UNORDERED_MEMORY_STREAMING);
     tezRuntimeKeys.add(TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT);
     tezRuntimeKeys.add(TEZ_RUNTIME_FREE_MEMORY_WRITER_OUTPUT_THRESHOLD_MB);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_SPECULATIVE_FETCH_WAIT_MILLIS);

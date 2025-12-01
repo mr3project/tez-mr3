@@ -26,7 +26,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.task.local.output.TezTaskOutputFiles;
@@ -55,7 +54,12 @@ public class DiskFetchedInput extends FetchedInput {
         this.getInputAttemptIdentifier().getInputIdentifier(), this
             .getInputAttemptIdentifier().getSpillEventId(), this.size);
     // Files are not clobbered due to the id being appended to the outputPath in the tmpPath,
-    // otherwise fetches for the same task but from different attempts would clobber each other.
+    // Otherwise fetches for the same task but from different attempts would clobber each other.
+    // tmpOutputPath is always unique because getId() is unique,
+    // so no additional logic is necessary for speculative fetchers.
+    // tmpOutputPath is renamed to outputPath in commit() and deleted in abort().
+    // It is okay not to delete tmpOutputPath(), e.g., if abort() is not called,
+    // because it is automatically deleted along with other intermediate files when the DAG is finished.
     this.tmpOutputPath = outputPath.suffix(String.valueOf(getId()));
   }
 
@@ -90,6 +94,7 @@ public class DiskFetchedInput extends FetchedInput {
   public void commit() throws IOException {
     if (isState(State.PENDING)) {
       setState(State.COMMITTED);
+      // A previous fetcher may already have generated outputPath, in which case rename() fails.
       localFS.rename(tmpOutputPath, outputPath);
       notifyFetchComplete();
     }

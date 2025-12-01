@@ -951,7 +951,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
     if (emptyPartitions.cardinality() != numPartitions) {
       // Populate payload only if at least 1 partition has data
-      String containerId = outputContext.getExecutionContext().getContainerId();
+      String containerId = outputContext.getExecutionContext().getEnvContainerId();
       int vertexId = outputContext.getTaskVertexIndex();
       payloadBuilder.setContainerId(containerId);
       payloadBuilder.setVertexId(vertexId);

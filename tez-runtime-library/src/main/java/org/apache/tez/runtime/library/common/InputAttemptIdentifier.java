@@ -36,6 +36,7 @@ public class InputAttemptIdentifier {
   public static final String PATH_PREFIX = "attempt";
   public static final String PATH_PREFIX_MR3 = com.datamonad.mr3.container.ContainerID$.MODULE$.prefixInContainerWorkerEnv();
 
+  // non-pipelined: FINAL_MERGE_ENABLED, pipelined: INCREMENTAL_UPDATE or FINAL_UPDATE
   public enum SPILL_INFO {
     FINAL_MERGE_ENABLED,  // Final merge is enabled at source
     INCREMENTAL_UPDATE,   // Final merge is disabled and qualifies for incremental spill updates.(i.e spill 0, 1 etc)

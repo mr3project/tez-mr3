@@ -99,8 +99,24 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   
   private final long memoryLimit;
   final long postMergeMemLimit;
+
+  // Lifecycle of InMemoryOutput:
+  // - create InMemoryOutput, increase usedMemory
+  // - 1. InMemoryOutput.commit()
+  //      --> closeInMemoryFile()
+  //      --> InMemoryReader
+  //      --> releaseCommittedMemory()
+  // - 2. InMemoryOutput.abort()
+
+  // MergeManager’s internal memory budget for controlling fetching
+  // increases at the time of creating InMemoryMapOutput
+  // guard with synchronized (this), or synchronized (manager) inside MergeThread
   private long usedMemory;
+  // Merge decisions depend on committed sizes (commitMemory >= mergeThreshold).
+  // increases when InMemoryMapOutput is accepted as valid input
+  // guard with synchronized (this), or synchronized (manager) inside MergeThread
   private long commitMemory;
+
   private final int ioSortFactor;
   private final long maxSingleShuffleLimit;
 
@@ -136,7 +152,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   private final SerializationContext serializationContext;
 
   private final boolean useFreeMemoryFetchedInput;
-  private final long freeMemoryThreshold;
+  private final long freeMemoryThreshold;   // minimum size of free memory for useFreeMemoryFetchedInput
+  private final long freeMemoryLimit;       // free memory that can be assigned to this LogicalInput
 
   /**
    * Construct the MergeManager. Must call start before it becomes usable.
@@ -167,7 +184,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     this.mapOutputFile = new TezTaskOutputFiles(conf,
         inputContext.getUniqueIdentifier(),
         inputContext.getDagIdentifier(),
-        inputContext.getExecutionContext().getContainerId(),
+        inputContext.getExecutionContext().getEnvContainerId(),
         inputContext.getTaskVertexIndex(),
         compositeFetch);
 
@@ -190,7 +207,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       this.ifileReadAheadLength = 0;
     }
 
-    // Figure out initial memory req start
     final float maxInMemCopyUse = conf.getFloat(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT_DEFAULT);
@@ -200,8 +216,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
           maxInMemCopyUse);
     }
 
-    // Allow unit tests to fix Runtime memory
-    long memLimit = (long)(inputContext.getTotalMemoryAvailableToTask() * maxInMemCopyUse);
+    long maxTaskAvailableMemory = inputContext.getTotalMemoryAvailableToTask();
+    long memLimit = (long)(maxTaskAvailableMemory * maxInMemCopyUse);
 
     float maxRedPer = conf.getFloat(
         TezRuntimeConfiguration.TEZ_RUNTIME_INPUT_POST_MERGE_BUFFER_PERCENT,
@@ -209,10 +225,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     if (maxRedPer > 1.0 || maxRedPer < 0.0) {
       throw new TezUncheckedException(TezRuntimeConfiguration.TEZ_RUNTIME_INPUT_POST_MERGE_BUFFER_PERCENT + maxRedPer);
     }
+    long maxRedBuffer = (long)(maxTaskAvailableMemory * maxRedPer);
 
-    long maxRedBuffer = (long) (inputContext.getTotalMemoryAvailableToTask() * maxRedPer);
-    // Figure out initial memory req end
-    
     if (memoryAssigned < memLimit) {
       this.memoryLimit = memoryAssigned;
     } else {
@@ -225,31 +239,22 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       this.postMergeMemLimit = maxRedBuffer;
     }
 
-    if (LOG.isDebugEnabled()) {
-      LOG.debug(
-          inputContext.getSourceVertexName() + ": " + "InitialRequest: ShuffleMem=" + memLimit +
-              ", postMergeMem=" + maxRedBuffer
-              + ", RuntimeTotalAvailable=" + memoryAssigned +
-              ". Updated to: ShuffleMem="
-              + this.memoryLimit + ", postMergeMem: " + this.postMergeMemLimit);
-    }
-
     this.ioSortFactor = conf.getInt(
         TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_FACTOR,
         TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_FACTOR_DEFAULT);
     
-    final float singleShuffleMemoryLimitPercent = conf.getFloat(
+    final float maxSingleShuffleMemoryLimitPercent = conf.getFloat(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MEMORY_LIMIT_PERCENT,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MEMORY_LIMIT_PERCENT_DEFAULT);
-    if (singleShuffleMemoryLimitPercent <= 0.0f
-        || singleShuffleMemoryLimitPercent > 1.0f) {
+    if (maxSingleShuffleMemoryLimitPercent <= 0.0f
+        || maxSingleShuffleMemoryLimitPercent > 1.0f) {
       throw new IllegalArgumentException("Invalid value for "
           + TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MEMORY_LIMIT_PERCENT + ": "
-          + singleShuffleMemoryLimitPercent);
+          + maxSingleShuffleMemoryLimitPercent);
     }
 
     //TODO: Cap it to MAX_VALUE until MapOutput starts supporting > 2 GB
-    this.maxSingleShuffleLimit = (long) Math.min((memoryLimit * singleShuffleMemoryLimitPercent), Integer.MAX_VALUE);
+    this.maxSingleShuffleLimit = (long) Math.min((memoryLimit * maxSingleShuffleMemoryLimitPercent), Integer.MAX_VALUE);
     this.memToMemMergeOutputsThreshold = conf.getInt(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MEMTOMEM_SEGMENTS, ioSortFactor);
     this.mergeThreshold = (long)(this.memoryLimit * conf.getFloat(
@@ -289,8 +294,17 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     this.useFreeMemoryFetchedInput = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT,
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT_DEFAULT);
-    this.freeMemoryThreshold = inputContext.getTotalMemoryAvailableToTask();
-    // TODO: introduce a factor for freeMemoryThreshold (e.g. 0.5)
+    this.freeMemoryThreshold = maxTaskAvailableMemory;  // TODO: factor
+
+    final float freeMemoryFactor = conf.getFloat(
+        TezRuntimeConfiguration.TEZ_RUNTIME_FREE_MEMORY_FACTOR_FOR_FETCHED_INPUT,
+        TezRuntimeConfiguration.TEZ_RUNTIME_FREE_MEMORY_FACTOR_FOR_FETCHED_INPUT_DEFAULT);
+    if (freeMemoryFactor <= 0.0f) {
+      throw new IllegalArgumentException("Invalid value for "
+        + TezRuntimeConfiguration.TEZ_RUNTIME_FREE_MEMORY_FACTOR_FOR_FETCHED_INPUT + ": "
+        + freeMemoryFactor);
+    }
+    this.freeMemoryLimit = (long)(maxTaskAvailableMemory * freeMemoryFactor);
   }
 
   void setupParentThread(Thread shuffleSchedulerThread) {
@@ -357,7 +371,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
      */
     boolean triggerAdditionalMerge = false;
     synchronized (this) {
-      if (commitMemory >= mergeThreshold) {
+      if (this.commitMemory >= mergeThreshold) {
         startMemToDiskMerge();
         triggerAdditionalMerge = true;
       }
@@ -376,7 +390,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
   public synchronized void waitForShuffleToMergeMemory() throws InterruptedException {
     long startTime = System.currentTimeMillis();
-    while(usedMemory > memoryLimit) {
+    while (this.usedMemory > memoryLimit) {
       wait();
     }
     if (LOG.isDebugEnabled()) {
@@ -414,35 +428,50 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     // all the stalled threads
 
     synchronized (this) {
-      if (usedMemory > memoryLimit) {
+      if (this.usedMemory > memoryLimit) {
         if (!useFreeMemoryFetchedInput) {
           if (LOG.isDebugEnabled()) {
-            LOG.debug(srcAttemptIdentifier + ": Stalling shuffle since usedMemory (" + usedMemory
+            LOG.debug(srcAttemptIdentifier + ": Stalling shuffle since usedMemory (" + this.usedMemory
                 + ") is greater than memoryLimit (" + memoryLimit + ")." +
-                " CommitMemory is (" + commitMemory + ")");
+                " CommitMemory is (" + this.commitMemory + ")");
           }
           return stallShuffle;
         }
-        // Check if we can find free memory in the current ContainerWorker
+        // check if we can find free memory in the current ContainerWorker
         long currentFreeMemory = Runtime.getRuntime().freeMemory();
-        if (currentFreeMemory < freeMemoryThreshold){
+        if (currentFreeMemory < freeMemoryThreshold ||
+            this.usedMemory + requestedSize > freeMemoryLimit) {
           // this ContainerWorker is busy serving Tasks, so do not borrow
           return stallShuffle;
         }
         if (LOG.isDebugEnabled()) {
           LOG.debug("Creating MemoryMapOutput in free memory: {}, {}, CommitMemory={}",
-              usedMemory, currentFreeMemory, commitMemory);
+              this.usedMemory, currentFreeMemory, this.commitMemory);
         }
-        // usedMemoryForMergeManager = 0 because this MemoryMapOutput should not contribute to usedMemory
-        return unconditionalReserve(srcAttemptIdentifier, 0L, requestedSize, true);
+        try {
+          // usedMemoryForMergeManager = 0 because this MemoryMapOutput should not contribute to usedMemory
+          return unconditionalReserve(srcAttemptIdentifier, 0L, requestedSize, true);
+        } catch (OutOfMemoryError oom) {
+          LOG.error("Failed to created MemoryMapOutput, stalling instead: {}, {}",
+            this.usedMemory, requestedSize, oom);
+          return stallShuffle;
+        }
       } else {
         // Allow the in-memory shuffle to progress
         if (LOG.isDebugEnabled()) {
           LOG.debug("Creating MemoryMapOutput: {}, {}, CommitMemory={}",
-              usedMemory, memoryLimit, commitMemory);
+              this.usedMemory, memoryLimit, this.commitMemory);
         }
-        // usedMemoryForMergeManager == requestedSize
-        return unconditionalReserve(srcAttemptIdentifier, requestedSize, requestedSize, true);
+        try {
+          // usedMemoryForMergeManager == requestedSize
+          return unconditionalReserve(srcAttemptIdentifier, requestedSize, requestedSize, true);
+        } catch (OutOfMemoryError oom) {
+          LOG.error("Failed to created MemoryMapOutput, returning DiskMapOutput instead: {}, {}",
+            this.usedMemory, requestedSize, oom);
+          // TODO: can we return stallShuffle without stalling all Fetchers?
+          return MapOutput.createDiskMapOutput(srcAttemptIdentifier, this, compressedLength, conf,
+              fetcher, true, mapOutputFile);
+        }
       }
     }
   }
@@ -450,21 +479,27 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   /**
    * Unconditional Reserve is used by the Memory-to-Memory thread
    */
+  // InMemoryMapOutput must call unreserve(), either
+  //   directly from InMemoryOutput.abort() or
+  //   indirectly via releaseCommittedMemory() after closeInMemoryFile() is called from InMemoryOutput.commit().
   private synchronized MapOutput unconditionalReserve(
       InputAttemptIdentifier srcAttemptIdentifier,
       long usedMemoryForMergeManager,
       long requestedSize,
       boolean primaryMapOutput) {
-    usedMemory += usedMemoryForMergeManager;
-    return MapOutput.createMemoryMapOutput(
+    // createMemoryMapOutput() may throw OOM, so increase usedMemory only if successful
+    MapOutput result = MapOutput.createMemoryMapOutput(
         srcAttemptIdentifier, this, usedMemoryForMergeManager, requestedSize, primaryMapOutput);
+    this.usedMemory += usedMemoryForMergeManager;
+    return result;
   }
 
   @Override
   public synchronized void unreserve(long size) {
-    usedMemory -= size;
+    assert usedMemory >= size;
+    this.usedMemory -= size;
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Notifying unreserve : size=" + size + ", commitMemory=" + commitMemory + ", usedMemory=" + usedMemory
+      LOG.debug("Notifying unreserve : size=" + size + ", commitMemory=" + this.commitMemory + ", usedMemory=" + this.usedMemory
           + ", mergeThreshold=" + mergeThreshold);
     }
     notifyAll();
@@ -472,7 +507,9 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
   @Override
   public synchronized void releaseCommittedMemory(long commitSize, long usedMemoryForMergeManager) {
-    commitMemory -= commitSize;
+    assert usedMemoryForMergeManager == commitSize || usedMemoryForMergeManager == 0L;
+    assert commitMemory >= commitSize;
+    this.commitMemory -= commitSize;
     unreserve(usedMemoryForMergeManager);
   }
 
@@ -481,9 +518,9 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     inMemoryMapOutputs.add(mapOutput);
     trackAndLogCloseInMemoryFile(mapOutput);
 
-    commitMemory += mapOutput.getSize();
+    this.commitMemory += mapOutput.getSize();
 
-    if (commitMemory >= mergeThreshold) {
+    if (this.commitMemory >= mergeThreshold) {
       startMemToDiskMerge();
     }
 
@@ -503,9 +540,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     if (LOG.isDebugEnabled()) {
       LOG.debug("closeInMemoryFile -> map-output of size: " + mapOutput.getSize()
           + ", inMemoryMapOutputs.size() -> " + inMemoryMapOutputs.size()
-          + ", commitMemory -> " + commitMemory + ", usedMemory ->" +
-          usedMemory + ", mapOutput=" +
-          mapOutput);
+          + ", commitMemory -> " + this.commitMemory + ", usedMemory ->" +
+          this.usedMemory + ", mapOutput=" + mapOutput);
     }
   }
 
@@ -513,7 +549,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     synchronized (inMemoryMerger) {
       if (!inMemoryMerger.isInProgress()) {
         LOG.info("{}: Starting inMemoryMerger's merge since commitMemory={} > mergeThreshold={}. Current usedMemory={}",
-            inputContext.getSourceVertexName(), commitMemory, mergeThreshold, usedMemory);
+            inputContext.getSourceVertexName(), this.commitMemory, mergeThreshold, this.usedMemory);
         inMemoryMapOutputs.addAll(inMemoryMergedMapOutputs);
         inMemoryMergedMapOutputs.clear();
         inMemoryMerger.startMerge(inMemoryMapOutputs);
@@ -531,9 +567,9 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
           inMemoryMergedMapOutputs.size());
     }
 
-    commitMemory += mapOutput.getSize();
+    this.commitMemory += mapOutput.getSize();
 
-    if (commitMemory >= mergeThreshold) {
+    if (this.commitMemory >= mergeThreshold) {
       startMemToDiskMerge();
     }
   }
@@ -638,7 +674,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       }
       fs.delete(path, true);
     } catch (IOException e) {
-      LOG.info("Error in deleting " + path);
+      LOG.warn("Error in deleting {}", path);
     }
   }
 
@@ -677,8 +713,12 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
         Iterator<MapOutput> it = inputs.iterator();
         MapOutput lastAddedMapOutput = null;
-        while(it.hasNext() && !Thread.currentThread().isInterrupted()) {
+        while (it.hasNext() && !Thread.currentThread().isInterrupted()) {
           MapOutput mo = it.next();
+          // We have to use mo.getSize(), not mo.getUsedMemoryForMergeManager(), because
+          // we will create a buffer big enough to hold the sum of the actual sizes of all selected inputs.
+          // Adding manager.getUsedMemory() is okay because
+          // the guard is about whether we can safely charge the new merged buffer under the budget.
           if ((mergeOutputSize + mo.getSize() + manager.getUsedMemory()) > memoryLimit) {
             //Search for smaller segments that can fit into existing mem
             if (LOG.isDebugEnabled()) {
@@ -714,8 +754,12 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
           return;
         }
 
-        // usedMemoryForMergeManager == mergeOutputSize
-        mergedMapOutputs = unconditionalReserve(dummyMapId, mergeOutputSize, mergeOutputSize, false);
+        try {
+          // usedMemoryForMergeManager == mergeOutputSize
+          mergedMapOutputs = unconditionalReserve(dummyMapId, mergeOutputSize, mergeOutputSize, false);
+        } catch (OutOfMemoryError err) {
+          throw new IOException("Cannot perform merging in MemoryToMemoryMerger - do not use Memory-to-Memory merging", err);
+        }
       }
 
       int noInMemorySegments = inMemorySegments.size();
@@ -776,7 +820,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     
     @Override
     public void merge(List<MapOutput> inputs) throws IOException, InterruptedException {
-      if (inputs == null || inputs.size() == 0) {
+      if (inputs == null || inputs.isEmpty()) {
         return;
       }
 
@@ -855,12 +899,11 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     }
 
     @Override
-    public void cleanup(List<MapOutput> inputs, boolean deleteData)
-        throws IOException, InterruptedException {
+    public void cleanup(List<MapOutput> inputs, boolean deleteData) {
       if (deleteData) {
-        //Additional check at task level
+        // Additional check at task level
         if (cleanup) {
-          LOG.info("Try deleting stale data");
+          LOG.info("Try deleting stale data: {}, {}", outputPath, tmpDir);
           MergeManager.cleanup(localFS, outputPath);
           MergeManager.cleanup(localFS, tmpDir);
         }
@@ -974,12 +1017,11 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     }
 
     @Override
-    public void cleanup(List<FileChunk> inputs, boolean deleteData) throws IOException,
-        InterruptedException {
+    public void cleanup(List<FileChunk> inputs, boolean deleteData) throws IOException, InterruptedException {
       if (deleteData) {
-        //Additional check at task level
+        // Additional check at task level
         if (cleanup) {
-          LOG.info("Try deleting stale data");
+          LOG.info("Try deleting stale data: {}, {}", outputPath, tmpDir);
           MergeManager.cleanup(localFS, inputs);
           MergeManager.cleanup(localFS, outputPath);
           MergeManager.cleanup(localFS, tmpDir);
@@ -1090,10 +1132,10 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         // disk segments and this will be incremented by 1 (result of the 
         // memory segments merge). Since this total would still be 
         // <= io.sort.factor, we will not do any more intermediate merges,
-        // the merge of all these disk segments would be directly fed to the reduce method
+        // the merge of all these disk segments would be directly fed to the reduce method.
         
         // must spill to disk, but can't retain in-mem for intermediate merge
-        // Can not use spill id in final merge as it would clobber with other files, hence using Integer.MAX_VALUE
+        // Cannot use spill id in final merge as it would clobber with other files, hence using Integer.MAX_VALUE
         final Path outputPath = mapOutputFile.getInputFileForWrite(
             srcTaskId, Integer.MAX_VALUE, inMemToDiskBytes).suffix(Constants.MERGED_OUTPUT_PREFIX);
         final TezRawKeyValueIterator rIter = TezMerger.merge(job, fs, serContext,
@@ -1250,7 +1292,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
   // always called inside synchronized (MergeManager) {}
   long getUsedMemory() {
-    return usedMemory;
+    return this.usedMemory;
   }
 
   void waitForMemToMemMerge() throws InterruptedException {

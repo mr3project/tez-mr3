@@ -58,7 +58,7 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
   protected final int minPartition;
   protected final int maxPartition;
 
-  public final int attempt;   // 0, 1, 2, ...
+  public final int attempt;   // speculative fetching attempt: 0, 1, 2, ...
 
   //
   // fields set during the execution of call()
@@ -80,6 +80,7 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
 
   // Set at the start of call(), so may be invalid when accessed from ShuffleServer.call() thread
   // Hence, we initialize it to Long.MAX_VALUE.
+  // Reset when stage changes
   public volatile long startMillis = Long.MAX_VALUE;
 
   public static int STAGE_INITIAL = 0;  // all until STAGE_FIRST_FETCHED
@@ -106,6 +107,7 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
   // set by Fetcher
   protected void setStage(int newStage) {
     stage = newStage;
+    startMillis = System.currentTimeMillis();   // reset startMillis because we have made progress
   }
 
   // read by ShuffleServer

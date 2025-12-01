@@ -73,6 +73,8 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
   private static final Logger LOG = LoggerFactory.getLogger(FetcherUnordered.class);
   private static final boolean isDebugEnabled = LOG.isDebugEnabled();
 
+  private static final CompositeInputAttemptIdentifier[] EMPTY_ATTEMPT_ID_ARRAY = new CompositeInputAttemptIdentifier[0];
+
   private final ShuffleManager shuffleManager;
   private final Long shuffleManagerId;
   private final int fetcherIdentifier;
@@ -152,7 +154,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
           CompositeInputAttemptIdentifier first = pendingInputsSeq.getInputs().get(0);
           // true if inputs originate from the current ContainerWorker
           useLocalDiskFetch = first.getPathComponent().startsWith(
-              taskContext.getExecutionContext().getContainerId());
+              taskContext.getExecutionContext().getEnvContainerId());
         } else {
           useLocalDiskFetch = true;
         }
@@ -355,6 +357,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         //   3. an individual InputAttemptIdentifier belonging to inputAttemptIdentifier
         //   4. null, error, isShutDown == true
         //   5. null, success, increment index
+        //   6. EMPTY_ATTEMPT_ID_ARRAY
         if (failedInputs != null) {
           break;
         }
@@ -385,7 +388,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       }
     }
 
-    // failedInputs[] is valid
+    // failedInputs[] is valid, and can be EMPTY_ATTEMPT_ID_ARRAY
 
     // do not consider the following case because we checked 'failedInputs != null' just after checking isShutDown:
     //   failedInputs != null && failedInputs.length > 0 && isShutDown.get()
@@ -593,6 +596,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     }
   }
 
+  // return failedInputs[]
   private CompositeInputAttemptIdentifier[] fetchInputs(
       DataInputStream input,
       CompositeInputAttemptIdentifier inputAttemptIdentifier,
@@ -693,20 +697,20 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         compressedLength = mapOutputStat.compressedLength;
         // TODO TEZ-957. handle IOException here when Broadcast has better error checking
         {
-          fetchedInput = shuffleManager.getInputManager().allocate(decompressedLength,
-              compressedLength, srcAttemptId);
+          fetchedInput = shuffleManager.getInputManager().allocate(
+              decompressedLength, compressedLength, srcAttemptId, false);
         }
-        // No concept of WAIT at the moment.
-        // // Check if we can shuffle *now* ...
-        // if (fetchedInput.getType() == FetchedInput.WAIT) {
-        // LOG.info("fetcher#" + id + " - MergerManager returned Status.WAIT ...");
-        // // Not an error but wait to process data.
-        // return EMPTY_ATTEMPT_ID_ARRAY;
-        // }
+        if (fetchedInput.getType() == Type.WAIT) {
+          if (isDebugEnabled) {
+            LOG.debug("Waiting for memory to be freed: {}, {}, {}",
+                fetchedInput.getInputAttemptIdentifier(), decompressedLength, compressedLength);
+          }
+          return EMPTY_ATTEMPT_ID_ARRAY;
+        }
 
         // Go!
         if (isDebugEnabled) {
-          LOG.debug("fetcher" + " about to shuffle output of srcAttempt "
+          LOG.debug("fetcher about to shuffle output of srcAttempt "
               + fetchedInput.getInputAttemptIdentifier() + " decomp: "
               + decompressedLength + " len: " + compressedLength + " to "
               + fetchedInput.getType());

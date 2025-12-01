@@ -20,14 +20,12 @@ package org.apache.tez.runtime.api;
 
 import java.io.IOException;
 import java.util.Collection;
-
-import org.apache.hadoop.classification.InterfaceAudience.Public;
+import java.util.List;
 
 /**
  * Context handle for the Processor to initialize itself.
  * This interface is not supposed to be implemented by users
  */
-@Public
 public interface ProcessorContext extends TaskContext {
 
   /**
@@ -115,4 +113,9 @@ public interface ProcessorContext extends TaskContext {
    * @throws InterruptedException
    */
   public boolean waitForAllInputsReady(Collection<Input> inputs, long timeoutMillis) throws InterruptedException;
+
+  public void incrementNumActiveShuffleRequests();
+  public void decrementNumActiveShuffleRequests();
+
+  public List<String> getEnvContainerIdsToBlockFetching();
 }
