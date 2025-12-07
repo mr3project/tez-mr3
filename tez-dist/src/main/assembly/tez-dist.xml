@@ -42,6 +42,8 @@
             <excludes>
               <exclude>org.apache.tez:*</exclude>
               <exclude>com.datamonad.mr3:*</exclude>
+              <exclude>jline:jline</exclude>
+              <exclude>org.jline:jline</exclude>
             </excludes>
           </dependencySet>
         </dependencySets>
