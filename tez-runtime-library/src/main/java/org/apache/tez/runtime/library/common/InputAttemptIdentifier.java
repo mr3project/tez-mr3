@@ -31,6 +31,10 @@ public class InputAttemptIdentifier {
 
   private final int inputIdentifier;
   private final int attemptNumber;
+
+  // pathComponent is NOT used in equals().
+  // As a result, two different CompositeInputAttemptIdentifier's originating from different source Vertexes
+  // are treated equal if they happen to inputIdentifier/attemptNumber/spillEventId.
   private final String pathComponent;   // in expanded form
 
   public static final String PATH_PREFIX = "attempt";
@@ -122,13 +126,13 @@ public class InputAttemptIdentifier {
     if (getClass() != obj.getClass())
       return false;
     InputAttemptIdentifier other = (InputAttemptIdentifier) obj;
-    if (attemptNumber != other.attemptNumber)
-      return false;
     if (inputIdentifier != other.inputIdentifier)
       return false;
-    // do not compare pathComponent as they may not always be present
+    if (attemptNumber != other.attemptNumber)
+      return false;
     if (spillEventId != other.spillEventId)
       return false;
+    // do not compare pathComponent as they may not always be present
     return true;
   }
 

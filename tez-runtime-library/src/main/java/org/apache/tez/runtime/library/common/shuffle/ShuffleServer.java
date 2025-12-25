@@ -644,7 +644,7 @@ public class ShuffleServer implements FetcherCallback {
     }
   }
 
-  public void fetchFailed(Long shuffleClientId,
+  public void fetchFailed(final Long shuffleClientId,
                           final CompositeInputAttemptIdentifier srcAttemptIdentifier,
                           boolean readFailed, boolean connectFailed,
                           @Nullable InputHost inputHost, InputHost.PartitionRange partitionRange,
@@ -679,7 +679,13 @@ public class ShuffleServer implements FetcherCallback {
         //   - so, existsConcurrentNotFailedFetcher is never true while it is in runningFetchers[].
         //   - by the time it is removed from runningFetchers[], ShuffleClient.fetchSucceeded() is called.
         boolean existsConcurrentNotFailedFetcher = runningFetchers.stream().anyMatch(f -> {
-          return f != fetcher && !f.isFailed &&
+          return f != fetcher &&
+            // f.containsInputAttemptIdentifier() does not consider pathComponent.
+            // As a result, two different CompositeInputAttemptIdentifier's originating from different source Vertexes
+            // are treated equal if they happen to inputIdentifier/attemptNumber/spillEventId.
+            // Hence, we should manually check if they originate from the same source Vertex.
+            f.useSingleShuffleClientId(shuffleClientId) &&
+            !f.isFailed &&
             f.inputHost.getHostPort().equals(inputHost.getHostPort()) &&  // redundant, but for quick filtering
             f.containsInputAttemptIdentifier(srcAttemptIdentifier);
         });

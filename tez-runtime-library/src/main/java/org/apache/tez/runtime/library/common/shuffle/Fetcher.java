@@ -57,6 +57,7 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
   protected final InputHost.PartitionToInputs pendingInputsSeq;   // contents are also immutable after initialization
   protected final int minPartition;
   protected final int maxPartition;
+  protected final Long shuffleClientId;
 
   public final int attempt;   // speculative fetching attempt: 0, 1, 2, ...
 
@@ -201,6 +202,7 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
     this.pendingInputsSeq = pendingInputsSeq;
     this.minPartition = pendingInputsSeq.getPartition();
     this.maxPartition = pendingInputsSeq.getPartition() + pendingInputsSeq.getPartitionCount() - 1;
+    this.shuffleClientId = pendingInputsSeq.getShuffleClientId();
 
     this.attempt = attempt;
 
@@ -208,7 +210,11 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
   }
 
   abstract public ShuffleClient<T> getShuffleClient();
-  abstract public boolean useSingleShuffleClientId(Long shuffleClientId);
+
+  public boolean useSingleShuffleClientId(Long targetShuffleClientId) {
+    return this.shuffleClientId.equals(targetShuffleClientId);
+  }
+
   abstract public String getFetcherIdentifier();
   abstract public void shutdown(boolean disconnect);
   abstract public FetchResult call() throws Exception;

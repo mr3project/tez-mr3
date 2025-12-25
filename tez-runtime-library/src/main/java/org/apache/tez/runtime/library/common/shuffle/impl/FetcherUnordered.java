@@ -76,7 +76,6 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
   private static final CompositeInputAttemptIdentifier[] EMPTY_ATTEMPT_ID_ARRAY = new CompositeInputAttemptIdentifier[0];
 
   private final ShuffleManager shuffleManager;
-  private final Long shuffleManagerId;
   private final int fetcherIdentifier;
   private final String logIdentifier;
 
@@ -94,11 +93,13 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     super(fetcherCallback, conf, inputHost, fetcherConfigCommon, fetcherConfig, taskContext, pendingInputsSeq, attempt);
 
     this.shuffleManager = shuffleManager;
-    this.shuffleManagerId = shuffleManager.getShuffleClientId();
     this.fetcherIdentifier = fetcherIdGen.getAndIncrement();
     this.logIdentifier = attempt == 0 ?
         shuffleManager.getLogIdentifier() + "_" + fetcherIdentifier + "-U-" + minPartition:
         shuffleManager.getLogIdentifier() + "_" + fetcherIdentifier + "-U-" + minPartition+ "=" + attempt;
+
+    // use '==' instead of 'equals' because we want to avoid conversion from long to Long
+    assert this.shuffleClientId == shuffleManager.getShuffleClientId();
   }
 
   public FetcherUnordered createClone() {
@@ -109,10 +110,6 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
 
   public ShuffleClient<FetchedInput> getShuffleClient() {
     return shuffleManager;
-  }
-
-  public boolean useSingleShuffleClientId(Long targetShuffleManagerId) {
-    return shuffleManagerId.equals(targetShuffleManagerId);
   }
 
   public String getFetcherIdentifier() {
@@ -179,7 +176,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> pendingInputs =
             hostFetchResult.fetchResult.getPendingInputs();
         for (CompositeInputAttemptIdentifier failed : hostFetchResult.failedInputs) {
-          fetcherCallback.fetchFailed(shuffleManagerId, failed, false, hostFetchResult.connectFailed,
+          fetcherCallback.fetchFailed(shuffleClientId, failed, false, hostFetchResult.connectFailed,
               inputHost, getPartitionRange(), this);
           if (pendingInputs != null) {
             pendingInputs.remove(failed);
@@ -256,7 +253,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         }
       }
       return new HostFetchResult(
-          new FetchResult(shuffleManagerId, inputHost.getHostPort(), pendingInputs),
+          new FetchResult(shuffleClientId, inputHost.getHostPort(), pendingInputs),
           failedFetches, true);
     }
 
@@ -298,7 +295,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         // It is okay to set pendingInputs[] to include all remaining IAIs, including failedFetches[0],
         // because call() removes failedInputs[0] from pendingInputs[].
         return new HostFetchResult(
-            new FetchResult(shuffleManagerId, inputHost.getHostPort(), buildInputMapFromIndex(currentIndex)),
+            new FetchResult(shuffleClientId, inputHost.getHostPort(), buildInputMapFromIndex(currentIndex)),
             failedFetches, false);
       }
     } catch (InterruptedException e) {
@@ -400,19 +397,19 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         return getResultWithNoPendingInputsNoFailedInputBecauseAlreadyShutdown();
       }
       return new HostFetchResult(
-          new FetchResult(shuffleManagerId, inputHost.getHostPort(), buildInputMapFromIndex(index)),
+          new FetchResult(shuffleClientId, inputHost.getHostPort(), buildInputMapFromIndex(index)),
           failedInputs, false);
     } else {
       assert failedInputs == null;
       return new HostFetchResult(
-          new FetchResult(shuffleManagerId, inputHost.getHostPort(), null),
+          new FetchResult(shuffleClientId, inputHost.getHostPort(), null),
           null, false);
     }
   }
 
   private HostFetchResult getResultWithNoPendingInputsNoFailedInputBecauseAlreadyShutdown() {
     return new HostFetchResult(
-        new FetchResult(shuffleManagerId, inputHost.getHostPort(), null),
+        new FetchResult(shuffleClientId, inputHost.getHostPort(), null),
         null, false);
   }
 
@@ -459,7 +456,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
 
           fetchedInput = getLocalDiskFetchedInput(srcAttemptId, indexRecord, inputFilePath);
           long endTime = System.currentTimeMillis();
-          fetcherCallback.fetchSucceeded(shuffleManagerId, host, srcAttemptId, fetchedInput,
+          fetcherCallback.fetchSucceeded(shuffleClientId, host, srcAttemptId, fetchedInput,
               indexRecord.getPartLength(), indexRecord.getRawLength(), (endTime - startTime));
         } catch (IOException | InternalError e) {
           hasFailures = true;
@@ -494,13 +491,13 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         return getResultWithNoPendingInputsNoFailedInputBecauseAlreadyShutdown();
       } else {
         return new HostFetchResult(new FetchResult(
-            shuffleManagerId, inputHost.getHostPort(), null),
+            shuffleClientId, inputHost.getHostPort(), null),
             failedFetches.toArray(new CompositeInputAttemptIdentifier[failedFetches.size()]), false);
       }
     } else {
       // nothing needs to be done to requeue remaining entries
       return new HostFetchResult(
-          new FetchResult(shuffleManagerId, inputHost.getHostPort(), null),
+          new FetchResult(shuffleClientId, inputHost.getHostPort(), null),
           null, false);
     }
   }
@@ -735,7 +732,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         long endTime = System.currentTimeMillis();
         // Reset retryStartTime as map task make progress if retried before.
         retryStartTime = 0;
-        fetcherCallback.fetchSucceeded(shuffleManagerId, host, srcAttemptId, fetchedInput,
+        fetcherCallback.fetchSucceeded(shuffleClientId, host, srcAttemptId, fetchedInput,
             compressedLength, decompressedLength, (endTime - startTime));
       }
 
