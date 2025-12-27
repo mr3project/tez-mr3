@@ -17,9 +17,6 @@
  */
 package org.apache.tez.runtime.library.common.shuffle;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-
-@Private
 public class HostPort {
 
   // Since containerId decides a unique host, use containerId in equals() and hashCode().

@@ -151,6 +151,7 @@ public class ShuffleServer implements FetcherCallback {
   protected final ConcurrentMap<Long, ShuffleClient<?>> shuffleClients;
   private final Object registerLock = new Object();
 
+  // Invariant: InputHost.hasPendingInput == true and InputHost.partitionToInputs[] non-empty
   private final BlockingQueue<InputHost> pendingHosts;
 
   // for loop in call()
@@ -243,6 +244,7 @@ public class ShuffleServer implements FetcherCallback {
 
   // variables local to call()
   private List<String> envContainerIdsToBlockFetching;
+  private List<String> envContainerIdsFinished;
   private boolean shouldLaunchNewFetchers;
   private boolean existsFetcherToRetry;
   private boolean existsFetcherFromStuckToRecovered;
@@ -269,7 +271,9 @@ public class ShuffleServer implements FetcherCallback {
   private void updateLoopConditions() {
     final long currentMillis = System.currentTimeMillis();
 
-    envContainerIdsToBlockFetching = taskContext.getEnvContainerIdsToBlockFetching();
+    scala.Tuple2<List<String>, List<String>> p = taskContext.getEnvContainerIdsToBlockFetchingAndFinished();
+    envContainerIdsToBlockFetching = p._1();
+    envContainerIdsFinished = p._2();
 
     int currentNumFetchers = runningFetchers.size();
     shouldLaunchNewFetchers =

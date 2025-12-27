@@ -117,5 +117,5 @@ public interface ProcessorContext extends TaskContext {
   public void incrementNumActiveShuffleRequests();
   public void decrementNumActiveShuffleRequests();
 
-  public List<String> getEnvContainerIdsToBlockFetching();
+  public scala.Tuple2<List<String>, List<String>> getEnvContainerIdsToBlockFetchingAndFinished();
 }
