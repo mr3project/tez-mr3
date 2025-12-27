@@ -286,7 +286,9 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
       moveDataToFetchedInput(dataProto, fetchedInput, hostIdentifier);
       shuffleManager.addCompletedInputWithData(input, fetchedInput);
 
-      LOG.debug("Payload via DME : " + srcAttemptIdentifier);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Payload via DME : {}", srcAttemptIdentifier);
+      }
     } else {
       shuffleManager.addKnownInput(
           StringInterner.intern(shufflePayload.getHost()),

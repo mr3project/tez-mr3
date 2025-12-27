@@ -44,6 +44,7 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -144,11 +145,12 @@ public class ShuffleServer implements FetcherCallback {
   // to prevent memory-leak in knownSrcHosts[] in public clouds
   private final int maxNumInputHosts;
 
-  // Invariant: pendingHosts[] \subset knownSrcHosts.InputHost[]
+  // Invariant: pendingHosts[] (with some valid shuffleClientId in partitionToInputs[]) \subset knownSrcHosts.InputHost[]
   private final ConcurrentMap<HostPort, InputHost> knownSrcHosts;
 
   private final AtomicLong shuffleClientCount = new AtomicLong(0L);
   protected final ConcurrentMap<Long, ShuffleClient<?>> shuffleClients;
+  private final Set<String> envContainerIdsFinishedSet = new HashSet<String>();
   private final Object registerLock = new Object();
 
   // Invariant: InputHost.hasPendingInput == true and InputHost.partitionToInputs[] non-empty
@@ -244,7 +246,6 @@ public class ShuffleServer implements FetcherCallback {
 
   // variables local to call()
   private List<String> envContainerIdsToBlockFetching;
-  private List<String> envContainerIdsFinished;
   private boolean shouldLaunchNewFetchers;
   private boolean existsFetcherToRetry;
   private boolean existsFetcherFromStuckToRecovered;
@@ -268,12 +269,19 @@ public class ShuffleServer implements FetcherCallback {
     return false;
   }
 
-  private void updateLoopConditions() {
-    final long currentMillis = System.currentTimeMillis();
-
+  private void updateLoopConditions() throws InterruptedException {
     scala.Tuple2<List<String>, List<String>> p = taskContext.getEnvContainerIdsToBlockFetchingAndFinished();
     envContainerIdsToBlockFetching = p._1();
-    envContainerIdsFinished = p._2();
+    List<String> envContainerIdsFinished = p._2();
+
+    if (!envContainerIdsFinished.isEmpty()) {
+      processEnvContainerIdsFinished(envContainerIdsFinished);
+      synchronized (registerLock) {
+        envContainerIdsFinishedSet.addAll(envContainerIdsFinished);
+      }
+    }
+
+    final long currentMillis = System.currentTimeMillis();
 
     int currentNumFetchers = runningFetchers.size();
     shouldLaunchNewFetchers =
@@ -551,6 +559,39 @@ public class ShuffleServer implements FetcherCallback {
     }
   }
 
+  private void processEnvContainerIdsFinished(
+      final List<String> envContainerIdsFinished) throws InterruptedException {
+    // use the same logic as in call() when shouldLaunchNewFetchers == true
+    // pendingHosts[] does not shrink inside method, but it may expand if addKnownInput() is called.
+    final int maxInputHosts = pendingHosts.size();
+
+    int numInputHosts = 0;
+    while (numInputHosts < maxInputHosts) {
+      InputHost peekInputHost = pendingHosts.peek();
+      assert peekInputHost != null;
+
+      InputHost inputHost;
+      try {
+        inputHost = peekInputHost.takeFromPendingHosts(pendingHosts);
+      } catch (InterruptedException ex) {
+        if (isShutdown.get()) {
+          LOG.info("Interrupted and has been shutdown, breaking out of the envContainerIdsFinished loop");
+          Thread.currentThread().interrupt();
+          break;
+        } else {
+          throw ex;
+        }
+      }
+
+      inputHost.processEnvContainerIdsFinished(envContainerIdsFinished, pendingHosts, shuffleClients);
+
+      numInputHosts += 1;
+    }
+
+    // Removing InputHosts from knownSrcHosts[] may destroy the invariant 'pendingInputs[] /subset knownSrcHosts[]'.
+    // Combining takeFromPendingHosts() and processEnvContainerIdsFinished() does not solve this problem.
+  }
+
   public void wakeupLoop() {
     lock.lock();
     try {
@@ -596,10 +637,21 @@ public class ShuffleServer implements FetcherCallback {
       ShuffleClient<?> old = shuffleClients.remove(shuffleClientId);
       assert old != null;
       if (shuffleClients.isEmpty()) {
-        // no new ShuffleClient can be registered, so addKnownInput() is not called
-        // as a result, knownSrcHosts[] can be safely cleaned inside this block
+        // No new ShuffleClient can be registered, so addKnownInput() is not called.
+        // Hence knownSrcHosts[] can be safely cleaned inside this block.
+        if (!envContainerIdsFinishedSet.isEmpty()) {
+          for (String envContainerId: envContainerIdsFinishedSet) {
+            LOG.info("Clearing InputHosts of ContainerWorker {}", envContainerId);
+          }
+          knownSrcHosts.entrySet().removeIf(entry ->
+            envContainerIdsFinishedSet.contains(entry.getKey().getEnvContainerId())
+          );
+          envContainerIdsFinishedSet.clear();
+        }
+        LOG.info("Known InputHosts: current size = {}", knownSrcHosts.size());
+
         if (knownSrcHosts.size() > maxNumInputHosts) {
-          LOG.warn("Clearing known InputHosts: current size = {}", knownSrcHosts.size());
+          LOG.warn("Clearing all known InputHosts");
           knownSrcHosts.clear();
         }
       }
@@ -782,7 +834,7 @@ public class ShuffleServer implements FetcherCallback {
           if (pendingInputs != null && !pendingInputs.isEmpty()) {
             HostPort identifier = result.getHostPort();
             InputHost inputHost = knownSrcHosts.get(identifier);
-            if (inputHost != null) {  // can be null (in rare cases) if unregister() has been called
+            if (inputHost != null) {
               for (Map.Entry<CompositeInputAttemptIdentifier, InputHost.PartitionRange> input : pendingInputs.entrySet()) {
                 InputHost.PartitionRange range = input.getValue();
                 inputHost.addKnownInput(fetcher.getShuffleClient(),
@@ -790,6 +842,7 @@ public class ShuffleServer implements FetcherCallback {
                     true);
               }
             } else {
+              // can be null if unregister() or processEnvContainerIdsFinished() was called
               Long shuffleClientId = result.getShuffleClientId();
               LOG.warn("Reporting fetch failure for all pending inputs because {} for ShuffleClient {} is gone",
                   identifier, shuffleClientId);

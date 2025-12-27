@@ -100,6 +100,9 @@ public class InputHost {
   // no need to use concurrent Map/Queue because we guard all access with synchronized{}
   private final Map<Long, Map<PartitionRange, List<CompositeInputAttemptIdentifier>>> partitionToInputs = new HashMap<>();
 
+  // Invariant: true iff. ShuffleSerer.pendingHosts[] contains this InputHost
+  // 'hasPendingInput == true' does NOT guarantee that partitionToInputs[] is not empty.
+  //   Cf. clearAndGetOnePartitionRange()
   private boolean hasPendingInput;
 
   // use synchronized (blockingFetchers)
@@ -186,6 +189,48 @@ public class InputHost {
     if (!hasPendingInput && !partitionToInputs.isEmpty()) {
       pendingHosts.add(this);
       hasPendingInput = true;
+    }
+  }
+
+  public synchronized void processEnvContainerIdsFinished(
+      List<String> envContainerIdsFinished,
+      BlockingQueue<InputHost> pendingHosts,
+      ConcurrentMap<Long, ShuffleClient<?>> shuffleClients) {
+    if (envContainerIdsFinished.contains(hostPort.getEnvContainerId())) {
+      for (Map.Entry<Long, Map<PartitionRange, List<CompositeInputAttemptIdentifier>>> p : partitionToInputs.entrySet()) {
+        Long shuffleClientId = p.getKey();
+        Map<PartitionRange, List<CompositeInputAttemptIdentifier>> partitionMap = p.getValue();
+
+        ShuffleClient<?> shuffleClient = shuffleClients.get(shuffleClientId);
+        if (shuffleClient == null) {
+          LOG.warn("ShuffleClient {} already unregistered, ignoring partitionToInputs[]", shuffleClientId);
+          continue;
+        }
+
+        // TODO: explain why we do not use PartitionRange
+        for (List<CompositeInputAttemptIdentifier> identifiers : partitionMap.values()) {
+          for (CompositeInputAttemptIdentifier srcAttemptIdentifier : identifiers) {
+            shuffleClient.fetchFailed(srcAttemptIdentifier, false, true);
+          }
+        }
+      }
+
+      partitionToInputs.clear();
+      // no need to add back to pendingHosts[]
+
+      // 'assert !hasPendingInput' is invalid because addKnownInput() may have been called,
+      // although this is extremely unlikely (because the source ContainerWorker has finished).
+      // Moreover removing this InputHost from ShuffleServer.knownSrcHosts[] here may destroy the invariant
+      //   'pendingHosts[] \subset knownSrcHosts.InputHost[]'
+      // because ShuffleServer.addKnownInput() may have already obtained a reference to this InputHost.
+    } else {
+      // 'assert !hasPendingInput' is invalid because addKnownInput() may have been called (although extremely unlikely)
+      // simulate a call to addToPendingHostsIfNecessary()
+      assert !partitionToInputs.isEmpty();  // because partitionToInputs[] was not consumed
+      if (!hasPendingInput) {
+        pendingHosts.add(this);
+        hasPendingInput = true;
+      }
     }
   }
 
