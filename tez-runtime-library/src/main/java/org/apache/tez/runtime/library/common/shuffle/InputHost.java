@@ -100,9 +100,9 @@ public class InputHost {
   // no need to use concurrent Map/Queue because we guard all access with synchronized{}
   private final Map<Long, Map<PartitionRange, List<CompositeInputAttemptIdentifier>>> partitionToInputs = new HashMap<>();
 
-  // Invariant: true iff. ShuffleSerer.pendingHosts[] contains this InputHost
+  // Invariant: true iff. ShuffleServer.pendingHosts[] contains this InputHost (one or more instances).
   // 'hasPendingInput == true' does NOT guarantee that partitionToInputs[] is not empty.
-  //   Cf. clearAndGetOnePartitionRange()
+  // Cf. clearAndGetOnePartitionRange()
   private boolean hasPendingInput;
 
   // use synchronized (blockingFetchers)
@@ -225,12 +225,7 @@ public class InputHost {
       // because ShuffleServer.addKnownInput() may have already obtained a reference to this InputHost.
     } else {
       // 'assert !hasPendingInput' is invalid because addKnownInput() may have been called (although extremely unlikely)
-      // simulate a call to addToPendingHostsIfNecessary()
-      assert !partitionToInputs.isEmpty();  // because partitionToInputs[] was not consumed
-      if (!hasPendingInput) {
-        pendingHosts.add(this);
-        hasPendingInput = true;
-      }
+      addToPendingHostsIfNecessary(pendingHosts);
     }
   }
 

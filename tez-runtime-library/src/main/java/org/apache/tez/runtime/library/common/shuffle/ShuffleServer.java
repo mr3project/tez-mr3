@@ -153,7 +153,10 @@ public class ShuffleServer implements FetcherCallback {
   private final Set<String> envContainerIdsFinishedSet = new HashSet<String>();
   private final Object registerLock = new Object();
 
-  // Invariant: InputHost.hasPendingInput == true and InputHost.partitionToInputs[] non-empty
+  // Invariant on InputHost in pendingHosts[]: InputHost.hasPendingInput == true
+  // InputHost.partitionToInputs[] can be empty.
+  // The same InputHost can appear multiple times in pendingHosts[].
+  // Cf. InputHost.clearAndGetOnePartitionRange()
   private final BlockingQueue<InputHost> pendingHosts;
 
   // for loop in call()
