@@ -275,6 +275,7 @@ public class ShuffleServer implements FetcherCallback {
     List<String> envContainerIdsFinished = p._2();
 
     if (!envContainerIdsFinished.isEmpty()) {
+      LOG.info("New envContainerIdsFinished: {}", String.join(", ", envContainerIdsFinished));
       processEnvContainerIdsFinished(envContainerIdsFinished);
       synchronized (registerLock) {
         envContainerIdsFinishedSet.addAll(envContainerIdsFinished);
@@ -559,8 +560,7 @@ public class ShuffleServer implements FetcherCallback {
     }
   }
 
-  private void processEnvContainerIdsFinished(
-      final List<String> envContainerIdsFinished) throws InterruptedException {
+  private void processEnvContainerIdsFinished(final List<String> envContainerIdsFinished) throws InterruptedException {
     // use the same logic as in call() when shouldLaunchNewFetchers == true
     // pendingHosts[] does not shrink inside method, but it may expand if addKnownInput() is called.
     final int maxInputHosts = pendingHosts.size();
