@@ -285,4 +285,8 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
   public boolean containsInputAttemptIdentifier(CompositeInputAttemptIdentifier srcAttemptIdentifier) {
     return pendingInputsSeq.getInputs().contains(srcAttemptIdentifier);
   }
+
+  public InputHost.PartitionToInputs getPendingInputs() {
+    return pendingInputsSeq;
+  }
 }
