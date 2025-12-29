@@ -188,7 +188,8 @@ public class HttpConnection extends BaseHttpConnection {
           // reset the connect time out for the final connect
           connection.setConnectTimeout(unit);
         }
-
+      } catch (RuntimeException e) {  // e.g., NullPointerException due to disconnect()
+        throw new IOException("Connecting failed due to an internal error", e);
       }
     }
     return true;
@@ -243,10 +244,16 @@ public class HttpConnection extends BaseHttpConnection {
    */
   @Override
   public DataInputStream getInputStream() throws IOException {
-    if (connectionSucceeed) {
+    HttpURLConnection connection = this.connection;
+    if (connection == null || !connectionSucceeed) {
+      throw new IOException("Connection already cleaned up or not established");
+    }
+    try {
       // Cf. connection.getInputStream() incurs a network transmission
       input = new DataInputStream(new BufferedInputStream(
               connection.getInputStream(), httpConnParams.getBufferSize()));
+    } catch (RuntimeException e) {  // e.g., NullPointerException due to disconnect()
+      throw new IOException("Getting input stream failed due to an internal error", e);
     }
     return input;
   }
