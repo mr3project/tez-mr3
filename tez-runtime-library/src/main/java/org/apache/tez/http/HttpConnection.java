@@ -291,6 +291,7 @@ public class HttpConnection extends BaseHttpConnection {
         }
         connection.disconnect();
         connection = null;
+        connectionSucceeed = false;
       }
     } catch (IOException e) {
       if (LOG.isDebugEnabled()) {
