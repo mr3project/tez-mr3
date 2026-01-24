@@ -823,6 +823,7 @@ public class ShuffleServer implements FetcherCallback {
     @Override
     public void onSuccess(FetchResult result) {
       fetcher.shutdown(false);  // disconnect = false to reuse HTTPConnection
+
       if (isShutdown.get()) {
         if (isDebugEnabled) {
           LOG.debug("Already shutdown. Ignoring event from fetcher");
@@ -837,7 +838,7 @@ public class ShuffleServer implements FetcherCallback {
           if (pendingInputs != null && !pendingInputs.isEmpty()) {
             HostPort identifier = result.getHostPort();
             InputHost inputHost = knownSrcHosts.get(identifier);
-            if (inputHost != null) {
+            if (inputHost != null) {  // can be null (in rare cases) if unregister() has been called
               for (Map.Entry<CompositeInputAttemptIdentifier, InputHost.PartitionRange> input : pendingInputs.entrySet()) {
                 InputHost.PartitionRange range = input.getValue();
                 inputHost.addKnownInput(fetcher.getShuffleClient(),
@@ -855,33 +856,61 @@ public class ShuffleServer implements FetcherCallback {
             }
           }
         }
-        doBookKeepingForFetcherComplete();
       }
+
+      doBookKeepingForFetcherComplete();
     }
 
     // onFailure() means that Fetcher thread itself failed, e.g., due to OutOfMemoryError.
     // It does not mean that Fetcher failed, e.g., due to IOException, in which case
     // onSuccess() is called (because Fetcher thread itself succeeded).
-    // We have to terminate ShuffleServer because InputAttemptIdentifier associated with
-    // Fetcher cannot be recovered.
-    // In Tez, this is not a problem because each Fetcher belongs to a specific TaskAttempt.
-    // In MR3, we have to terminate ShuffleServer because Fetchers are shared by all TaskAttempts.
+    // We can continue to run ShuffleServer by recovering InputAttemptIdentifier associated with Fetcher.
     @Override
-    public void onFailure(Throwable t) {
+    public void onFailure(Throwable th) {
       // Unsuccessful - the fetcher may not have shutdown correctly. Try shutting it down.
       fetcher.shutdown(true);   // disconnect = true and do not reuse HTTPConnection
-      LOG.error("Fetcher failed with error: ", t);
-      doBookKeepingForFetcherComplete();
+      LOG.error("Fetcher failed with error: ", th);
 
-      // We should fail DaemonTaskAttempt ShuffleServerDaemonProcessor so that MR3 terminates
-      // the current ContainerWorker.
-      synchronized (throwableLock) {
-        if (throwableFromFetcherOnFailure == null) {
-          throwableFromFetcherOnFailure = t;
+      if (isShutdown.get()) {
+        if (isDebugEnabled) {
+          LOG.debug("Already shutdown. Ignoring failure from fetcher");
+        }
+      } else {
+        Long shuffleClientId = fetcher.getShuffleClient().getShuffleClientId();
+        ShuffleClient<?> shuffleClient = shuffleClients.get(shuffleClientId);
+
+        // if ShuffleClient for this fetcher is gone, ignore failure
+        if (shuffleClient != null) {
+          HostPort identifier = fetcher.inputHost.getHostPort();
+          InputHost inputHost = knownSrcHosts.get(identifier);
+
+          InputHost.PartitionToInputs pendingInputs = fetcher.getPendingInputs();
+          InputHost.PartitionRange range = pendingInputs.getPartitionRange();
+          List<CompositeInputAttemptIdentifier> inputs = pendingInputs.getInputs();
+
+          if (inputHost != null) {  // can be null (in rare cases) if unregister() has been called
+            for (CompositeInputAttemptIdentifier input : inputs) {
+              inputHost.addKnownInput(shuffleClient,
+                  range.getPartition(), range.getPartitionCount(), input, pendingHosts,
+                  true);
+            }
+          } else {
+            LOG.warn("Reporting fetch failure for all inputs because {} for ShuffleClient {} is gone",
+                identifier, shuffleClientId);
+            for (CompositeInputAttemptIdentifier input : inputs) {
+              fetchFailed(shuffleClientId, input, false, true, null, null, null);
+            }
+          }
         }
       }
 
-      shutdown();
+      doBookKeepingForFetcherComplete();
+
+      synchronized (throwableLock) {
+        if (throwableFromFetcherOnFailure == null && (th instanceof VirtualMachineError)) {
+          throwableFromFetcherOnFailure = th;
+        }
+      }
     }
   }
 }

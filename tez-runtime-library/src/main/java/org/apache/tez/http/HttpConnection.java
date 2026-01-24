@@ -52,7 +52,6 @@ public class HttpConnection extends BaseHttpConnection {
   private String msgToEncode;
 
   private final HttpConnectionParams httpConnParams;
-  private final AtomicLong urlLogCount;
 
   /**
    * HttpConnection
@@ -69,7 +68,6 @@ public class HttpConnection extends BaseHttpConnection {
     this.jobTokenSecretMgr = jobTokenSecretManager;
     this.httpConnParams = connParams;
     this.url = url;
-    this.urlLogCount = new AtomicLong();
     if (LOG.isDebugEnabled()) {
       LOG.debug("MapOutput URL: " + url.toString());
     }
@@ -188,7 +186,8 @@ public class HttpConnection extends BaseHttpConnection {
           // reset the connect time out for the final connect
           connection.setConnectTimeout(unit);
         }
-
+      } catch (RuntimeException e) {  // e.g., NullPointerException due to disconnect()
+        throw new IOException("Connecting failed due to an internal error", e);
       }
     }
     return true;
@@ -228,11 +227,6 @@ public class HttpConnection extends BaseHttpConnection {
       // verify that replyHash is HMac of encHash
       SecureShuffleUtils.verifyReply(replyHash, encHash, jobTokenSecretMgr);
     }
-
-    // Log summary
-    if (urlLogCount.incrementAndGet() % 1000 == 0) {
-      LOG.info("Sent hash and received reply for {} urls", urlLogCount);
-    }
   }
 
   /**
@@ -243,10 +237,16 @@ public class HttpConnection extends BaseHttpConnection {
    */
   @Override
   public DataInputStream getInputStream() throws IOException {
-    if (connectionSucceeed) {
+    HttpURLConnection connection = this.connection;
+    if (connection == null || !connectionSucceeed) {
+      throw new IOException("Connection already cleaned up or not established");
+    }
+    try {
       // Cf. connection.getInputStream() incurs a network transmission
       input = new DataInputStream(new BufferedInputStream(
               connection.getInputStream(), httpConnParams.getBufferSize()));
+    } catch (RuntimeException e) {  // e.g., NullPointerException due to disconnect()
+      throw new IOException("Getting input stream failed due to an internal error", e);
     }
     return input;
   }
@@ -284,6 +284,7 @@ public class HttpConnection extends BaseHttpConnection {
         }
         connection.disconnect();
         connection = null;
+        connectionSucceeed = false;
       }
     } catch (IOException e) {
       if (LOG.isDebugEnabled()) {
