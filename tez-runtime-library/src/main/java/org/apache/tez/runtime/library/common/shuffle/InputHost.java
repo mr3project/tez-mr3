@@ -210,6 +210,7 @@ public class InputHost {
         // TODO: explain why we do not use PartitionRange
         for (List<CompositeInputAttemptIdentifier> identifiers : partitionMap.values()) {
           for (CompositeInputAttemptIdentifier srcAttemptIdentifier : identifiers) {
+            LOG.warn("Failing fetch because of ContainerWorker finished: {} from {}", srcAttemptIdentifier, hostPort);
             shuffleClient.fetchFailed(srcAttemptIdentifier, false, true);
           }
         }
