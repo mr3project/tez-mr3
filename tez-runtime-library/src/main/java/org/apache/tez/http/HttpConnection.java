@@ -52,7 +52,6 @@ public class HttpConnection extends BaseHttpConnection {
   private String msgToEncode;
 
   private final HttpConnectionParams httpConnParams;
-  private final AtomicLong urlLogCount;
 
   /**
    * HttpConnection
@@ -69,7 +68,6 @@ public class HttpConnection extends BaseHttpConnection {
     this.jobTokenSecretMgr = jobTokenSecretManager;
     this.httpConnParams = connParams;
     this.url = url;
-    this.urlLogCount = new AtomicLong();
     if (LOG.isDebugEnabled()) {
       LOG.debug("MapOutput URL: " + url.toString());
     }
@@ -228,11 +226,6 @@ public class HttpConnection extends BaseHttpConnection {
       }
       // verify that replyHash is HMac of encHash
       SecureShuffleUtils.verifyReply(replyHash, encHash, jobTokenSecretMgr);
-    }
-
-    // Log summary
-    if (urlLogCount.incrementAndGet() % 1000 == 0) {
-      LOG.info("Sent hash and received reply for {} urls", urlLogCount);
     }
   }
 
