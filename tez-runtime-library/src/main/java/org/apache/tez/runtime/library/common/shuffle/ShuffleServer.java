@@ -44,7 +44,9 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -142,15 +144,13 @@ public class ShuffleServer implements FetcherCallback {
   private final int maxTaskOutputAtOnce;
   private final RangesScheme rangesScheme;
 
-  // to prevent memory-leak in knownSrcHosts[] in public clouds
-  private final int maxNumInputHosts;
-
   // Invariant: pendingHosts[] (with some valid shuffleClientId in partitionToInputs[]) \subset knownSrcHosts.InputHost[]
   private final ConcurrentMap<HostPort, InputHost> knownSrcHosts;
 
   private final AtomicLong shuffleClientCount = new AtomicLong(0L);
   protected final ConcurrentMap<Long, ShuffleClient<?>> shuffleClients;
-  private final Set<String> envContainerIdsFinishedSet = new HashSet<String>();
+  private final Map<String, Set<Integer>> envContainerIdFinishedMap = new HashMap<String, Set<Integer>>();
+  private final Set<Integer> currentRunningDagIds = new HashSet<Integer>();
   private final Object registerLock = new Object();
 
   // Invariant on InputHost in pendingHosts[]: InputHost.hasPendingInput == true
@@ -218,14 +218,10 @@ public class ShuffleServer implements FetcherCallback {
 
     runningFetchers = Collections.newSetFromMap(new ConcurrentHashMap<Fetcher<?>, Boolean>());
 
-    this.maxNumInputHosts = conf.getInt(
-        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MAX_INPUT_HOSTPORTS,
-        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MAX_INPUT_HOSTPORTS_DEFAULT);
-
     this.shutdownExecutor = Executors.newSingleThreadExecutor();
 
-    LOG.info("{} Configuration: numFetchers={}, maxTaskOutputAtOnce={}, FetcherConfigCommon={}, rangesScheme={}, maxNumInputHosts={}",
-        serverName, numFetchers, maxTaskOutputAtOnce, fetcherConfigCommon, rangesScheme, maxNumInputHosts);
+    LOG.info("{} Configuration: numFetchers={}, maxTaskOutputAtOnce={}, FetcherConfigCommon={}, rangesScheme={}",
+        serverName, numFetchers, maxTaskOutputAtOnce, fetcherConfigCommon, rangesScheme);
   }
 
   public int getMaxTaskOutputAtOnce() {
@@ -278,10 +274,19 @@ public class ShuffleServer implements FetcherCallback {
     List<String> envContainerIdsFinished = p._2();
 
     if (!envContainerIdsFinished.isEmpty()) {
-      LOG.info("New envContainerIdsFinished: {}", String.join(", ", envContainerIdsFinished));
+      LOG.info("New envContainerIdFinished: {}", String.join(", ", envContainerIdsFinished));
       processEnvContainerIdsFinished(envContainerIdsFinished);
       synchronized (registerLock) {
-        envContainerIdsFinishedSet.addAll(envContainerIdsFinished);
+        if (currentRunningDagIds.isEmpty()) {
+          for (String envContainerIdFinished : envContainerIdsFinished) {
+            retireContainerFinished(envContainerIdFinished);
+          }
+        } else {
+          for (String envContainerIdFinished : envContainerIdsFinished) {
+            Set<Integer> runningDagIds = new HashSet<Integer>(currentRunningDagIds);
+            envContainerIdFinishedMap.put(envContainerIdFinished, runningDagIds);
+          }
+        }
       }
     }
 
@@ -639,25 +644,6 @@ public class ShuffleServer implements FetcherCallback {
     synchronized (registerLock) {
       ShuffleClient<?> old = shuffleClients.remove(shuffleClientId);
       assert old != null;
-      if (shuffleClients.isEmpty()) {
-        // No new ShuffleClient can be registered, so addKnownInput() is not called.
-        // Hence knownSrcHosts[] can be safely cleaned inside this block.
-        if (!envContainerIdsFinishedSet.isEmpty()) {
-          for (String envContainerId: envContainerIdsFinishedSet) {
-            LOG.info("Clearing InputHosts of ContainerWorker {}", envContainerId);
-          }
-          knownSrcHosts.entrySet().removeIf(entry ->
-            envContainerIdsFinishedSet.contains(entry.getKey().getEnvContainerId())
-          );
-          envContainerIdsFinishedSet.clear();
-        }
-        LOG.info("Known InputHosts: current size = {}", knownSrcHosts.size());
-
-        if (knownSrcHosts.size() > maxNumInputHosts) {
-          LOG.warn("Clearing all known InputHosts");
-          knownSrcHosts.clear();
-        }
-      }
     }
 
     LOG.info("Unregistered ShuffleClient: {}", shuffleClientId);
@@ -759,8 +745,35 @@ public class ShuffleServer implements FetcherCallback {
     shuffleClient.fetchFailed(srcAttemptIdentifier, readFailed, connectFailed);
   }
 
+  public void dagJoining(int dagIdId) {
+    synchronized (registerLock) {
+      currentRunningDagIds.add(dagIdId);
+    }
+  }
+
   public void dagLeaving(int dagIdId) {
-    // TODO: currently no action necessary because unregister() is called for every ShuffleClient
+    synchronized (registerLock) {
+      currentRunningDagIds.remove(dagIdId);
+
+      Iterator<Map.Entry<String, Set<Integer>>> it = envContainerIdFinishedMap.entrySet().iterator();
+      while (it.hasNext()) {
+        Map.Entry<String, Set<Integer>> e = it.next();
+        Set<Integer> set = e.getValue();
+        set.remove(dagIdId);
+
+        if (set.isEmpty()) {
+          // this envContainerIdFinished is no longer needed
+          retireContainerFinished(e.getKey());
+          it.remove();
+        }
+      }
+    }
+  }
+
+  private void retireContainerFinished(String envContainerIdFinished) {
+    LOG.info("Removing envContainerIdFinished: {}", envContainerIdFinished);
+    knownSrcHosts.entrySet().removeIf(entry ->
+      entry.getKey().getEnvContainerId().equals(envContainerIdFinished));
   }
 
   public void shutdown() {

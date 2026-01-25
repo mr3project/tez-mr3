@@ -352,11 +352,6 @@ public class TezRuntimeConfiguration {
       TEZ_RUNTIME_PREFIX + "shuffle.fetch.max.task.output.at.once";
   public final static int TEZ_RUNTIME_SHUFFLE_FETCH_MAX_TASK_OUTPUT_AT_ONCE_DEFAULT = 20;
 
-  @ConfigurationProperty(type = "integer")
-  public static final String TEZ_RUNTIME_SHUFFLE_MAX_INPUT_HOSTPORTS =
-      TEZ_RUNTIME_PREFIX + "shuffle.max.input.hostports";
-  public final static int TEZ_RUNTIME_SHUFFLE_MAX_INPUT_HOSTPORTS_DEFAULT = 10000;
-
   // "first", "max" - used in ShuffleServer
   public static final String TEZ_RUNTIME_SHUFFLE_RANGES_SCHEME =
       TEZ_RUNTIME_PREFIX + "shuffle.ranges.scheme";
