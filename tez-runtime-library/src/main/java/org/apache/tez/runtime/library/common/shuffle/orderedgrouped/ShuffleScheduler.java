@@ -379,7 +379,7 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
 
   // Notify AM
   public void informAM(CompositeInputAttemptIdentifier srcAttempt) {
-    LOG.info("ShuffleScheduler {}: Reporting fetch failure for InputIdentifier: {}, taskAttemptIdentifier: {}",
+    LOG.warn("ShuffleScheduler {}: Reporting fetch failure for InputIdentifier: {}, taskAttemptIdentifier: {}",
         shuffleClientId, srcAttempt,
         TezRuntimeUtils.getTaskAttemptIdentifier(
             inputContext.getSourceVertexName(), srcAttempt.getInputIdentifier(), srcAttempt.getAttemptNumber()));

@@ -409,13 +409,15 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
       }
     }
 
-    LOG.info("Unordered fetch failed for {}, InputIdentifier={}, connectFailed={}",
-        shuffleClientId, srcAttemptIdentifier, connectFailed);
-
     if (isObsoleteInputAttemptIdentifier(srcAttemptIdentifier)) {
       LOG.info("Do not report obsolete unordered input: {}", srcAttemptIdentifier);
       return;
     }
+
+    LOG.warn("ShuffleManager {}: Reporting fetch failure for InputIdentifier: {}, taskAttemptIdentifier: {}",
+        shuffleClientId, srcAttemptIdentifier,
+        TezRuntimeUtils.getTaskAttemptIdentifier(
+            inputContext.getSourceVertexName(), srcAttemptIdentifier.getInputIdentifier(), srcAttemptIdentifier.getAttemptNumber()));
 
     // we send InputReadError regardless of connectFailed (Cf. gla2019.6.10.pptx, page 21)
     InputReadErrorEvent readError = InputReadErrorEvent.create(
