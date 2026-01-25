@@ -394,13 +394,14 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       }
       if (stopped) {
         if (isDebugEnabled) {
-          LOG.debug("Not reporting fetch failure, since an Exception was caught after shutdown");
+          LOG.debug("Not reporting fetch failure during connection establishment, since an Exception was caught after shutdown." +
+            ie.getClass().getName() + ", Message: " + ie.getMessage());
         }
         return new HashMap<>();
       }
       shuffleErrorCounterGroup.ioErrs.increment(1);
-      LOG.warn("{}: Failed to connect from {} to {} with index = {}", logIdentifier, fetcherConfigCommon.localHostName,
-        host, currentIndex, ie);
+      LOG.warn("{}: Failed to connect from {} to {} with index = {}: {}", logIdentifier, fetcherConfigCommon.localHostName,
+          host, currentIndex, ie.getMessage());
       shuffleErrorCounterGroup.connectionErrs.increment(1);
 
       if (fetcherConfigCommon.connectionFailAllInput) {

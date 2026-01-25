@@ -222,8 +222,8 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       httpConnection = ShuffleUtils.getHttpConnection(url, httpConnectionParams,
           logIdentifier, fetcherConfigCommon.jobTokenSecretMgr);
       httpConnection.connect();
-    } catch (IOException | InterruptedException e) {
-      if (e instanceof InterruptedException) {
+    } catch (IOException | InterruptedException ie) {
+      if (ie instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
       // If connect did not succeed, just mark all the maps as failed.
@@ -232,7 +232,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       if (isShutDown.get()) {
         if (isDebugEnabled) {
           LOG.debug("Not reporting fetch failure during connection establishment, since an Exception was caught after shutdown." +
-              e.getClass().getName() + ", Message: " + e.getMessage());
+              ie.getClass().getName() + ", Message: " + ie.getMessage());
         }
         failedFetches = null;
         pendingInputs = null;
@@ -252,6 +252,8 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
           pendingInputs.remove(failedFetch);
         }
       }
+      LOG.warn("{}: Failed to connect from {} to {} with index = {}: {}", logIdentifier, fetcherConfigCommon.localHostName,
+        host, currentIndex, ie.getMessage());
       return new HostFetchResult(
           new FetchResult(shuffleClientId, inputHost.getHostPort(), pendingInputs),
           failedFetches, true);
