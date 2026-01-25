@@ -22,7 +22,7 @@ option java_generate_equals_and_hash = true;
 
 message DataMovementEventPayloadProto {
   optional bytes empty_partitions = 1;
-  optional string containerId = 2;
+  optional string container_id = 2;
   optional int32 vertex_id = 3;
   optional string path_component = 4;   // not in expanded form
   optional string host = 5;
