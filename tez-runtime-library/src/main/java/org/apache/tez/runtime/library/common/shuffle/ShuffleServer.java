@@ -152,6 +152,7 @@ public class ShuffleServer implements FetcherCallback {
   private final Map<String, Set<Integer>> envContainerIdFinishedMap = new HashMap<String, Set<Integer>>();
   private final Set<Integer> currentRunningDagIds = new HashSet<Integer>();
   private final Object registerLock = new Object();
+  private volatile boolean hasContainerIdFinished = false;  // true iff !envContainerIdFinishedMap.isEmpty()
 
   // Invariant on InputHost in pendingHosts[]: InputHost.hasPendingInput == true
   // InputHost.partitionToInputs[] can be empty.
@@ -286,6 +287,7 @@ public class ShuffleServer implements FetcherCallback {
             Set<Integer> runningDagIds = new HashSet<Integer>(currentRunningDagIds);
             envContainerIdFinishedMap.put(envContainerIdFinished, runningDagIds);
           }
+          hasContainerIdFinished = true;
         }
       }
     }
@@ -652,6 +654,16 @@ public class ShuffleServer implements FetcherCallback {
   public void addKnownInput(ShuffleClient<?> shuffleClient,
                             String hostName, String containerId, int port,
                             CompositeInputAttemptIdentifier srcAttemptIdentifier, int partitionId) {
+    if (hasContainerIdFinished) {
+      synchronized (registerLock) {
+        if (envContainerIdFinishedMap.containsKey(containerId)) {
+          LOG.warn("Immediately fail {} because {} is already finished", srcAttemptIdentifier, containerId);
+          shuffleClient.fetchFailed(srcAttemptIdentifier, false, true);
+          return;
+        }
+      }
+    }
+
     HostPort identifier = new HostPort(hostName, containerId, port);
     InputHost host = knownSrcHosts.get(identifier);
     if (host == null) {
@@ -766,6 +778,10 @@ public class ShuffleServer implements FetcherCallback {
           retireContainerFinished(e.getKey());
           it.remove();
         }
+      }
+
+      if (envContainerIdFinishedMap.isEmpty()) {
+        hasContainerIdFinished = false;
       }
     }
   }
