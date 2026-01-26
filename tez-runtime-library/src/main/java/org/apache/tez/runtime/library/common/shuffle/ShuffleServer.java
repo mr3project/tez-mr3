@@ -61,6 +61,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 
 public class ShuffleServer implements FetcherCallback {
 
@@ -150,7 +151,6 @@ public class ShuffleServer implements FetcherCallback {
   private final AtomicLong shuffleClientCount = new AtomicLong(0L);
   protected final ConcurrentMap<Long, ShuffleClient<?>> shuffleClients;
   private final Map<String, Set<Integer>> envContainerIdFinishedMap = new HashMap<String, Set<Integer>>();
-  private final Set<Integer> currentRunningDagIds = new HashSet<Integer>();
   private final Object registerLock = new Object();
   private volatile boolean hasContainerIdFinished = false;  // true iff !envContainerIdFinishedMap.isEmpty()
 
@@ -270,22 +270,29 @@ public class ShuffleServer implements FetcherCallback {
   }
 
   private void updateLoopConditions() throws InterruptedException {
-    scala.Tuple2<List<String>, List<String>> p = taskContext.getEnvContainerIdsToBlockFetchingAndFinished();
+    scala.Tuple3<List<String>, List<String>, List<Integer>> p = taskContext.getEnvContainerIdsToBlockFetchingAndFinished();
     envContainerIdsToBlockFetching = p._1();
     List<String> envContainerIdsFinished = p._2();
+    List<Integer> dagIdIdsInScheduling = p._3();
 
     if (!envContainerIdsFinished.isEmpty()) {
-      LOG.info("New envContainerIdFinished: {}", String.join(", ", envContainerIdsFinished));
+      String dagIdIdsInSchedulingStr = dagIdIdsInScheduling.stream()
+        .map(String::valueOf)
+        .collect(Collectors.joining(", "));
+      LOG.info("New envContainerIdFinished = {}, dagIdIdsInScheduling = {}",
+          String.join(", ", envContainerIdsFinished), dagIdIdsInSchedulingStr);
+
       processEnvContainerIdsFinished(envContainerIdsFinished);
+
       synchronized (registerLock) {
-        if (currentRunningDagIds.isEmpty()) {
+        if (dagIdIdsInScheduling.isEmpty()) {
           for (String envContainerIdFinished : envContainerIdsFinished) {
             retireContainerFinished(envContainerIdFinished);
           }
         } else {
           for (String envContainerIdFinished : envContainerIdsFinished) {
-            Set<Integer> runningDagIds = new HashSet<Integer>(currentRunningDagIds);
-            envContainerIdFinishedMap.put(envContainerIdFinished, runningDagIds);
+            Set<Integer> runningDagIdIds = new HashSet<Integer>(dagIdIdsInScheduling);
+            envContainerIdFinishedMap.put(envContainerIdFinished, runningDagIdIds);
           }
           hasContainerIdFinished = true;
         }
@@ -757,16 +764,8 @@ public class ShuffleServer implements FetcherCallback {
     shuffleClient.fetchFailed(srcAttemptIdentifier, readFailed, connectFailed);
   }
 
-  public void dagJoining(int dagIdId) {
-    synchronized (registerLock) {
-      currentRunningDagIds.add(dagIdId);
-    }
-  }
-
   public void dagLeaving(int dagIdId) {
     synchronized (registerLock) {
-      currentRunningDagIds.remove(dagIdId);
-
       Iterator<Map.Entry<String, Set<Integer>>> it = envContainerIdFinishedMap.entrySet().iterator();
       while (it.hasNext()) {
         Map.Entry<String, Set<Integer>> e = it.next();
