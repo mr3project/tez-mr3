@@ -665,6 +665,8 @@ public class ShuffleServer implements FetcherCallback {
       synchronized (registerLock) {
         if (envContainerIdFinishedMap.containsKey(containerId)) {
           LOG.warn("Immediately fail {} because {} is already finished", srcAttemptIdentifier, containerId);
+          // directly call shuffleClient.fetchFailed(), instead of this.fetchFailed(),
+          // because srcAttemptIdentifier is no longer valid
           shuffleClient.fetchFailed(srcAttemptIdentifier, false, true);
           return;
         }
@@ -822,6 +824,17 @@ public class ShuffleServer implements FetcherCallback {
     }
   }
 
+  private boolean isInputHostReachable(InputHost inputHost) {
+    if (hasContainerIdFinished) {
+      synchronized (registerLock) {
+        if (envContainerIdFinishedMap.containsKey(inputHost.getHostPort().getEnvContainerId())) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
   private class FetchFutureCallback implements FutureCallback<FetchResult> {
 
     private final Fetcher fetcher;
@@ -866,7 +879,8 @@ public class ShuffleServer implements FetcherCallback {
           if (pendingInputs != null && !pendingInputs.isEmpty()) {
             HostPort identifier = result.getHostPort();
             InputHost inputHost = knownSrcHosts.get(identifier);
-            if (inputHost != null) {  // can be null (in rare cases) if unregister() has been called
+            // inputHost can be null (in rare cases) if unregister() has been called
+            if (inputHost != null && isInputHostReachable(inputHost)) {
               for (Map.Entry<CompositeInputAttemptIdentifier, InputHost.PartitionRange> input : pendingInputs.entrySet()) {
                 InputHost.PartitionRange range = input.getValue();
                 inputHost.addKnownInput(fetcher.getShuffleClient(),
@@ -874,9 +888,9 @@ public class ShuffleServer implements FetcherCallback {
                     true);
               }
             } else {
-              // can be null if unregister() or processEnvContainerIdsFinished() was called
+              // can be null if unregister() was called
               Long shuffleClientId = result.getShuffleClientId();
-              LOG.warn("Reporting fetch failure for all pending inputs because {} for ShuffleClient {} is gone",
+              LOG.warn("Reporting fetch failure for all pending inputs because {} for ShuffleClient {} is gone or invalid",
                   identifier, shuffleClientId);
               for (Map.Entry<CompositeInputAttemptIdentifier, InputHost.PartitionRange> input : pendingInputs.entrySet()) {
                 fetchFailed(shuffleClientId, input.getKey(), false, true, null, null, null);
@@ -916,14 +930,15 @@ public class ShuffleServer implements FetcherCallback {
           InputHost.PartitionRange range = pendingInputs.getPartitionRange();
           List<CompositeInputAttemptIdentifier> inputs = pendingInputs.getInputs();
 
-          if (inputHost != null) {  // can be null (in rare cases) if unregister() has been called
+          // can be null (in rare cases) if unregister() has been called
+          if (inputHost != null && isInputHostReachable(inputHost)) {
             for (CompositeInputAttemptIdentifier input : inputs) {
               inputHost.addKnownInput(shuffleClient,
                   range.getPartition(), range.getPartitionCount(), input, pendingHosts,
                   true);
             }
           } else {
-            LOG.warn("Reporting fetch failure for all inputs because {} for ShuffleClient {} is gone",
+            LOG.warn("Reporting fetch failure for all inputs because {} for ShuffleClient {} is gone or invalid",
                 identifier, shuffleClientId);
             for (CompositeInputAttemptIdentifier input : inputs) {
               fetchFailed(shuffleClientId, input, false, true, null, null, null);
