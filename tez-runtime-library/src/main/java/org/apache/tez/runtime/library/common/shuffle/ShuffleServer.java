@@ -307,7 +307,7 @@ public class ShuffleServer implements FetcherCallback {
         getShouldLaunchNewFetchers();
 
     existsFetcherToRetry = runningFetchers.stream().anyMatch(f -> {
-        if (isBlockedFetching(f.inputHost)) {
+        if (isBlockedFetching(f.inputHost) || !isInputHostReachable(f.inputHost)) {
           return false;
         }
         FetcherConfig fetcherConfig = f.fetcherConfig;
@@ -322,7 +322,7 @@ public class ShuffleServer implements FetcherCallback {
         f.getStage() == Fetcher.STAGE_FIRST_FETCHED);
 
     existsFetcherFromStuckToSpeculative = runningFetchers.stream().anyMatch(f -> {
-      if (isBlockedFetching(f.inputHost)) {
+      if (isBlockedFetching(f.inputHost) || !isInputHostReachable(f.inputHost)) {
         return false;
       }
       FetcherConfig fetcherConfig = f.fetcherConfig;
@@ -367,7 +367,7 @@ public class ShuffleServer implements FetcherCallback {
       if (existsFetcherToRetry) {
         // transition: from NORMAL/RECOVERED to RETRY
         runningFetchers.forEach(fetcher -> {
-          if (isBlockedFetching(fetcher.inputHost)) {
+          if (isBlockedFetching(fetcher.inputHost) || !isInputHostReachable(fetcher.inputHost)) {
             return;
           }
           FetcherConfig fetcherConfig = fetcher.fetcherConfig;
@@ -410,7 +410,7 @@ public class ShuffleServer implements FetcherCallback {
       if (existsFetcherFromStuckToSpeculative) {
         // try to transition: from STUCK to SPECULATIVE
         runningFetchers.forEach(fetcher -> {
-          if (isBlockedFetching(fetcher.inputHost)) {
+          if (isBlockedFetching(fetcher.inputHost) || !isInputHostReachable(fetcher.inputHost)) {
             return;
           }
           FetcherConfig fetcherConfig = fetcher.fetcherConfig;
