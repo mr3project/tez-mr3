@@ -143,7 +143,9 @@ public class MultiByteArrayOutputStream extends OutputStream {
   private void spillToFile() throws IOException {
     assert posInBuf == cacheSize;
     assert fileOut == null;
-    LOG.info("Creating fileOut: {}", outputPath);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Creating fileOut: {}", outputPath);
+    }
     fileOut = fs.create(outputPath);
     // bufferBytes is never updated again
   }
@@ -159,7 +161,9 @@ public class MultiByteArrayOutputStream extends OutputStream {
   // after calling close(), no more writes should be made
   @Override
   synchronized public void close() throws IOException {
-    LOG.info("Closing: totalBytes={}, bufferBytes={}, outputPath={}", totalBytes, bufferBytes, outputPath);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Closing: totalBytes={}, bufferBytes={}, outputPath={}", totalBytes, bufferBytes, outputPath);
+    }
     if (fileOut != null) {
       fileOut.close();
     }
@@ -288,7 +292,9 @@ public class MultiByteArrayOutputStream extends OutputStream {
 
   // 3. called from ShuffleHandlerDaemonProcessor thread
   synchronized public void clean() {
-    LOG.info("Cleaning: outputPath={}", outputPath);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Cleaning: outputPath={}", outputPath);
+    }
     buffers = null;
     currentBuffer = null;
     // do not delete fileOut because it will be deleted after the source DAG or Vertex is finished
