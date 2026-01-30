@@ -395,8 +395,10 @@ public class PipelinedSorter extends ExternalSorter {
         reportDetailedPartitionStats(), auxiliaryService, deflater,
         compositeFetch);
     outputContext.sendEvents(events);
-    LOG.info("{}: Added spill event for spill (final update=false), spillId={}",
-        outputContext.getDestinationVertexName(), (numSpills - 1));
+    if (isDebugEnabled) {
+      LOG.debug("{}: Added spill event for spill (final update=false), spillId={}",
+          outputContext.getDestinationVertexName(), (numSpills - 1));
+    }
   }
 
   @Override
@@ -615,7 +617,9 @@ public class PipelinedSorter extends ExternalSorter {
       }
       ensureSpillFilePermissions(spillFileName, rfs);
 
-      LOG.info("Spilling to {} (use in-memory buffers = {})", spillFileName.toString(), canUseBuffers);
+      if (isDebugEnabled) {
+        LOG.debug("Spilling to {} (use in-memory buffers = {})", spillFileName.toString(), canUseBuffers);
+      }
 
       for (int i = 0; i < partitions; ++i) {
         if (isThreadInterrupted()) {
@@ -683,7 +687,9 @@ public class PipelinedSorter extends ExternalSorter {
       ShuffleUtils.writeSpillInfoToIndexPathCacheAndByteCache(
           outputContext, numSpills, outputFilePath, spillRec, byteArrayOutput);
     }
-    LOG.info("{}: Finished spill {}", outputContext.getDestinationVertexName(), numSpills);
+    if (isDebugEnabled) {
+      LOG.debug("{}: Finished spill {}", outputContext.getDestinationVertexName(), numSpills);
+    }
 
     // TODO: honor cache limits
     indexCacheList.add(spillRec);
@@ -779,8 +785,10 @@ public class PipelinedSorter extends ExternalSorter {
               sendEmptyPartitionDetails, pathComponent, partitionStats,
               reportDetailedPartitionStats(), auxiliaryService, deflater,
               compositeFetch);
-          LOG.info("{}: Adding spill event for spill (final update={}), spillId={}",
-              outputContext.getDestinationVertexName(), isLastEvent, i);
+          if (isDebugEnabled) {
+            LOG.debug("{}: Adding spill event for spill (final update={}), spillId={}",
+                outputContext.getDestinationVertexName(), isLastEvent, i);
+          }
         }
         return;
       }
@@ -1168,7 +1176,7 @@ public class PipelinedSorter extends ExternalSorter {
         LOG.debug("{}: {}", outputContext.getDestinationVertexName(),
             String.format("Span%d.length = %d, perItem = %d", index, length(), perItem));
       }
-      if(remaining.remaining() < METASIZE+perItem) {
+      if (remaining.remaining() < METASIZE+perItem) {
         //Check if we can get the next Buffer from the main buffer list
         ByteBuffer space = allocateSpace();
         if (space != null) {

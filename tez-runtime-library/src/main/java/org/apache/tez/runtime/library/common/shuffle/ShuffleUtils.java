@@ -703,7 +703,9 @@ public class ShuffleUtils {
     if (byteArrayOutput != null) {
       ConcurrentByteCache concurrentByteCache = outputContext.getConcurrentByteCache();
       concurrentByteCache.add(mapId, byteArrayOutput);
-      LOG.info("Write SpillInfo to IndexPathCache and ByteCache: mapId={}, totalBytes={}", mapId, byteArrayOutput.getTotalBytes());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Write SpillInfo to IndexPathCache and ByteCache: mapId={}, totalBytes={}", mapId, byteArrayOutput.getTotalBytes());
+      }
     }
   }
 
