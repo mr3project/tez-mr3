@@ -72,6 +72,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   
   private static final Logger LOG = LoggerFactory.getLogger(MergeManager.class);
+  private static final boolean isDebugEnabled = LOG.isDebugEnabled();
 
   private final Configuration conf;
   private final FileSystem localFS;
@@ -260,7 +261,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     this.mergeThreshold = (long)(this.memoryLimit * conf.getFloat(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MERGE_PERCENT,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MERGE_PERCENT_DEFAULT));
-    if (LOG.isDebugEnabled()) {
+    if (isDebugEnabled) {
       LOG.debug(inputContext.getSourceVertexName() + ": MergerManager: memoryLimit=" + memoryLimit + ", " +
                "maxSingleShuffleLimit=" + maxSingleShuffleLimit + ", " +
                "mergeThreshold=" + mergeThreshold + ", " +
@@ -308,7 +309,9 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   }
 
   void setupParentThread(Thread shuffleSchedulerThread) {
-    LOG.info("Setting merger's parent thread to " + shuffleSchedulerThread.getName());
+    if (isDebugEnabled) {
+      LOG.debug("Setting merger's parent thread to " + shuffleSchedulerThread.getName());
+    }
     if (this.memToMemMerger != null) {
       memToMemMerger.setParentThread(shuffleSchedulerThread);
     }
@@ -349,7 +352,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       }
       long maxRedBuffer = (long) (maxAvailableTaskMemory * maxRedPer);
 
-      if (LOG.isDebugEnabled()) {
+      if (isDebugEnabled) {
         LOG.debug("Initial Memory required for SHUFFLE_BUFFER=" + memLimit +
             " based on INPUT_BUFFER_FACTOR=" + maxInMemCopyUse + ",  for final merged output=" +
             maxRedBuffer + ", using factor: " + maxRedPer);
@@ -378,7 +381,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     }
     if (triggerAdditionalMerge) {
       inMemoryMerger.waitForMerge();
-      if (LOG.isDebugEnabled()) {
+      if (isDebugEnabled) {
         LOG.debug("Additional in-memory merge triggered");
       }
     }
@@ -393,7 +396,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     while (this.usedMemory > memoryLimit) {
       wait();
     }
-    if (LOG.isDebugEnabled()) {
+    if (isDebugEnabled) {
       LOG.debug("Waited for " + (System.currentTimeMillis() - startTime) + " for memory to become available");
     }
   }
@@ -430,7 +433,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     synchronized (this) {
       if (this.usedMemory > memoryLimit) {
         if (!useFreeMemoryFetchedInput) {
-          if (LOG.isDebugEnabled()) {
+          if (isDebugEnabled) {
             LOG.debug(srcAttemptIdentifier + ": Stalling shuffle since usedMemory (" + this.usedMemory
                 + ") is greater than memoryLimit (" + memoryLimit + ")." +
                 " CommitMemory is (" + this.commitMemory + ")");
@@ -444,7 +447,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
           // this ContainerWorker is busy serving Tasks, so do not borrow
           return stallShuffle;
         }
-        if (LOG.isDebugEnabled()) {
+        if (isDebugEnabled) {
           LOG.debug("Creating MemoryMapOutput in free memory: {}, {}, CommitMemory={}",
               this.usedMemory, currentFreeMemory, this.commitMemory);
         }
@@ -458,7 +461,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         }
       } else {
         // Allow the in-memory shuffle to progress
-        if (LOG.isDebugEnabled()) {
+        if (isDebugEnabled) {
           LOG.debug("Creating MemoryMapOutput: {}, {}, CommitMemory={}",
               this.usedMemory, memoryLimit, this.commitMemory);
         }
@@ -498,7 +501,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   public synchronized void unreserve(long size) {
     assert usedMemory >= size;
     this.usedMemory -= size;
-    if (LOG.isDebugEnabled()) {
+    if (isDebugEnabled) {
       LOG.debug("Notifying unreserve : size=" + size + ", commitMemory=" + this.commitMemory + ", usedMemory=" + this.usedMemory
           + ", mergeThreshold=" + mergeThreshold);
     }
@@ -537,7 +540,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   private void trackAndLogCloseInMemoryFile(MapOutput mapOutput) {
     statsInMemTotal.updateStats(mapOutput.getSize());
 
-    if (LOG.isDebugEnabled()) {
+    if (isDebugEnabled) {
       LOG.debug("closeInMemoryFile -> map-output of size: " + mapOutput.getSize()
           + ", inMemoryMapOutputs.size() -> " + inMemoryMapOutputs.size()
           + ", commitMemory -> " + this.commitMemory + ", usedMemory ->" +
@@ -559,7 +562,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   
   public synchronized void closeInMemoryMergedFile(MapOutput mapOutput) {
     inMemoryMergedMapOutputs.add(mapOutput);
-    if (LOG.isDebugEnabled()) {
+    if (isDebugEnabled) {
       // This log could be moved to INFO level for a while, after mem-to-mem
       // merge is production ready.
       LOG.debug("closeInMemoryMergedFile -> size: " + mapOutput.getSize() +
@@ -603,7 +606,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   }
 
   private void logCloseOnDiskFile(FileChunk file) {
-    if (LOG.isDebugEnabled()) {
+    if (isDebugEnabled) {
       LOG.debug("close onDiskFile=" + file.getPath() + ", len=" + file.getLength() +
           ", onDisMapOutputs=" + onDiskMapOutputs.size());
     }
@@ -625,12 +628,14 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       List<FileChunk> disk = new ArrayList<FileChunk>(onDiskMapOutputs);
       onDiskMapOutputs.clear();
 
-      if (statsInMemTotal.count > 0) {
-        LOG.info(
-            "TotalInMemFetchStats: count={}, totalSize={}, min={}, max={}, avg={}",
-            statsInMemTotal.count, statsInMemTotal.size,
-            statsInMemTotal.minSize, statsInMemTotal.maxSize,
-            (statsInMemTotal.size / (float) statsInMemTotal.count));
+      if (isDebugEnabled) {
+        if (statsInMemTotal.count > 0) {
+          LOG.debug(
+              "TotalInMemFetchStats: count={}, totalSize={}, min={}, max={}, avg={}",
+              statsInMemTotal.count, statsInMemTotal.size,
+              statsInMemTotal.minSize, statsInMemTotal.maxSize,
+              (statsInMemTotal.size / (float) statsInMemTotal.count));
+        }
       }
 
       // Don't attempt a final merge if close is invoked as a result of a previous
@@ -669,7 +674,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     }
 
     try {
-      if (LOG.isDebugEnabled()) {
+      if (isDebugEnabled) {
         LOG.debug("Deleting " + path);
       }
       fs.delete(path, true);
@@ -721,7 +726,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
           // the guard is about whether we can safely charge the new merged buffer under the budget.
           if ((mergeOutputSize + mo.getSize() + manager.getUsedMemory()) > memoryLimit) {
             //Search for smaller segments that can fit into existing mem
-            if (LOG.isDebugEnabled()) {
+            if (isDebugEnabled) {
               LOG.debug("Size is greater than usedMemory. "
                   + "mergeOutputSize=" + mergeOutputSize
                   + ", moSize=" + mo.getSize()
@@ -737,7 +742,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
                 (mo.isPrimaryMapOutput() ? mergedMapOutputsCounter : null)));
             lastAddedMapOutput = mo;
             it.remove();
-            if (LOG.isDebugEnabled()) {
+            if (isDebugEnabled) {
               LOG.debug("Added segment for merging. mergeOutputSize=" + mergeOutputSize);
             }
           }
@@ -766,8 +771,10 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
       IFile.WriterAppend writer = new InMemoryWriter(mergedMapOutputs.getMemory());
 
-      LOG.info("{}: Initiating Memory-to-Memory merge with {} segments of total-size: {}",
-          inputContext.getSourceVertexName(), noInMemorySegments, mergeOutputSize);
+      if (isDebugEnabled) {
+        LOG.debug("{}: Initiating Memory-to-Memory merge with {} segments of total-size: {}",
+            inputContext.getSourceVertexName(), noInMemorySegments, mergeOutputSize);
+      }
 
       if (Thread.currentThread().isInterrupted()) {
         return; // early exit
@@ -786,8 +793,10 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       TezMerger.writeFile(rIter, writer, progressable, TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
       writer.close();
 
-      LOG.info("{} Memory-to-Memory merge of the {} files in-memory complete with mergeOutputSize={}",
-          inputContext.getSourceVertexName(), noInMemorySegments, mergeOutputSize);
+      if (isDebugEnabled) {
+        LOG.debug("{} Memory-to-Memory merge of the {} files in-memory complete with mergeOutputSize={}",
+            inputContext.getSourceVertexName(), noInMemorySegments, mergeOutputSize);
+      }
 
       // Note the output of the merge
       closeInMemoryMergedFile(mergedMapOutputs);
@@ -950,7 +959,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         final long offset = fileChunk.getOffset();
         final long size = fileChunk.getLength();
         final boolean preserve = fileChunk.isLocalFile();
-        if (LOG.isDebugEnabled()) {
+        if (isDebugEnabled) {
           LOG.debug("InputAttemptIdentifier=" + fileChunk.getInputAttemptIdentifier()
               + ", len=" + fileChunk.getLength() + ", offset=" + fileChunk.getOffset()
               + ", path=" + fileChunk.getPath());
@@ -1111,8 +1120,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
                                        ) throws IOException, InterruptedException {
 
     logFinalMergeStart(inMemoryMapOutputs, onDiskMapOutputs);
-    StringBuilder finalMergeLog = new StringBuilder();
-    
+
     // merge config params
     SerializationContext serContext = new SerializationContext(job);
     final Path tmpDir = new Path(inputContext.getUniqueIdentifier());
@@ -1167,24 +1175,18 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         // add to list of final disk outputs.
         onDiskMapOutputs.add(new FileChunk(outputPath, 0, fStatus.getLen()));
 
-        if (LOG.isInfoEnabled()) {
-          finalMergeLog.append("MemMerged: " + numMemDiskSegments + ", " + inMemToDiskBytes);
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("Merged " + numMemDiskSegments + "segments, size=" +
-                inMemToDiskBytes + " to " + outputPath);
-          }
+        if (isDebugEnabled) {
+          LOG.debug("MemMerged: Merged " + numMemDiskSegments + "segments, size=" +
+              inMemToDiskBytes + " to " + outputPath);
         }
 
         inMemToDiskBytes = 0;
         memDiskSegments.clear();
       } else if (inMemToDiskBytes != 0) {
-        if (LOG.isInfoEnabled()) {
-          finalMergeLog.append("DelayedMemMerge: " + numMemDiskSegments + ", " + inMemToDiskBytes);
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("Keeping " + numMemDiskSegments + " segments, " +
-                inMemToDiskBytes + " bytes in memory for " +
-                "intermediate, on-disk merge");
-          }
+        if (isDebugEnabled) {
+          LOG.debug("DelayedMemMerge: Keeping " + numMemDiskSegments + " segments, " +
+              inMemToDiskBytes + " bytes in memory for " +
+              "intermediate, on-disk merge");
         }
       }
     }
@@ -1196,7 +1198,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     for (FileChunk fileChunk : onDisk) {
       final long fileLength = fileChunk.getLength();
       onDiskBytes += fileLength;
-      if (LOG.isDebugEnabled()) {
+      if (isDebugEnabled) {
         LOG.debug("Disk file=" + fileChunk.getPath() + ", len=" + fileLength +
             ", isLocal=" +
             fileChunk.isLocalFile());
@@ -1211,12 +1213,9 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       diskSegments.add(new DiskSegment(fs, file, fileOffset, fileLength, codec, ifileReadAhead,
                                    ifileReadAheadLength, preserve, counter, inputContext));
     }
-    if (LOG.isInfoEnabled()) {
-      finalMergeLog.append(". DiskSeg: " + onDisk.length + ", " + onDiskBytes);
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Merging " + onDisk.length + " files, " +
-            onDiskBytes + " bytes from disk");
-      }
+    if (isDebugEnabled) {
+      LOG.debug("DiskSeg: Merging " + onDisk.length + " files, " +
+          onDiskBytes + " bytes from disk");
     }
     Collections.sort(diskSegments, new Comparator<Segment>() {
       public int compare(Segment o1, Segment o2) {
@@ -1230,12 +1229,9 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     // build final list of segments from merged backed by disk + in-mem
     List<Segment> finalSegments = new ArrayList<Segment>();
     long inMemBytes = createInMemorySegments(inMemoryMapOutputs, finalSegments, 0);
-    if (LOG.isInfoEnabled()) {
-      finalMergeLog.append(". MemSeg: " + finalSegments.size() + ", " + inMemBytes);
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Merging " + finalSegments.size() + " segments, " +
-            inMemBytes + " bytes from memory into reduce");
-      }
+    if (isDebugEnabled) {
+      LOG.debug("MemSeg: Merging " + finalSegments.size() + " segments, " +
+          inMemBytes + " bytes from memory into reduce");
     }
 
     if (0 != onDiskBytes) {
@@ -1253,9 +1249,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       finalSegments.add(new Segment(
             new RawKVIteratorReader(diskMerge, onDiskBytes), null));
     }
-    if (LOG.isInfoEnabled()) {
-      LOG.info(finalMergeLog.toString());
-    }
     // This is doing nothing but creating an iterator over the segments.
     return TezMerger.merge(job, fs, serContext, codec,
         finalSegments, finalSegments.size(), tmpDir,
@@ -1269,7 +1262,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     for (MapOutput inMemoryMapOutput : inMemoryMapOutputs) {
       inMemSegmentSize += inMemoryMapOutput.getSize();
 
-      if (LOG.isDebugEnabled()) {
+      if (isDebugEnabled) {
         LOG.debug("finalMerge: inMemoryOutput=" + inMemoryMapOutput + ", size=" +
             inMemoryMapOutput.getSize());
       }
@@ -1278,7 +1271,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     for (FileChunk onDiskMapOutput : onDiskMapOutputs) {
       onDiskSegmentSize += onDiskMapOutput.getLength();
 
-      if (LOG.isDebugEnabled()) {
+      if (isDebugEnabled) {
         LOG.debug("finalMerge: onDiskMapOutput=" + onDiskMapOutput.getPath() +
             ", size=" + onDiskMapOutput.getLength());
       }
