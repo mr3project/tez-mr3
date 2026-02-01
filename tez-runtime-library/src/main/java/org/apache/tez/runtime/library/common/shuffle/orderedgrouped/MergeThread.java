@@ -80,8 +80,10 @@ abstract class MergeThread<T> extends Thread {
         this.inputs.add(iter.next());
         iter.remove();
       }
-      LOG.info("{}: Starting merge with {} segments, while ignoring {} segments",
-          getName(), this.inputs.size(), inputs.size());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("{}: Starting merge with {} segments, while ignoring {} segments",
+            getName(), this.inputs.size(), inputs.size());
+      }
       notifyAll();
     }
   }
