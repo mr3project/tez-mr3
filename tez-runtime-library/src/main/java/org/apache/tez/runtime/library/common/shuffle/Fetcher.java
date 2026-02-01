@@ -226,12 +226,12 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
     sb.append(getFetcherIdentifier());
     sb.append("/");
     sb.append(inputHost);
-    sb.append("/");
-    sb.append(System.currentTimeMillis() - startMillis);
-    sb.append("ms/state=");
-    sb.append(state);
-    sb.append("/stage=");
-    sb.append(stage);
+    // sb.append("/");
+    // sb.append(System.currentTimeMillis() - startMillis);
+    // sb.append("ms/state=");
+    // sb.append(state);
+    // sb.append("/stage=");
+    // sb.append(stage);
     return sb.toString();
   }
 
