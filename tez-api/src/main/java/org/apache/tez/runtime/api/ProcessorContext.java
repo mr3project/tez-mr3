@@ -118,4 +118,6 @@ public interface ProcessorContext extends TaskContext {
   public void decrementNumActiveShuffleRequests();
 
   public scala.Tuple3<List<String>, List<String>, List<Integer>> getEnvContainerIdsToBlockFetchingAndFinished();
+
+  public void notifyPerVertexCacheLoaded();
 }
