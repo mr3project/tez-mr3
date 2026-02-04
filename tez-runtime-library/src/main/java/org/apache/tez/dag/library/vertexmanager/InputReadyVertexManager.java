@@ -26,7 +26,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.tez.dag.api.EdgeManagerPluginDescriptor;
 import org.apache.tez.dag.api.EdgeProperty;
 import org.apache.tez.dag.api.EdgeProperty.DataMovementType;
@@ -47,7 +46,6 @@ import org.apache.tez.common.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
-@Private
 public class InputReadyVertexManager extends VertexManagerPlugin {
   private static final Logger LOG = 
       LoggerFactory.getLogger(InputReadyVertexManager.class);
@@ -325,9 +323,11 @@ public class InputReadyVertexManager extends VertexManagerPlugin {
           if (oneToOneLocationHints[i] != null) {
             locationHint = oneToOneLocationHints[i];
           }
-          LOG.info("Starting task {} for vertex: {} with location: {}",
-              i, getContext().getVertexName(),
-              (locationHint != null) ? locationHint.getAffinitizedTask() : "null");
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Starting task {} for vertex: {} with location: {}",
+                i, getContext().getVertexName(),
+                (locationHint != null) ? locationHint.getAffinitizedTask() : "null");
+          }
           tasksToStart.add(ScheduleTaskRequest.create(Integer.valueOf(i), locationHint));
         }
       }
@@ -336,7 +336,5 @@ public class InputReadyVertexManager extends VertexManagerPlugin {
     if (tasksToStart != null && !tasksToStart.isEmpty()) {
       getContext().scheduleTasks(tasksToStart);
     }
-    
   }
-
 }
