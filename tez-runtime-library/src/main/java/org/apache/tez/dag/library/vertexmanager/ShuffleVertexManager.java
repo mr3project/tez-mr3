@@ -35,8 +35,6 @@ import org.apache.tez.dag.api.VertexManagerPluginContext.ScheduleTaskRequest;
 import org.apache.tez.dag.api.VertexManagerPluginDescriptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.tez.runtime.api.TaskAttemptIdentifier;
 import org.apache.tez.runtime.api.events.DataMovementEvent;
@@ -59,8 +57,6 @@ import java.util.Map;
  * <code>slowStartMinSrcCompletionFraction</code> and schedules all tasks 
  *  when <code>slowStartMaxSrcCompletionFraction</code> is reached
  */
-@Public
-@Evolving
 public class ShuffleVertexManager extends ShuffleVertexManagerBase {
 
   private static final Logger LOG =
@@ -523,7 +519,7 @@ public class ShuffleVertexManager extends ShuffleVertexManagerBase {
     BigInteger bigDesiredTaskParallelism =
         expectedTotalSourceTasksOutputSize.add(desiredTaskInputDataSizeMinusOne).divide(desiredTaskInputDataSize);
 
-    if(bigDesiredTaskParallelism.compareTo(BigInteger.valueOf(Integer.MAX_VALUE)) > 0) {
+    if (bigDesiredTaskParallelism.compareTo(BigInteger.valueOf(Integer.MAX_VALUE)) > 0) {
       LOG.info("Not reducing auto parallelism for vertex: {}"
               + " since the desired parallelism of {} is greater than or equal"
               + " to the max parallelism of {}", getContext().getVertexName(),
@@ -571,20 +567,20 @@ public class ShuffleVertexManager extends ShuffleVertexManagerBase {
         getContext().getVertexName(), pendingTasks.size(),
         finalTaskParallelism);
 
-    if(finalTaskParallelism >= currentParallelism) {
+    if (finalTaskParallelism >= currentParallelism) {
       return null;
     }
 
     // finalTaskParallelism < currentParallelism;
 
     if (!useStatsAutoParallelism) {
-      LOG.info("Do not use stats because useStatsAutoParallelism = " + useStatsAutoParallelism);
-      return computeParams(currentParallelism, finalTaskParallelism);
+      LOG.info("Do not use stats because useStatsAutoParallelism is not set");
+      return computeParams(currentParallelism, finalTaskParallelism);   // DynamicScatterGatherEdgeManager
     }
 
     if (getContext().hasOneToOneOutputEdge()) {
       LOG.info("Do not use stats because of one-to-one output edge");
-      return computeParams(currentParallelism, finalTaskParallelism);
+      return computeParams(currentParallelism, finalTaskParallelism);   // DynamicScatterGatherEdgeManager
     }
 
     // now try useStatsAutoParallelism
@@ -630,10 +626,10 @@ public class ShuffleVertexManager extends ShuffleVertexManagerBase {
     // if all stats are identical, revert to computeParams()
     if (numMinEqualsMax == numScatterGatherEdges) {
       LOG.info("Do not use stats which are all identical: {}, {}", numMinEqualsMax, numScatterGatherEdges);
-      return computeParams(currentParallelism, finalTaskParallelism);
+      return computeParams(currentParallelism, finalTaskParallelism);   // DynamicScatterGatherEdgeManager
     }
 
-    // now use distributeStats()
+    // now we use MappingEdgeManager -- call distributeStats() in MR3
     scala.Tuple2<int[], int[][]> mappingIndexes =
       com.datamonad.mr3.api.common.Utils.distributeStats(currentStatsInMB, finalTaskParallelism);
     int[] mapping = mappingIndexes._1();

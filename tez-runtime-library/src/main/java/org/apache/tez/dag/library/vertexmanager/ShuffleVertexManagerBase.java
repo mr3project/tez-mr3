@@ -44,8 +44,6 @@ import org.apache.tez.runtime.library.utils.DATA_RANGE_IN_MB;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.tez.common.TezUtils;
 import org.apache.tez.runtime.api.Event;
@@ -72,8 +70,6 @@ import java.util.zip.Inflater;
  * It provides common functions used by ShuffleVertexManager and
  * FairShuffleVertexManager.
  */
-@Private
-@Evolving
 abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
   static long MB = 1024l * 1024l;
   static long KB = 1024l;
