@@ -27,7 +27,6 @@ import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
-import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.MapOutput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,6 +44,40 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
   protected static final Logger LOG = LoggerFactory.getLogger(ShuffleClient.class);
   protected static final Logger LOG_FETCH = LoggerFactory.getLogger(LOG.getName() + ".fetch");
   protected static final ShuffleUtils.FetchStatsLogger fetchStatsLogger = new ShuffleUtils.FetchStatsLogger(LOG_FETCH, LOG);
+
+  enum ShuffleErrors {
+    IO_ERROR,
+    WRONG_LENGTH,
+    BAD_ID,
+    WRONG_MAP,
+    CONNECTION,
+    WRONG_REDUCE
+  }
+  private final static String SHUFFLE_ERR_GRP_NAME = "Shuffle Errors";
+
+  public static class ShuffleErrorCounterGroup {
+    public final TezCounter ioErrs;
+    public final TezCounter wrongLengthErrs;
+    public final TezCounter badIdErrs;
+    public final TezCounter wrongMapErrs;
+    public final TezCounter connectionErrs;
+    public final TezCounter wrongReduceErrs;
+
+    public ShuffleErrorCounterGroup(
+        TezCounter ioErrs,
+        TezCounter wrongLengthErrs,
+        TezCounter badIdErrs,
+        TezCounter wrongMapErrs,
+        TezCounter connectionErrs,
+        TezCounter wrongReduceErrs) {
+      this.ioErrs = ioErrs;
+      this.wrongLengthErrs = wrongLengthErrs;
+      this.badIdErrs = badIdErrs;
+      this.wrongMapErrs = wrongMapErrs;
+      this.connectionErrs = connectionErrs;
+      this.wrongReduceErrs = wrongReduceErrs;
+    }
+  }
 
   /**
    * Placeholder for tracking shuffle events in case we get multiple spills info for the same attempt.
@@ -135,6 +168,8 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
   private final TezCounter shuffleBytesDiskDirectCounter;
   private final TezCounter shuffleBytesMemoryCounter;
 
+  private final ShuffleErrorCounterGroup shuffleErrorCounterGroup;
+
   public ShuffleClient(
       InputContext inputContext,
       Configuration conf,
@@ -167,6 +202,23 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
     this.shuffleBytesDiskCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_DISK);
     this.shuffleBytesDiskDirectCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_DISK_DIRECT);
     this.shuffleBytesMemoryCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_MEMORY);
+
+    TezCounter ioErrsCounter = inputContext.getCounters().findCounter(SHUFFLE_ERR_GRP_NAME,
+        ShuffleErrors.IO_ERROR.toString());
+    TezCounter wrongLengthErrsCounter = inputContext.getCounters().findCounter(SHUFFLE_ERR_GRP_NAME,
+        ShuffleErrors.WRONG_LENGTH.toString());
+    TezCounter badIdErrsCounter = inputContext.getCounters().findCounter(SHUFFLE_ERR_GRP_NAME,
+        ShuffleErrors.BAD_ID.toString());
+    TezCounter wrongMapErrsCounter = inputContext.getCounters().findCounter(SHUFFLE_ERR_GRP_NAME,
+        ShuffleErrors.WRONG_MAP.toString());
+    TezCounter connectionErrsCounter = inputContext.getCounters().findCounter(SHUFFLE_ERR_GRP_NAME,
+        ShuffleErrors.CONNECTION.toString());
+    TezCounter wrongReduceErrsCounter = inputContext.getCounters().findCounter(SHUFFLE_ERR_GRP_NAME,
+        ShuffleErrors.WRONG_REDUCE.toString());
+    this.shuffleErrorCounterGroup = new ShuffleErrorCounterGroup(
+        ioErrsCounter, wrongLengthErrsCounter,
+        badIdErrsCounter, wrongMapErrsCounter,
+        connectionErrsCounter, wrongReduceErrsCounter);
   }
 
   public int getNumInputs() {
@@ -175,6 +227,10 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
 
   public String getLogIdentifier() {
     return logIdentifier;
+  }
+
+  public ShuffleErrorCounterGroup getShuffleErrorCounterGroup() {
+    return shuffleErrorCounterGroup;
   }
 
   protected void setInputFinished(int inputIndex) {

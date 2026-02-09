@@ -38,43 +38,7 @@ import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.MapOutput.Ty
 
 public class ShuffleScheduler extends ShuffleClient<MapOutput> {
 
-  public static class ShuffleErrorCounterGroup {
-    public final TezCounter ioErrs;
-    public final TezCounter wrongLengthErrs;
-    public final TezCounter badIdErrs;
-    public final TezCounter wrongMapErrs;
-    public final TezCounter connectionErrs;
-    public final TezCounter wrongReduceErrs;
-
-    public ShuffleErrorCounterGroup(
-        TezCounter ioErrs,
-        TezCounter wrongLengthErrs,
-        TezCounter badIdErrs,
-        TezCounter wrongMapErrs,
-        TezCounter connectionErrs,
-        TezCounter wrongReduceErrs) {
-      this.ioErrs = ioErrs;
-      this.wrongLengthErrs = wrongLengthErrs;
-      this.badIdErrs = badIdErrs;
-      this.wrongMapErrs = wrongMapErrs;
-      this.connectionErrs = connectionErrs;
-      this.wrongReduceErrs = wrongReduceErrs;
-    }
-  }
-
-  enum ShuffleErrors {
-    IO_ERROR,
-    WRONG_LENGTH,
-    BAD_ID,
-    WRONG_MAP,
-    CONNECTION,
-    WRONG_REDUCE
-  }
-  private final static String SHUFFLE_ERR_GRP_NAME = "Shuffle Errors";
-
   private final TezCounter shuffleNumSkippedOrderedInputCounter;
-
-  private final ShuffleErrorCounterGroup shuffleErrorCounterGroup;
 
   private final long startTime;
 
@@ -109,22 +73,6 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
     remainingMaps = new AtomicInteger(numInputs);
 
     this.shuffleNumSkippedOrderedInputCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_NUM_SKIPPED_ORDERED_INPUTS);
-
-    // Counters used by Fetchers
-    TezCounter ioErrsCounter = inputContext.getCounters().findCounter(SHUFFLE_ERR_GRP_NAME,
-        ShuffleErrors.IO_ERROR.toString());
-    TezCounter wrongLengthErrsCounter = inputContext.getCounters().findCounter(SHUFFLE_ERR_GRP_NAME,
-        ShuffleErrors.WRONG_LENGTH.toString());
-    TezCounter badIdErrsCounter = inputContext.getCounters().findCounter(SHUFFLE_ERR_GRP_NAME,
-        ShuffleErrors.BAD_ID.toString());
-    TezCounter wrongMapErrsCounter = inputContext.getCounters().findCounter(SHUFFLE_ERR_GRP_NAME,
-        ShuffleErrors.WRONG_MAP.toString());
-    TezCounter connectionErrsCounter = inputContext.getCounters().findCounter(SHUFFLE_ERR_GRP_NAME,
-        ShuffleErrors.CONNECTION.toString());
-    TezCounter wrongReduceErrsCounter = inputContext.getCounters().findCounter(SHUFFLE_ERR_GRP_NAME,
-        ShuffleErrors.WRONG_REDUCE.toString());
-    this.shuffleErrorCounterGroup = new ShuffleErrorCounterGroup(ioErrsCounter, wrongLengthErrsCounter,
-        badIdErrsCounter, wrongMapErrsCounter, connectionErrsCounter, wrongReduceErrsCounter);
 
     this.startTime = startTime;
 
@@ -381,10 +329,6 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
 
   public ExceptionReporter getExceptionReporter() {
     return exceptionReporter;
-  }
-
-  public ShuffleErrorCounterGroup getShuffleErrorCounterGroup() {
-    return shuffleErrorCounterGroup;
   }
 
   // can run in ShuffleServer.call() thread, ShuffleInputEventHandler thread

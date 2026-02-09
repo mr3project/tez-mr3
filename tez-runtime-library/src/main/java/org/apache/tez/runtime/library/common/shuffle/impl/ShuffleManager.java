@@ -46,7 +46,6 @@ import org.apache.tez.runtime.library.common.shuffle.ShuffleClient;
 
 import org.apache.tez.common.Preconditions;
 import com.google.common.collect.Lists;
-import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.MapOutput;
 
 // This only knows how to deal with a single srcIndex for a given targetIndex.
 // In case the src task generates multiple outputs for the same target Index

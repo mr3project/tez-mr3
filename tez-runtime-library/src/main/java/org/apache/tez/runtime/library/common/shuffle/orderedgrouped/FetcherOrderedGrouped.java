@@ -49,7 +49,6 @@ import org.apache.tez.runtime.library.common.shuffle.ShuffleServer.PathPartition
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.shuffle.api.ShuffleHandlerError;
 import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.MapOutput.Type;
-import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.ShuffleScheduler.ShuffleErrorCounterGroup;
 import org.apache.tez.runtime.library.common.sort.impl.TezIndexRecord;
 import org.apache.tez.runtime.library.common.sort.impl.TezSpillRecord;
 import org.apache.tez.runtime.library.exceptions.FetcherReadTimeoutException;
@@ -87,13 +86,14 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     }
   }
 
+  private final ShuffleScheduler shuffleScheduler;
   private final int fetcherIdentifier;
   private final String logIdentifier;
-  private final ShuffleScheduler shuffleScheduler;
 
   private final FetchedInputAllocatorOrderedGrouped allocator;
   private final ExceptionReporter exceptionReporter;
-  private final ShuffleErrorCounterGroup shuffleErrorCounterGroup;
+
+  private final ShuffleClient.ShuffleErrorCounterGroup shuffleErrorCounterGroup;
 
   private volatile boolean stopped = false;
   private final Object cleanupLock = new Object();
@@ -111,7 +111,6 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     super(fetcherCallback, conf, inputHost, fetcherConfigCommon, fetcherConfig, taskContext, pendingInputsSeq, attempt);
 
     this.shuffleScheduler = shuffleScheduler;
-
     this.fetcherIdentifier = fetcherIdGen.incrementAndGet();
     this.logIdentifier = attempt == 0 ?
         shuffleScheduler.getLogIdentifier() + "_" + fetcherIdentifier + "-O-" + minPartition:
@@ -119,6 +118,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
 
     this.allocator = shuffleScheduler.getAllocator();
     this.exceptionReporter = shuffleScheduler.getExceptionReporter();
+
     this.shuffleErrorCounterGroup = shuffleScheduler.getShuffleErrorCounterGroup();
 
     // use '==' instead of 'equals' because we want to avoid conversion from long to Long
@@ -400,9 +400,9 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         return new HashMap<>();
       }
       shuffleErrorCounterGroup.ioErrs.increment(1);
+      shuffleErrorCounterGroup.connectionErrs.increment(1);
       LOG.warn("{}: Failed to connect from {} to {} with index = {}: {}", logIdentifier, fetcherConfigCommon.localHostName,
           host, currentIndex, ie.getMessage());
-      shuffleErrorCounterGroup.connectionErrs.increment(1);
 
       if (fetcherConfigCommon.connectionFailAllInput) {
         // no pending inputs && only failed inputs
@@ -792,7 +792,8 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     if (forReduce < minPartition || forReduce > maxPartition) {
       shuffleErrorCounterGroup.wrongReduceErrs.increment(1);
       LOG.warn("{}: Data for wrong partition map: {}, len: {}, decomp len: {} for partition {}, expected partition range: {}-{}",
-          logIdentifier, srcAttemptId, compressedLength, decompressedLength, forReduce, minPartition, maxPartition);
+          logIdentifier, srcAttemptId, compressedLength, decompressedLength,
+          forReduce, minPartition, maxPartition);
       return false;
     }
     return true;

@@ -79,6 +79,8 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
   private final int fetcherIdentifier;
   private final String logIdentifier;
 
+  private final ShuffleClient.ShuffleErrorCounterGroup shuffleErrorCounterGroup;
+
   private final AtomicBoolean isShutDown = new AtomicBoolean(false);
 
   public FetcherUnordered(ShuffleServer fetcherCallback,
@@ -97,6 +99,8 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     this.logIdentifier = attempt == 0 ?
         shuffleManager.getLogIdentifier() + "_" + fetcherIdentifier + "-U-" + minPartition:
         shuffleManager.getLogIdentifier() + "_" + fetcherIdentifier + "-U-" + minPartition+ "=" + attempt;
+
+    this.shuffleErrorCounterGroup = shuffleManager.getShuffleErrorCounterGroup();
 
     // use '==' instead of 'equals' because we want to avoid conversion from long to Long
     assert this.shuffleClientId == shuffleManager.getShuffleClientId();
@@ -251,9 +255,11 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
           // pendingInputs.remove() is optional because call() removes failedFetches[] from pendingInputs[]
           pendingInputs.remove(failedFetch);
         }
+        shuffleErrorCounterGroup.ioErrs.increment(1);
+        shuffleErrorCounterGroup.connectionErrs.increment(1);
       }
       LOG.warn("{}: Failed to connect from {} to {} with index = {}: {}", logIdentifier, fetcherConfigCommon.localHostName,
-        host, currentIndex, ie.getMessage());
+          host, currentIndex, ie.getMessage());
       return new HostFetchResult(
           new FetchResult(shuffleClientId, inputHost.getHostPort(), pendingInputs),
           failedFetches, true);
@@ -284,6 +290,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         }
         return getResultWithNoPendingInputsNoFailedInputBecauseAlreadyShutdown();
       } else {
+        shuffleErrorCounterGroup.ioErrs.increment(1);
         LOG.warn("{}: Failed to verify reply after connecting from {} to {}:{}, informing ShuffleManager: {}",
             logIdentifier, fetcherConfigCommon.localHostName, host, port,
             e.getClass().getName() + "/" + e.getMessage());
@@ -461,7 +468,6 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
           fetcherCallback.fetchSucceeded(shuffleClientId, host, srcAttemptId, fetchedInput,
               indexRecord.getPartLength(), indexRecord.getRawLength(), (endTime - startTime));
         } catch (IOException | InternalError e) {
-          hasFailures = true;
           cleanupFetchedInput(fetchedInput);
           if (isShutDown.get()) {
             if (isDebugEnabled) {
@@ -470,6 +476,8 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
             }
             return getResultWithNoPendingInputsNoFailedInputBecauseAlreadyShutdown();
           }
+          hasFailures = true;
+          shuffleErrorCounterGroup.ioErrs.increment(1);
           LOG.warn("{}: Failed to shuffle output of {} from {} (local fetch)", logIdentifier, srcAttemptId, host, e);
         }
         // do not break out the inner loop
@@ -628,6 +636,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
           header.readFields(input);
           pathComponent = header.getMapId();
           if (!pathComponent.startsWith(InputAttemptIdentifier.PATH_PREFIX_MR3) && !pathComponent.startsWith(InputAttemptIdentifier.PATH_PREFIX)) {
+            shuffleErrorCounterGroup.badIdErrs.increment(1);
             if (pathComponent.startsWith(ShuffleHandlerError.DISK_ERROR_EXCEPTION.toString())) {
               LOG.warn("{}: ShuffleHandler error - {}, while fetching {}",
                   logIdentifier, pathComponent, inputAttemptIdentifier);
@@ -656,6 +665,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
           responsePartition = header.getPartition();
         } catch (IllegalArgumentException e) {
           if (!isShutDown.get()) {
+            shuffleErrorCounterGroup.badIdErrs.increment(1);
             LOG.warn("{}: Invalid src id", logIdentifier, e);
             // don't know which one was bad, so consider all of them (starting from currentIndex) as bad
             return buildInputSeqFromIndex(currentIndex);  // okay because it is IllegalArgumentException
@@ -743,9 +753,8 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       if (isShutDown.get()) {
         cleanupFetchedInput(fetchedInput);
         if (isDebugEnabled) {
-          LOG.debug(
-              "Already shutdown. Ignoring exception during fetch " + ioe.getClass().getName() +
-                  ", Message: " + ioe.getMessage());
+          LOG.debug("Already shutdown. Ignoring exception during fetch " + ioe.getClass().getName() +
+              ", Message: " + ioe.getMessage());
         }
         return null;
       }
@@ -754,6 +763,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         cleanupFetchedInput(fetchedInput);
         throw new FetcherReadTimeoutException(ioe);
       }
+      shuffleErrorCounterGroup.ioErrs.increment(1);
       if (srcAttemptId == null || fetchedInput == null) {
         LOG.info("{}: Failed to read map header {} ({}, {}): {}",
             logIdentifier, srcAttemptId, decompressedLength, compressedLength,
@@ -790,7 +800,6 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
   /**
    * Check connection needs to be re-established.
    *
-   * @param srcAttemptId
    * @param ioe
    * @return true to indicate connection retry. false otherwise.
    * @throws IOException
@@ -830,6 +839,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
   private boolean verifySanity(long compressedLength, long decompressedLength,
       int fetchPartition, InputAttemptIdentifier srcAttemptId, String pathComponent) {
     if (compressedLength < 0 || decompressedLength < 0) {
+      shuffleErrorCounterGroup.wrongLengthErrs.increment(1);
       LOG.warn("{}: Invalid lengths in input header -> headerPathComponent: {}, " +
           "mappedSrcAttemptId: {}, len: {}, decomp len: {}",
           logIdentifier, pathComponent, srcAttemptId, compressedLength, decompressedLength);
@@ -837,10 +847,11 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     }
 
     if (fetchPartition < this.minPartition || fetchPartition > this.maxPartition) {
+      shuffleErrorCounterGroup.wrongReduceErrs.increment(1);
       LOG.warn("{}: Data for the wrong reduce -> headerPathComponent: {}, " +
-              "mappedSrcAttemptId: {}, len: {}, decomp len: {} for reduce {}",
+              "mappedSrcAttemptId: {}, len: {}, decomp len: {} for reduce {}, expected partition range: {}-{}",
           logIdentifier, pathComponent, srcAttemptId, compressedLength, decompressedLength,
-          fetchPartition);
+          fetchPartition, minPartition, maxPartition);
       return false;
     }
     return true;
