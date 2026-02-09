@@ -72,16 +72,7 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
   }
   private final static String SHUFFLE_ERR_GRP_NAME = "Shuffle Errors";
 
-  private final TezCounter shuffleInputsCounter;
-  private final TezCounter shuffleSkippedInputCounter;
-  private final TezCounter shuffleFailedInputsCounter;
-
-  private final TezCounter reduceShuffleBytes;
-  private final TezCounter reduceBytesDecompressed;
-
-  private final TezCounter bytesShuffledToDisk;
-  private final TezCounter bytesShuffledToDiskDirect;
-  private final TezCounter bytesShuffledToMemory;
+  private final TezCounter shuffleNumSkippedOrderedInputCounter;
 
   private final ShuffleErrorCounterGroup shuffleErrorCounterGroup;
 
@@ -117,16 +108,7 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
 
     remainingMaps = new AtomicInteger(numInputs);
 
-    this.shuffleInputsCounter = inputContext.getCounters().findCounter(TaskCounter.NUM_SHUFFLE_INPUTS);
-    this.shuffleSkippedInputCounter = inputContext.getCounters().findCounter(TaskCounter.NUM_SHUFFLE_SKIPPED_INPUTS);
-    this.shuffleFailedInputsCounter = inputContext.getCounters().findCounter(TaskCounter.NUM_SHUFFLE_FAILED_INPUTS);
-
-    this.reduceShuffleBytes = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES);
-    this.reduceBytesDecompressed = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_DECOMPRESSED);
-
-    this.bytesShuffledToDisk = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_DISK);
-    this.bytesShuffledToDiskDirect = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_DISK_DIRECT);
-    this.bytesShuffledToMemory = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_MEMORY);
+    this.shuffleNumSkippedOrderedInputCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_NUM_SKIPPED_ORDERED_INPUTS);
 
     // Counters used by Fetchers
     TezCounter ioErrsCounter = inputContext.getCounters().findCounter(SHUFFLE_ERR_GRP_NAME,
@@ -212,6 +194,7 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
       long copyDuration) throws IOException {
     int inputIdentifier = srcAttemptIdentifier.getInputIdentifier();
 
+    boolean updateStats = false;
     if (!isInputFinished(inputIdentifier)) {
       // guard shuffleInfoEventsMap[], already covered by this.synchronized
       // The result of checkCommitRegister() is valid in this.synchronized, so inside fetchSucceeded()
@@ -228,26 +211,18 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
       if (output != null) {
         if (commitAndRegister) {
           output.commit();
-          fetchStatsLogger.logIndividualFetchComplete(copyDuration, bytesCompressed, bytesDecompressed,
-              output.getType().toString(), srcAttemptIdentifier);
-          if (output.getType() == Type.DISK) {
-            bytesShuffledToDisk.increment(bytesCompressed);
-          } else if (output.getType() == Type.DISK_DIRECT) {
-            bytesShuffledToDiskDirect.increment(bytesCompressed);
-          } else {
-            bytesShuffledToMemory.increment(bytesCompressed);
-          }
-          shuffleInputsCounter.increment(1);
+          updateStats = true;
         } else {
           LOG.warn("Duplicate fetch of ordered input for {} ({} remaining): {}",
             inputContext.getUniqueIdentifier(), remainingMaps.get(), srcAttemptIdentifier);
+          shuffleNumDuplicateInputsCounter.increment(1);
+          // free the resource - especially memory
           output.abort();
         }
       } else {
         // cannot call output.commit()/abort()
-        // Output null implies that a physical input completion is being
-        // registered without needing to fetch data
-        shuffleSkippedInputCounter.increment(1);
+        // Output null implies that a physical input completion is being registered without needing to fetch data
+        shuffleNumSkippedOrderedInputCounter.increment(1);
       }
 
       // 2. register completed input if necessary
@@ -277,12 +252,6 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
         LOG.info("All inputs fetched for ShuffleScheduler {}", shuffleClientId);
       }
 
-      // update the status
-      totalBytesShuffledTillNow += bytesCompressed;
-      logProgress();
-      reduceShuffleBytes.increment(bytesCompressed);
-      reduceBytesDecompressed.increment(bytesDecompressed);
-
       if (LOG.isDebugEnabled()) {
         LOG.debug("Source done for {} ({} remaining): {}",
             inputContext.getUniqueIdentifier(), remainingMaps.get(), srcAttemptIdentifier);
@@ -291,12 +260,21 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
       // input is already finished. duplicate fetch.
       LOG.warn("Fetch of ordered input after completion for {} ({} remaining): {}",
           inputContext.getUniqueIdentifier(), remainingMaps.get(), srcAttemptIdentifier);
-
       // free the resource - especially memory
-      // If the src does not generate data, output will be null.
+      // If the source does not generate data, output will be null.
       if (output != null) {
+        shuffleNumDuplicateInputsCounter.increment(1);
         output.abort();
       }
+    }
+
+    if (updateStats) {
+      updateCounters(srcAttemptIdentifier, bytesCompressed, bytesDecompressed, copyDuration,
+          output.getType().toString(),
+          output.getType() == Type.DISK,
+          output.getType() == Type.DISK_DIRECT);
+      totalBytesShuffledTillNow += bytesCompressed;
+      logProgress();
     }
   }
 
@@ -340,7 +318,7 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
   public void fetchFailed(CompositeInputAttemptIdentifier srcAttemptIdentifier,
                           boolean readFailed, boolean connectFailed) {
     int inputIdentifier = srcAttemptIdentifier.getInputIdentifier();
-    shuffleFailedInputsCounter.increment(1);
+    shuffleNumFailedInputsCounter.increment(1);
 
     if (isInputFinished(inputIdentifier)) {
       LOG.warn("Ordered fetch failed for {}, but input already completed: InputIdentifier={}",

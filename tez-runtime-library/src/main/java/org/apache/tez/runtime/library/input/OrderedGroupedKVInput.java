@@ -79,7 +79,6 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput {
 
   private TezCounter inputKeyCounter;
   private TezCounter inputValueCounter;
-  private TezCounter shuffleInputs;
 
   private final AtomicBoolean isStarted = new AtomicBoolean(false);
 
@@ -109,7 +108,7 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput {
 
     this.inputKeyCounter = getContext().getCounters().findCounter(TaskCounter.INPUT_GROUPS_ORDERED);
     this.inputValueCounter = getContext().getCounters().findCounter(TaskCounter.INPUT_RECORDS_ORDERED);
-    this.shuffleInputs = getContext().getCounters().findCounter(TaskCounter.NUM_SHUFFLE_INPUTS);
+
     this.conf.setStrings(TezRuntimeFrameworkConfigs.LOCAL_DIRS, getContext().getWorkDirs());
 
     return Collections.emptyList();
@@ -257,9 +256,7 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput {
     int totalInputs = getNumPhysicalInputs();
     if (totalInputs != 0) {
       synchronized (this) {
-        return ((0.5f) * this.shuffleInputs.getValue() / totalInputs) +
-            ((rawIter != null) ?
-             ((0.5f) * rawIter.getProgress().getProgress()) : 0.0f);
+        return (rawIter != null) ? rawIter.getProgress().getProgress() : 0.0f;
       }
     } else {
       return 0.0f;
@@ -298,7 +295,6 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput {
 
     vIter = new ValuesIterator(rawIter, rawComparator, keyClass, valClass,
         conf, inputKeyCounter, inputValueCounter);
-
   }
 
   @SuppressWarnings("rawtypes")

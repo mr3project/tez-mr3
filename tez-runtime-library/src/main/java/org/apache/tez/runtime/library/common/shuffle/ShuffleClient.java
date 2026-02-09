@@ -20,11 +20,14 @@ package org.apache.tez.runtime.library.common.shuffle;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.tez.common.Preconditions;
+import org.apache.tez.common.counters.TaskCounter;
+import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
+import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.MapOutput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -121,6 +124,17 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
   private int numPartitionRanges = 0;
   private final Object lock = new Object();
 
+  private final TezCounter shuffleNumInputsCounter;
+  protected final TezCounter shuffleNumDuplicateInputsCounter;
+  protected final TezCounter shuffleNumFailedInputsCounter;
+
+  private final TezCounter shuffleBytesCounter;
+  private final TezCounter shuffleBytesDecompressedCounter;
+
+  private final TezCounter shuffleBytesDiskCounter;
+  private final TezCounter shuffleBytesDiskDirectCounter;
+  private final TezCounter shuffleBytesMemoryCounter;
+
   public ShuffleClient(
       InputContext inputContext,
       Configuration conf,
@@ -144,6 +158,15 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
     this.shuffleInfoEventsMap = new HashMap<Integer, ShuffleEventInfo>();
 
     this.shuffleClientId = shuffleServer.register(this);
+
+    this.shuffleNumInputsCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_NUM_INPUTS);
+    this.shuffleNumDuplicateInputsCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_NUM_DUPLICATE_INPUTS);
+    this.shuffleNumFailedInputsCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_NUM_FAILED_INPUTS);
+    this.shuffleBytesCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES);
+    this.shuffleBytesDecompressedCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_DECOMPRESSED);
+    this.shuffleBytesDiskCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_DISK);
+    this.shuffleBytesDiskDirectCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_DISK_DIRECT);
+    this.shuffleBytesMemoryCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_MEMORY);
   }
 
   public int getNumInputs() {
@@ -371,6 +394,28 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
     }
 
     return true;
+  }
+
+  // process counters for completed and commit fetches only
+  protected void updateCounters(
+      InputAttemptIdentifier srcAttemptIdentifier,
+      long bytesCompressed,
+      long bytesDecompressed,
+      long copyDuration,
+      String outputType, boolean isOutputDisk, boolean isOutputDiskDirect) {
+    fetchStatsLogger.logIndividualFetchComplete(copyDuration, bytesCompressed, bytesDecompressed,
+      outputType, srcAttemptIdentifier);
+
+    shuffleNumInputsCounter.increment(1);
+    shuffleBytesCounter.increment(bytesCompressed);
+    shuffleBytesDecompressedCounter.increment(bytesDecompressed);
+    if (isOutputDisk) {
+      shuffleBytesDiskCounter.increment(bytesCompressed);
+    } else if (isOutputDiskDirect) {
+      shuffleBytesDiskDirectCounter.increment(bytesCompressed);
+    } else {
+      shuffleBytesMemoryCounter.increment(bytesCompressed);
+    }
   }
 
   protected abstract void killSelf(Exception exception, String message);

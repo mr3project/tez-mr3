@@ -28,7 +28,6 @@ import java.util.Map;
 
 import com.google.common.collect.Maps;
 import org.apache.tez.runtime.api.Event;
-import org.apache.tez.runtime.api.OutputStatisticsReporter;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
@@ -144,10 +143,6 @@ public abstract class ExternalSorter {
   // Number of spills written & consumed by the same task to generate the final file
   protected final TezCounter numAdditionalSpillsCounter;
 
-  // Number of files offered via shuffle-handler to consumers.
-  // TODO: restore when numShuffleChunks is useful for analysis
-  // protected final TezCounter numShuffleChunks;
-
   protected Path finalOutputFile;
   // null if writeSpillRecord == false
   protected Path finalIndexFile;
@@ -246,8 +241,6 @@ public abstract class ExternalSorter {
     this.additionalSpillBytesWrittenCounter = outputContext.getCounters().findCounter(TaskCounter.SPILL_BYTES_DISK);
     this.additionalSpillBytesReadCounter = outputContext.getCounters().findCounter(TaskCounter.SPILL_BYTES_READ_ADDITIONAL);
     this.numAdditionalSpillsCounter = outputContext.getCounters().findCounter(TaskCounter.SPILL_COUNT_ADDITIONAL);
-
-    // this.numShuffleChunks = outputContext.getCounters().findCounter(TaskCounter.SHUFFLE_CHUNK_COUNT);
 
     finalIndexComputed = false;
   }

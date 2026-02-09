@@ -46,6 +46,7 @@ import org.apache.tez.runtime.library.common.shuffle.ShuffleClient;
 
 import org.apache.tez.common.Preconditions;
 import com.google.common.collect.Lists;
+import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.MapOutput;
 
 // This only knows how to deal with a single srcIndex for a given targetIndex.
 // In case the src task generates multiple outputs for the same target Index
@@ -55,17 +56,6 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
   private final FetchedInputAllocator inputManager;
 
   private final TezCounter approximateInputRecords;
-
-  private final TezCounter shuffleInputsCounter;
-  private final TezCounter shuffleFailedInputsCounter;
-
-  private final TezCounter bytesShuffledCounter;
-  private final TezCounter decompressedDataSizeCounter;
-
-  private final TezCounter bytesShuffledToDiskCounter;
-  private final TezCounter bytesShuffledDirectDiskCounter;
-  private final TezCounter bytesShuffledToMemoryCounter;
-
   private final TezCounter shufflePhaseTime;
 
   private final long startTime;
@@ -106,17 +96,6 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
     this.inputManager = inputAllocator;
 
     this.approximateInputRecords = inputContext.getCounters().findCounter(TaskCounter.APPROXIMATE_INPUT_RECORDS);
-
-    this.shuffleInputsCounter = inputContext.getCounters().findCounter(TaskCounter.NUM_SHUFFLE_INPUTS);
-    this.shuffleFailedInputsCounter = inputContext.getCounters().findCounter(TaskCounter.NUM_SHUFFLE_FAILED_INPUTS);
-
-    this.bytesShuffledCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES);
-    this.decompressedDataSizeCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_DECOMPRESSED);
-
-    this.bytesShuffledToDiskCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_DISK);
-    this.bytesShuffledDirectDiskCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_DISK_DIRECT);
-    this.bytesShuffledToMemoryCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_MEMORY);
-
     this.shufflePhaseTime = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_PHASE_TIME);
 
     this.startTime = System.currentTimeMillis();
@@ -236,7 +215,9 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
   public void fetchSucceeded(
       InputAttemptIdentifier srcAttemptIdentifier,
       FetchedInput fetchedInput,
-      long fetchedBytes, long decompressedLength, long copyDuration) throws IOException {
+      long bytesCompressed,
+      long bytesDecompressed,
+      long copyDuration) throws IOException {
     int inputIdentifier = srcAttemptIdentifier.getInputIdentifier();
 
     boolean updateStats = false;
@@ -252,7 +233,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
           assert !(isPipelined && commitAndRegister) || !killInPipelined;
           assert !(isPipelined && killInPipelined) || !commitAndRegister;
 
-          // 1. call fetchedInput.commit() or fetchecInput.abort() if necessary
+          // 1. call fetchedInput.commit() or fetchedInput.abort() if necessary
           // consider commitAndRegister only
           if (commitAndRegister) {
             fetchedInput.commit();  // may fail with IOException
@@ -260,6 +241,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
           } else {
             LOG.warn("Duplicate fetch of unordered input for {} ({}/{} completed): {}",
               inputContext.getUniqueIdentifier(), numCompletedInputs.get(), numInputs, srcAttemptIdentifier);
+            shuffleNumDuplicateInputsCounter.increment(1);
             fetchedInput.abort();
           }
 
@@ -287,32 +269,19 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
       } else {
         // input is already finished. duplicate fetch.
         LOG.warn("Fetch of unordered input after completion for {} ({}/{} completed): {}",
-          inputContext.getUniqueIdentifier(), numCompletedInputs.get(), numInputs, srcAttemptIdentifier);
-
+            inputContext.getUniqueIdentifier(), numCompletedInputs.get(), numInputs, srcAttemptIdentifier);
         // free the resource - especially memory
+        shuffleNumDuplicateInputsCounter.increment(1);
         fetchedInput.abort();
       }
     }
 
     if (updateStats) {
-      fetchStatsLogger.logIndividualFetchComplete(copyDuration,
-          fetchedBytes, decompressedLength, fetchedInput.getType().toString(), srcAttemptIdentifier);
-
-      // Processing counters for completed and commit fetches only. Need
-      // additional counters for excessive fetches - which primarily comes
-      // in after speculation or retries.
-      shuffleInputsCounter.increment(1);
-      bytesShuffledCounter.increment(fetchedBytes);
-      if (fetchedInput.getType() == Type.MEMORY) {
-        bytesShuffledToMemoryCounter.increment(fetchedBytes);
-      } else if (fetchedInput.getType() == Type.DISK) {
-        bytesShuffledToDiskCounter.increment(fetchedBytes);
-      } else if (fetchedInput.getType() == Type.DISK_DIRECT) {
-        bytesShuffledDirectDiskCounter.increment(fetchedBytes);
-      }
-      decompressedDataSizeCounter.increment(decompressedLength);
-
-      long totalBytes = totalBytesShuffledTillNow.addAndGet(fetchedBytes);
+      updateCounters(srcAttemptIdentifier, bytesCompressed, bytesDecompressed, copyDuration,
+          fetchedInput.getType().toString(),
+          fetchedInput.getType() == Type.DISK,
+          fetchedInput.getType() == Type.DISK_DIRECT);
+      long totalBytes = totalBytesShuffledTillNow.addAndGet(bytesCompressed);
       logProgress(totalBytes);
     }
   }
@@ -398,7 +367,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
       CompositeInputAttemptIdentifier srcAttemptIdentifier, boolean readFailed, boolean connectFailed) {
     assert !readFailed;   // ignore in ShuffleManager
     final int inputIdentifier = srcAttemptIdentifier.getInputIdentifier();
-    shuffleFailedInputsCounter.increment(1);
+    shuffleNumFailedInputsCounter.increment(1);
 
     synchronized (completedInputSet) {
       boolean isCompleted = completedInputSet.get(inputIdentifier);

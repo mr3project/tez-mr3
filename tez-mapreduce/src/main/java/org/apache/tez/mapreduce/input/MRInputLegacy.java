@@ -25,16 +25,12 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.apache.tez.runtime.api.ProgressFailedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience.LimitedPrivate;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.RecordReader;
 import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.api.events.InputDataInformationEvent;
 
-@LimitedPrivate("Hive")
 public class MRInputLegacy extends MRInput {
 
   private static final Logger LOG = LoggerFactory.getLogger(MRInputLegacy.class);
@@ -72,20 +68,17 @@ public class MRInputLegacy extends MRInput {
     super(inputContext, numPhysicalInputs);
   }
 
-  @Private
   protected void initializeInternal() throws IOException {
     if (LOG.isDebugEnabled()) {
       LOG.debug(getContext().getSourceVertexName() + " MRInputLegacy deferring initialization");
     }
   }
   
-  @Private
   public org.apache.hadoop.mapreduce.InputSplit getNewInputSplit() {
     return (org.apache.hadoop.mapreduce.InputSplit) mrReader.getSplit();
   }  
 
   @SuppressWarnings("rawtypes")
-  @Unstable
   public org.apache.hadoop.mapreduce.RecordReader getNewRecordReader() {
     return (org.apache.hadoop.mapreduce.RecordReader) mrReader.getRecordReader();
   }
@@ -94,23 +87,19 @@ public class MRInputLegacy extends MRInput {
       return super.getProgress();
   }
 
-  @Private
   public InputSplit getOldInputSplit() {
     return (InputSplit) mrReader.getSplit();
   }
 
-  @Unstable
   public boolean isUsingNewApi() {
     return this.useNewApi;
   }
 
   @SuppressWarnings("rawtypes")
-  @Private
   public RecordReader getOldRecordReader() {
     return (RecordReader) mrReader.getRecordReader();
   }
   
-  @LimitedPrivate("hive")
   public void init() throws IOException {
     super.initializeInternal();
     checkAndAwaitRecordReaderInitialization();

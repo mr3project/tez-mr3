@@ -85,7 +85,6 @@ public class Shuffle implements ExceptionReporter {
   private final AtomicBoolean mergerClosed = new AtomicBoolean(false);
 
   private final long startTime;
-  private final TezCounter mergePhaseTime;
   private final TezCounter shufflePhaseTime;
 
   public Shuffle(InputContext inputContext, Configuration conf, int numInputs,
@@ -143,7 +142,6 @@ public class Shuffle implements ExceptionReporter {
         startTime,
         srcNameTrimmed);
 
-    this.mergePhaseTime = inputContext.getCounters().findCounter(TaskCounter.MERGE_PHASE_TIME);
     this.shufflePhaseTime = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_PHASE_TIME);
 
     boolean compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
@@ -280,7 +278,6 @@ public class Shuffle implements ExceptionReporter {
         throwable.set(e);
         throw new ShuffleError("Error while doing final merge ", e);
       }
-      mergePhaseTime.setValue(System.currentTimeMillis() - startTime);
 
       // Sanity check
       synchronized (Shuffle.this) {
