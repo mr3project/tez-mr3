@@ -22,6 +22,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.tez.common.Preconditions;
 import org.apache.tez.common.counters.TaskCounter;
 import org.apache.tez.common.counters.TezCounter;
+import org.apache.tez.common.counters.TezCounters;
 import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
@@ -157,6 +158,8 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
   private int numPartitionRanges = 0;
   private final Object lock = new Object();
 
+  private final TezCounter shuffleNumFetchersCounter;
+
   private final TezCounter shuffleNumInputsCounter;
   protected final TezCounter shuffleNumDuplicateInputsCounter;
   protected final TezCounter shuffleNumFailedInputsCounter;
@@ -194,27 +197,23 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
 
     this.shuffleClientId = shuffleServer.register(this);
 
-    this.shuffleNumInputsCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_NUM_INPUTS);
-    this.shuffleNumDuplicateInputsCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_NUM_DUPLICATE_INPUTS);
-    this.shuffleNumFailedInputsCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_NUM_FAILED_INPUTS);
-    this.shuffleBytesCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES);
-    this.shuffleBytesDecompressedCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_DECOMPRESSED);
-    this.shuffleBytesDiskCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_DISK);
-    this.shuffleBytesDiskDirectCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_DISK_DIRECT);
-    this.shuffleBytesMemoryCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_BYTES_MEMORY);
+    TezCounters counters = inputContext.getCounters();
+    this.shuffleNumFetchersCounter = counters.findCounter(TaskCounter.SHUFFLE_NUM_FETCHERS);
+    this.shuffleNumInputsCounter = counters.findCounter(TaskCounter.SHUFFLE_NUM_INPUTS);
+    this.shuffleNumDuplicateInputsCounter = counters.findCounter(TaskCounter.SHUFFLE_NUM_DUPLICATE_INPUTS);
+    this.shuffleNumFailedInputsCounter = counters.findCounter(TaskCounter.SHUFFLE_NUM_FAILED_INPUTS);
+    this.shuffleBytesCounter = counters.findCounter(TaskCounter.SHUFFLE_BYTES);
+    this.shuffleBytesDecompressedCounter = counters.findCounter(TaskCounter.SHUFFLE_BYTES_DECOMPRESSED);
+    this.shuffleBytesDiskCounter = counters.findCounter(TaskCounter.SHUFFLE_BYTES_DISK);
+    this.shuffleBytesDiskDirectCounter = counters.findCounter(TaskCounter.SHUFFLE_BYTES_DISK_DIRECT);
+    this.shuffleBytesMemoryCounter = counters.findCounter(TaskCounter.SHUFFLE_BYTES_MEMORY);
 
-    TezCounter ioErrsCounter = inputContext.getCounters().findCounter(SHUFFLE_ERR_GRP_NAME,
-        ShuffleErrors.IO_ERROR.toString());
-    TezCounter wrongLengthErrsCounter = inputContext.getCounters().findCounter(SHUFFLE_ERR_GRP_NAME,
-        ShuffleErrors.WRONG_LENGTH.toString());
-    TezCounter badIdErrsCounter = inputContext.getCounters().findCounter(SHUFFLE_ERR_GRP_NAME,
-        ShuffleErrors.BAD_ID.toString());
-    TezCounter wrongMapErrsCounter = inputContext.getCounters().findCounter(SHUFFLE_ERR_GRP_NAME,
-        ShuffleErrors.WRONG_MAP.toString());
-    TezCounter connectionErrsCounter = inputContext.getCounters().findCounter(SHUFFLE_ERR_GRP_NAME,
-        ShuffleErrors.CONNECTION.toString());
-    TezCounter wrongReduceErrsCounter = inputContext.getCounters().findCounter(SHUFFLE_ERR_GRP_NAME,
-        ShuffleErrors.WRONG_REDUCE.toString());
+    TezCounter ioErrsCounter = counters.findCounter(SHUFFLE_ERR_GRP_NAME, ShuffleErrors.IO_ERROR.toString());
+    TezCounter wrongLengthErrsCounter = counters.findCounter(SHUFFLE_ERR_GRP_NAME, ShuffleErrors.WRONG_LENGTH.toString());
+    TezCounter badIdErrsCounter = counters.findCounter(SHUFFLE_ERR_GRP_NAME, ShuffleErrors.BAD_ID.toString());
+    TezCounter wrongMapErrsCounter = counters.findCounter(SHUFFLE_ERR_GRP_NAME, ShuffleErrors.WRONG_MAP.toString());
+    TezCounter connectionErrsCounter = counters.findCounter(SHUFFLE_ERR_GRP_NAME, ShuffleErrors.CONNECTION.toString());
+    TezCounter wrongReduceErrsCounter = counters.findCounter(SHUFFLE_ERR_GRP_NAME, ShuffleErrors.WRONG_REDUCE.toString());
     this.shuffleErrorCounterGroup = new ShuffleErrorCounterGroup(
         ioErrsCounter, wrongLengthErrsCounter,
         badIdErrsCounter, wrongMapErrsCounter,
@@ -349,6 +348,7 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
   }
 
   public void fetcherFinished() {
+    shuffleNumFetchersCounter.increment(1);
     synchronized (lock) {
       numFetchers -= 1;
       assert numFetchers >= 0;
