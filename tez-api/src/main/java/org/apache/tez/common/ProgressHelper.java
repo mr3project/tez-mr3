@@ -31,8 +31,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+// ProgressHelper is unnecessary in MR3 because RuntimeTask.progress set by ProcessorContext.setProgress() is never used.
+// In Hive-MR3, ProgressHelper is created via reflection in TezProcessor.ReflectiveProgressHelper.
+
 public class ProgressHelper {
   private static final Logger LOG = LoggerFactory.getLogger(ProgressHelper.class);
+
   private String processorName;
   protected final Map<String, LogicalInput> inputs;
   final ProcessorContext processorContext;
@@ -85,5 +89,4 @@ public class ProgressHelper {
       scheduledExecutorService = null;
     }
   }
-
 }
