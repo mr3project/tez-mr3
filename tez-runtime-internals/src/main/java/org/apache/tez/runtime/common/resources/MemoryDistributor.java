@@ -170,7 +170,7 @@ public class MemoryDistributor {
           "A single entity can only make one call to request resources for now");
     }
 
-    RequestorInfo requestInfo = new RequestorInfo(entityContext,requestSize, callback, descriptor);
+    RequestorInfo requestInfo = new RequestorInfo(entityContext, requestSize, callback, descriptor);
     switch (requestInfo.getRequestContext().getComponentType()) {
     case INPUT:
       numInputsSeen.incrementAndGet();

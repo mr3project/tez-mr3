@@ -375,8 +375,9 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       }
 
       InputHost.PartitionRange range = pendingInputsSeq.getPartitionRange();
+      String appIdInURI = fetcherConfigCommon.compositeFetch ? null : applicationId;
       StringBuilder baseURI = ShuffleUtils.constructBaseURIForShuffleHandler(finalHost,
-          port, range, applicationId, shuffleScheduler.getDagIdentifier(),
+          port, range, appIdInURI,
           fetcherConfigCommon.httpConnectionParams.isSslShuffle());
 
       Collection<CompositeInputAttemptIdentifier> inputsForPathComponents =

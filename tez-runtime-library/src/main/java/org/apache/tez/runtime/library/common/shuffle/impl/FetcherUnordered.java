@@ -214,8 +214,9 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       }
 
       InputHost.PartitionRange range = pendingInputsSeq.getPartitionRange();
+      String appIdInURI = fetcherConfigCommon.compositeFetch ? null : applicationId;
       StringBuilder baseURI = ShuffleUtils.constructBaseURIForShuffleHandler(finalHost,
-          port, range, applicationId, shuffleManager.getDagIdentifier(), httpConnectionParams.isSslShuffle());
+          port, range, appIdInURI, httpConnectionParams.isSslShuffle());
 
       Collection<CompositeInputAttemptIdentifier> inputsForPathComponents =
         pendingInputsSeq.getInputs().subList(currentIndex, pendingInputsSeq.getInputs().size());

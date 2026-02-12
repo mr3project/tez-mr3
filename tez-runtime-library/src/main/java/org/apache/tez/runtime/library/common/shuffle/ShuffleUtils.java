@@ -201,18 +201,19 @@ public class ShuffleUtils {
   }
 
   public static StringBuilder constructBaseURIForShuffleHandler(String host,
-      int port, InputHost.PartitionRange range, String appId, int dagIdentifier, boolean sslShuffle) {
+      int port, InputHost.PartitionRange range, @Nullable String appId, boolean sslShuffle) {
     final String http_protocol = (sslShuffle) ? "https://" : "http://";
     StringBuilder sb = new StringBuilder(http_protocol);
     sb.append(host);
     sb.append(":");
     sb.append(port);
-    sb.append("/");
-    sb.append("mapOutput?job=");
-    sb.append(appId.replace("application", "job"));
-    // sb.append("&dag=");
-    // sb.append(dagIdentifier);
-    sb.append("&reduce=");
+    if (appId != null) {
+      sb.append("/mapOutput?job=");
+      sb.append(appId.replace("application", "job"));
+      sb.append("&reduce=");
+    } else {
+      sb.append("/mapOutput?reduce=");
+    }
     sb.append(range.toString());
     sb.append("&map=");
     return sb;
