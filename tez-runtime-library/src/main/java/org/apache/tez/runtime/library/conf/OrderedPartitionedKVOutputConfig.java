@@ -175,14 +175,6 @@ public class OrderedPartitionedKVOutputConfig {
       return this;
     }
 
-    public Builder setSorter(SorterImpl sorterImpl) {
-      Objects.requireNonNull(sorterImpl, "Sorter cannot be null");
-      this.conf.set(TezRuntimeConfiguration.TEZ_RUNTIME_SORTER_CLASS,
-          sorterImpl.name());
-      return this;
-    }
-
-
     @SuppressWarnings("unchecked")
     public Builder setAdditionalConfiguration(String key, String value) {
       Objects.requireNonNull(key, "Key cannot be null");

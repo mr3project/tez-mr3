@@ -18,15 +18,11 @@
 
 package org.apache.tez.runtime.library.common;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.tez.dag.api.TezUncheckedException;
-
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Container for a task number and an attempt number for the task.
  */
-@Private
 public class InputAttemptIdentifier {
 
   private final int inputIdentifier;

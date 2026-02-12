@@ -53,7 +53,6 @@ public class EdgeProperty {
      * are gathered by designated destination tasks.
      */
     SCATTER_GATHER,
-    
     /**
      * Custom routing defined by the user.
      */

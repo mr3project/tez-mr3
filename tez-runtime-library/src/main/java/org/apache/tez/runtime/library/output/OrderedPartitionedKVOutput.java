@@ -60,8 +60,7 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
 
   private static final Logger LOG = LoggerFactory.getLogger(OrderedPartitionedKVOutput.class);
 
-  protected ExternalSorter sorter;
-  private boolean usePipelinedSorter = false;
+  protected PipelinedSorter sorter;
   protected Configuration conf;
   private RawLocalFileSystem localFs;
   protected MemoryUpdateCallbackHandler memoryUpdateCallbackHandler;
@@ -107,17 +106,6 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
   public synchronized void start() throws Exception {
     if (!isStarted.get()) {
       memoryUpdateCallbackHandler.validateUpdateReceived();
-      String sorterClass = conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_SORTER_CLASS,
-          TezRuntimeConfiguration.TEZ_RUNTIME_SORTER_CLASS_DEFAULT).toUpperCase(Locale.ENGLISH);
-      SorterImpl sorterImpl = null;
-      try {
-        sorterImpl = SorterImpl.valueOf(sorterClass);
-      } catch (IllegalArgumentException e) {
-        throw new IllegalArgumentException("Invalid sorter class specified in config"
-            + ", propertyName=" + TezRuntimeConfiguration.TEZ_RUNTIME_SORTER_CLASS
-            + ", value=" + sorterClass
-            + ", validValues=" + Arrays.asList(SorterImpl.values()));
-      }
 
       isPipelinedShuffle = conf.getBoolean(
           TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED,
@@ -125,21 +113,8 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
       // We do not use TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT.
       isFinalMergeEnabled = !this.isPipelinedShuffle;
 
-      if (isPipelinedShuffle) {
-        Preconditions.checkArgument(sorterImpl.equals(SorterImpl.PIPELINED),
-            TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED + "only works with PipelinedSorter.");
-      }
-
-      if (sorterImpl.equals(SorterImpl.PIPELINED)) {
-        sorter = new PipelinedSorter(getContext(), conf, getNumPhysicalOutputs(),
-            memoryUpdateCallbackHandler.getMemoryAssigned());
-        usePipelinedSorter = true;
-      } else {
-        throw new UnsupportedOperationException("Unsupported sorter class specified in config"
-            + ", propertyName=" + TezRuntimeConfiguration.TEZ_RUNTIME_SORTER_CLASS
-            + ", value=" + sorterClass
-            + ", validValues=" + Arrays.asList(SorterImpl.values()));
-      }
+      sorter = new PipelinedSorter(getContext(), conf, getNumPhysicalOutputs(),
+          memoryUpdateCallbackHandler.getMemoryAssigned());
 
       isStarted.set(true);
     }
@@ -196,7 +171,7 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
 
       // In PipelinedSorter.flush() skips renaming output directories if finalMergeEnabled == true && numSpills == 1.
       // Here we adjust pathComponent in accordance so that downstream tasks can request, e.g., ".../...10031_0/file.out".
-      String pathComponent = (usePipelinedSorter && sorter.getNumSpills() == 1) ?
+      String pathComponent = (sorter.getNumSpills() == 1) ?
           getContext().getUniqueIdentifier() + "_0" :   // use original output directory ".../...10031_0"
           getContext().getUniqueIdentifier();           // use renamed output directory ".../...10031"
       String pathComponentExpanded = ShuffleUtils.expandPathComponent(getContext(), compositeFetch, pathComponent);
@@ -243,7 +218,6 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT);
-    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_SORTER_CLASS);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_FREE_MEMORY_WRITER_OUTPUT_THRESHOLD_MB);

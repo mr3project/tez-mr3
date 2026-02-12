@@ -30,7 +30,7 @@ message DataMovementEventPayloadProto {
   repeated int32 ports = 7;
   optional DataProto data = 8;
   optional bool last_event = 9;   // Related to pipelined shuffle
-  optional int32 spill_id = 10;   //  Related to pipelined shuffle.
+  optional int32 spill_id = 10;   // Related to pipelined shuffle
   optional int32 num_record = 11;
 } 
 

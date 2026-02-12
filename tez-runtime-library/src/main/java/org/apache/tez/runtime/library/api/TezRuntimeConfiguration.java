@@ -255,9 +255,9 @@ public class TezRuntimeConfiguration {
   /**
    * Expert level setting. Enable pipelined shuffle in ordered outputs and in unordered
    * partitioned outputs. In ordered cases, it works with PipelinedSorter.
-   * set tez.runtime.sort.threads to greater than 1 to enable pipelinedsorter.
+   * set tez.runtime.sort.threads to greater than 1 to enable PipelinedSorter.
    * Ensure to set tez.runtime.enable.final-merge.in.output=false.
-   * Speculative execution needs to be turned off when using this parameter. //TODO: TEZ-2132
+   * Speculative execution needs to be turned off when using this parameter. --> Not the case in MR3
    */
   @ConfigurationProperty(type = "boolean")
   public static final String TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED =
@@ -440,7 +440,6 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SORTER_MIN_BLOCK_SIZE_IN_MB);
     tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SORTER_USE_SOFT_REFERENCE);
     tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SORTER_LAZY_ALLOCATE_MEMORY);
-    tezRuntimeKeys.add(TEZ_RUNTIME_SORTER_CLASS);
     tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SORTER_SORT_THREADS);
     tezRuntimeKeys.add(TEZ_RUNTIME_UNORDERED_PARTITIONED_KVWRITER_BUFFER_MERGE_PERCENT);
     tezRuntimeKeys.add(TEZ_RUNTIME_UNORDERED_OUTPUT_BUFFER_SIZE_MB);

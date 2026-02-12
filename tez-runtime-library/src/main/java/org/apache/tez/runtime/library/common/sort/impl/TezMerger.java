@@ -186,11 +186,11 @@ public class TezMerger {
       Progressable progressable, long recordsBeforeProgress)
       throws IOException, InterruptedException {
     long recordCtr = 0;
-    long count = 0;
-    while(records.next()) {
+    // long count = 0;
+    while (records.next()) {
       if (records.isSameKey()) {
         writer.append(IFile.REPEAT_KEY, records.getValue());
-        count++;
+        // count++;
       } else {
         writer.append(records.getKey(), records.getValue());
       }
@@ -208,9 +208,9 @@ public class TezMerger {
         }
       }
     }
-    if ((count > 0) && LOG.isTraceEnabled()) {
+    /* if ((count > 0) && LOG.isTraceEnabled()) {
       LOG.trace("writeFile SAME_KEY count=" + count);
-    }
+    } */
   }
 
   static class KeyValueBuffer {
