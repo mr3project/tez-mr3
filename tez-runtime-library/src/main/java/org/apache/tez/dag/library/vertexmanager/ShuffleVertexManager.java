@@ -125,7 +125,7 @@ public class ShuffleVertexManager extends ShuffleVertexManagerBase {
   private int autoParallelismMaxReductionPercentage;
   private boolean useStatsAutoParallelism;
 
-  private int[][] targetIndexes;
+  private int[][] targetIndexes;  // targetIndexes[i][0] = start, targetIndexes[i][1] = count > 0
   private int basePartitionRange;
   private int remainderRangeForLastShuffler;
 
@@ -187,13 +187,11 @@ public class ShuffleVertexManager extends ShuffleVertexManagerBase {
     return mgrConfig;
   }
 
-  static int[] createIndices(int partitionRange, int taskIndex,
-      int offSetPerTask) {
+  static int[] createIndices(int partitionRange, int taskIndex, int offSetPerTask) {
     int startIndex = taskIndex * offSetPerTask;
-    int[] indices = new int[partitionRange];
-    for (int currentIndex = 0; currentIndex < partitionRange; ++currentIndex) {
-      indices[currentIndex] = (startIndex + currentIndex);
-    }
+    int[] indices = new int[2];
+    indices[0] = startIndex;
+    indices[1] = partitionRange;
     return indices;
   }
 
@@ -349,6 +347,7 @@ public class ShuffleVertexManager extends ShuffleVertexManagerBase {
     }
     buffer.putInt(indexes.length);
     for (int i = 0; i < indexes.length; i++) {
+      assert indexes[i].length == 2;  // indexes[i][0] = start, indexes[i][1] = count
       buffer.putInt(indexes[i].length);
       for (int j = 0; j < indexes[i].length; j++) {
         buffer.putInt(indexes[i][j]);
@@ -395,15 +394,13 @@ public class ShuffleVertexManager extends ShuffleVertexManagerBase {
     targetIndexes = new int[tasks][];
     for (int idx = 0; idx < tasks; ++idx) {
       int partitionRange = basePartitionRange;
-      if (idx == (tasks - 1)) {
-        partitionRange = ((remainderRangeForLastShuffler > 0)
-            ? remainderRangeForLastShuffler : basePartitionRange);
+      if (idx == tasks - 1) {
+        partitionRange = remainderRangeForLastShuffler > 0 ? remainderRangeForLastShuffler : basePartitionRange;
       }
       // skip the basePartitionRange per destination task
       targetIndexes[idx] = createIndices(partitionRange, idx, basePartitionRange);
       if (LOG.isDebugEnabled()) {
-        LOG.debug("targetIdx[{}] to {}", idx,
-            Arrays.toString(targetIndexes[idx]));
+        LOG.debug("targetIdx[{}] to {}", idx, Arrays.toString(targetIndexes[idx]));
       }
     }
   }
@@ -478,9 +475,12 @@ public class ShuffleVertexManager extends ShuffleVertexManagerBase {
         Preconditions.checkState(index < targetIndexes.length,
             "index={}, targetIndexes length={}", index, targetIndexes.length);
         int[] mapping = targetIndexes[index];
+        assert mapping.length == 2;
+        int startIndex = mapping[0];
+        int count = mapping[1];
         long partitionStats = 0L;
-        for (int i : mapping) {
-          partitionStats += getCurrentlyKnownStatsAtIndex(i);
+        for (int i = 0; i < count; i++) {
+          partitionStats += getCurrentlyKnownStatsAtIndex(startIndex + i);
         }
         int partitionStatsFinal = (int)Math.min(partitionStats, ShuffleUtils.KB_THRESHOLD_FOR_TB);
         computedPartitionSizes |= taskInfo.setInputStats(partitionStatsFinal);
