@@ -184,7 +184,7 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
   static class ReconfigVertexParams {
     final private int finalParallelism;
     final int[] mapping;
-    final int[][] indexes;
+    final int[][] indexes;  // indexes[i][0] = start, indexes[i][1] = count > 0
 
     public ReconfigVertexParams(final int finalParallelism) {
       this.finalParallelism = finalParallelism;
