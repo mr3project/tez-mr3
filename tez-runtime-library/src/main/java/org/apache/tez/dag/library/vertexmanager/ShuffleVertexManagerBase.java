@@ -40,6 +40,7 @@ import org.apache.tez.dag.api.VertexManagerPlugin;
 import org.apache.tez.dag.api.VertexManagerPluginContext.ScheduleTaskRequest;
 import org.apache.tez.dag.api.event.VertexState;
 import org.apache.tez.dag.api.event.VertexStateUpdate;
+import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.utils.DATA_RANGE_IN_MB;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
@@ -51,7 +52,6 @@ import org.apache.tez.runtime.api.TaskAttemptIdentifier;
 import org.apache.tez.runtime.api.TaskIdentifier;
 import org.apache.tez.runtime.api.events.VertexManagerEvent;
 import org.apache.tez.runtime.library.shuffle.impl.ShuffleUserPayloads.VertexManagerEventPayloadProto;
-
 
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -71,11 +71,8 @@ import java.util.zip.Inflater;
  * FairShuffleVertexManager.
  */
 abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
-  static long MB = 1024l * 1024l;
-  static long KB = 1024l;
 
-  private static final Logger LOG =
-     LoggerFactory.getLogger(ShuffleVertexManagerBase.class);
+  private static final Logger LOG = LoggerFactory.getLogger(ShuffleVertexManagerBase.class);
 
   ComputeRoutingAction computeRoutingAction = ComputeRoutingAction.WAIT;
 
@@ -124,10 +121,14 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
     final BitSet finishedTaskSet;
     int numTasks;
     int numVMEventsReceived;
+
     // The total uncompressed size
     long outputSize;
-    // The uncompressed size of each partition. The size might not be precise
+
+    // The uncompressed size of each partition. The size might not be precise.
+    // Invariant: never exceeds ShuffleUtils.KB_THRESHOLD_FOR_TB
     int[] statsInKB;
+
     EdgeManagerPluginDescriptor newDescriptor;  // used only in reconfigVertex()
 
     SourceVertexInfo(final EdgeProperty edgeProperty,
@@ -143,15 +144,6 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
 
     int getNumCompletedTasks() {
       return finishedTaskSet.cardinality();
-    }
-
-    BigInteger getExpectedStatsAtIndex(int index) {
-      return (numVMEventsReceived == 0) ?
-         BigInteger.ZERO :
-         BigInteger.valueOf(statsInKB[index]).
-           multiply(BigInteger.valueOf(numTasks)).
-           divide(BigInteger.valueOf(numVMEventsReceived)).
-           multiply(BigInteger.valueOf(KB));
     }
   }
 
@@ -177,6 +169,7 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
     public int getInputStats() {
       return inputStats;
     }
+
     // return true if stat is set.
     public boolean setInputStats(int inputStats) {
       if (inputStats > 0 && this.inputStats != inputStats) {
@@ -287,9 +280,7 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
     processPendingTasks(attempt);
   }
 
-  void parsePartitionStats(SourceVertexInfo srcInfo,
-      RoaringBitmap partitionStats) {
-    Preconditions.checkState(srcInfo.statsInKB != null, "Stats should be initialized");
+  void parsePartitionStats(SourceVertexInfo srcInfo, RoaringBitmap partitionStats) {
     Iterator<Integer> it = partitionStats.iterator();
     final DATA_RANGE_IN_MB[] RANGES = DATA_RANGE_IN_MB.values();
     final int RANGE_LEN = RANGES.length;
@@ -297,20 +288,18 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
       int pos = it.next();
       int index = ((pos) / RANGE_LEN);
       int rangeIndex = ((pos) % RANGE_LEN);
-      //Add to aggregated stats and normalize to DATA_RANGE_IN_MB.
       if (RANGES[rangeIndex].getSizeInMB() > 0) {
-        srcInfo.statsInKB[index] += RANGES[rangeIndex].getSizeInMB();
+        long sum = (long)srcInfo.statsInKB[index] + RANGES[rangeIndex].getSizeInMB() * 1024L;
+        srcInfo.statsInKB[index] = (int)Math.min(sum, ShuffleUtils.KB_THRESHOLD_FOR_TB);
       }
     }
   }
 
-  protected static final long KB_THRESHOLD = 1024l * 1024l * 1024l;   // corresponds to 1TB, ShuffleUtils.KB_THRESHOLD
-
-  void parseDetailedPartitionStats(SourceVertexInfo srcInfo,
-      List<Integer> partitionStats) {
-    for (int i=0; i<partitionStats.size(); i++) {
-      long sum = srcInfo.statsInKB[i] + partitionStats.get(i);
-      srcInfo.statsInKB[i] = (int)(sum >= KB_THRESHOLD ? KB_THRESHOLD : sum);
+  void parseDetailedPartitionStats(SourceVertexInfo srcInfo, List<Integer> partitionStats) {
+    for (int i = 0; i < partitionStats.size(); i++) {
+      assert partitionStats.get(i) <= ShuffleUtils.KB_THRESHOLD_FOR_TB;   // set in ShuffleUtils.getDetailedPartitionStatsForPhysicalOutput()
+      long sum = (long)srcInfo.statsInKB[i] + partitionStats.get(i);
+      srcInfo.statsInKB[i] = (int)Math.min(sum, ShuffleUtils.KB_THRESHOLD_FOR_TB);
     }
   }
 
@@ -362,13 +351,11 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
           partitionStats.deserialize(new DataInputStream(bin));
 
           parsePartitionStats(srcInfo, partitionStats);
-
         } catch (IOException e) {
           throw new TezUncheckedException(e);
         }
       } else if (proto.hasDetailedPartitionStats()) {
-        List<Integer> detailedPartitionStats =
-            proto.getDetailedPartitionStats().getSizeInMbList();
+        List<Integer> detailedPartitionStats = proto.getDetailedPartitionStats().getSizeInKbList();
         parseDetailedPartitionStats(srcInfo, detailedPartitionStats);
       }
       srcInfo.numVMEventsReceived++;
@@ -410,8 +397,7 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
         numBipartiteSourceTasksCompleted != totalNumBipartiteSourceTasks) {
       // Wait when there aren't enough completed tasks
       return ComputeRoutingAction.WAIT;
-    } else if (numVertexManagerEventsReceived == 0 &&
-      totalNumBipartiteSourceTasks > 0) {
+    } else if (numVertexManagerEventsReceived == 0 && totalNumBipartiteSourceTasks > 0) {
       // When source tasks don't have output data,
       // there will be no VME.
       return ComputeRoutingAction.SKIP;
@@ -462,23 +448,10 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
 
   int getCurrentlyKnownStatsAtIndex(int index) {
     long stats = 0L;
-    for(SourceVertexInfo entry : getAllSourceVertexInfo()) {
+    for (SourceVertexInfo entry : getAllSourceVertexInfo()) {
       stats += entry.statsInKB[index];
     }
-    return (int)(stats >= KB_THRESHOLD ? KB_THRESHOLD : stats);
-  }
-
-  long getExpectedStatsAtIndex(int index) {
-    BigInteger stats = BigInteger.ZERO;
-    for(SourceVertexInfo entry : getAllSourceVertexInfo()) {
-      stats = stats.add(entry.getExpectedStatsAtIndex(index));
-    }
-    if (stats.compareTo(BigInteger.valueOf(Long.MAX_VALUE)) > 0) {
-      LOG.warn("Partition {}'s size {} exceeded Long.MAX_VALUE", index, stats);
-      return Long.MAX_VALUE;
-    } else {
-      return stats.longValue();
-    }
+    return (int)Math.min(stats, ShuffleUtils.KB_THRESHOLD_FOR_TB);
   }
 
   /**
@@ -520,7 +493,6 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
   /**
    * End of functions related to how new parallelism is determined.
    */
-
 
   /**
    * Subclass might return null or empty list to indicate no tasks
@@ -709,6 +681,7 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
     final private long desiredTaskInputDataSize;
     final private float slowStartMinFraction;
     final private float slowStartMaxFraction;
+
     public ShuffleVertexManagerBaseConfig(final boolean enableAutoParallelism,
         final long desiredTaskInputDataSize, final float slowStartMinFraction,
         final float slowStartMaxFraction) {

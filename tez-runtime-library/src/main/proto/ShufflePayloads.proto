@@ -48,7 +48,7 @@ message InputInformationEventPayloadProto {
 // DetailedPartitionStatsProto represents size of a list of partitions.
 // It is more accurate than the partition_stats.
 message DetailedPartitionStatsProto {
-  repeated int32 size_in_mb = 1;
+  repeated int32 size_in_kb = 1;
 }
 
 message VertexManagerEventPayloadProto {

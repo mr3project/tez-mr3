@@ -81,9 +81,12 @@ import org.apache.tez.runtime.library.shuffle.impl.ShuffleUserPayloads.DetailedP
 public class ShuffleUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(ShuffleUtils.class);
-  private static final long MB = 1024l * 1024l;
-  private static final long KB = 1024l;
-  private static final long KB_THRESHOLD = 1024l * 1024l * 1024l;   // corresponds to 1TB
+
+  public static final long MB = 1024L * 1024L;
+  public static final long KB = 1024L;
+
+  // used for the invariant on SourceVertexInfo.statsInKB[]
+  public static final long KB_THRESHOLD_FOR_TB = 1024L * 1024L * 1024L;   // corresponds to 1TB
 
   public static SecretKey getJobTokenSecretFromTokenBytes(ByteBuffer meta)
       throws IOException {
@@ -472,14 +475,13 @@ public class ShuffleUtils {
     vmBuilder.setNumRecord(context.getCounters().findCounter(TaskCounter.OUTPUT_RECORDS).getValue()
      + context.getCounters().findCounter(TaskCounter.OUTPUT_LARGE_RECORDS).getValue());
 
-    //set partition stats
+    // set partition stats
     if (sizePerPartition != null && sizePerPartition.length > 0) {
       if (reportDetailedPartitionStats) {
         vmBuilder.setDetailedPartitionStats(
             getDetailedPartitionStatsForPhysicalOutput(sizePerPartition));
       } else {
-        RoaringBitmap stats = getPartitionStatsForPhysicalOutput(
-            sizePerPartition);
+        RoaringBitmap stats = getPartitionStatsForPhysicalOutput(sizePerPartition);
         DataOutputBuffer dout = new DataOutputBuffer();
         stats.serialize(dout);
         ByteString partitionStatsBytes =
@@ -525,13 +527,12 @@ public class ShuffleUtils {
   public static DetailedPartitionStatsProto getDetailedPartitionStatsForPhysicalOutput(long[] sizes) {
     DetailedPartitionStatsProto.Builder builder = DetailedPartitionStatsProto.newBuilder();
     for (int i = 0; i < sizes.length; i++) {
-      // Round the size up. So 1 byte -> the value of sizeInMB == 1
+      // Round the size up. So 1 byte -> the value of sizeInKB == 1
       // Throws IllegalArgumentException if value is greater than Integer.MAX_VALUE.
-      // That should be ok given Integer.MAX_VALUE * MB means PB.
-      // --> revised to use KB with truncation
-      long sizeInKb = ceil(sizes[i], KB);
-      long adjustedSizeInKb = sizeInKb >= KB_THRESHOLD ? KB_THRESHOLD : sizeInKb;
-      builder.addSizeInMb((int)adjustedSizeInKb);
+      // That should be ok given Integer.MAX_VALUE * KB means TB.
+      long sizeInKB = ceil(sizes[i], KB);
+      long adjustedSizeInKB = Math.min(sizeInKB, KB_THRESHOLD_FOR_TB);
+      builder.addSizeInKb((int)adjustedSizeInKB);
     }
     return builder.build();
   }
