@@ -127,14 +127,14 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
     // The total uncompressed size
     long outputSize;
     // The uncompressed size of each partition. The size might not be precise
-    int[] statsInMB;  // TODO: rename to statsInKB[]
+    int[] statsInKB;
     EdgeManagerPluginDescriptor newDescriptor;  // used only in reconfigVertex()
 
     SourceVertexInfo(final EdgeProperty edgeProperty,
        int totalTasksToSchedule) {
       this.edgeProperty = edgeProperty;
       this.finishedTaskSet = new BitSet();
-      this.statsInMB = new int[totalTasksToSchedule];
+      this.statsInKB = new int[totalTasksToSchedule];
     }
 
     int getNumTasks() {
@@ -148,7 +148,7 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
     BigInteger getExpectedStatsAtIndex(int index) {
       return (numVMEventsReceived == 0) ?
          BigInteger.ZERO :
-         BigInteger.valueOf(statsInMB[index]).
+         BigInteger.valueOf(statsInKB[index]).
            multiply(BigInteger.valueOf(numTasks)).
            divide(BigInteger.valueOf(numVMEventsReceived)).
            multiply(BigInteger.valueOf(KB));
@@ -289,7 +289,7 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
 
   void parsePartitionStats(SourceVertexInfo srcInfo,
       RoaringBitmap partitionStats) {
-    Preconditions.checkState(srcInfo.statsInMB != null, "Stats should be initialized");
+    Preconditions.checkState(srcInfo.statsInKB != null, "Stats should be initialized");
     Iterator<Integer> it = partitionStats.iterator();
     final DATA_RANGE_IN_MB[] RANGES = DATA_RANGE_IN_MB.values();
     final int RANGE_LEN = RANGES.length;
@@ -299,7 +299,7 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
       int rangeIndex = ((pos) % RANGE_LEN);
       //Add to aggregated stats and normalize to DATA_RANGE_IN_MB.
       if (RANGES[rangeIndex].getSizeInMB() > 0) {
-        srcInfo.statsInMB[index] += RANGES[rangeIndex].getSizeInMB();
+        srcInfo.statsInKB[index] += RANGES[rangeIndex].getSizeInMB();
       }
     }
   }
@@ -309,8 +309,8 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
   void parseDetailedPartitionStats(SourceVertexInfo srcInfo,
       List<Integer> partitionStats) {
     for (int i=0; i<partitionStats.size(); i++) {
-      long sum = srcInfo.statsInMB[i] + partitionStats.get(i);
-      srcInfo.statsInMB[i] = (int)(sum >= KB_THRESHOLD ? KB_THRESHOLD : sum);
+      long sum = srcInfo.statsInKB[i] + partitionStats.get(i);
+      srcInfo.statsInKB[i] = (int)(sum >= KB_THRESHOLD ? KB_THRESHOLD : sum);
     }
   }
 
@@ -463,7 +463,7 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
   int getCurrentlyKnownStatsAtIndex(int index) {
     long stats = 0L;
     for(SourceVertexInfo entry : getAllSourceVertexInfo()) {
-      stats += entry.statsInMB[index];
+      stats += entry.statsInKB[index];
     }
     return (int)(stats >= KB_THRESHOLD ? KB_THRESHOLD : stats);
   }
