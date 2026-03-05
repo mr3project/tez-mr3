@@ -24,7 +24,7 @@ public enum DATA_RANGE_IN_MB {
 
   private final int sizeInMB;
 
-  private DATA_RANGE_IN_MB(int sizeInMB) {
+  DATA_RANGE_IN_MB(int sizeInMB) {
     this.sizeInMB = sizeInMB;
   }
 
@@ -36,8 +36,8 @@ public enum DATA_RANGE_IN_MB {
     return (a + (b - 1)) / b;
   }
 
-  public static final DATA_RANGE_IN_MB getRange(long sizeInBytes) {
-    long sizeInMB = ceil(sizeInBytes, (1024l * 1024l));
+  public static DATA_RANGE_IN_MB getRange(long sizeInBytes) {
+    long sizeInMB = ceil(sizeInBytes, 1024L * 1024L);
     for (DATA_RANGE_IN_MB range : values()) {
       if (sizeInMB >= range.sizeInMB) {
         return range;

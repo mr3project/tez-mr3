@@ -29,6 +29,7 @@ import org.apache.tez.dag.api.UserPayload;
 import org.apache.tez.dag.api.VertexManagerPluginContext;
 import org.apache.tez.dag.api.VertexManagerPluginContext.ScheduleTaskRequest;
 import org.apache.tez.dag.api.VertexManagerPluginDescriptor;
+import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -60,7 +61,7 @@ public class ShuffleVertexManager extends ShuffleVertexManagerBase {
    */
   public static final String TEZ_SHUFFLE_VERTEX_MANAGER_DESIRED_TASK_INPUT_SIZE =
       "tez.shuffle-vertex-manager.desired-task-input-size";
-  public static final long TEZ_SHUFFLE_VERTEX_MANAGER_DESIRED_TASK_INPUT_SIZE_DEFAULT = 100 * MB;
+  public static final long TEZ_SHUFFLE_VERTEX_MANAGER_DESIRED_TASK_INPUT_SIZE_DEFAULT = 100 * ShuffleUtils.MB;
 
   /**
    * Enables automatic parallelism determination for the vertex. Based on input data
@@ -119,15 +120,10 @@ public class ShuffleVertexManager extends ShuffleVertexManagerBase {
       "tez.shuffle-vertex-manager.use-stats-auto-parallelism";
   public static final boolean TEZ_SHUFFLE_VERTEX_MANAGER_USE_STATS_AUTO_PARALLELISM_DEFAULT = false;
 
-  public static final String TEZ_SHUFFLE_VERTEX_MANAGER_AUTO_PARALLELISM_MIN_PERCENT =
-      "tez.shuffle.vertex.manager.auto.parallelism.min.percent";
-  public static final int TEZ_SHUFFLE_VERTEX_MANAGER_AUTO_PARALLELISM_MIN_PERCENT_DEFAULT = 20;
-
   ShuffleVertexManagerConfig mgrConfig;
   private int autoParallelismMinNumTasks;
   private int autoParallelismMaxReductionPercentage;
   private boolean useStatsAutoParallelism;
-  private int autoParallelismMinPercent;
 
   private int[][] targetIndexes;
   private int basePartitionRange;
@@ -185,12 +181,8 @@ public class ShuffleVertexManager extends ShuffleVertexManagerBase {
     useStatsAutoParallelism = conf.getBoolean(
         TEZ_SHUFFLE_VERTEX_MANAGER_USE_STATS_AUTO_PARALLELISM,
         TEZ_SHUFFLE_VERTEX_MANAGER_USE_STATS_AUTO_PARALLELISM_DEFAULT);
-    autoParallelismMinPercent = conf.getInt(
-        TEZ_SHUFFLE_VERTEX_MANAGER_AUTO_PARALLELISM_MIN_PERCENT,
-        TEZ_SHUFFLE_VERTEX_MANAGER_AUTO_PARALLELISM_MIN_PERCENT_DEFAULT);
-    LOG.info("config for auto parallelism: {} {} {} {}",
-        autoParallelismMinNumTasks, autoParallelismMaxReductionPercentage,
-        useStatsAutoParallelism, autoParallelismMinPercent);
+    LOG.info("config for auto parallelism: {} {} {}",
+        autoParallelismMinNumTasks, autoParallelismMaxReductionPercentage, useStatsAutoParallelism);
 
     return mgrConfig;
   }
@@ -251,7 +243,7 @@ public class ShuffleVertexManager extends ShuffleVertexManagerBase {
       desiredTaskParallelism = mgrConfig.getMinTaskParallelism();
     }
 
-    if(desiredTaskParallelism >= currentParallelism) {
+    if (desiredTaskParallelism >= currentParallelism) {
       LOG.info("Not reducing auto parallelism for vertex: {}"
           + " since the desired parallelism of {} is greater than or equal"
           + " to the current parallelism of {}", getContext().getVertexName(),
@@ -268,7 +260,7 @@ public class ShuffleVertexManager extends ShuffleVertexManagerBase {
     }
 
     // most shufflers will be assigned this range
-    basePartitionRange = currentParallelism/desiredTaskParallelism;
+    basePartitionRange = currentParallelism / desiredTaskParallelism;
     if (basePartitionRange <= 1) {
       // nothing to do if range is equal 1 partition. shuffler does it by default
       LOG.info("Not reducing auto parallelism for vertex: {} by less than"
@@ -312,15 +304,9 @@ public class ShuffleVertexManager extends ShuffleVertexManagerBase {
       }
     }
 
-    // initialize currentStatsInMB[]
-    int[] currentStatsInMB = new int[currentParallelism];
-    for(int index = 0; index < currentParallelism; index++) {
-      currentStatsInMB[index] = 0;
-    }
-
-    // fill currentStatsInMB[]
+    // fill totalStatsInKB[]
+    long[] totalStatsInKB = new long[currentParallelism];   // all initialized to 0L
     int numMinEqualsMax = 0;
-    long autoParallelismMaxPercent = 100 - autoParallelismMinPercent;   // long to prevent overflow
     for (Map.Entry<String, SourceVertexInfo> entry : getBipartiteInfo()) {
       // assert currentParallelism == entry.getValue().statsInMB.length;
       int min = Integer.MAX_VALUE;
@@ -335,10 +321,7 @@ public class ShuffleVertexManager extends ShuffleVertexManagerBase {
       } else {
         assert max > 0;
         for(int index = 0; index < currentParallelism; index++) {
-          long stat = entry.getValue().statsInKB[index];
-          long incr = autoParallelismMaxPercent * stat / max + autoParallelismMinPercent;
-          long sum = (long)currentStatsInMB[index] + incr;
-          currentStatsInMB[index] = (int)(sum >= KB_THRESHOLD ? KB_THRESHOLD : sum);
+          totalStatsInKB[index] += entry.getValue().statsInKB[index];
         }
       }
     }
@@ -351,7 +334,7 @@ public class ShuffleVertexManager extends ShuffleVertexManagerBase {
 
     // now we use MappingEdgeManager -- call distributeStats() in MR3
     scala.Tuple2<int[], int[][]> mappingIndexes =
-      com.datamonad.mr3.api.common.Utils.distributeStats(currentStatsInMB, finalTaskParallelism);
+      com.datamonad.mr3.api.common.Utils.distributeStats(totalStatsInKB, finalTaskParallelism);
     int[] mapping = mappingIndexes._1();
     int[][] indexes = mappingIndexes._2();
 
@@ -491,18 +474,18 @@ public class ShuffleVertexManager extends ShuffleVertexManagerBase {
     boolean computedPartitionSizes = false;
     for (PendingTaskInfo taskInfo : pendingTasks) {
       int index = taskInfo.getIndex();
-      if (targetIndexes != null) { //parallelism has changed.
+      if (targetIndexes != null) {  // parallelism has changed
         Preconditions.checkState(index < targetIndexes.length,
             "index={}, targetIndexes length={}", index, targetIndexes.length);
         int[] mapping = targetIndexes[index];
-        int partitionStats = 0;
+        long partitionStats = 0L;
         for (int i : mapping) {
           partitionStats += getCurrentlyKnownStatsAtIndex(i);
         }
-        computedPartitionSizes |= taskInfo.setInputStats(partitionStats);
+        int partitionStatsFinal = (int)Math.min(partitionStats, ShuffleUtils.KB_THRESHOLD_FOR_TB);
+        computedPartitionSizes |= taskInfo.setInputStats(partitionStatsFinal);
       } else {
-        computedPartitionSizes |= taskInfo.setInputStats(
-            getCurrentlyKnownStatsAtIndex(index));
+        computedPartitionSizes |= taskInfo.setInputStats(getCurrentlyKnownStatsAtIndex(index));
       }
     }
     return computedPartitionSizes;
