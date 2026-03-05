@@ -22,9 +22,11 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.serializer.Serialization;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
+import org.apache.tez.runtime.library.common.sort.impl.TezSpillRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -52,7 +54,12 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
   
   protected final OutputContext outputContext;
   protected final Configuration conf;
+
   protected final RawLocalFileSystem localFs;
+  protected final boolean localFsSpillFilePerms;
+
+  protected final int numPartitions;
+
   protected final Partitioner partitioner;
   protected final Class keyClass;
   protected final Class valClass;
@@ -61,7 +68,6 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
   protected final SerializationFactory serializationFactory;
   protected final Serialization keySerialization;
   protected final Serialization valSerialization;
-  protected final int numPartitions;
   protected final CompressionCodec codec;
 
   protected final String auxiliaryService;
@@ -123,8 +129,11 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
   public BaseUnorderedPartitionedKVWriter(OutputContext outputContext, Configuration conf, int numOutputs) {
     this.outputContext = outputContext;
     this.conf = conf;
+
     try {
       this.localFs = (RawLocalFileSystem) FileSystem.getLocal(conf).getRaw();
+      this.localFsSpillFilePerms = TezSpillRecord.SPILL_FILE_PERMS.equals(
+          TezSpillRecord.SPILL_FILE_PERMS.applyUMask(FsPermission.getUMask(this.localFs.getConf())));
     } catch (IOException e) {
       throw new RuntimeException(e);
     }

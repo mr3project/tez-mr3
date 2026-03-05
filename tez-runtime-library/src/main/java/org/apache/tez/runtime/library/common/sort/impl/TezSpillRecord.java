@@ -49,11 +49,6 @@ public class TezSpillRecord {
     entries = buf.asLongBuffer();
   }
 
-  public TezSpillRecord(Path indexFileName, FileSystem fs, String expectedIndexOwner)
-    throws IOException {
-    this(indexFileName, fs);
-  }
-
   public TezSpillRecord(Path indexFileName, FileSystem rfs) throws IOException {
     assert indexFileName != null;   // writeSpillRecord should be false in UnorderedPartitionedKVWriter/PipelinedSorter
     Checksum crc = new PureJavaCrc32();
@@ -130,7 +125,7 @@ public class TezSpillRecord {
   /**
    * Write this spill record to the location provided.
    */
-  public void writeToFile(Path loc, FileSystem rfs) throws IOException {
+  public void writeToFile(Path loc, FileSystem rfs, boolean rfsSpillFilePerms) throws IOException {
     PureJavaCrc32 crc = new PureJavaCrc32();
     CheckedOutputStream chk = null;
     final FSDataOutputStream out = rfs.create(loc);
@@ -145,12 +140,12 @@ public class TezSpillRecord {
       } else {
         out.close();
       }
-      ensureSpillFilePermissions(loc, rfs);
+      ensureSpillFilePermissions(loc, rfs, rfsSpillFilePerms);
     }
   }
 
-  public static void ensureSpillFilePermissions(Path loc, FileSystem rfs) throws IOException {
-    if (!SPILL_FILE_PERMS.equals(SPILL_FILE_PERMS.applyUMask(FsPermission.getUMask(rfs.getConf())))) {
+  public static void ensureSpillFilePermissions(Path loc, FileSystem rfs, boolean spillFilePerms) throws IOException {
+    if (!spillFilePerms) {
       rfs.setPermission(loc, SPILL_FILE_PERMS);
     }
   }

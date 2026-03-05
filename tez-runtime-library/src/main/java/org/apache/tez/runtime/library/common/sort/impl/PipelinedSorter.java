@@ -504,8 +504,8 @@ public class PipelinedSorter extends ExternalSorter {
     // getSpillFileForWrite with size -1 as the serialized size of KV pair is still unknown
     final Path outputFilePath = mapOutputFile.getSpillFileForWrite(numSpills, -1);
     spillFilePaths.put(numSpills, outputFilePath);
-    FSDataOutputStream out = rfs.create(outputFilePath, true, 4096);
-    ensureSpillFilePermissions(outputFilePath, rfs);
+    FSDataOutputStream out = localFs.create(outputFilePath, true, 4096);
+    ensureSpillFilePermissions(outputFilePath, localFs, localFsSpillFilePerms);
 
     try {
       LOG.info("{}: Spilling single record to {}", outputContext.getDestinationVertexName(), outputFilePath.toString());
@@ -554,7 +554,7 @@ public class PipelinedSorter extends ExternalSorter {
         Path indexFilename = mapOutputFile.getSpillIndexFileForWrite(
             numSpills, partitions * MAP_OUTPUT_INDEX_RECORD_LENGTH);
         spillFileIndexPaths.put(numSpills, indexFilename);
-        spillRec.writeToFile(indexFilename, localFs);
+        spillRec.writeToFile(indexFilename, localFs, localFsSpillFilePerms);
       } else {
         ShuffleUtils.writeSpillInfoToIndexPathCacheAndByteCache(outputContext, numSpills, outputFilePath, spillRec, null);
       }
@@ -565,7 +565,7 @@ public class PipelinedSorter extends ExternalSorter {
 
       if (isPipelinedShuffle) {
         // This output file is directly served to downstream tasks, so increment fileOutputBytesCounter.
-        fileOutputBytesCounter.increment(rfs.getFileStatus(outputFilePath).getLen());
+        fileOutputBytesCounter.increment(localFs.getFileStatus(outputFilePath).getLen());
         // No final merge. Set the number of files offered via shuffle-handler
         // numShuffleChunks.setValue(numSpills);
         sendPipelinedShuffleEvents();
@@ -602,7 +602,7 @@ public class PipelinedSorter extends ExternalSorter {
     if (useFreeMemoryWriterOutput) {
       canUseBuffers = MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold);
       if (canUseBuffers) {
-        byteArrayOutput = new MultiByteArrayOutputStream(rfs, spillFileName);
+        byteArrayOutput = new MultiByteArrayOutputStream(localFs, spillFileName);
       }
     }
 
@@ -611,11 +611,11 @@ public class PipelinedSorter extends ExternalSorter {
     long sumPartLength = 0L;
     try {
       if (byteArrayOutput == null) {
-        fsOutput = rfs.create(spillFileName, true, 4096);
+        fsOutput = localFs.create(spillFileName, true, 4096);
       } else {
         fsOutput = new FSDataOutputStream(byteArrayOutput, null);
       }
-      ensureSpillFilePermissions(spillFileName, rfs);
+      ensureSpillFilePermissions(spillFileName, localFs, localFsSpillFilePerms);
 
       if (isDebugEnabled) {
         LOG.debug("Spilling to {} (use in-memory buffers = {})", spillFileName.toString(), canUseBuffers);
@@ -681,7 +681,7 @@ public class PipelinedSorter extends ExternalSorter {
       Path indexFilename = mapOutputFile.getSpillIndexFileForWrite(
           numSpills, partitions * MAP_OUTPUT_INDEX_RECORD_LENGTH);
       spillFileIndexPaths.put(numSpills, indexFilename);
-      spillRec.writeToFile(indexFilename, localFs);
+      spillRec.writeToFile(indexFilename, localFs, localFsSpillFilePerms);
     } else {
       Path outputFilePath = byteArrayOutput == null ? spillFileName : null;
       ShuffleUtils.writeSpillInfoToIndexPathCacheAndByteCache(
@@ -698,7 +698,7 @@ public class PipelinedSorter extends ExternalSorter {
     if (!isFinalMergeEnabled) {
       // This spill is directly served to downstream tasks, so increment fileOutputByteCounter.
       if (byteArrayOutput == null) {
-        fileOutputBytesCounter.increment(rfs.getFileStatus(spillFileName).getLen());
+        fileOutputBytesCounter.increment(localFs.getFileStatus(spillFileName).getLen());
       } else {
         fileOutputBytesMemoryCounter.increment(sumPartLength);
       }
@@ -837,7 +837,7 @@ public class PipelinedSorter extends ExternalSorter {
         // useFreeMemoryWriterOutput == false because isFinalMergeEnabled == true,
         // so finalOutputFile was actually written to local disk.
         // finalOutputFile is be served to downstream tasks, so increment fileOutputByteCounter
-        fileOutputBytesCounter.increment(rfs.getFileStatus(finalOutputFile).getLen());
+        fileOutputBytesCounter.increment(localFs.getFileStatus(finalOutputFile).getLen());
 
         // TODO: why are events not being sent here???
         return;
@@ -856,8 +856,8 @@ public class PipelinedSorter extends ExternalSorter {
 
       // the output stream for the final single output file
       // TODO: use try/finally to always close finalOut
-      FSDataOutputStream finalOut = rfs.create(finalOutputFile, true, 4096);
-      ensureSpillFilePermissions(finalOutputFile, rfs);
+      FSDataOutputStream finalOut = localFs.create(finalOutputFile, true, 4096);
+      ensureSpillFilePermissions(finalOutputFile, localFs, localFsSpillFilePerms);
 
       final TezSpillRecord spillRec = new TezSpillRecord(partitions);
 
@@ -871,7 +871,7 @@ public class PipelinedSorter extends ExternalSorter {
           if (indexRecord.hasData() || !sendEmptyPartitionDetails) {
             shouldWrite = true;
             DiskSegment s =
-                new DiskSegment(rfs, spillFilename, indexRecord.getStartOffset(),
+                new DiskSegment(localFs, spillFilename, indexRecord.getStartOffset(),
                     indexRecord.getPartLength(), codec, ifileReadAhead,
                     ifileReadAheadLength, true, outputContext);
             segmentList.add(s);
@@ -883,7 +883,7 @@ public class PipelinedSorter extends ExternalSorter {
         // sort the segments only if there are intermediate merges
         boolean sortSegments = segmentList.size() > mergeFactor;
         //merge
-        TezRawKeyValueIterator kvIter = TezMerger.merge(conf, rfs,
+        TezRawKeyValueIterator kvIter = TezMerger.merge(conf, localFs,
             serializationContext, codec,
             segmentList, mergeFactor,
             new Path(uniqueIdentifier),
@@ -928,10 +928,10 @@ public class PipelinedSorter extends ExternalSorter {
 
       // finalOutputFile is the new file to be served to downstream tasks, so increment fileOutputByteCounter
       // Here, we do not use free memory to store the merged output.
-      fileOutputBytesCounter.increment(rfs.getFileStatus(finalOutputFile).getLen());
+      fileOutputBytesCounter.increment(localFs.getFileStatus(finalOutputFile).getLen());
 
       if (writeSpillRecord) {
-        spillRec.writeToFile(finalIndexFile, localFs);
+        spillRec.writeToFile(finalIndexFile, localFs, localFsSpillFilePerms);
       } else {
         ShuffleUtils.writeToIndexPathCacheAndByteCache(outputContext, finalOutputFile, spillRec, null);
       }
@@ -939,14 +939,14 @@ public class PipelinedSorter extends ExternalSorter {
 
       for (int i = 0; i < numSpills; i++) {
         Path spillFilename = spillFilePaths.get(i);
-        rfs.delete(spillFilename, true);
+        localFs.delete(spillFilename, true);
       }
       spillFilePaths.clear();
 
       if (writeSpillRecord) {
         for (int i = 0; i < numSpills; i++) {
           Path indexFilename = spillFileIndexPaths.get(i);
-          rfs.delete(indexFilename, true);
+          localFs.delete(indexFilename, true);
         }
         spillFileIndexPaths.clear();
       }

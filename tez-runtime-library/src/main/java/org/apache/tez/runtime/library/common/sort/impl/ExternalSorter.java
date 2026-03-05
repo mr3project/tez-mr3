@@ -18,15 +18,14 @@
 
 package org.apache.tez.runtime.library.common.sort.impl;
 
-import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
 import com.google.common.collect.Maps;
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
@@ -57,7 +56,6 @@ import org.apache.tez.runtime.library.common.ConfigUtils;
 import org.apache.tez.runtime.library.common.TezRuntimeUtils;
 import org.apache.tez.runtime.library.common.combine.Combiner;
 import org.apache.tez.runtime.library.common.serializer.SerializationContext;
-import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.ShuffleHeader;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Writer;
 import org.apache.tez.runtime.api.TezTaskOutput;
 import org.apache.tez.runtime.library.utils.CodecUtils;
@@ -79,7 +77,7 @@ public abstract class ExternalSorter {
   protected final int partitions;
 
   protected final RawLocalFileSystem localFs;
-  protected final FileSystem rfs;
+  protected final boolean localFsSpillFilePerms;
 
   // How partition stats should be reported.
   final ReportPartitionStats reportPartitionStats;
@@ -154,8 +152,9 @@ public abstract class ExternalSorter {
     this.conf = conf;
     this.partitions = numOutputs;
 
-    this.localFs = (RawLocalFileSystem) FileSystem.getLocal(conf).getRaw();
-    this.rfs = ((LocalFileSystem)FileSystem.getLocal(this.conf)).getRaw();
+    this.localFs = (RawLocalFileSystem)FileSystem.getLocal(this.conf).getRaw();
+    this.localFsSpillFilePerms = TezSpillRecord.SPILL_FILE_PERMS.equals(
+        TezSpillRecord.SPILL_FILE_PERMS.applyUMask(FsPermission.getUMask(this.localFs.getConf())));
 
     this.reportPartitionStats = ReportPartitionStats.fromString(
         conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_REPORT_PARTITION_STATS,
@@ -292,35 +291,6 @@ public abstract class ExternalSorter {
     }
   }
 
-  /**
-   * Rename srcPath to dstPath on the same volume. This is the same as
-   * RawLocalFileSystem's rename method, except that it will not fall back to a
-   * copy, and it will create the target directory if it doesn't exist.
-   */
-  protected void sameVolRename(Path srcPath, Path dstPath) throws IOException {
-    RawLocalFileSystem rfs = (RawLocalFileSystem) this.rfs;
-    File src = rfs.pathToFile(srcPath);
-    File dst = rfs.pathToFile(dstPath);
-    if (!dst.getParentFile().exists()) {
-      if (!dst.getParentFile().mkdirs()) {
-        throw new IOException("Unable to rename " + src + " to " + dst
-            + ": couldn't create parent directory");
-      }
-    }
-
-    if (!src.renameTo(dst)) {
-      throw new IOException("Unable to rename " + src + " to " + dst);
-    }
-  }
-
-  public InputStream getSortedStream(int partition) {
-    throw new UnsupportedOperationException("getSortedStream isn't supported!");
-  }
-
-  public ShuffleHeader getShuffleHeader(int reduce) {
-    throw new UnsupportedOperationException("getShuffleHeader isn't supported!");
-  }
-
   public static long getInitialMemoryRequirement(Configuration conf, long maxAvailableTaskMemory) {
     int initialMemRequestMb = conf.getInt(
         TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB,
@@ -360,7 +330,7 @@ public abstract class ExternalSorter {
     }
     try {
       LOG.info("Deleting " + path);
-      rfs.delete(path, true);
+      localFs.delete(path, true);
     } catch(IOException ioe) {
       LOG.warn("Error in deleting "  + path);
     }
