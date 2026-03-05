@@ -336,8 +336,7 @@ public class ShuffleVertexManager extends ShuffleVertexManagerBase {
     int[] mapping = mappingIndexes._1();
     int[][] indexes = mappingIndexes._2();
 
-    int numIndexes = mapping.length;
-    int numInts = 1 + mapping.length + 1 + indexes.length + numIndexes;
+    int numInts = 1 + mapping.length + 1 + indexes.length * 2;
 
     // build buffer[]
     ByteBuffer buffer = ByteBuffer.allocate(numInts * 4);
@@ -348,7 +347,6 @@ public class ShuffleVertexManager extends ShuffleVertexManagerBase {
     buffer.putInt(indexes.length);
     for (int i = 0; i < indexes.length; i++) {
       assert indexes[i].length == 2;  // indexes[i][0] = start, indexes[i][1] = count
-      buffer.putInt(indexes[i].length);
       for (int j = 0; j < indexes[i].length; j++) {
         buffer.putInt(indexes[i][j]);
       }
