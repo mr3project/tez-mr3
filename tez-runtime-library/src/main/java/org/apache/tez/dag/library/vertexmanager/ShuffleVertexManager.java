@@ -326,7 +326,7 @@ public class ShuffleVertexManager extends ShuffleVertexManagerBase {
       int min = Integer.MAX_VALUE;
       int max = Integer.MIN_VALUE;
       for(int index = 0; index < currentParallelism; index++) {
-        int stat = entry.getValue().statsInMB[index];
+        int stat = entry.getValue().statsInKB[index];
         if (stat < min) { min = stat; }
         if (stat > max) { max = stat; }
       }
@@ -335,7 +335,7 @@ public class ShuffleVertexManager extends ShuffleVertexManagerBase {
       } else {
         assert max > 0;
         for(int index = 0; index < currentParallelism; index++) {
-          long stat = entry.getValue().statsInMB[index];
+          long stat = entry.getValue().statsInKB[index];
           long incr = autoParallelismMaxPercent * stat / max + autoParallelismMinPercent;
           long sum = (long)currentStatsInMB[index] + incr;
           currentStatsInMB[index] = (int)(sum >= KB_THRESHOLD ? KB_THRESHOLD : sum);
