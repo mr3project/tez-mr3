@@ -23,8 +23,6 @@ import java.util.Map;
 
 import javax.annotation.Nullable;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.events.CompositeDataMovementEvent;
 import org.apache.tez.runtime.api.events.DataMovementEvent;
@@ -36,8 +34,6 @@ import org.apache.tez.runtime.api.events.InputReadErrorEvent;
  * consumer vertices. The routing is bi-directional. Users can customize the 
  * routing by providing an implementation of this interface.
  */
-@Public
-@Unstable
 public abstract class EdgeManagerPluginOnDemand extends EdgeManagerPlugin {
 
   public static class CompositeEventRouteMetadata {
