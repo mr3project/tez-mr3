@@ -18,10 +18,8 @@
 
 package org.apache.tez.dag.api;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.nio.ByteBuffer;
 import javax.annotation.Nullable;
-
 
 /**
  * Wrapper class to hold user payloads
@@ -90,7 +88,6 @@ public final class UserPayload {
     return payload != null && payload != EMPTY_BYTE;
   }
 
-  @VisibleForTesting
   public byte[] deepCopyAsArray() {
     ByteBuffer src = getPayload();
     if (src != null) {

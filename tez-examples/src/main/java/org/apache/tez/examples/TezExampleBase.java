@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.util.Set;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Sets;
 
 import org.apache.commons.cli.Options;
@@ -297,7 +296,6 @@ public abstract class TezExampleBase extends Configured implements Tool {
   protected abstract int runJob(String[] args, TezConfiguration tezConf,
                                 TezClient tezClient) throws Exception;
   
-  @VisibleForTesting
   public ApplicationId getAppId() {
     if (tezClientInternal == null) {
       LOG.warn("TezClient is not initialized, return null for AppId");

@@ -18,7 +18,6 @@
 
 package org.apache.tez.client;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.LocalResource;
@@ -53,7 +52,6 @@ public class TezClient {
   private static final String appIdStrPrefix = "application";
   private static final String APPLICATION_ID_PREFIX = appIdStrPrefix + '_';
   
-  @VisibleForTesting
   static final String NO_CLUSTER_DIAGNOSTICS_MSG = "No cluster diagnostics found.";
 
   private TezClient(String name, TezConfiguration tezConf) {

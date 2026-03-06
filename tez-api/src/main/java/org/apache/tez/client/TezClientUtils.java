@@ -18,7 +18,6 @@
 
 package org.apache.tez.client;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.tez.dag.api.TezConstants;
@@ -27,7 +26,6 @@ import java.util.List;
 
 public class TezClientUtils {
 
-  @VisibleForTesting
   public static void addLog4jSystemProperties(String logLevel,
       List<String> vargs) {
     vargs.add("-Dlog4j.configuratorClass=org.apache.tez.common.TezLog4jConfigurator");
