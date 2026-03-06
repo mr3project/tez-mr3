@@ -53,8 +53,7 @@ import java.util.Map;
  */
 public class ShuffleVertexManager extends ShuffleVertexManagerBase {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(ShuffleVertexManager.class);
+  private static final Logger LOG = LoggerFactory.getLogger(ShuffleVertexManager.class);
 
   /**
    * The desired size of input per task. Parallelism will be changed to meet this criteria
@@ -128,7 +127,6 @@ public class ShuffleVertexManager extends ShuffleVertexManagerBase {
   private int[][] targetIndexes;  // targetIndexes[i][0] = start, targetIndexes[i][1] = count > 0
   private int basePartitionRange;
   private int remainderRangeForLastShuffler;
-
 
   public ShuffleVertexManager(VertexManagerPluginContext context) {
     super(context);
@@ -431,17 +429,17 @@ public class ShuffleVertexManager extends ShuffleVertexManagerBase {
   @Override
   void processPendingTasks() {
     if (totalNumBipartiteSourceTasks > 0) {
-      //Sort in case partition stats are available
+      // Sort in case partition stats are available
       sortPendingTasksBasedOnDataSize();
     }
   }
 
   private void sortPendingTasksBasedOnDataSize() {
-    //Get partition sizes from all source vertices
+    // Get partition sizes from all source vertices
     boolean statsUpdated = computePartitionSizes();
 
     if (statsUpdated) {
-      //Order the pending tasks based on task size in reverse order
+      // Order the pending tasks based on task size in reverse order
       Collections.sort(pendingTasks, new Comparator<PendingTaskInfo>() {
         @Override
         public int compare(PendingTaskInfo left, PendingTaskInfo right) {

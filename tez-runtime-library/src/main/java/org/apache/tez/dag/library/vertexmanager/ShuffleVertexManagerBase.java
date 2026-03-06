@@ -67,8 +67,7 @@ import java.util.Set;
 import java.util.zip.Inflater;
 
 /**
- * It provides common functions used by ShuffleVertexManager and
- * FairShuffleVertexManager.
+ * It provides common functions used by ShuffleVertexManager.
  */
 abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
 
@@ -84,7 +83,7 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
 
   private Set<TaskIdentifier> taskWithVmEvents = Sets.newHashSet();
 
-  //Track source vertex and its finished tasks
+  // Track source vertex and its finished tasks
   private final Map<String, SourceVertexInfo> srcVertexInfo = Maps.newConcurrentMap();
   boolean sourceVerticesScheduled = false;
   int bipartiteSources = 0;
@@ -465,11 +464,11 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
    * Compute optimal parallelism needed for the job
    * @return true (if parallelism is determined), false otherwise
    */
-  boolean determineParallelismAndApply(
-      float minSourceVertexCompletedTaskFraction) {
+  private boolean determineParallelismAndApply() {
+    float minSourceVertexCompletedTaskFraction = getMinSourceVertexCompletedTaskFraction();
+
     if (computeRoutingAction.equals(ComputeRoutingAction.WAIT)) {
-      ComputeRoutingAction computeRoutingAction = getComputeRoutingAction(
-          minSourceVertexCompletedTaskFraction);
+      ComputeRoutingAction computeRoutingAction = getComputeRoutingAction(minSourceVertexCompletedTaskFraction);
       if (computeRoutingAction.equals(computeRoutingAction.COMPUTE)) {
         ReconfigVertexParams params = computeRouting();
         if (params != null) {
@@ -483,13 +482,10 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
       }
       this.computeRoutingAction = computeRoutingAction;
     }
+
     return this.computeRoutingAction.determined();
   }
 
-  private boolean determineParallelismAndApply() {
-    return determineParallelismAndApply(
-        getMinSourceVertexCompletedTaskFraction());
-  }
   /**
    * End of functions related to how new parallelism is determined.
    */
@@ -666,9 +662,9 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
     // as specified by the user. If/When we move to some other method of
     // calculating parallelism or change parallelism while tasks are already
     // running then we can create other parameters to trigger this calculation.
-    if(config.isAutoParallelismEnabled()) {
+    if (config.isAutoParallelismEnabled()) {
       if (!determineParallelismAndApply()) {
-        //try to determine parallelism later when more info is available.
+        // try to determine parallelism later when more info is available.
         return;
       }
     }
@@ -733,7 +729,7 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
     if (config.isAutoParallelismEnabled()) {
       getContext().vertexReconfigurationPlanned();
     }
-    // dont track the source tasks here since those tasks may themselves be
+    // don't track the source tasks here since those tasks may themselves be
     // dynamically changed as the DAG progresses.
   }
 
