@@ -21,8 +21,6 @@ package org.apache.tez.dag.api.client;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.google.common.annotations.VisibleForTesting;
-
 import org.apache.tez.common.counters.TezCounters;
 import org.apache.tez.dag.api.Vertex;
 import org.apache.tez.dag.api.records.DAGProtos;
@@ -64,7 +62,6 @@ public class VertexStatus {
     return getState(proxy.getState());
   }
 
-  @VisibleForTesting
   static State getState(DAGProtos.VertexStatusStateProto stateProto) {
     switch(stateProto) {
       case VERTEX_NEW:
