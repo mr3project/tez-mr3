@@ -18,14 +18,10 @@
 
 package org.apache.tez.dag.api.event;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 
 /**
  * Updates that are sent to user code running within the AM, on Vertex state changes.
  */
-@InterfaceAudience.Public
-@InterfaceStability.Unstable
 public class VertexStateUpdate {
 
   private final String vertexName;

@@ -30,7 +30,6 @@ import java.util.Set;
 import org.apache.tez.runtime.api.ProgressFailedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.io.RawComparator;
 import org.apache.tez.runtime.api.Input;
 import org.apache.tez.runtime.api.MergedLogicalInput;
@@ -45,7 +44,6 @@ import org.apache.tez.runtime.library.api.KeyValuesReader;
  * Combiners and Secondary Sort are not implemented, so there is no guarantee on
  * the order of values.
  */
-@Public
 public class OrderedGroupedMergedKVInput extends MergedLogicalInput {
 
   private static final Logger LOG = LoggerFactory.getLogger(OrderedGroupedMergedKVInput.class);

@@ -18,8 +18,6 @@
 
 package org.apache.tez.runtime.library.common.serializer;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.io.BytesWritable;
@@ -50,8 +48,6 @@ import java.io.OutputStream;
  *            TezBytesComparator.class.getName()).build())
  * </pre>
  */
-@Public
-@Unstable
 public class TezBytesWritableSerialization extends Configured implements Serialization<Writable> {
 
   @Override

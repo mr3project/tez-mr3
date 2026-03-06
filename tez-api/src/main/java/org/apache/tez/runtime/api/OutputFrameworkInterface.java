@@ -22,7 +22,6 @@ package org.apache.tez.runtime.api;
 
 import java.util.List;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 
 /**
  * Represents the Tez framework part of an {@link org.apache.tez.runtime.api.Output}.
@@ -38,7 +37,6 @@ import org.apache.hadoop.classification.InterfaceAudience.Public;
  * Users are expected to derive from {@link AbstractLogicalOutput}
  *
  */
-@Public
 public interface OutputFrameworkInterface {
 
   /**

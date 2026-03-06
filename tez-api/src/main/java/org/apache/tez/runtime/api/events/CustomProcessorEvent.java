@@ -18,8 +18,6 @@
 
 package org.apache.tez.runtime.api.events;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.tez.runtime.api.Event;
 
 import java.nio.ByteBuffer;
@@ -47,7 +45,6 @@ public class CustomProcessorEvent extends Event
     return new CustomProcessorEvent(payload);
   }
 
-  @Private
   public static CustomProcessorEvent create(ByteBuffer payload, int version) {
     return new CustomProcessorEvent(payload, version);
   }
@@ -56,7 +53,6 @@ public class CustomProcessorEvent extends Event
     return payload.asReadOnlyBuffer();
   }
 
-  @Private
   public void setVersion(int version) {
     this.version = version;
   }

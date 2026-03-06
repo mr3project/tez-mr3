@@ -18,8 +18,6 @@
 
 package org.apache.tez.runtime.api;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
 
 import java.util.List;
 
@@ -32,7 +30,6 @@ import java.util.List;
  * <p/>
  * Users are expected to derive from {@link AbstractLogicalIOProcessor}
  */
-@Public
 public interface ProcessorFrameworkInterface {
 
   /**
@@ -63,6 +60,5 @@ public interface ProcessorFrameworkInterface {
    * Indicates <code>Processor</code> to abort. Cleanup can be done.
    *
    */
-  @Unstable
   public void abort();
 }

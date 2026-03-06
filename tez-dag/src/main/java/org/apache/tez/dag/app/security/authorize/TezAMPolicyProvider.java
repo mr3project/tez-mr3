@@ -17,8 +17,6 @@
  */
 package org.apache.tez.dag.app.security.authorize;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.security.authorize.PolicyProvider;
 import org.apache.hadoop.security.authorize.Service;
 import org.apache.tez.common.TezTaskUmbilicalProtocol;
@@ -28,8 +26,6 @@ import org.apache.tez.dag.api.client.rpc.DAGClientAMProtocolBlockingPB;
 /**
  * {@link PolicyProvider} for YARN Tez client protocols.
  */
-@InterfaceAudience.Private
-@InterfaceStability.Unstable
 public class TezAMPolicyProvider extends PolicyProvider {
   
   private static final Service[] tezApplicationMasterServices = 

@@ -20,11 +20,9 @@ package org.apache.tez.runtime.library.utils;
 
 import java.io.IOException;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
 
-@Private
 public class BufferUtils {
 
   public static int compare(DataInputBuffer buf1, DataInputBuffer buf2) {

@@ -17,12 +17,8 @@
  */
 package org.apache.tez.runtime.library.common.comparator;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.io.RawComparator;
 
-@Unstable
-@Private
 public interface ProxyComparator<KEY> extends RawComparator {
   /**
    * This comparator interface provides a fast-path for comparisons between keys.

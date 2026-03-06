@@ -21,12 +21,10 @@
 
 package org.apache.tez.common;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 
 /**
  * Configuration parameters which are internal to the Inputs and Outputs which exist in the Runtime
  */
-@Private
 public class TezRuntimeFrameworkConfigs {
 
   private static final String TEZ_RUNTIME_FRAMEWORK_PREFIX = "tez.runtime.framework.";

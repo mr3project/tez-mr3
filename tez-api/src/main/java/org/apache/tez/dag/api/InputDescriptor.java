@@ -18,17 +18,13 @@
 
 package org.apache.tez.dag.api;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.tez.runtime.api.Input;
 
 /**
  * Describes the {@link Input}
  */
-@Public
 public class InputDescriptor extends EntityDescriptor<InputDescriptor> {
 
-  @Private // for Writable
   public InputDescriptor() {
     super();
   }

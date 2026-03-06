@@ -26,7 +26,6 @@ package org.apache.tez.serviceplugins.api;/*
  * limitations under the License.
  */
 
-import org.apache.hadoop.classification.InterfaceAudience;
 
 /**
  * A default set of errors from ServicePlugins
@@ -35,7 +34,6 @@ import org.apache.hadoop.classification.InterfaceAudience;
  * Fatal errors cause the AM to go down.
  *
  */
-@InterfaceAudience.Public
 public enum ServicePluginErrorDefaults implements ServicePluginError {
   /**
    * Indicates that the service is currently unavailable.

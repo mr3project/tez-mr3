@@ -17,12 +17,10 @@
  */
 package org.apache.tez.dag.api;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 
 import javax.annotation.Nullable;
 import java.nio.ByteBuffer;
 
-@Private
 public class DagTypeConverters {
 
   public static UserPayload convertToTezUserPayload(@Nullable ByteBuffer payload, int version) {

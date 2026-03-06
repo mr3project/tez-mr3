@@ -14,14 +14,10 @@
 
 package org.apache.tez.serviceplugins.api;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.Token;
 
-@InterfaceAudience.Public
-@InterfaceStability.Unstable
 public class ContainerLauncherOperationBase {
 
   // TODO TEZ-2702 (TEZ-2003 post)

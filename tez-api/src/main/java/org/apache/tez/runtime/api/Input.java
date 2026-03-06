@@ -18,7 +18,6 @@
 
 package org.apache.tez.runtime.api;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 
 /**
  * Represents an input through which a {@link Processor} receives data on an edge.
@@ -29,7 +28,6 @@ import org.apache.hadoop.classification.InterfaceAudience.Public;
  * 
  * Actual implementations are expected to derive from {@link AbstractLogicalInput}
  */
-@Public
 public interface Input {
 
   /**

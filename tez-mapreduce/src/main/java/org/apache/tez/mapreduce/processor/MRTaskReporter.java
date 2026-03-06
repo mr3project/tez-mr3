@@ -18,8 +18,6 @@
 
 package org.apache.tez.mapreduce.processor;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.mapred.Counters;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.Reporter;
@@ -31,8 +29,6 @@ import org.apache.tez.runtime.api.OutputContext;
 import org.apache.tez.runtime.api.ProcessorContext;
 import org.apache.tez.runtime.api.TaskContext;
 
-@InterfaceAudience.Private
-@InterfaceStability.Unstable
 public class MRTaskReporter
     extends org.apache.hadoop.mapreduce.StatusReporter
     implements Reporter {

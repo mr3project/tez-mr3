@@ -20,8 +20,6 @@ package org.apache.tez.runtime.common.security;
 
 import java.util.Collection;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
@@ -32,8 +30,6 @@ import org.apache.tez.common.security.JobTokenIdentifier;
  * Look through tokens to find the first job token that matches the service
  * and return it.
  */
-@InterfaceAudience.Private
-@InterfaceStability.Unstable
 public class JobTokenSelector implements TokenSelector<JobTokenIdentifier> {
 
   @SuppressWarnings("unchecked")

@@ -14,8 +14,6 @@
 
 package org.apache.tez.serviceplugins.api;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.Token;
@@ -23,8 +21,6 @@ import org.apache.hadoop.yarn.api.records.Token;
 /**
  * Contains specifications for a container which needs to be stopped
  */
-@InterfaceAudience.Public
-@InterfaceStability.Unstable
 public class ContainerStopRequest extends ContainerLauncherOperationBase {
 
   private final String schedulerName;

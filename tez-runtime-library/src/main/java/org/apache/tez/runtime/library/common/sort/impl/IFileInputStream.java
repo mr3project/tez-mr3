@@ -27,8 +27,6 @@ import java.util.Arrays;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.ChecksumException;
 import org.apache.hadoop.fs.HasFileDescriptor;
 import org.apache.hadoop.io.IOUtils;
@@ -39,8 +37,6 @@ import org.apache.hadoop.util.DataChecksum;
  * A checksum input stream, used for IFiles.
  * Used to validate the checksum of files created by {@link IFileOutputStream}. 
 */
-@InterfaceAudience.Private
-@InterfaceStability.Unstable
 public class IFileInputStream extends InputStream {
   
   private final InputStream in; //The input stream to be verified for checksum.

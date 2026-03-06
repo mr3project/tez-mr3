@@ -16,7 +16,5 @@
  * limitations under the License.
  */
 
-@Private
 package org.apache.tez.runtime.library.common.sort.impl.dflt;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;

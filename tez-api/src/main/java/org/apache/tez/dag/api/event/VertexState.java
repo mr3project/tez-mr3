@@ -18,14 +18,10 @@
 
 package org.apache.tez.dag.api.event;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 
 /**
  * Vertex state information.
  */
-@InterfaceAudience.Public
-@InterfaceStability.Unstable
 public enum VertexState {
   /**
    * Indicates that the Vertex had entered the SUCCEEDED state. A vertex could

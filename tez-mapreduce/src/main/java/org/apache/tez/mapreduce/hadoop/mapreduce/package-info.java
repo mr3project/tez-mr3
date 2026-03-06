@@ -16,7 +16,5 @@
  * limitations under the License.
  */
 
-@Private
 package org.apache.tez.mapreduce.hadoop.mapreduce;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;

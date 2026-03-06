@@ -20,8 +20,6 @@ package org.apache.tez.runtime.library.processor;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.tez.common.ProgressHelper;
 import org.apache.tez.runtime.api.AbstractLogicalIOProcessor;
 import org.apache.tez.runtime.api.Event;
@@ -36,8 +34,6 @@ import org.apache.tez.runtime.api.ProcessorContext;
  * This can be used to implement simple {@link Processor}s that dont need to 
  * do event handling etc.
  */
-@Public
-@Evolving
 public abstract class SimpleProcessor extends AbstractLogicalIOProcessor {
   protected Map<String, LogicalInput> inputs;
   protected Map<String, LogicalOutput> outputs;

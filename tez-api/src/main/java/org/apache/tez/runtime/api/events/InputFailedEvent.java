@@ -18,7 +18,6 @@
 
 package org.apache.tez.runtime.api.events;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.runtime.api.Event;
 
@@ -28,7 +27,6 @@ import org.apache.tez.runtime.api.Event;
  * source.
  * Users are not expected to send this event.
  */
-@Private
 public class InputFailedEvent extends Event
   implements com.datamonad.mr3.api.EventToLogicalInput {
 
@@ -61,17 +59,14 @@ public class InputFailedEvent extends Event
    */
   private int version;
   
-  @Private // for Writable
   public InputFailedEvent() {
   }
   
-  @Private
   private InputFailedEvent(int targetIndex, int version) {
     this.targetIndex = targetIndex;
     this.version = version;
   }
 
-  @Private
   public static InputFailedEvent create(int targetIndex, int version) {
     return new InputFailedEvent(targetIndex, version);
   }
@@ -87,7 +82,6 @@ public class InputFailedEvent extends Event
    * @return copy of the {@link InputFailedEvent} with the target input index
    *         added
    */
-  @Private
   public InputFailedEvent makeCopy(int targetIndex) {
     return create(targetIndex, version);
   }
@@ -96,7 +90,6 @@ public class InputFailedEvent extends Event
     return targetIndex;
   }
 
-  @Private
   public void setTargetIndex(int targetIndex) {
     this.targetIndex = targetIndex;
   }
@@ -105,7 +98,6 @@ public class InputFailedEvent extends Event
     return version;
   }
 
-  @Private
   public void setVersion(int version) {
     this.version = version;
   }

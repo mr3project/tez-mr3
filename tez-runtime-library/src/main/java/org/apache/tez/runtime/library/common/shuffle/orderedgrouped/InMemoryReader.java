@@ -23,8 +23,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.tez.common.io.NonSyncByteArrayInputStream;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
@@ -34,8 +32,6 @@ import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader;
 /**
  * <code>IFile.InMemoryReader</code> to read map-outputs present in-memory.
  */
-@InterfaceAudience.Private
-@InterfaceStability.Unstable
 public class InMemoryReader extends Reader {
 
   private static class ByteArrayDataInput extends NonSyncByteArrayInputStream implements DataInput {

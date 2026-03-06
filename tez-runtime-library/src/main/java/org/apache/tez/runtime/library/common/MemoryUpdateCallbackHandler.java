@@ -18,14 +18,10 @@
 
 package org.apache.tez.runtime.library.common;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.tez.runtime.api.MemoryUpdateCallback;
 
 import org.apache.tez.common.Preconditions;
 
-@Public
-@Evolving
 public class MemoryUpdateCallbackHandler extends MemoryUpdateCallback {
 
   private long assignedMemory;

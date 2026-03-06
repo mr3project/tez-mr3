@@ -17,20 +17,16 @@
 
 package org.apache.tez.common;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 
 import java.util.BitSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-@Private
 public class TezUtilsInternal {
 
   private static final Pattern pattern = Pattern.compile("\\W");
-  @Private
   public static final int MAX_VERTEX_NAME_LENGTH = 40;
 
-  @Private
   public static String cleanVertexName(String vertexName) {
     return sanitizeString(vertexName).substring(0,
         vertexName.length() > MAX_VERTEX_NAME_LENGTH ? MAX_VERTEX_NAME_LENGTH : vertexName.length());

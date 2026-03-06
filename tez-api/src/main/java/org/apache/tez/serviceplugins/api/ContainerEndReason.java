@@ -14,11 +14,7 @@
 
 package org.apache.tez.serviceplugins.api;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 
-@InterfaceAudience.Public
-@InterfaceStability.Unstable
 public enum ContainerEndReason {
   NODE_FAILED, // Completed because the node running the container was marked as dead
   INTERNAL_PREEMPTION, // Preempted by the AM, due to an internal decision

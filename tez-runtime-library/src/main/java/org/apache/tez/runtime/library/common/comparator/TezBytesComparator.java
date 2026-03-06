@@ -17,14 +17,10 @@
  */
 package org.apache.tez.runtime.library.common.comparator;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.WritableComparator;
 import org.apache.tez.runtime.library.utils.FastByteComparisons;
 
-@Public
-@Unstable
 public final class TezBytesComparator extends WritableComparator implements
     ProxyComparator<BytesWritable> {
 

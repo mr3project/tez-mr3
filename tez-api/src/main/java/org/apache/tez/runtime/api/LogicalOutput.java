@@ -18,7 +18,6 @@
 
 package org.apache.tez.runtime.api;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 
 /**
  * An @link {@link Output} which handles all outgoing physical connections on an
@@ -27,7 +26,6 @@ import org.apache.hadoop.classification.InterfaceAudience.Public;
  * outputs from the {@link Processor}
  * Users are expected to derive from {@link AbstractLogicalOutput}
  */
-@Public
 public interface LogicalOutput extends Output {
 
 }

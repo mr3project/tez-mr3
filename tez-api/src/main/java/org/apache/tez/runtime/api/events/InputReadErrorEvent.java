@@ -18,7 +18,6 @@
 
 package org.apache.tez.runtime.api.events;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.tez.runtime.api.Event;
 
 /**
@@ -26,7 +25,6 @@ import org.apache.tez.runtime.api.Event;
  * This is not necessarily a fatal event - it's an indication to the AM to retry
  * source data generation.
  */
-@Public
 public final class InputReadErrorEvent extends Event {
 
   /**

@@ -20,11 +20,9 @@ package org.apache.tez.mapreduce.lib;
 
 import java.io.IOException;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.library.api.KeyValueReader;
 
-@Private
 public abstract class MRReader extends KeyValueReader {
   
   public abstract void setSplit(Object split) throws IOException;

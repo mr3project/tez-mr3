@@ -16,8 +16,6 @@ package org.apache.tez.serviceplugins.api;
 
 import javax.annotation.Nullable;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.NodeId;
@@ -33,8 +31,6 @@ import org.apache.tez.common.ServicePluginLifecycle;
  * The plugin is initialized with an instance of {@link TaskSchedulerContext} - which provides
  * a mechanism to notify the system about allocation decisions and resources to the Tez framework.
  */
-@InterfaceAudience.Public
-@InterfaceStability.Unstable
 public abstract class TaskScheduler implements ServicePluginLifecycle {
 
   // TODO TEZ-2003 (post) TEZ-2668

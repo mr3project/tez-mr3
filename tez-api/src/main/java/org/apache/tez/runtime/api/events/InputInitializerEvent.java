@@ -21,9 +21,6 @@
 package org.apache.tez.runtime.api.events;
 
 import java.util.Objects;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.InputInitializer;
 
@@ -40,8 +37,6 @@ import java.nio.ByteBuffer;
  * was running failed. If the Task had succeeded once, the event would already have been sent - and
  * will not be resent when the task reruns and succeeds. </p>
  */
-@Unstable
-@Public
 public class InputInitializerEvent extends Event
   implements com.datamonad.mr3.api.EventToInputInitializer {
 
@@ -106,7 +101,6 @@ public class InputInitializerEvent extends Event
     return eventPayload == null ? null : eventPayload.asReadOnlyBuffer();
   }
 
-  @InterfaceAudience.Private
   public void setSourceVertexName(String srcVertexName) {
     this.sourceVertexName = srcVertexName;
   }

@@ -21,13 +21,11 @@ import org.apache.tez.dag.api.UserPayload;
 
 import java.util.Map;
 
-import static org.apache.hadoop.classification.InterfaceStability.Evolving;
 
 /**
  * User can extend this base class and override <method>isValidCombination</method> to implement
  * custom filter
  */
-@Evolving
 public abstract class CartesianProductFilter {
   private UserPayload userPayload;
 

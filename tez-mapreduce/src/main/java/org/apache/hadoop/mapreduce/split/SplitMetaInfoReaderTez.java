@@ -24,8 +24,6 @@ import java.util.Arrays;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -40,8 +38,6 @@ import org.apache.tez.mapreduce.hadoop.MRJobConfig;
 /**
  * A utility that reads the split meta info and creates split meta info objects
  */
-@InterfaceAudience.Private
-@InterfaceStability.Unstable
 public class SplitMetaInfoReaderTez {
 
   public static final Logger LOG = LoggerFactory.getLogger(SplitMetaInfoReaderTez.class);

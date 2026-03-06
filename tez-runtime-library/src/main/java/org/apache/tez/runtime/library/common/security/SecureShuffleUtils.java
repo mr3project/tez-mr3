@@ -25,8 +25,6 @@ import javax.crypto.SecretKey;
 
 import com.google.common.base.Charsets;
 import org.apache.commons.codec.binary.Base64;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.WritableComparator;
 import org.apache.tez.common.security.JobTokenSecretManager;
 
@@ -35,8 +33,6 @@ import org.apache.tez.common.security.JobTokenSecretManager;
  * utilities for generating keys, hashes and verifying them for shuffle
  *
  */
-@InterfaceAudience.Private
-@InterfaceStability.Unstable
 public class SecureShuffleUtils {
 
   public static final String HTTP_HEADER_URL_HASH = "UrlHash";

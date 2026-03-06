@@ -16,7 +16,5 @@
  * limitations under the License.
  */
 
-@Private
 package org.apache.tez.dag.api.client.rpc;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;

@@ -16,13 +16,11 @@ package org.apache.tez.mapreduce.grouper;
 
 import java.io.IOException;
 
-import org.apache.hadoop.classification.InterfaceAudience;
 
 
 /**
  * An interface to handle split size estimation across mapred and mapreduce splits
  */
-@InterfaceAudience.Private
 public interface SplitSizeEstimatorWrapper {
 
   long getEstimatedSize(SplitContainer splitContainer) throws IOException, InterruptedException;

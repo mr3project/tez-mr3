@@ -20,16 +20,12 @@ package org.apache.tez.runtime.library.api;
 
 import java.io.IOException;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.tez.runtime.api.Writer;
 
 /**
  * A key/value(s) pair based {@link Writer} that supports
  * output to different files.
  */
-@Public
-@Evolving
 public abstract class KeyValueWriterWithBasePath extends KeyValueWriter {
   /**
    * Writes a key/value pair.

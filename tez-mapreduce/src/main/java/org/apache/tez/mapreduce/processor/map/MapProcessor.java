@@ -26,7 +26,6 @@ import org.apache.tez.common.ProgressHelper;
 import org.apache.tez.runtime.api.ProgressFailedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.InputSplit;
@@ -55,7 +54,6 @@ import org.apache.tez.runtime.library.api.KeyValueWriter;
 import org.apache.tez.runtime.library.output.OrderedPartitionedKVOutput;
 
 @SuppressWarnings({ "unchecked", "rawtypes" })
-@Private
 public class MapProcessor extends MRTask{
 
   private static final Logger LOG = LoggerFactory.getLogger(MapProcessor.class);

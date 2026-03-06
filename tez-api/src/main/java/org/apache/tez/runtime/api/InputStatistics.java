@@ -18,8 +18,6 @@
 
 package org.apache.tez.runtime.api;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.tez.dag.api.Vertex;
 
 /**
@@ -27,8 +25,6 @@ import org.apache.tez.dag.api.Vertex;
  * logical input in a {@link Vertex}. Inputs can be external inputs or inputs
  * from other vertices.
  */
-@Public
-@Evolving
 public interface InputStatistics {
   
   /**

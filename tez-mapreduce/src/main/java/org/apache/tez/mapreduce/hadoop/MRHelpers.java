@@ -18,8 +18,6 @@
 
 package org.apache.tez.mapreduce.hadoop;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.tez.mapreduce.combine.MRCombiner;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
@@ -28,8 +26,6 @@ import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
  * This class contains helper methods for frameworks which migrate from MapReduce to Tez, and need
  * to continue to work with existing MapReduce configurations.
  */
-@Public
-@Evolving
 public class MRHelpers {
 
   /**

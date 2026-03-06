@@ -25,7 +25,6 @@ import java.util.Objects;
 
 import javax.annotation.Nullable;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.security.Credentials;
 
 import com.google.common.collect.Sets;
@@ -34,7 +33,6 @@ import com.google.common.collect.Sets;
  * Defines the output and output committer for a data sink 
  *
  */
-@Public
 public class DataSinkDescriptor {
   private final OutputDescriptor outputDescriptor;
   private final OutputCommitterDescriptor committerDescriptor;

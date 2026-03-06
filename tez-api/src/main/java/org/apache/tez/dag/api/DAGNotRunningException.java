@@ -18,12 +18,10 @@
 
 package org.apache.tez.dag.api;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 
 /**
  *  Checked Exception thrown upon error
  */
-@Private
 public class DAGNotRunningException extends TezException {
   private static final long serialVersionUID = 6337442733802964448L;
   public DAGNotRunningException(Throwable cause) { super(cause); }

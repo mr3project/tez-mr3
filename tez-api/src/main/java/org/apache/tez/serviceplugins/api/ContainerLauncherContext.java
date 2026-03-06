@@ -15,13 +15,9 @@
 package org.apache.tez.serviceplugins.api;
 
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 
-@InterfaceAudience.Public
-@InterfaceStability.Unstable
 public interface ContainerLauncherContext extends ServicePluginContextBase {
 
   // TODO TEZ-2003 (post) TEZ-2664 Tez abstraction for ContainerId, NodeId, other YARN constructs

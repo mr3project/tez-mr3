@@ -17,8 +17,6 @@
  */
 package org.apache.tez.dag.api;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.tez.runtime.api.MergedLogicalInput;
 
 /**
@@ -28,7 +26,6 @@ import org.apache.tez.runtime.api.MergedLogicalInput;
  * the input vertices. The output vertex tasks see a unified/merged
  * view of the data from all the input vertices.
  */
-@Public
 public class GroupInputEdge {
 
   private final VertexGroup inputVertexGroup;
@@ -96,7 +93,6 @@ public class GroupInputEdge {
   /*
    * Used to identify the edge in the configuration
    */
-  @Private
   public String getId() {
     return String.valueOf(this.hashCode());
   }

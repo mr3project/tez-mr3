@@ -24,8 +24,6 @@ import java.util.Set;
 
 import javax.annotation.Nullable;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.yarn.api.records.ApplicationReport;
 import org.apache.tez.dag.api.TezException;
 
@@ -33,7 +31,6 @@ import org.apache.tez.dag.api.TezException;
  * Class for monitoring the <code>DAG</code> running in a Tez DAG
  * Application Master.
  */
-@Public
 public abstract class DAGClient implements Closeable {
 
   /**
@@ -42,7 +39,6 @@ public abstract class DAGClient implements Closeable {
    */
   public abstract String getExecutionContext();
 
-  @Private
   /**
    * Get the YARN ApplicationReport for the app running the DAG. For performance
    * reasons this may be stale copy and should be used to access static info. It

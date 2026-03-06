@@ -42,10 +42,6 @@ import com.google.protobuf.ByteString;
 import org.apache.tez.runtime.api.events.InputDataInformationEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -79,8 +75,6 @@ import org.apache.tez.mapreduce.input.MRInputLegacy;
 import org.apache.tez.mapreduce.protos.MRRuntimeProtos;
 import org.apache.tez.mapreduce.protos.MRRuntimeProtos.MRSplitProto;
 
-@Public
-@Unstable
 public class MRInputHelpers {
 
   private static final Logger LOG = LoggerFactory.getLogger(MRInputHelpers.class);
@@ -108,8 +102,6 @@ public class MRInputHelpers {
    * @return an instance of {@link org.apache.tez.dag.api.DataSourceDescriptor} which can be added
    * as a data source to a {@link org.apache.tez.dag.api.Vertex}
    */
-  @InterfaceStability.Unstable
-  @InterfaceAudience.LimitedPrivate({"hive, pig"})
   public static DataSourceDescriptor configureMRInputWithLegacySplitGeneration(Configuration conf,
                                                                                Path splitsDir,
                                                                                boolean useLegacyInput) {
@@ -147,8 +139,6 @@ public class MRInputHelpers {
    * which provides access to the underlying configuration bytes
    * @throws IOException
    */
-  @InterfaceStability.Evolving
-  @InterfaceAudience.LimitedPrivate({"hive, pig"})
   public static MRRuntimeProtos.MRInputUserPayloadProto parseMRInputPayload(UserPayload payload)
       throws IOException {
     return MRRuntimeProtos.MRInputUserPayloadProto.parseFrom(UnsafeByteOperations.unsafeWrap(payload.getPayload()));
@@ -165,8 +155,6 @@ public class MRInputHelpers {
    * @throws java.io.IOException
    */
   @SuppressWarnings("unchecked")
-  @InterfaceStability.Evolving
-  @InterfaceAudience.LimitedPrivate({"hive, pig"})
   public static InputSplit createOldFormatSplitFromUserPayload(
       MRRuntimeProtos.MRSplitProto splitProto, SerializationFactory serializationFactory)
       throws IOException {
@@ -200,7 +188,6 @@ public class MRInputHelpers {
    * @return an instance of the split
    * @throws IOException
    */
-  @InterfaceStability.Evolving
   @SuppressWarnings("unchecked")
   public static org.apache.hadoop.mapreduce.InputSplit createNewFormatSplitFromUserPayload(
       MRRuntimeProtos.MRSplitProto splitProto, SerializationFactory serializationFactory)
@@ -225,7 +212,6 @@ public class MRInputHelpers {
     return inputSplit;
   }
 
-  @InterfaceStability.Evolving
   public static <T extends org.apache.hadoop.mapreduce.InputSplit> MRRuntimeProtos.MRSplitProto createSplitProto(
       T newSplit, SerializationFactory serializationFactory)
       throws IOException, InterruptedException {
@@ -248,8 +234,6 @@ public class MRInputHelpers {
     return builder.build();
   }
 
-  @InterfaceStability.Evolving
-  @InterfaceAudience.LimitedPrivate({"hive, pig"})
   public static MRRuntimeProtos.MRSplitProto createSplitProto(
       org.apache.hadoop.mapred.InputSplit oldSplit) throws IOException {
     MRRuntimeProtos.MRSplitProto.Builder builder = MRRuntimeProtos.MRSplitProto.newBuilder();
@@ -288,8 +272,6 @@ public class MRInputHelpers {
    * @throws ClassNotFoundException
    * @throws InterruptedException
    */
-  @InterfaceStability.Unstable
-  @InterfaceAudience.LimitedPrivate({"hive, pig"})
   public static InputSplitInfoMem generateInputSplitsToMem(Configuration conf,
                                                            boolean groupSplits, int targetTasks)
       throws IOException, ClassNotFoundException, InterruptedException {
@@ -320,7 +302,6 @@ public class MRInputHelpers {
    * @throws ClassNotFoundException
    * @throws InterruptedException
    */
-  @InterfaceStability.Unstable
   public static InputSplitInfoMem generateInputSplitsToMem(Configuration conf,
       boolean groupSplits, boolean sortSplits, int targetTasks)
       throws IOException, ClassNotFoundException, InterruptedException {
@@ -723,7 +704,6 @@ public class MRInputHelpers {
    * the user-specified InputFormat replaced by either {@link org.apache.hadoop.mapred.split.TezGroupedSplitsInputFormat}
    * or {@link org.apache.hadoop.mapreduce.split.TezGroupedSplitsInputFormat}
    */
-  @InterfaceAudience.Private
   protected static UserPayload createMRInputPayloadWithGrouping(Configuration conf) throws IOException {
     Preconditions
         .checkArgument(conf != null, "Configuration must be specified");
@@ -731,7 +711,6 @@ public class MRInputHelpers {
         null, true, true);
   }
 
-  @InterfaceAudience.Private
   protected static UserPayload createMRInputPayload(Configuration conf,
                                                     MRRuntimeProtos.MRSplitsProto mrSplitsProto) throws
       IOException {
@@ -748,7 +727,6 @@ public class MRInputHelpers {
    * the user-specified InputFormat replaced by either {@link org.apache.hadoop.mapred.split.TezGroupedSplitsInputFormat}
    * or {@link org.apache.hadoop.mapreduce.split.TezGroupedSplitsInputFormat}
    */
-  @InterfaceAudience.Private
   protected static UserPayload createMRInputPayload(Configuration conf,
       MRRuntimeProtos.MRSplitsProto mrSplitsProto, boolean isGrouped,
       boolean isSorted) throws

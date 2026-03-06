@@ -22,8 +22,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Evolving;
 
 /**
  * A LogicalInput that is used to merge the data from multiple inputs and provide a
@@ -37,8 +35,6 @@ import org.apache.hadoop.classification.InterfaceStability.Evolving;
  * take care of initializing and closing the Input after a {@link Processor} completes. </p>
  * <p/>
  */
-@Public
-@Evolving
 public abstract class MergedLogicalInput implements LogicalInput {
 
   private AtomicBoolean notifiedInputReady = new AtomicBoolean(false);

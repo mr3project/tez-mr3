@@ -21,8 +21,6 @@ package org.apache.tez.runtime.api.events;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.tez.dag.api.EdgeManagerPluginOnDemand.CompositeEventRouteMetadata;
 import org.apache.tez.runtime.api.Event;
 
@@ -38,7 +36,6 @@ import org.apache.tez.runtime.api.Event;
  * the Physical Outputs that it generates.
  * 
  */
-@Public
 public class CompositeDataMovementEvent extends Event
   implements com.datamonad.mr3.api.CompositeEventToLogicalInput {
 
@@ -100,7 +97,6 @@ public class CompositeDataMovementEvent extends Event
    *         {@link CompositeDataMovementEvent} with indices specified by the
    *         method parameters
    */
-  @Private
   public DataMovementEvent expand(int sourceIndex, int targetIndex) {
     return new DataMovementEvent(sourceIndex, targetIndex, version, userPayload);
   }
@@ -157,7 +153,6 @@ public class CompositeDataMovementEvent extends Event
     };
   }
 
-  @Private
   public CompositeRoutedDataMovementEvent expandRouted(CompositeEventRouteMetadata routeMeta) {
     return CompositeRoutedDataMovementEvent.create(routeMeta.getSource(), routeMeta.getTarget(), routeMeta.getCount(), version, userPayload);
   }

@@ -26,9 +26,6 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.yarn.api.records.LocalResource;
 import org.apache.tez.dag.api.TaskLocationHint;
@@ -41,7 +38,6 @@ import com.google.common.collect.Sets;
  * Defines the input and input initializer for a data source 
  *
  */
-@Public
 public class DataSourceDescriptor {
   private final InputDescriptor inputDescriptor;
   private final InputInitializerDescriptor initializerDescriptor;
@@ -178,7 +174,6 @@ public class DataSourceDescriptor {
    * Returns -1 when this is determined at runtime in the AM.
    * @return number of tasks
    */
-  @InterfaceAudience.Private
   public int getNumberOfShards() {
     return numShards;
   }
@@ -188,7 +183,6 @@ public class DataSourceDescriptor {
    * Is null when this calculation happens on the AppMaster (default)
    * @return credentials.
    */
-  @InterfaceAudience.Private
   public @Nullable Credentials getCredentials() {
     return credentials;
   }
@@ -198,7 +192,6 @@ public class DataSourceDescriptor {
    * Is null when shard calculation happens on the AppMaster (default)
    * @return List of {@link TaskLocationHint}
    */
-  @InterfaceAudience.Private
   public @Nullable VertexLocationHint getLocationHint() {
     return locationHint;
   }
@@ -207,7 +200,6 @@ public class DataSourceDescriptor {
    * Get the list of additional local files which were specified during creation.
    * @return  Map of additional local files or null if there are none
    */
-  @InterfaceAudience.Private
   public @Nullable Map<String, LocalResource> getAdditionalLocalFiles() {
     return additionalLocalFiles;
   }

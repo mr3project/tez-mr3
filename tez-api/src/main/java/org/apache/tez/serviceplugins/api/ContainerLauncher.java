@@ -14,8 +14,6 @@
 
 package org.apache.tez.serviceplugins.api;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.tez.common.ServicePluginLifecycle;
 
 /**
@@ -23,8 +21,6 @@ import org.apache.tez.common.ServicePluginLifecycle;
  * of executors.
  */
 
-@InterfaceAudience.Public
-@InterfaceStability.Unstable
 public abstract class ContainerLauncher implements ServicePluginLifecycle {
 
   private final ContainerLauncherContext containerLauncherContext;

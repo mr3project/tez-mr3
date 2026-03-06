@@ -22,8 +22,6 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 
 /**
  * TezTaskAttemptID represents the immutable and unique identifier for
@@ -40,8 +38,6 @@ import org.apache.hadoop.classification.InterfaceStability;
  *
  * @see TezTaskID
  */
-@InterfaceAudience.Public
-@InterfaceStability.Stable
 public class TezTaskAttemptID extends TezID implements TaskIDAware {
   public static final String ATTEMPT = "attempt";
   private TezTaskID taskId;
@@ -61,7 +57,6 @@ public class TezTaskAttemptID extends TezID implements TaskIDAware {
     return tezTaskAttemptIDCache.getInstance(new TezTaskAttemptID(taskID, id));
   }
 
-  @InterfaceAudience.Private
   public static void clearCache() {
     tezTaskAttemptIDCache.clear();
   }

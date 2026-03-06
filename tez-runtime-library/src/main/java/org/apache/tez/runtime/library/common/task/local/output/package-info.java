@@ -16,7 +16,5 @@
  * limitations under the License.
  */
 
-@Private
 package org.apache.tez.runtime.library.common.task.local.output;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;

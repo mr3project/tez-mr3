@@ -18,14 +18,10 @@
 
 package org.apache.tez.runtime.api;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Evolving;
 
 /**
  * Report statistics about the {@link Output}
  */
-@Public
-@Evolving
 public interface OutputStatisticsReporter {
 
   /**

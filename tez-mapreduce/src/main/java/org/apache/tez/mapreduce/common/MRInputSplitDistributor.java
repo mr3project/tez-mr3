@@ -24,8 +24,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.tez.common.TezUtils;
@@ -53,8 +51,6 @@ import com.google.common.collect.Lists;
  * and splits must be produced at the client. They can still be distributed
  * intelligently among tasks at runtime using this.
  */
-@Public
-@Evolving
 public class MRInputSplitDistributor extends InputInitializer {
 
   private static final Logger LOG = LoggerFactory.getLogger(MRInputSplitDistributor.class);

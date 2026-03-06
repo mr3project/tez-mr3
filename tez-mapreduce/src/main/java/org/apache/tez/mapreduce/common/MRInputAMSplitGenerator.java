@@ -26,8 +26,6 @@ import com.google.common.collect.Lists;
 import org.apache.tez.mapreduce.grouper.TezSplitGrouper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapreduce.split.TezMapReduceSplitsGrouper;
@@ -55,8 +53,6 @@ import org.apache.tez.runtime.api.events.InputInitializerEvent;
  * recommended {@link InputInitializer} to use when reading Map Reduce 
  * compatible data sources.
  */
-@Public
-@Evolving
 public class MRInputAMSplitGenerator extends InputInitializer {
 
   private boolean sendSerializedEvents;

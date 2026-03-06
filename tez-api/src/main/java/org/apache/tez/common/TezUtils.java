@@ -30,7 +30,6 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.UnsafeByteOperations;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.tez.client.TezClientUtils;
 import org.apache.tez.dag.api.UserPayload;
@@ -42,7 +41,6 @@ import org.xerial.snappy.SnappyOutputStream;
  * Utility methods for setting up a DAG. Has helpers for setting up log4j configuration, converting
  * {@link org.apache.hadoop.conf.Configuration} to {@link org.apache.tez.dag.api.UserPayload} etc.
  */
-@InterfaceAudience.Public
 public class TezUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(TezUtils.class);

@@ -14,11 +14,7 @@
 
 package org.apache.tez.serviceplugins.api;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 
-@InterfaceAudience.Public
-@InterfaceStability.Unstable
 public enum TaskAttemptEndReason {
   NODE_FAILED, // Completed because the node running the container was marked as dead
   COMMUNICATION_ERROR, // Communication error with the task

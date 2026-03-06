@@ -20,13 +20,11 @@
 
 package org.apache.tez.runtime.api;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 
 /**
  * Defines the framework facing interfact for a {@link LogicalInput}
  *
  * User implementations are expected to derive from {@link AbstractLogicalInput}
  */
-@Public
 public interface LogicalInputFrameworkInterface extends InputFrameworkInterface {
 }

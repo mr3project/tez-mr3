@@ -17,8 +17,6 @@
  */
 package org.apache.tez.dag.api;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 
 /**
  * Edge defines the connection between a producer and consumer vertex in the DAG.
@@ -27,7 +25,6 @@ import org.apache.hadoop.classification.InterfaceAudience.Public;
  * edge.
  * 
  */
-@Public
 public class Edge {
 
   private final Vertex inputVertex;
@@ -87,7 +84,6 @@ public class Edge {
   /*
    * Used to identify the edge in the configuration
    */
-  @Private
   public String getId() {
     // ensure it is unique.
     return String.valueOf(System.identityHashCode(this));

@@ -20,9 +20,6 @@ package org.apache.tez.runtime.api;
 
 import java.util.List;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.tez.runtime.api.events.InputDataInformationEvent;
 
 import com.google.common.collect.Lists;
@@ -33,8 +30,6 @@ import com.google.common.collect.Lists;
  * numPhysicalInputs for each work unit.
  * 
  */
-@Unstable
-@Public
 public class InputSpecUpdate {
 
   private final boolean forAllWorkUnits;
@@ -82,7 +77,6 @@ public class InputSpecUpdate {
     this.numPhysicalInputs = Lists.newArrayList(perWorkUnitNumPhysicalInputs);
   }
 
-  @Private
   public int getNumPhysicalInputsForWorkUnit(int index) {
     if (this.forAllWorkUnits) {
       return numPhysicalInputs.get(0);
@@ -91,13 +85,11 @@ public class InputSpecUpdate {
     }
   }
   
-  @Private
   /* Used for recovery serialization */
   public boolean isForAllWorkUnits() {
     return this.forAllWorkUnits;
   }
   
-  @Private
   /* Used for recovery serialization */
   public List<Integer> getAllNumPhysicalInputs() {
     return numPhysicalInputs;

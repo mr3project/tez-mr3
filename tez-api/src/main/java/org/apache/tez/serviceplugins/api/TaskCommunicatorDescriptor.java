@@ -14,12 +14,8 @@
 
 package org.apache.tez.serviceplugins.api;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.tez.dag.api.NamedEntityDescriptor;
 
-@InterfaceAudience.Public
-@InterfaceStability.Unstable
 public class TaskCommunicatorDescriptor extends NamedEntityDescriptor<TaskCommunicatorDescriptor> {
 
 

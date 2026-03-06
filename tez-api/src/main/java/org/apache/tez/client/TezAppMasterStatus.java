@@ -18,12 +18,10 @@
 
 package org.apache.tez.client;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 
 /**
  * Defines status for the App Master executing the DAG
  */
-@Public
 public enum TezAppMasterStatus {
   /** App Master initializing itself */
   INITIALIZING,

@@ -19,8 +19,6 @@
 package org.apache.tez.runtime.api;
 
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.tez.dag.api.Vertex;
 
 /**
@@ -28,8 +26,6 @@ import org.apache.tez.dag.api.Vertex;
  * logical output in a {@link Vertex}. Outputs can be external outputs or
  * outputs to other vertices.
  */
-@Public
-@Evolving
 public interface OutputStatistics {
   
   /**
