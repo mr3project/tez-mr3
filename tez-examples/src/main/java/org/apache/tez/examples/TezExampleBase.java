@@ -33,8 +33,6 @@ import org.apache.tez.client.CallerContext;
 import org.apache.tez.common.TezUtilsInternal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -50,7 +48,6 @@ import org.apache.tez.dag.api.client.DAGStatus;
 import org.apache.tez.dag.api.client.StatusGetOpts;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 
-@InterfaceAudience.Private
 public abstract class TezExampleBase extends Configured implements Tool {
 
   private static final Logger LOG = LoggerFactory.getLogger(TezExampleBase.class);
@@ -300,7 +297,6 @@ public abstract class TezExampleBase extends Configured implements Tool {
   protected abstract int runJob(String[] args, TezConfiguration tezConf,
                                 TezClient tezClient) throws Exception;
   
-  @Private
   @VisibleForTesting
   public ApplicationId getAppId() {
     if (tezClientInternal == null) {

@@ -22,7 +22,6 @@ package org.apache.tez.runtime.api;
 
 import java.util.List;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 
 
 /**
@@ -44,7 +43,6 @@ import org.apache.hadoop.classification.InterfaceAudience.Public;
  * 
  * Input implementations are expected to derive from {@link AbstractLogicalInput}
  */
-@Public
 public interface InputFrameworkInterface {
   /**
    * Initializes the <code>Input</code>.

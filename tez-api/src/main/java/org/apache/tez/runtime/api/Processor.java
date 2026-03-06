@@ -18,7 +18,6 @@
 
 package org.apache.tez.runtime.api;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 
 /**
  * {@link Processor} represents the <em>Tez</em> entity responsible for
@@ -27,6 +26,5 @@ import org.apache.hadoop.classification.InterfaceAudience.Public;
  * 
  * Users are expected to derive from {@link AbstractLogicalIOProcessor}
  */
-@Public
 public interface Processor {
 }

@@ -18,12 +18,8 @@
 
 package org.apache.tez.runtime.api;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.tez.dag.api.TezException;
 
-@Public
-@Evolving
 /**
  * Exception invoked when getProgress fails
  */

@@ -15,6 +15,4 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@InterfaceAudience.Private
 package org.apache.tez.dag.app;
-import org.apache.hadoop.classification.InterfaceAudience;

@@ -14,9 +14,7 @@
 
 package org.apache.tez.dag.api.client;
 
-import org.apache.hadoop.classification.InterfaceAudience;
 
-@InterfaceAudience.Private
 public enum DagStatusSource {
   AM, RM, TIMELINE
 }

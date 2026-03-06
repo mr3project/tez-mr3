@@ -18,8 +18,6 @@
 
 package org.apache.tez.runtime.api;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
 
 /**
  * This interface will be used by Tez to inform components about available
@@ -28,8 +26,6 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
  * for appropriate memory limits for the respective components.
  * 
  */
-@Unstable
-@Public
 public abstract class MemoryUpdateCallback {
 
   public abstract void memoryAssigned(long assignedSize);

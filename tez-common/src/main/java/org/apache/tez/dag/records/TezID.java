@@ -24,8 +24,6 @@ import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.util.WeakHashMap;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.WritableComparable;
 
 /**
@@ -36,8 +34,6 @@ import org.apache.hadoop.io.WritableComparable;
  * @see TezTaskID
  * @see TezTaskAttemptID
  */
-@InterfaceAudience.Public
-@InterfaceStability.Stable
 public abstract class TezID implements WritableComparable<TezID> {
   public static final char SEPARATOR = '_';
   protected int id;

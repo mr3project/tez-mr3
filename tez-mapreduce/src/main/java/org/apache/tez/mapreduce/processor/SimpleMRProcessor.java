@@ -22,8 +22,6 @@ import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.tez.mapreduce.output.MROutput;
 import org.apache.tez.runtime.api.LogicalOutput;
 import org.apache.tez.runtime.api.Processor;
@@ -37,8 +35,6 @@ import com.google.common.collect.Lists;
  * processing by calling commit (if needed) on all {@link MROutput}s 
  * connected to this {@link Processor}. 
  */
-@Public
-@Evolving
 public abstract class SimpleMRProcessor extends SimpleProcessor {
   private static final Logger LOG = LoggerFactory.getLogger(SimpleMRProcessor.class);
 

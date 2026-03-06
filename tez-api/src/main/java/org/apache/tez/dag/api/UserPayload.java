@@ -22,14 +22,11 @@ import com.google.common.annotations.VisibleForTesting;
 import java.nio.ByteBuffer;
 import javax.annotation.Nullable;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability;
 
 /**
  * Wrapper class to hold user payloads
  * Provides a version to help in evolving the payloads
  */
-@Public
 public final class UserPayload {
   private final ByteBuffer payload;
   private final int version;
@@ -93,7 +90,6 @@ public final class UserPayload {
     return payload != null && payload != EMPTY_BYTE;
   }
 
-  @InterfaceStability.Unstable
   @VisibleForTesting
   public byte[] deepCopyAsArray() {
     ByteBuffer src = getPayload();

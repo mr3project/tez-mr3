@@ -17,7 +17,6 @@
  */
 package org.apache.tez.runtime.api;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 
 /**
  * Abstract representation of the interface {@link LogicalIOProcessor}.
@@ -25,7 +24,6 @@ import org.apache.hadoop.classification.InterfaceAudience.Public;
  * to be the base class that is derived to implement the user {@link Processor}
  *
  */
-@Public
 public abstract class AbstractLogicalIOProcessor implements LogicalIOProcessor,
     LogicalIOProcessorFrameworkInterface {
   private final ProcessorContext context;

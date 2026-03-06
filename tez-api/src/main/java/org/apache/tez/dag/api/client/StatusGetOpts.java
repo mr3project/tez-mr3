@@ -18,15 +18,11 @@
 
 package org.apache.tez.dag.api.client;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Evolving;
 
 /**
  * Status Get Options used when making calls like getDAGStatus and
  * getVertexStatus in DAGClient
  */
-@Public
-@Evolving
 public enum StatusGetOpts {
   /** Retrieve Counters with Status */
   GET_COUNTERS

@@ -18,8 +18,6 @@
 
 package org.apache.tez.runtime.api.events;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.Output;
 
@@ -31,7 +29,6 @@ import java.nio.ByteBuffer;
  * ( such as URI for file-based output data, port info in case of
  * streaming-based data transfers ) to the Input on the destination vertex.
  */
-@Public
 public final class DataMovementEvent extends Event
   implements com.datamonad.mr3.api.EventToLogicalInput {
 
@@ -61,7 +58,6 @@ public final class DataMovementEvent extends Event
     return CompositeRoutedDataMovementEvent.create(srcOutputIndex, destInputIndex, count, version, userPayload);
   }
 
-  @Private
   public static DataMovementEvent createRaw(int version,
                                             ByteBuffer userPayload) {
     return new DataMovementEvent(-1, -1, version, userPayload);
@@ -100,7 +96,6 @@ public final class DataMovementEvent extends Event
   private int version;
 
 
-  @Private
   DataMovementEvent(int sourceIndex,
                     int targetIndex,
                     int version,
@@ -126,7 +121,6 @@ public final class DataMovementEvent extends Event
     return new DataMovementEvent(sourceIndex, -1, -1, userPayload);
   }
   
-  @Private
   /**
    * Constructor for Processor-generated User Events
    * @param userPayload
@@ -135,7 +129,6 @@ public final class DataMovementEvent extends Event
     return new DataMovementEvent(userPayload);
   }
 
-  @Private
   public static DataMovementEvent create(int sourceIndex,
                                          int targetIndex,
                                          int version,
@@ -153,7 +146,6 @@ public final class DataMovementEvent extends Event
    * @return Copy of this {@link DataMovementEvent} with the target input index
    *         added to it
    */
-  @Private
   public DataMovementEvent makeCopy(int targetIndex) {
     return new DataMovementEvent(sourceIndex, targetIndex, version, userPayload);
   }
@@ -170,7 +162,6 @@ public final class DataMovementEvent extends Event
     return targetIndex;
   }
 
-  @Private
   public void setTargetIndex(int targetIndex) {
     this.targetIndex = targetIndex;
   }
@@ -179,7 +170,6 @@ public final class DataMovementEvent extends Event
     return version;
   }
 
-  @Private
   public void setVersion(int version) {
     this.version = version;
   }

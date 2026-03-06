@@ -23,8 +23,6 @@ import javax.annotation.Nullable;
 import java.util.Map;
 import java.util.Objects;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.tez.dag.api.EdgeManagerPluginDescriptor;
 import org.apache.tez.dag.api.EdgeProperty;
@@ -39,8 +37,6 @@ import org.apache.tez.runtime.library.output.OrderedPartitionedKVOutput;
  * Values will be picked up from tez-site if not specified, otherwise defaults from
  * {@link org.apache.tez.runtime.library.api.TezRuntimeConfiguration} will be used.
  */
-@InterfaceAudience.Public
-@InterfaceStability.Evolving
 public class OrderedPartitionedKVEdgeConfig
     extends HadoopKeyValuesBasedBaseEdgeConfig {
 
@@ -142,8 +138,6 @@ public class OrderedPartitionedKVEdgeConfig
     return edgeProperty;
   }
 
-  @InterfaceAudience.Public
-  @InterfaceStability.Evolving
   public static class Builder extends HadoopKeyValuesBasedBaseEdgeConfig.Builder<Builder> {
 
     private final OrderedPartitionedKVOutputConfig.Builder outputBuilder =
@@ -152,7 +146,6 @@ public class OrderedPartitionedKVEdgeConfig
     private final OrderedGroupedKVInputConfig.Builder inputBuilder =
         new OrderedGroupedKVInputConfig.Builder();
 
-    @InterfaceAudience.Private
     Builder(String keyClassName, String valueClassName, String partitionerClassName,
             Map<String, String> partitionerConf) {
       outputBuilder.setKeyClassName(keyClassName);

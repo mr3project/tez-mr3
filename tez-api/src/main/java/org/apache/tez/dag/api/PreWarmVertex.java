@@ -18,8 +18,6 @@
 
 package org.apache.tez.dag.api;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.tez.client.TezClient;
@@ -49,8 +47,6 @@ import org.apache.tez.runtime.api.Processor;
  * processors can be used to initialize classes etc. and setup the environment
  * for the actual processing to reduce latency.
  */
-@Unstable
-@Public
 public class PreWarmVertex extends Vertex {
 
 

@@ -20,14 +20,12 @@ package org.apache.tez.runtime.api;
 
 import java.util.Map;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 
 /**
  * Represents a processor framework interface which consumes {@link LogicalInput}s and produces
  * {@link LogicalOutput}s.
  * Users are expected to implements {@link AbstractLogicalIOProcessor}
  */
-@Public
 public interface LogicalIOProcessorFrameworkInterface extends ProcessorFrameworkInterface {
 
   /**

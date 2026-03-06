@@ -18,13 +18,11 @@
 
 package org.apache.tez.runtime.api;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 
 /**
  * Context handle for the Output to initialize itself.
  * This interface is not supposed to be implemented by users
  */
-@Public
 public interface OutputContext extends TaskContext {
 
   /**

@@ -18,15 +18,11 @@
 
 package org.apache.tez.runtime.library.partitioner;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.tez.runtime.library.api.Partitioner;
 
 /**
  * Implements a {@link Partitioner} that does hash based partitioning
  */
-@Public
-@Evolving
 public class HashPartitioner implements Partitioner {
 
   @Override

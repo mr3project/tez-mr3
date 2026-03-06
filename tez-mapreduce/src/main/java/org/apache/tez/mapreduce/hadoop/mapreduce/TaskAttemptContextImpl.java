@@ -17,8 +17,6 @@
 
 package org.apache.tez.mapreduce.hadoop.mapreduce;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.mapreduce.Counter;
@@ -34,8 +32,6 @@ import org.apache.tez.mapreduce.common.Utils;
 // NOTE: NEWTEZ: This is a copy of org.apache.tez.mapreduce.hadoop.mapred (not mapreduce). mapred likely does not need it's own copy of this class.
 // Meant for use by the "mapreduce" API
 
-@InterfaceAudience.Private
-@InterfaceStability.Unstable
 public class TaskAttemptContextImpl
        extends org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl {
 

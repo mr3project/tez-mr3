@@ -18,12 +18,10 @@
 
 package org.apache.tez.dag.api;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 
 /**
  *  Checked Exception thrown upon error
  */
-@Public
 public class TezException extends Exception {
   private static final long serialVersionUID = 6337442733802964447L;
   public TezException(Throwable cause) { super(cause); }

@@ -18,7 +18,6 @@
 
 package org.apache.tez.runtime.api;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 
 /**
  * Represents an Output through which a TezProcessor writes information to an edge.
@@ -30,7 +29,6 @@ import org.apache.hadoop.classification.InterfaceAudience.Public;
  * Users are expected to derive from {@link AbstractLogicalOutput}
  *
  */
-@Public
 public interface Output {
 
 

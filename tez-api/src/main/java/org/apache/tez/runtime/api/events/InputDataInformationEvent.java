@@ -18,8 +18,6 @@
 
 package org.apache.tez.runtime.api.events;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.tez.dag.api.VertexManagerPlugin;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.InputInitializer;
@@ -41,8 +39,6 @@ import java.nio.ByteBuffer;
  * Events, after being processed by a {@link VertexManagerPlugin}, must
  * contain the payload in a serialized form.
  */
-@Unstable
-@Public
 public final class InputDataInformationEvent extends Event
   implements
     com.datamonad.mr3.api.EventFromInputInitializerToVertexManager,

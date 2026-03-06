@@ -18,7 +18,6 @@
 
 package org.apache.tez.runtime.api;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 
 /**
  * Base class for all events generated within the Tez execution engine.
@@ -26,7 +25,6 @@ import org.apache.hadoop.classification.InterfaceAudience.Public;
  * and Outputs.
  * Users are not expected to implement or derive from this class
  */
-@Public
 public abstract class Event {
 
 }

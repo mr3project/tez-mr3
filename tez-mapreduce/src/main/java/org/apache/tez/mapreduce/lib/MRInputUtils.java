@@ -22,7 +22,6 @@ import java.io.IOException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -42,7 +41,6 @@ import org.apache.tez.mapreduce.protos.MRRuntimeProtos.MRSplitProto;
 /**
  * Helper methods for InputFormat based Inputs. Private to Tez.
  */
-@Private
 public class MRInputUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(MRInputUtils.class);
@@ -128,7 +126,6 @@ public class MRInputUtils {
     return split;
   }
   
-  @Private
   public static InputSplit getOldSplitDetailsFromEvent(MRSplitProto splitProto, Configuration conf)
       throws IOException {
     SerializationFactory serializationFactory = new SerializationFactory(conf);

@@ -25,8 +25,6 @@ import java.nio.ByteBuffer;
 import java.util.Objects;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
@@ -38,7 +36,6 @@ import org.apache.hadoop.io.Writable;
   * <br>This is not supposed to be extended by users. Users are expected to use the derived
   * classes for specific entities
  */
-@Public
 @SuppressWarnings("unchecked")
 public class EntityDescriptor<T extends EntityDescriptor<T>> implements Writable {
   // abstract in Tez, but not in MR3
@@ -48,7 +45,6 @@ public class EntityDescriptor<T extends EntityDescriptor<T>> implements Writable
   private String className;
   protected String historyText;
 
-  @Private // for Writable
   public EntityDescriptor() {
   }
 
@@ -86,7 +82,6 @@ public class EntityDescriptor<T extends EntityDescriptor<T>> implements Writable
     return (T) this;
   }
 
-  @Private // Internal use only
   public String getHistoryText() {
     return this.historyText;
   }

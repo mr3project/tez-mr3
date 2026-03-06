@@ -17,8 +17,6 @@
 
 package org.apache.tez.mapreduce.hadoop.mapred;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.TaskAttemptContext;
 import org.apache.hadoop.mapred.TaskAttemptID;
@@ -26,8 +24,6 @@ import org.apache.hadoop.mapreduce.Counter;
 import org.apache.hadoop.util.Progressable;
 import org.apache.tez.mapreduce.processor.MRTaskReporter;
 
-@InterfaceAudience.Private
-@InterfaceStability.Unstable
 public class TaskAttemptContextImpl
        extends org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl 
        implements TaskAttemptContext {

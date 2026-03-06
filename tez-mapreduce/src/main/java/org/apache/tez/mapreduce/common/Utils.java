@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -32,7 +31,6 @@ import org.apache.hadoop.mapred.Counters.Counter;
 import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.mapreduce.hadoop.mapred.MRCounters;
 
-@Private
 public class Utils {
 
   /**
@@ -44,7 +42,6 @@ public class Utils {
    *   the path.
    * @return a Statistics instance, or null if none is found for the scheme.
    */
-  @Private
   public static List<Statistics> getFsStatistics(Path path, Configuration conf) throws IOException {
     List<Statistics> matchedStats = new ArrayList<FileSystem.Statistics>();
     path = path.getFileSystem(conf).makeQualified(path);

@@ -19,12 +19,8 @@
 package org.apache.tez.runtime.library.exceptions;
 
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.tez.dag.api.TezException;
 
-@Public
-@Evolving
 /**
  * Exception invoked when socket read timeout happens in fetcher
  */

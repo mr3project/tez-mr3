@@ -20,10 +20,8 @@ package org.apache.tez.runtime.common.resources;
 
 import java.util.Objects;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 
 
-@Private
 public class InitialMemoryRequestContext {
 
   public static enum ComponentType {

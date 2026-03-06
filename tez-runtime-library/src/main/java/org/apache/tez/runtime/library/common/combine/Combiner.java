@@ -20,8 +20,6 @@ package org.apache.tez.runtime.library.common.combine;
 
 import java.io.IOException;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.sort.impl.TezRawKeyValueIterator;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Writer;
@@ -34,8 +32,6 @@ import org.apache.tez.runtime.library.common.sort.impl.IFile.Writer;
  * Partitioners need to provide a single argument ({@link TezRawKeyValueIterator})
  * constructor.
  */
-@Private
-@Unstable
 public interface Combiner {
   public void combine(TezRawKeyValueIterator rawIter, Writer writer)
       throws InterruptedException, IOException;

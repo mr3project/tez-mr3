@@ -22,10 +22,8 @@ import javax.annotation.Nullable;
 
 import java.util.Map;
 
-import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.tez.dag.api.UserPayload;
 
-@InterfaceAudience.Private
 abstract class HadoopKeyValuesBasedBaseEdgeConfig {
 
   /**

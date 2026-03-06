@@ -18,7 +18,6 @@
 
 package org.apache.tez.runtime.api;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.tez.dag.api.UserPayload;
 
@@ -27,7 +26,6 @@ import org.apache.tez.dag.api.UserPayload;
  * information that it needs. This interface is not supposed to be implemented
  * by users
  */
-@Public
 public interface OutputCommitterContext {
 
   /**

@@ -20,8 +20,6 @@ package org.apache.tez.common;
 
 import java.io.IOException;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.ipc.VersionedProtocol;
 import org.apache.hadoop.security.token.TokenInfo;
 import org.apache.tez.dag.api.TezException;
@@ -35,8 +33,6 @@ import org.apache.tez.runtime.common.security.JobTokenSelector;
  * reduce task and runs it as a child process.  All communication between child
  * and parent is via this protocol. */
 @TokenInfo(JobTokenSelector.class)
-@InterfaceAudience.Private
-@InterfaceStability.Stable
 // ProtocolInfo will be required once we move to Hadoop PB RPC
 //@ProtocolInfo(protocolName = "TezTaskUmbilicalProtocol", protocolVersion = 1)
 public interface TezTaskUmbilicalProtocol extends VersionedProtocol {

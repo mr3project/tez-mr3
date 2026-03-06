@@ -27,16 +27,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.tez.dag.api.TezReflectionException;
 import org.apache.tez.dag.api.TezUncheckedException;
 
-@Private
 public class ReflectionUtils {
 
   private static final Map<String, Class<?>> CLAZZ_CACHE = new ConcurrentHashMap<String, Class<?>>();
 
-  @Private
   public static Class<?> getClazz(String className) throws TezReflectionException {
     Class<?> clazz = CLAZZ_CACHE.get(className);
     if (clazz == null) {
@@ -73,7 +70,6 @@ public class ReflectionUtils {
     return instance;
   }
 
-  @Private
   public static <T> T createClazzInstance(String className) throws TezReflectionException {
     Class<?> clazz = getClazz(className);
     @SuppressWarnings("unchecked")
@@ -81,7 +77,6 @@ public class ReflectionUtils {
     return instance;
   }
 
-  @Private
   public static <T> T createClazzInstance(String className, Class<?>[] parameterTypes, Object[] parameters)
     throws TezReflectionException {
     Class<?> clazz = getClazz(className);

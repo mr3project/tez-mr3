@@ -16,9 +16,5 @@
  * limitations under the License.
  */
 
-@Public
-@Evolving
 package org.apache.tez.runtime.library.conf;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Evolving;

@@ -14,11 +14,7 @@
 
 package org.apache.tez.serviceplugins.api;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 
-@InterfaceAudience.Public
-@InterfaceStability.Unstable
 /**
  * Represents errors from a ServicePlugin. The default implementation {@link ServicePluginErrorDefaults}
  * lists a basic set of errors.

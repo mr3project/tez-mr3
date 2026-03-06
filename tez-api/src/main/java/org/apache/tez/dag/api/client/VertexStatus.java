@@ -23,7 +23,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google.common.annotations.VisibleForTesting;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.tez.common.counters.TezCounters;
 import org.apache.tez.dag.api.Vertex;
 import org.apache.tez.dag.api.records.DAGProtos;
@@ -33,7 +32,6 @@ import org.apache.tez.dag.api.TezUncheckedException;
 /**
  * Describes the status of the {@link Vertex}
  */
-@Public
 public class VertexStatus {
 
   public enum State {

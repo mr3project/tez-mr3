@@ -16,12 +16,10 @@ package org.apache.hadoop.mapreduce.split;
 
 import java.io.IOException;
 
-import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.tez.mapreduce.grouper.MapReduceSplitContainer;
 import org.apache.tez.mapreduce.grouper.SplitContainer;
 import org.apache.tez.mapreduce.grouper.SplitLocationProviderWrapper;
 
-@InterfaceAudience.Private
 public class SplitLocationProviderMapReduce implements SplitLocationProviderWrapper {
 
   private final SplitLocationProvider locationProvider;

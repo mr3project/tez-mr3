@@ -16,14 +16,10 @@ package org.apache.tez.runtime.library.api;
 
 import java.io.IOException;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 
 /**
  * Indicates that an IOOperation was interrupted
  */
-@InterfaceAudience.Public
-@InterfaceStability.Evolving
 public class IOInterruptedException extends IOException {
 
   public IOInterruptedException(String message) {

@@ -18,9 +18,7 @@
 
 package org.apache.tez.dag.api;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 
-@Private
 public class RootInputLeafOutput <T extends EntityDescriptor<T>, S extends EntityDescriptor<S>> {
 
   private final String name;

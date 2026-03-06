@@ -16,9 +16,7 @@ package org.apache.tez.mapreduce.grouper;
 
 import java.io.IOException;
 
-import org.apache.hadoop.classification.InterfaceAudience;
 
-@InterfaceAudience.Private
 /**
  * Interface to represent both mapred and mapreduce splits
  */

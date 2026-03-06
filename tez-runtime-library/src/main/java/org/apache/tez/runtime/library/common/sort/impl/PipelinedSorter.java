@@ -34,7 +34,6 @@ import org.apache.hadoop.io.compress.Compressor;
 import org.apache.tez.common.Preconditions;
 import com.google.common.collect.Lists;
 
-import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.tez.runtime.api.MultiByteArrayOutputStream;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
 import org.apache.tez.runtime.library.utils.CodecUtils;
@@ -1458,7 +1457,6 @@ public class PipelinedSorter extends ExternalSorter {
     }
   }
 
-  @InterfaceAudience.Private
   public boolean needsRLE() {
     return merger.needsRLE();
   }

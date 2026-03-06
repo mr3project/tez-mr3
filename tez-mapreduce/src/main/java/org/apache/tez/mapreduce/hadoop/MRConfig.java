@@ -17,7 +17,6 @@
  */
 package org.apache.tez.mapreduce.hadoop;
 
-import org.apache.hadoop.classification.InterfaceAudience;
 
 /**
  * Place holder for cluster level configuration keys.
@@ -25,7 +24,6 @@ import org.apache.hadoop.classification.InterfaceAudience;
  * The keys should have "mapreduce.cluster." as the prefix.
  *
  */
-@InterfaceAudience.Private
 public interface MRConfig {
 
   // Cluster-level configuration parameters

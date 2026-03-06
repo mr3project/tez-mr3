@@ -22,10 +22,8 @@ package org.apache.tez.runtime.library.conf;
 
 import java.util.Map;
 
-import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 
-@InterfaceAudience.Private
 interface BaseConfigBuilder<T> {
   /**
    * Used to set additional configuration parameters which are not set via API methods. This is
@@ -57,6 +55,5 @@ interface BaseConfigBuilder<T> {
    * @param conf
    * @return this object for further chained method calls
    */
-  @InterfaceAudience.LimitedPrivate({"hive, pig"})
   public T setFromConfiguration(Configuration conf);
 }

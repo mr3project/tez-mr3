@@ -19,9 +19,6 @@
 package org.apache.tez.client;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.LocalResource;
@@ -51,7 +48,6 @@ import java.util.concurrent.TimeUnit;
  * session mode configuration, the same application can be running in session or
  * non-session mode.
  */
-@Public
 public class TezClient {
 
   private static final String appIdStrPrefix = "application";
@@ -64,7 +60,6 @@ public class TezClient {
     throw new TezUncheckedException("TezClient not supported");
   }
 
-  @Private
   TezClient(String name, TezConfiguration tezConf,
             @Nullable Map<String, LocalResource> localResources,
             @Nullable Credentials credentials) {
@@ -75,14 +70,12 @@ public class TezClient {
     throw new TezUncheckedException("TezClient not supported");
   }
 
-  @Private
   protected TezClient(String name, TezConfiguration tezConf, boolean isSession,
                       @Nullable Map<String, LocalResource> localResources,
                       @Nullable Credentials credentials) {
     throw new TezUncheckedException("TezClient not supported");
   }
 
-  @Private
   protected TezClient(String name, TezConfiguration tezConf, boolean isSession,
             @Nullable Map<String, LocalResource> localResources,
             @Nullable Credentials credentials, ServicePluginsDescriptor servicePluginsDescriptor) {
@@ -180,7 +173,6 @@ public class TezClient {
   /**
    * A builder for setting up an instance of {@link org.apache.tez.client.TezClient}
    */
-  @Public
   public static class TezClientBuilder {
 
     private TezClientBuilder(String name, TezConfiguration tezConf) {
@@ -211,8 +203,6 @@ public class TezClient {
   //Copied this helper method from 
   //org.apache.hadoop.yarn.api.records.ApplicationId in Hadoop 2.8+
   //to simplify implementation on 2.7.x
-  @Public
-  @Unstable
   public static ApplicationId appIdfromString(String appIdStr) {
     if (!appIdStr.startsWith(APPLICATION_ID_PREFIX)) {
       throw new IllegalArgumentException("Invalid ApplicationId prefix: "

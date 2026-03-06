@@ -19,17 +19,14 @@
 package org.apache.tez.client;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.tez.dag.api.TezConstants;
 
 import java.util.List;
 
-@Private
 public class TezClientUtils {
 
-  @Private
   @VisibleForTesting
   public static void addLog4jSystemProperties(String logLevel,
       List<String> vargs) {

@@ -18,8 +18,6 @@
 
 package org.apache.tez.runtime.api.events;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.tez.dag.api.VertexLocationHint;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.InputInitializer;
@@ -30,8 +28,6 @@ import org.apache.tez.runtime.api.InputSpecUpdate;
  * to configure the tasks of the vertex. It could change the task 
  * placement hints or input specification for the inputs of the tasks
  */
-@Unstable
-@Public
 public class InputConfigureVertexTasksEvent extends Event
   implements com.datamonad.mr3.api.EventFromInputInitializerToVertexManager {
 

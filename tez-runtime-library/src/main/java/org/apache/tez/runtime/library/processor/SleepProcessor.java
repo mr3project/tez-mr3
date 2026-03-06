@@ -28,7 +28,6 @@ import com.google.common.base.Charsets;
 import org.apache.tez.common.ProgressHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.tez.dag.api.UserPayload;
 import org.apache.tez.runtime.api.AbstractLogicalIOProcessor;
 import org.apache.tez.runtime.api.Event;
@@ -42,7 +41,6 @@ import org.apache.tez.runtime.api.ProcessorContext;
  *
  * @see SleepProcessorConfig for configuring the SleepProcessor
  */
-@Private
 public class SleepProcessor extends AbstractLogicalIOProcessor {
 
   private static final Logger LOG = LoggerFactory.getLogger(SleepProcessor.class);

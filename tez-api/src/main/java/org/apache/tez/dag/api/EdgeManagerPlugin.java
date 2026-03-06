@@ -21,8 +21,6 @@ package org.apache.tez.dag.api;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.tez.runtime.api.events.DataMovementEvent;
 import org.apache.tez.runtime.api.events.InputReadErrorEvent;
 
@@ -31,8 +29,6 @@ import org.apache.tez.runtime.api.events.InputReadErrorEvent;
  * consumer vertices. The routing is bi-directional. Users can customize the 
  * routing by providing an implementation of this interface.
  */
-@Public
-@Unstable
 public abstract class EdgeManagerPlugin {
 
   private final EdgeManagerPluginContext context;

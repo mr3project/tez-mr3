@@ -17,9 +17,7 @@
  */
 package org.apache.tez.dag.api;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 
-@Private
 public enum Scope {
   // DO NOT CHANGE THE ORDER
   AM,       // can only been set at AM level 

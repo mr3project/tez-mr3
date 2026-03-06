@@ -25,9 +25,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
@@ -40,8 +37,6 @@ import org.apache.tez.dag.api.TezUncheckedException;
  * A Mapreduce InputSplit that provides a generic wrapper
  * around a set of real InputSplits.
  */
-@Public
-@Evolving
 public class TezGroupedSplit extends InputSplit 
   implements Writable, Configurable {
 
@@ -52,12 +47,10 @@ public class TezGroupedSplit extends InputSplit
   long length = 0;
   Configuration conf;
 
-  @InterfaceAudience.Private
   public TezGroupedSplit() {
     
   }
 
-  @InterfaceAudience.Private
   /**
    * Meant for internal usage only
    */

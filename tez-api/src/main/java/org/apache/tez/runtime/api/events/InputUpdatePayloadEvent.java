@@ -18,8 +18,6 @@
 
 package org.apache.tez.runtime.api.events;
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.InputInitializer;
 
@@ -33,8 +31,6 @@ import java.util.Objects;
  * This event is specific to an Input, and should only be sent once - ideally
  * before {@link InputDataInformationEvent}s
  */
-@Unstable
-@Public
 public class InputUpdatePayloadEvent extends Event
   implements com.datamonad.mr3.api.EventFromInputInitializerToVertexManager {
 

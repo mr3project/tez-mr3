@@ -21,11 +21,9 @@ package org.apache.tez.runtime.api.impl;
 import java.io.IOException;
 import java.util.Collection;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.tez.dag.records.TezTaskAttemptID;
 import org.apache.tez.runtime.api.TaskFailureType;
 
-@Private
 public interface TezUmbilical {
 
   void addEvents(Collection<TezEvent> events);

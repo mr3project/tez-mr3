@@ -20,14 +20,10 @@ package org.apache.tez.common;
 
 import java.util.concurrent.ExecutorService;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
 
 /**
  * Interface to capture factory of ExecutorService.
  */
-@Private
-@Unstable
 public interface TezExecutors {
 
   /**

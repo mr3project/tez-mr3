@@ -32,7 +32,6 @@ import org.apache.tez.runtime.api.Output;
 import org.apache.tez.runtime.api.OutputContext;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
 import org.apache.tez.runtime.library.api.KeyValueWriterWithBasePath;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
@@ -46,7 +45,6 @@ import org.apache.tez.mapreduce.hadoop.mapred.MRReporter;
  * OutputFormat implementations.
  *
  */
-@Public
 public class MultiMROutput extends MROutput {
 
   Map<String, org.apache.hadoop.mapreduce.RecordWriter<?, ?>>

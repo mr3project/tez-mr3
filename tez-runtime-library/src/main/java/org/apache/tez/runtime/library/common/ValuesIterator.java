@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
-import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.RawComparator;
@@ -41,7 +40,6 @@ import org.apache.tez.common.Preconditions;
  * 
  */
 
-@Private
 public class ValuesIterator<KEY,VALUE> {
   protected TezRawKeyValueIterator in; //input iterator
   private KEY key;               // current key

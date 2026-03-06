@@ -23,7 +23,6 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.Objects;
 
 import com.google.common.collect.Maps;
-import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.ipc.ProtocolSignature;
@@ -63,7 +62,6 @@ import org.apache.tez.runtime.api.impl.TezHeartbeatResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@InterfaceAudience.Private
 public class TezTaskCommunicatorImpl extends TaskCommunicator {
 
   private static final Logger LOG = LoggerFactory.getLogger(TezTaskCommunicatorImpl.class);

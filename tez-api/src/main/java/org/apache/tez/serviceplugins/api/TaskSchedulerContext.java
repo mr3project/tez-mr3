@@ -18,8 +18,6 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.Container;
@@ -39,8 +37,6 @@ import org.apache.tez.common.ContainerSignatureMatcher;
  * scheduler
  * which implement the {@link TaskScheduler} interface
  */
-@InterfaceAudience.Public
-@InterfaceStability.Unstable
 public interface TaskSchedulerContext extends ServicePluginContextBase {
 
   class AppFinalStatus {

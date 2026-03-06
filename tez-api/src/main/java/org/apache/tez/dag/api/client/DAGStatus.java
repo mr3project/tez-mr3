@@ -24,8 +24,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.tez.common.counters.TezCounters;
 import org.apache.tez.dag.api.DAG;
 import org.apache.tez.dag.api.records.DAGProtos.DAGStatusProtoOrBuilder;
@@ -35,7 +33,6 @@ import org.apache.tez.dag.api.TezUncheckedException;
 /**
  * Describes the status of the {@link DAG}
  */
-@Public
 public class DAGStatus {
 
   private static final String LINE_SEPARATOR = System
@@ -59,7 +56,6 @@ public class DAGStatus {
   TezCounters dagCounters = null;
   AtomicBoolean countersInitialized = new AtomicBoolean(false);
 
-  @InterfaceAudience.Private
   public DAGStatus(DAGStatusProtoOrBuilder proxy, DagStatusSource source) {
     this.proxy = proxy;
     this.source = source;
@@ -143,7 +139,6 @@ public class DAGStatus {
     return dagCounters;
   }
 
-  @InterfaceAudience.Private
   DagStatusSource getSource() {
     return this.source;
   }

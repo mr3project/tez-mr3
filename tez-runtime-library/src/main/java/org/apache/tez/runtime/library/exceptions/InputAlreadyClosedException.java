@@ -19,12 +19,8 @@
 package org.apache.tez.runtime.library.exceptions;
 
 
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.tez.dag.api.TezException;
 
-@Public
-@Evolving
 /**
  * Exception invoked when an operation is invoked on an Input that has already been closed.
  */
