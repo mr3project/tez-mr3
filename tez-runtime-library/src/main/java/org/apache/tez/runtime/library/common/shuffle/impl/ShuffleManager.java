@@ -302,7 +302,6 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
 
   // called from ShuffleInputEventHandler thread, Fetcher thread
   // Called only while holding lockForInput(inputIdentifier).
-  // For pipelined callers, shuffleInfoEventsMap is also held by the caller.
   private void registerCompletedInput(FetchedInput fetchedInput) {
     maybeInformInputReady(fetchedInput);
     // call adjustCompletedInputs() because this is not pipelined shuffle
