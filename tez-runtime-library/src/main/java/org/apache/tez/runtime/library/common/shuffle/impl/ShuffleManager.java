@@ -87,8 +87,18 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
   private final AtomicLong totalSizeOfMemoryCompletedInputs = new AtomicLong(0L);
   private final AtomicInteger numCallsGetNextInput = new AtomicInteger(0);
 
-  // Use striped locks to serialize completion per inputIdentifier while allowing
+  // Use striped locks to serialize completion for a specific inputIdentifier while allowing
   // unrelated inputIdentifiers to proceed in parallel.
+  //
+  // Variables/invariants guarded by lockForInput(inputIdentifier):
+  //  - per-input completion transaction in addCompletedInputWithNoData(), addCompletedInputWithData(),
+  //    and fetchSucceeded() (check-complete -> commit/abort -> queue/register)
+  //  - per-input queueing/notification side effects in maybeInformInputReady()
+  //  - per-input finalization in adjustCompletedInputs()
+  //
+  // Note: completedInputSet itself is ALWAYS guarded with synchronized(completedInputSet).
+  // lockForInput(inputIdentifier) protects cross-variable atomicity for one inputIdentifier,
+  // not raw access to completedInputSet.
   private static final int NUM_INPUT_LOCKS = 256;
   private final Object[] inputLocks;
 
@@ -303,7 +313,8 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
   }
 
   // called from ShuffleInputEventHandler thread, Fetcher thread
-  // inside synchronized (lockForInput(inputIdentifier)) and synchronized (shuffleInfoEventsMap)
+  // Called only while holding lockForInput(inputIdentifier).
+  // For pipelined callers, shuffleInfoEventsMap is also held by the caller.
   private void registerCompletedInput(FetchedInput fetchedInput) {
     maybeInformInputReady(fetchedInput);
     // call adjustCompletedInputs() because this is not pipelined shuffle
@@ -312,7 +323,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
   }
 
   // called from ShuffleInputEventHandler thread, Fetcher thread
-  // inside synchronized (lockForInput(inputIdentifier)) and synchronized (shuffleInfoEventsMap) {
+  // Called only while holding lockForInput(inputIdentifier) and synchronized (shuffleInfoEventsMap).
   private void registerCompletedInputForPipelinedShuffle(
       InputAttemptIdentifier srcAttemptIdentifier, FetchedInput fetchedInput) {
     // The input has been successfully fetched for inputIdentifier + spillId, so srcAttemptIdentifier can be obsolete.
@@ -351,7 +362,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
     }
   }
 
-  // inside synchronized (lockForInput(inputIdentifier))
+  // Called only while holding lockForInput(inputIdentifier).
   private void maybeInformInputReady(FetchedInput fetchedInput) {
     if (!(fetchedInput instanceof NullFetchedInput)) {
       completedInputs.add(fetchedInput);
@@ -365,7 +376,8 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
     }
   }
 
-  // inside synchronized (lockForInput(inputIdentifier))
+  // Called only while holding lockForInput(inputIdentifier).
+  // completedInputSet access remains guarded by synchronized(completedInputSet).
   private void adjustCompletedInputs(FetchedInput fetchedInput) {
     synchronized (completedInputSet) {
       completedInputSet.set(fetchedInput.getInputAttemptIdentifier().getInputIdentifier());
