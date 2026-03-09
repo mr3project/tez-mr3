@@ -39,6 +39,10 @@ import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.MapOutput.Ty
 public class ShuffleScheduler extends ShuffleClient<MapOutput> {
 
   private final TezCounter shuffleNumSkippedOrderedInputCounter;
+  private final TezCounter fetchSucceededLockWaitNs;
+  private final TezCounter fetchSucceededLockHoldNs;
+  private final TezCounter fetchSucceededTotalNs;
+  private final TezCounter outputCommitNs;
 
   private final long startTime;
 
@@ -73,6 +77,10 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
     remainingMaps = new AtomicInteger(numInputs);
 
     this.shuffleNumSkippedOrderedInputCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_NUM_SKIPPED_ORDERED_INPUTS);
+    this.fetchSucceededLockWaitNs = inputContext.getCounters().findCounter("FETCH_SUCCEEDED_LOCK_WAIT_NS");
+    this.fetchSucceededLockHoldNs = inputContext.getCounters().findCounter("FETCH_SUCCEEDED_LOCK_HOLD_NS");
+    this.fetchSucceededTotalNs = inputContext.getCounters().findCounter("FETCH_SUCCEEDED_TOTAL_NS");
+    this.outputCommitNs = inputContext.getCounters().findCounter("OUTPUT_COMMIT_NS");
 
     this.startTime = startTime;
 
@@ -134,87 +142,104 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
     shuffleServer.addKnownInput(this, hostName, containerId, port, srcAttempt, partitionId);
   }
 
-  public synchronized void fetchSucceeded(
+  public void fetchSucceeded(
       InputAttemptIdentifier srcAttemptIdentifier,
       MapOutput output,
       long bytesCompressed,
       long bytesDecompressed,
       long copyDuration) throws IOException {
+    long fetchSucceededEnterNanos = System.nanoTime();
+    long lockAcquiredNanos;
+    long lockReleasedNanos;
+
     int inputIdentifier = srcAttemptIdentifier.getInputIdentifier();
 
     boolean updateStats = false;
-    if (!isInputFinished(inputIdentifier)) {
-      // guard shuffleInfoEventsMap[], already covered by this.synchronized
-      // The result of checkCommitRegister() is valid in this.synchronized, so inside fetchSucceeded()
-      CommitRegister cr = checkCommitRegister(srcAttemptIdentifier);
-      boolean isPipelined = cr.isPipelined;
-      boolean commitAndRegister = cr.commitAndRegister;
-      boolean killInPipelined = cr.killInPipelined;   // killBecauseDifferentSpillAttemptInPipelined
-      assert !(!isPipelined) || commitAndRegister;
-      assert !(isPipelined && commitAndRegister) || !killInPipelined;
-      assert !(isPipelined && killInPipelined) || !commitAndRegister;
+    long outputCommitDurationNanos = 0L;
+    synchronized (this) {
+      lockAcquiredNanos = System.nanoTime();
+      if (!isInputFinished(inputIdentifier)) {
+        // guard shuffleInfoEventsMap[], already covered by this.synchronized
+        // The result of checkCommitRegister() is valid in this.synchronized, so inside fetchSucceeded()
+        CommitRegister cr = checkCommitRegister(srcAttemptIdentifier);
+        boolean isPipelined = cr.isPipelined;
+        boolean commitAndRegister = cr.commitAndRegister;
+        boolean killInPipelined = cr.killInPipelined;   // killBecauseDifferentSpillAttemptInPipelined
+        assert !(!isPipelined) || commitAndRegister;
+        assert !(isPipelined && commitAndRegister) || !killInPipelined;
+        assert !(isPipelined && killInPipelined) || !commitAndRegister;
 
-      // 1. call output.commit() or output.abort() if necessary
-      // consider commitAndRegister only
-      if (output != null) {
-        if (commitAndRegister) {
-          output.commit();
-          updateStats = true;
-        } else {
-          LOG.warn("Duplicate fetch of ordered input for {} ({} remaining): {}",
-            inputContext.getUniqueIdentifier(), remainingMaps.get(), srcAttemptIdentifier);
-          shuffleNumDuplicateInputsCounter.increment(1);
-          // free the resource - especially memory
-          output.abort();
-        }
-      } else {
-        // cannot call output.commit()/abort()
-        // Output null implies that a physical input completion is being registered without needing to fetch data
-        shuffleNumSkippedOrderedInputCounter.increment(1);
-      }
-
-      // 2. register completed input if necessary
-      // consider isPipelined, commitAndRegister, killInPipelined
-      if (!isPipelined) {
-        // commitAndRegister == true
-        registerCompletedInput(srcAttemptIdentifier);
-      } else {
-        if (commitAndRegister) {
-          // killInPipelined == false
-          registerCompletedInputForPipelinedShuffle(srcAttemptIdentifier);
-        } else {
-          if (!killInPipelined) {
-            LOG.info("Ordered spill already processed for {} (remaining={}): {}",
-                inputContext.getUniqueIdentifier(), remainingMaps.get(), srcAttemptIdentifier);
+        // 1. call output.commit() or output.abort() if necessary
+        // consider commitAndRegister only
+        if (output != null) {
+          if (commitAndRegister) {
+            long outputCommitStartNanos = System.nanoTime();
+            output.commit();
+            outputCommitDurationNanos = System.nanoTime() - outputCommitStartNanos;
+            updateStats = true;
           } else {
-            String message = "Killing self as previous attempt ordered data could have been consumed in pipelined shuffling";
-            IOException exception = new IOException(
-                message + ": " + inputContext.getUniqueIdentifier() + ", " + srcAttemptIdentifier);
-            killSelf(exception, message);
+            LOG.warn("Duplicate fetch of ordered input for {} ({} remaining): {}",
+              inputContext.getUniqueIdentifier(), remainingMaps.get(), srcAttemptIdentifier);
+            shuffleNumDuplicateInputsCounter.increment(1);
+            // free the resource - especially memory
+            output.abort();
+          }
+        } else {
+          // cannot call output.commit()/abort()
+          // Output null implies that a physical input completion is being registered without needing to fetch data
+          shuffleNumSkippedOrderedInputCounter.increment(1);
+        }
+
+        // 2. register completed input if necessary
+        // consider isPipelined, commitAndRegister, killInPipelined
+        if (!isPipelined) {
+          // commitAndRegister == true
+          registerCompletedInput(srcAttemptIdentifier);
+        } else {
+          if (commitAndRegister) {
+            // killInPipelined == false
+            registerCompletedInputForPipelinedShuffle(srcAttemptIdentifier);
+          } else {
+            if (!killInPipelined) {
+              LOG.info("Ordered spill already processed for {} (remaining={}): {}",
+                  inputContext.getUniqueIdentifier(), remainingMaps.get(), srcAttemptIdentifier);
+            } else {
+              String message = "Killing self as previous attempt ordered data could have been consumed in pipelined shuffling";
+              IOException exception = new IOException(
+                  message + ": " + inputContext.getUniqueIdentifier() + ", " + srcAttemptIdentifier);
+              killSelf(exception, message);
+            }
           }
         }
-      }
 
-      if (remainingMaps.get() == 0) {
-        notifyAll();
-        LOG.info("All inputs fetched for ShuffleScheduler {}", shuffleClientId);
-      }
+        if (remainingMaps.get() == 0) {
+          notifyAll();
+          LOG.info("All inputs fetched for ShuffleScheduler {}", shuffleClientId);
+        }
 
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Source done for {} ({} remaining): {}",
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Source done for {} ({} remaining): {}",
+              inputContext.getUniqueIdentifier(), remainingMaps.get(), srcAttemptIdentifier);
+        }
+      } else {
+        // input is already finished. duplicate fetch.
+        LOG.warn("Fetch of ordered input after completion for {} ({} remaining): {}",
             inputContext.getUniqueIdentifier(), remainingMaps.get(), srcAttemptIdentifier);
+        // free the resource - especially memory
+        // If the source does not generate data, output will be null.
+        if (output != null) {
+          shuffleNumDuplicateInputsCounter.increment(1);
+          output.abort();
+        }
       }
-    } else {
-      // input is already finished. duplicate fetch.
-      LOG.warn("Fetch of ordered input after completion for {} ({} remaining): {}",
-          inputContext.getUniqueIdentifier(), remainingMaps.get(), srcAttemptIdentifier);
-      // free the resource - especially memory
-      // If the source does not generate data, output will be null.
-      if (output != null) {
-        shuffleNumDuplicateInputsCounter.increment(1);
-        output.abort();
-      }
+      lockReleasedNanos = System.nanoTime();
     }
+
+    long fetchSucceededTotalDurationNanos = System.nanoTime() - fetchSucceededEnterNanos;
+    fetchSucceededLockWaitNs.increment(lockAcquiredNanos - fetchSucceededEnterNanos);
+    fetchSucceededLockHoldNs.increment(lockReleasedNanos - lockAcquiredNanos);
+    fetchSucceededTotalNs.increment(fetchSucceededTotalDurationNanos);
+    outputCommitNs.increment(outputCommitDurationNanos);
 
     if (updateStats) {
       updateCounters(srcAttemptIdentifier, bytesCompressed, bytesDecompressed, copyDuration,
