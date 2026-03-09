@@ -196,7 +196,9 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
         if (!srcAttemptIdentifier.canRetrieveInputInChunks()) {
           registerCompletedInput(fetchedInput);
         } else {
-          registerCompletedInputForPipelinedShuffle(srcAttemptIdentifier, fetchedInput);
+          synchronized (shuffleInfoEventsMap) {
+            registerCompletedInputForPipelinedShuffle(srcAttemptIdentifier, fetchedInput);
+          }
         }
       }
     }
@@ -250,36 +252,31 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
         isCompleted = completedInputSet.get(inputIdentifier);
       }
       if (!isCompleted) {
-        synchronized (shuffleInfoEventsMap) {
-          CommitRegister cr = checkCommitRegister(srcAttemptIdentifier);
-          boolean isPipelined = cr.isPipelined;
-          boolean commitAndRegister = cr.commitAndRegister;
-          boolean killInPipelined = cr.killInPipelined;   // killBecauseDifferentSpillAttemptInPipelined
-          assert !(!isPipelined) || commitAndRegister;
-          assert !(isPipelined && commitAndRegister) || !killInPipelined;
-          assert !(isPipelined && killInPipelined) || !commitAndRegister;
+        if (!srcAttemptIdentifier.canRetrieveInputInChunks()) {
+          fetchedInput.commit();  // may fail with IOException
+          updateStats = true;
+          registerCompletedInput(fetchedInput);
+        } else {
+          synchronized (shuffleInfoEventsMap) {
+            CommitRegister cr = checkCommitRegister(srcAttemptIdentifier);
+            boolean commitAndRegister = cr.commitAndRegister;
+            boolean killInPipelined = cr.killInPipelined;   // killBecauseDifferentSpillAttemptInPipelined
+            assert cr.isPipelined;
+            assert !(commitAndRegister && killInPipelined);
 
-          // 1. call fetchedInput.commit() or fetchedInput.abort() if necessary
-          // consider commitAndRegister only
-          if (commitAndRegister) {
-            fetchedInput.commit();  // may fail with IOException
-            updateStats = true;
-          } else {
-            LOG.warn("Duplicate fetch of unordered input for {} ({}/{} completed): {}",
-              inputContext.getUniqueIdentifier(), numCompletedInputs.get(), numInputs, srcAttemptIdentifier);
-            shuffleNumDuplicateInputsCounter.increment(1);
-            fetchedInput.abort();
-          }
-
-          // 2. register completed input if necessary
-          // consider isPipelined, commitAndRegister, killInPipelined
-          if (!isPipelined) {
-            // commitAndRegister == true
-            registerCompletedInput(fetchedInput);
-          } else {
+            // 1. call fetchedInput.commit() or fetchedInput.abort() if necessary
+            // consider commitAndRegister only
             if (commitAndRegister) {
+              fetchedInput.commit();  // may fail with IOException
+              updateStats = true;
+              // 2. register completed input for pipelined shuffle
               registerCompletedInputForPipelinedShuffle(srcAttemptIdentifier, fetchedInput);
             } else {
+              LOG.warn("Duplicate fetch of unordered input for {} ({}/{} completed): {}",
+                inputContext.getUniqueIdentifier(), numCompletedInputs.get(), numInputs, srcAttemptIdentifier);
+              shuffleNumDuplicateInputsCounter.increment(1);
+              fetchedInput.abort();
+
               if (!killInPipelined) {
                 LOG.info("Unordered spill already processed for {} ({}/{} completed): {}",
                   inputContext.getUniqueIdentifier(), numCompletedInputs.get(), numInputs, srcAttemptIdentifier);
