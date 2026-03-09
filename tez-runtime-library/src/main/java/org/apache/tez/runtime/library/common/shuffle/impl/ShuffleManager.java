@@ -57,6 +57,12 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
   private final TezCounter approximateInputRecords;
   private final TezCounter shufflePhaseTime;
 
+  private final TezCounter fetchSucceededCount;
+  private final TezCounter fetchSucceededCompletedInputSetLockWaitNs;
+  private final TezCounter fetchSucceededCompletedInputSetLockHoldNs;
+  private final TezCounter fetchSucceededShuffleInfoEventsMapLockWaitNs;
+  private final TezCounter fetchSucceededShuffleInfoEventsMapLockHoldNs;
+
   private final long startTime;
 
   // accessed only from ShuffleInputEventHandler thread, so thread-safe
@@ -96,6 +102,12 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
 
     this.approximateInputRecords = inputContext.getCounters().findCounter(TaskCounter.APPROXIMATE_INPUT_RECORDS);
     this.shufflePhaseTime = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_PHASE_TIME);
+
+    this.fetchSucceededCount = inputContext.getCounters().findCounter("SHUFFLE_MANAGER_FETCH_SUCCEEDED", "FETCH_SUCCEEDED_COUNT");
+    this.fetchSucceededCompletedInputSetLockWaitNs = inputContext.getCounters().findCounter("SHUFFLE_MANAGER_FETCH_SUCCEEDED", "FETCH_SUCCEEDED_COMPLETED_INPUT_SET_LOCK_WAIT_NS");
+    this.fetchSucceededCompletedInputSetLockHoldNs = inputContext.getCounters().findCounter("SHUFFLE_MANAGER_FETCH_SUCCEEDED", "FETCH_SUCCEEDED_COMPLETED_INPUT_SET_LOCK_HOLD_NS");
+    this.fetchSucceededShuffleInfoEventsMapLockWaitNs = inputContext.getCounters().findCounter("SHUFFLE_MANAGER_FETCH_SUCCEEDED", "FETCH_SUCCEEDED_SHUFFLE_INFO_EVENTS_MAP_LOCK_WAIT_NS");
+    this.fetchSucceededShuffleInfoEventsMapLockHoldNs = inputContext.getCounters().findCounter("SHUFFLE_MANAGER_FETCH_SUCCEEDED", "FETCH_SUCCEEDED_SHUFFLE_INFO_EVENTS_MAP_LOCK_HOLD_NS");
 
     this.startTime = System.currentTimeMillis();
 
@@ -219,60 +231,87 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
       long copyDuration) throws IOException {
     int inputIdentifier = srcAttemptIdentifier.getInputIdentifier();
 
+    long completedInputSetLockWaitNs = 0L;
+    long completedInputSetLockHoldNs = 0L;
+    long shuffleInfoEventsMapLockWaitNs = 0L;
+    long shuffleInfoEventsMapLockHoldNs = 0L;
+
     boolean updateStats = false;
-    synchronized (completedInputSet) {
-      boolean isCompleted = completedInputSet.get(inputIdentifier);
-      if (!isCompleted) {
-        synchronized (shuffleInfoEventsMap) {
-          CommitRegister cr = checkCommitRegister(srcAttemptIdentifier);
-          boolean isPipelined = cr.isPipelined;
-          boolean commitAndRegister = cr.commitAndRegister;
-          boolean killInPipelined = cr.killInPipelined;   // killBecauseDifferentSpillAttemptInPipelined
-          assert !(!isPipelined) || commitAndRegister;
-          assert !(isPipelined && commitAndRegister) || !killInPipelined;
-          assert !(isPipelined && killInPipelined) || !commitAndRegister;
+    try {
+      long completedInputSetLockAcquireStart = System.nanoTime();
+      synchronized (completedInputSet) {
+        long completedInputSetLockAcquired = System.nanoTime();
+        completedInputSetLockWaitNs = completedInputSetLockAcquired - completedInputSetLockAcquireStart;
 
-          // 1. call fetchedInput.commit() or fetchedInput.abort() if necessary
-          // consider commitAndRegister only
-          if (commitAndRegister) {
-            fetchedInput.commit();  // may fail with IOException
-            updateStats = true;
-          } else {
-            LOG.warn("Duplicate fetch of unordered input for {} ({}/{} completed): {}",
-              inputContext.getUniqueIdentifier(), numCompletedInputs.get(), numInputs, srcAttemptIdentifier);
-            shuffleNumDuplicateInputsCounter.increment(1);
-            fetchedInput.abort();
-          }
+        boolean isCompleted = completedInputSet.get(inputIdentifier);
+        if (!isCompleted) {
+          long shuffleInfoEventsMapLockAcquireStart = System.nanoTime();
+          synchronized (shuffleInfoEventsMap) {
+            long shuffleInfoEventsMapLockAcquired = System.nanoTime();
+            shuffleInfoEventsMapLockWaitNs = shuffleInfoEventsMapLockAcquired - shuffleInfoEventsMapLockAcquireStart;
 
-          // 2. register completed input if necessary
-          // consider isPipelined, commitAndRegister, killInPipelined
-          if (!isPipelined) {
-            // commitAndRegister == true
-            registerCompletedInput(fetchedInput);
-          } else {
+            CommitRegister cr = checkCommitRegister(srcAttemptIdentifier);
+            boolean isPipelined = cr.isPipelined;
+            boolean commitAndRegister = cr.commitAndRegister;
+            boolean killInPipelined = cr.killInPipelined;   // killBecauseDifferentSpillAttemptInPipelined
+            assert !(!isPipelined) || commitAndRegister;
+            assert !(isPipelined && commitAndRegister) || !killInPipelined;
+            assert !(isPipelined && killInPipelined) || !commitAndRegister;
+
+            // 1. call fetchedInput.commit() or fetchedInput.abort() if necessary
+            // consider commitAndRegister only
             if (commitAndRegister) {
-              registerCompletedInputForPipelinedShuffle(srcAttemptIdentifier, fetchedInput);
+              fetchedInput.commit();  // may fail with IOException
+              updateStats = true;
             } else {
-              if (!killInPipelined) {
-                LOG.info("Unordered spill already processed for {} ({}/{} completed): {}",
-                  inputContext.getUniqueIdentifier(), numCompletedInputs.get(), numInputs, srcAttemptIdentifier);
+              LOG.warn("Duplicate fetch of unordered input for {} ({}/{} completed): {}",
+                inputContext.getUniqueIdentifier(), numCompletedInputs.get(), numInputs, srcAttemptIdentifier);
+              shuffleNumDuplicateInputsCounter.increment(1);
+              fetchedInput.abort();
+            }
+
+            // 2. register completed input if necessary
+            // consider isPipelined, commitAndRegister, killInPipelined
+            if (!isPipelined) {
+              // commitAndRegister == true
+              registerCompletedInput(fetchedInput);
+            } else {
+              if (commitAndRegister) {
+                registerCompletedInputForPipelinedShuffle(srcAttemptIdentifier, fetchedInput);
               } else {
-                String message = "Killing self as previous attempt unordered data could have been consumed in pipelined shuffling";
-                IOException exception = new IOException(
-                    message + ": " + inputContext.getUniqueIdentifier() + ", " + srcAttemptIdentifier);
-                killSelf(exception, message);
+                if (!killInPipelined) {
+                  LOG.info("Unordered spill already processed for {} ({}/{} completed): {}",
+                    inputContext.getUniqueIdentifier(), numCompletedInputs.get(), numInputs, srcAttemptIdentifier);
+                } else {
+                  String message = "Killing self as previous attempt unordered data could have been consumed in pipelined shuffling";
+                  IOException exception = new IOException(
+                      message + ": " + inputContext.getUniqueIdentifier() + ", " + srcAttemptIdentifier);
+                  killSelf(exception, message);
+                }
               }
             }
+
+            long shuffleInfoEventsMapLockReleased = System.nanoTime();
+            shuffleInfoEventsMapLockHoldNs = shuffleInfoEventsMapLockReleased - shuffleInfoEventsMapLockAcquired;
           }
+        } else {
+          // input is already finished. duplicate fetch.
+          LOG.warn("Fetch of unordered input after completion for {} ({}/{} completed): {}",
+              inputContext.getUniqueIdentifier(), numCompletedInputs.get(), numInputs, srcAttemptIdentifier);
+          // free the resource - especially memory
+          shuffleNumDuplicateInputsCounter.increment(1);
+          fetchedInput.abort();
         }
-      } else {
-        // input is already finished. duplicate fetch.
-        LOG.warn("Fetch of unordered input after completion for {} ({}/{} completed): {}",
-            inputContext.getUniqueIdentifier(), numCompletedInputs.get(), numInputs, srcAttemptIdentifier);
-        // free the resource - especially memory
-        shuffleNumDuplicateInputsCounter.increment(1);
-        fetchedInput.abort();
+
+        long completedInputSetLockReleased = System.nanoTime();
+        completedInputSetLockHoldNs = completedInputSetLockReleased - completedInputSetLockAcquired;
       }
+    } finally {
+      fetchSucceededCount.increment(1);
+      fetchSucceededCompletedInputSetLockWaitNs.increment(completedInputSetLockWaitNs);
+      fetchSucceededCompletedInputSetLockHoldNs.increment(completedInputSetLockHoldNs);
+      fetchSucceededShuffleInfoEventsMapLockWaitNs.increment(shuffleInfoEventsMapLockWaitNs);
+      fetchSucceededShuffleInfoEventsMapLockHoldNs.increment(shuffleInfoEventsMapLockHoldNs);
     }
 
     if (updateStats) {
