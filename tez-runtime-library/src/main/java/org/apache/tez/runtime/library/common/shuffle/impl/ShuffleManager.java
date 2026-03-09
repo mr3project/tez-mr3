@@ -187,10 +187,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
     }
 
     synchronized (lockForInput(inputIdentifier)) {
-      boolean isCompleted;
-      synchronized (completedInputSet) {
-        isCompleted = completedInputSet.get(inputIdentifier);
-      }
+      boolean isCompleted = isInputFinished(inputIdentifier);
       if (!isCompleted) {
         NullFetchedInput fetchedInput = new NullFetchedInput(srcAttemptIdentifier);
         if (!srcAttemptIdentifier.canRetrieveInputInChunks()) {
@@ -212,10 +209,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
     }
 
     synchronized (lockForInput(inputIdentifier)) {
-      boolean isCompleted;
-      synchronized (completedInputSet) {
-        isCompleted = completedInputSet.get(inputIdentifier);
-      }
+      boolean isCompleted = isInputFinished(inputIdentifier);
       if (!isCompleted) {
         fetchedInput.commit();
         // 1. 'pipelined == false && merged == true'  --> FINAL_MERGE_ENABLED == true
@@ -247,10 +241,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
 
     boolean updateStats = false;
     synchronized (lockForInput(inputIdentifier)) {
-      boolean isCompleted;
-      synchronized (completedInputSet) {
-        isCompleted = completedInputSet.get(inputIdentifier);
-      }
+      boolean isCompleted = isInputFinished(inputIdentifier);
       if (!isCompleted) {
         if (!srcAttemptIdentifier.canRetrieveInputInChunks()) {
           fetchedInput.commit();  // may fail with IOException
@@ -374,11 +365,9 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
   }
 
   // Called only while holding lockForInput(inputIdentifier).
-  // completedInputSet access remains guarded by synchronized(completedInputSet).
+  // completedInputSet access remains guarded by setInputFinished().
   private void adjustCompletedInputs(FetchedInput fetchedInput) {
-    synchronized (completedInputSet) {
-      completedInputSet.set(fetchedInput.getInputAttemptIdentifier().getInputIdentifier());
-    }
+    setInputFinished(fetchedInput.getInputAttemptIdentifier().getInputIdentifier());
 
     int numComplete = numCompletedInputs.incrementAndGet();
     if (numComplete == numInputs) {
@@ -396,13 +385,11 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
     final int inputIdentifier = srcAttemptIdentifier.getInputIdentifier();
     shuffleNumFailedInputsCounter.increment(1);
 
-    synchronized (completedInputSet) {
-      boolean isCompleted = completedInputSet.get(inputIdentifier);
-      if (isCompleted) {
-        LOG.warn("Unordered fetch failed for {}, but input already completed: InputIdentifier={}",
+    boolean isCompleted = isInputFinished(inputIdentifier);
+    if (isCompleted) {
+      LOG.warn("Unordered fetch failed for {}, but input already completed: InputIdentifier={}",
           shuffleClientId, srcAttemptIdentifier);
-        return;
-      }
+      return;
     }
 
     if (isObsoleteInputAttemptIdentifier(srcAttemptIdentifier)) {
