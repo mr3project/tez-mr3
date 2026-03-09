@@ -99,7 +99,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
   // Note: completedInputSet itself is ALWAYS guarded with synchronized(completedInputSet).
   // lockForInput(inputIdentifier) protects cross-variable atomicity for one inputIdentifier,
   // not raw access to completedInputSet.
-  private static final int NUM_INPUT_LOCKS = 256;
+  private static final int NUM_INPUT_LOCKS = 64;
   private final Object[] inputLocks;
 
   public ShuffleManager(InputContext inputContext, Configuration conf, int numInputs,
