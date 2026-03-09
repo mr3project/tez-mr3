@@ -84,9 +84,23 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
   private static final FetchedInput endOfInputMarker = new NullFetchedInput(null);
 
   // sum of the sizes of all MemoryFetchedInput in completedInputs[]
-  // guard with synchronized(completedInputs)
-  private long totalSizeOfMemoryCompletedInputs = 0L;
-  private AtomicInteger numCallsGetNextInput = new AtomicInteger(0);
+  private final AtomicLong totalSizeOfMemoryCompletedInputs = new AtomicLong(0L);
+  private final AtomicInteger numCallsGetNextInput = new AtomicInteger(0);
+
+  // Use striped locks to serialize completion for a specific inputIdentifier while allowing
+  // unrelated inputIdentifiers to proceed in parallel.
+  //
+  // Variables/invariants guarded by lockForInput(inputIdentifier):
+  //  - per-input completion transaction in addCompletedInputWithNoData(), addCompletedInputWithData(),
+  //    and fetchSucceeded() (check-complete -> commit/abort -> queue/register)
+  //  - per-input queueing/notification side effects in maybeInformInputReady()
+  //  - per-input finalization in adjustCompletedInputs()
+  //
+  // Note: completedInputSet itself is ALWAYS guarded with synchronized(completedInputSet).
+  // lockForInput(inputIdentifier) protects cross-variable atomicity for one inputIdentifier,
+  // not raw access to completedInputSet.
+  private static final int NUM_INPUT_LOCKS = 256;
+  private final Object[] inputLocks;
 
   public ShuffleManager(InputContext inputContext, Configuration conf, int numInputs,
       FetchedInputAllocator inputAllocator, String srcNameTrimmed) throws IOException {
@@ -102,6 +116,10 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
     // In case of pipelined shuffle, it is possible to get multiple FetchedInput per attempt.
     // We do not know upfront the number of spills from source.
     completedInputs = new LinkedBlockingDeque<FetchedInput>();
+    inputLocks = new Object[Math.min(NUM_INPUT_LOCKS, Math.max(1, numInputs))];
+    for (int i = 0; i < inputLocks.length; i++) {
+      inputLocks[i] = new Object();
+    }
 
     LOG.info("ShuffleManager for {}/{}: shuffleClientId={}, numInputs={}",
         inputContext.getUniqueIdentifier(), srcNameTrimmed, shuffleClientId, numInputs);
@@ -168,14 +186,16 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
       LOG.debug("No input data exists for SrcTask: " + inputIdentifier + ". Marking as complete.");
     }
 
-    synchronized (completedInputSet) {
-      boolean isCompleted = completedInputSet.get(inputIdentifier);
+    synchronized (lockForInput(inputIdentifier)) {
+      boolean isCompleted = isInputFinished(inputIdentifier);
       if (!isCompleted) {
         NullFetchedInput fetchedInput = new NullFetchedInput(srcAttemptIdentifier);
         if (!srcAttemptIdentifier.canRetrieveInputInChunks()) {
           registerCompletedInput(fetchedInput);
         } else {
-          registerCompletedInputForPipelinedShuffle(srcAttemptIdentifier, fetchedInput);
+          synchronized (shuffleInfoEventsMap) {
+            registerCompletedInputForPipelinedShuffle(srcAttemptIdentifier, fetchedInput);
+          }
         }
       }
     }
@@ -188,8 +208,8 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
       LOG.debug("Received Data via Event: " + srcAttemptIdentifier + " to " + fetchedInput.getType());
     }
 
-    synchronized (completedInputSet) {
-      boolean isCompleted = completedInputSet.get(inputIdentifier);
+    synchronized (lockForInput(inputIdentifier)) {
+      boolean isCompleted = isInputFinished(inputIdentifier);
       if (!isCompleted) {
         fetchedInput.commit();
         // 1. 'pipelined == false && merged == true'  --> FINAL_MERGE_ENABLED == true
@@ -220,39 +240,34 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
     int inputIdentifier = srcAttemptIdentifier.getInputIdentifier();
 
     boolean updateStats = false;
-    synchronized (completedInputSet) {
-      boolean isCompleted = completedInputSet.get(inputIdentifier);
+    synchronized (lockForInput(inputIdentifier)) {
+      boolean isCompleted = isInputFinished(inputIdentifier);
       if (!isCompleted) {
-        synchronized (shuffleInfoEventsMap) {
-          CommitRegister cr = checkCommitRegister(srcAttemptIdentifier);
-          boolean isPipelined = cr.isPipelined;
-          boolean commitAndRegister = cr.commitAndRegister;
-          boolean killInPipelined = cr.killInPipelined;   // killBecauseDifferentSpillAttemptInPipelined
-          assert !(!isPipelined) || commitAndRegister;
-          assert !(isPipelined && commitAndRegister) || !killInPipelined;
-          assert !(isPipelined && killInPipelined) || !commitAndRegister;
+        if (!srcAttemptIdentifier.canRetrieveInputInChunks()) {
+          fetchedInput.commit();  // may fail with IOException
+          updateStats = true;
+          registerCompletedInput(fetchedInput);
+        } else {
+          synchronized (shuffleInfoEventsMap) {
+            CommitRegister cr = checkCommitRegister(srcAttemptIdentifier);
+            boolean commitAndRegister = cr.commitAndRegister;
+            boolean killInPipelined = cr.killInPipelined;   // killBecauseDifferentSpillAttemptInPipelined
+            assert cr.isPipelined;
+            assert !(commitAndRegister && killInPipelined);
 
-          // 1. call fetchedInput.commit() or fetchedInput.abort() if necessary
-          // consider commitAndRegister only
-          if (commitAndRegister) {
-            fetchedInput.commit();  // may fail with IOException
-            updateStats = true;
-          } else {
-            LOG.warn("Duplicate fetch of unordered input for {} ({}/{} completed): {}",
-              inputContext.getUniqueIdentifier(), numCompletedInputs.get(), numInputs, srcAttemptIdentifier);
-            shuffleNumDuplicateInputsCounter.increment(1);
-            fetchedInput.abort();
-          }
-
-          // 2. register completed input if necessary
-          // consider isPipelined, commitAndRegister, killInPipelined
-          if (!isPipelined) {
-            // commitAndRegister == true
-            registerCompletedInput(fetchedInput);
-          } else {
+            // 1. call fetchedInput.commit() or fetchedInput.abort() if necessary
+            // consider commitAndRegister only
             if (commitAndRegister) {
+              fetchedInput.commit();  // may fail with IOException
+              updateStats = true;
+              // 2. register completed input for pipelined shuffle
               registerCompletedInputForPipelinedShuffle(srcAttemptIdentifier, fetchedInput);
             } else {
+              LOG.warn("Duplicate fetch of unordered input for {} ({}/{} completed): {}",
+                inputContext.getUniqueIdentifier(), numCompletedInputs.get(), numInputs, srcAttemptIdentifier);
+              shuffleNumDuplicateInputsCounter.increment(1);
+              fetchedInput.abort();
+
               if (!killInPipelined) {
                 LOG.info("Unordered spill already processed for {} ({}/{} completed): {}",
                   inputContext.getUniqueIdentifier(), numCompletedInputs.get(), numInputs, srcAttemptIdentifier);
@@ -286,7 +301,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
   }
 
   // called from ShuffleInputEventHandler thread, Fetcher thread
-  // inside synchronized (completedInputSet) and synchronized (shuffleInfoEventsMap)
+  // Called only while holding lockForInput(inputIdentifier).
   private void registerCompletedInput(FetchedInput fetchedInput) {
     maybeInformInputReady(fetchedInput);
     // call adjustCompletedInputs() because this is not pipelined shuffle
@@ -295,7 +310,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
   }
 
   // called from ShuffleInputEventHandler thread, Fetcher thread
-  // inside synchronized (completedInputSet) and synchronized (shuffleInfoEventsMap) {
+  // Called only while holding lockForInput(inputIdentifier) and synchronized (shuffleInfoEventsMap).
   private void registerCompletedInputForPipelinedShuffle(
       InputAttemptIdentifier srcAttemptIdentifier, FetchedInput fetchedInput) {
     // The input has been successfully fetched for inputIdentifier + spillId, so srcAttemptIdentifier can be obsolete.
@@ -334,12 +349,12 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
     }
   }
 
-  // inside synchronized (completedInputSet)
+  // Called only while holding lockForInput(inputIdentifier).
   private void maybeInformInputReady(FetchedInput fetchedInput) {
     if (!(fetchedInput instanceof NullFetchedInput)) {
       completedInputs.add(fetchedInput);
       if (fetchedInput instanceof MemoryFetchedInput) {
-        totalSizeOfMemoryCompletedInputs += fetchedInput.getSize();
+        totalSizeOfMemoryCompletedInputs.addAndGet(fetchedInput.getSize());
       }
     }
     if (!inputReadyNotificationSent.getAndSet(true)) {
@@ -348,9 +363,10 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
     }
   }
 
-  // inside synchronized (completedInputSet)
+  // Called only while holding lockForInput(inputIdentifier).
+  // completedInputSet access remains guarded by setInputFinished().
   private void adjustCompletedInputs(FetchedInput fetchedInput) {
-    completedInputSet.set(fetchedInput.getInputAttemptIdentifier().getInputIdentifier());
+    setInputFinished(fetchedInput.getInputAttemptIdentifier().getInputIdentifier());
 
     int numComplete = numCompletedInputs.incrementAndGet();
     if (numComplete == numInputs) {
@@ -368,13 +384,11 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
     final int inputIdentifier = srcAttemptIdentifier.getInputIdentifier();
     shuffleNumFailedInputsCounter.increment(1);
 
-    synchronized (completedInputSet) {
-      boolean isCompleted = completedInputSet.get(inputIdentifier);
-      if (isCompleted) {
-        LOG.warn("Unordered fetch failed for {}, but input already completed: InputIdentifier={}",
+    boolean isCompleted = isInputFinished(inputIdentifier);
+    if (isCompleted) {
+      LOG.warn("Unordered fetch failed for {}, but input already completed: InputIdentifier={}",
           shuffleClientId, srcAttemptIdentifier);
-        return;
-      }
+      return;
     }
 
     if (isObsoleteInputAttemptIdentifier(srcAttemptIdentifier)) {
@@ -448,9 +462,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
     FetchedInput fetchedInput = completedInputs.take();
 
     if (fetchedInput instanceof MemoryFetchedInput) {
-      synchronized (completedInputSet) {
-        totalSizeOfMemoryCompletedInputs -= fetchedInput.getSize();
-      }
+      totalSizeOfMemoryCompletedInputs.addAndGet(-fetchedInput.getSize());
     }
 
     if (fetchedInput == endOfInputMarker) {   // reference equality
@@ -472,9 +484,11 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
   }
 
   public long getTotalSizeOfMemoryCompletedInputs() {
-    synchronized (completedInputSet) {
-      return totalSizeOfMemoryCompletedInputs;
-    }
+    return totalSizeOfMemoryCompletedInputs.get();
+  }
+
+  private Object lockForInput(int inputIdentifier) {
+    return inputLocks[inputIdentifier % inputLocks.length];
   }
 
   /////////////////// End of methods for walking the available inputs
