@@ -157,7 +157,7 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
   protected final Map<Integer, ShuffleEventInfo> shuffleInfoEventsMap;
 
   // Striped per-input locks for subclasses that need per-input transactions without global contention.
-  private static final int NUM_INPUT_LOCKS = 64;
+  private static final int NUM_INPUT_LOCKS = 256;
   private final Object[] inputLocks;
 
   private int numFetchers = 0;

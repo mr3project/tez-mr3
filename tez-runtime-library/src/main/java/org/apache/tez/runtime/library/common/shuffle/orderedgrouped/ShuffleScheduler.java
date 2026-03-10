@@ -50,7 +50,6 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
 
   private final AtomicInteger remainingMaps;
 
-
   private final FetchedInputAllocatorOrderedGrouped allocator;
   private final ExceptionReporter exceptionReporter;
   private final MergeManager mergeManager;
