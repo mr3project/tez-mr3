@@ -19,7 +19,6 @@
 package org.apache.tez.runtime.library.common.shuffle;
 
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
-import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 
 import java.util.Map;
 

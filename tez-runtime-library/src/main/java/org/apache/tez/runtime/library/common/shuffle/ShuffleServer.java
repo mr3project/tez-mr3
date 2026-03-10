@@ -861,9 +861,10 @@ public class ShuffleServer implements FetcherCallback {
       }
     }
 
+    // onSuccess() means that Fetcher thread succeeded, irrespective of fetch success/failure.
     @Override
     public void onSuccess(FetchResult result) {
-      fetcher.shutdown(false);  // disconnect = false to reuse HTTPConnection
+      fetcher.shutdown(false);  // disconnect = false in order to try to reuse HttpConnection
 
       if (isShutdown.get()) {
         if (isDebugEnabled) {
