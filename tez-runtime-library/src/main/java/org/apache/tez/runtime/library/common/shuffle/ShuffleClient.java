@@ -156,6 +156,10 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
   //            lockForInput(inputIdentifier) in ShuffleManager).
   protected final Map<Integer, ShuffleEventInfo> shuffleInfoEventsMap;
 
+  // Striped per-input locks for subclasses that need per-input transactions without global contention.
+  private static final int NUM_INPUT_LOCKS = 64;
+  private final Object[] inputLocks;
+
   private int numFetchers = 0;
   private int numPartitionRanges = 0;
   private final Object lock = new Object();
@@ -188,6 +192,11 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
 
     this.numInputs = numInputs;
     this.completedInputSet = new BitSet(numInputs);
+
+    this.inputLocks = new Object[Math.min(NUM_INPUT_LOCKS, Math.max(1, numInputs))];
+    for (int i = 0; i < inputLocks.length; i++) {
+      inputLocks[i] = new Object();
+    }
 
     this.obsoletedInputs = Collections.newSetFromMap(new ConcurrentHashMap<InputAttemptIdentifier, Boolean>());
 
@@ -228,6 +237,11 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
 
   public String getLogIdentifier() {
     return logIdentifier;
+  }
+
+  protected Object lockForInput(int inputIdentifier) {
+    int idx = (inputIdentifier & Integer.MAX_VALUE) % inputLocks.length;
+    return inputLocks[idx];
   }
 
   public ShuffleErrorCounterGroup getShuffleErrorCounterGroup() {

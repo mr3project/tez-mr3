@@ -50,8 +50,6 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
 
   private final AtomicInteger remainingMaps;
 
-  private static final int NUM_INPUT_LOCKS = 64;
-  private final Object[] inputLocks;
 
   private final FetchedInputAllocatorOrderedGrouped allocator;
   private final ExceptionReporter exceptionReporter;
@@ -75,10 +73,6 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
     this.mergeManager = mergeManager;
 
     remainingMaps = new AtomicInteger(numInputs);
-    inputLocks = new Object[Math.min(NUM_INPUT_LOCKS, Math.max(1, numInputs))];
-    for (int i = 0; i < inputLocks.length; i++) {
-      inputLocks[i] = new Object();
-    }
 
     this.shuffleNumSkippedOrderedInputCounter = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_NUM_SKIPPED_ORDERED_INPUTS);
 
@@ -363,10 +357,6 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
     exceptionReporter.killSelf(exception, message);
   }
 
-  private Object lockForInput(int inputIdentifier) {
-    int idx = (inputIdentifier & Integer.MAX_VALUE) % inputLocks.length;
-    return inputLocks[idx];
-  }
 
   private void logProgress() {
     int inputsDone = numInputs - remainingMaps.get();

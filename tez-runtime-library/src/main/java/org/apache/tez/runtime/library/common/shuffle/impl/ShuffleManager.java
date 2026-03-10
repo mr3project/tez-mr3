@@ -101,8 +101,6 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
   // not raw access to completedInputSet.
   // This per-input locking model also replaces the old global map monitor
   // (synchronized(shuffleInfoEventsMap)) for pipelined completion paths.
-  private static final int NUM_INPUT_LOCKS = 64;
-  private final Object[] inputLocks;
 
   public ShuffleManager(InputContext inputContext, Configuration conf, int numInputs,
       FetchedInputAllocator inputAllocator, String srcNameTrimmed) throws IOException {
@@ -118,10 +116,6 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
     // In case of pipelined shuffle, it is possible to get multiple FetchedInput per attempt.
     // We do not know upfront the number of spills from source.
     completedInputs = new LinkedBlockingDeque<FetchedInput>();
-    inputLocks = new Object[Math.min(NUM_INPUT_LOCKS, Math.max(1, numInputs))];
-    for (int i = 0; i < inputLocks.length; i++) {
-      inputLocks[i] = new Object();
-    }
 
     LOG.info("ShuffleManager for {}/{}: shuffleClientId={}, numInputs={}",
         inputContext.getUniqueIdentifier(), srcNameTrimmed, shuffleClientId, numInputs);
@@ -485,9 +479,6 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
     return totalSizeOfMemoryCompletedInputs.get();
   }
 
-  private Object lockForInput(int inputIdentifier) {
-    return inputLocks[inputIdentifier % inputLocks.length];
-  }
 
   /////////////////// End of methods for walking the available inputs
 
