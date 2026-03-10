@@ -34,7 +34,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.BitSet;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -149,10 +148,17 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
 
   protected final int maxNumFetchers;
 
-  // to track shuffleInfo events when finalMerge is disabled in source or pipelined shuffle is enabled in source
-  // Invariant: guard with this.synchronized in ShuffleScheduler
-  //            guard with: synchronized (shuffleInfoEventsMap) in ShuffleManager
+  // to track shuffleInfo events when finalMerge is disabled in source or pipelined shuffle is enabled in source.
+  // NOTE: ConcurrentHashMap removes the need for a single global map monitor
+  // (synchronized(shuffleInfoEventsMap)), but NOT the need for this map itself.
+  // We still need per-input ShuffleEventInfo state to validate attempts/spills and detect completion.
+  // Invariant: guard multi-step decisions with caller lock (this.synchronized in ShuffleScheduler,
+  //            lockForInput(inputIdentifier) in ShuffleManager).
   protected final Map<Integer, ShuffleEventInfo> shuffleInfoEventsMap;
+
+  // Striped per-input locks for subclasses that need per-input transactions without global contention.
+  private static final int NUM_INPUT_LOCKS = 64;
+  private final Object[] inputLocks;
 
   private int numFetchers = 0;
   private int numPartitionRanges = 0;
@@ -187,13 +193,18 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
     this.numInputs = numInputs;
     this.completedInputSet = new BitSet(numInputs);
 
+    this.inputLocks = new Object[Math.min(NUM_INPUT_LOCKS, Math.max(1, numInputs))];
+    for (int i = 0; i < inputLocks.length; i++) {
+      inputLocks[i] = new Object();
+    }
+
     this.obsoletedInputs = Collections.newSetFromMap(new ConcurrentHashMap<InputAttemptIdentifier, Boolean>());
 
     this.maxNumFetchers = conf.getInt(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_PARALLEL_COPIES,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_PARALLEL_COPIES_DEFAULT);
 
-    this.shuffleInfoEventsMap = new HashMap<Integer, ShuffleEventInfo>();
+    this.shuffleInfoEventsMap = new ConcurrentHashMap<Integer, ShuffleEventInfo>();
 
     this.shuffleClientId = shuffleServer.register(this);
 
@@ -226,6 +237,11 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
 
   public String getLogIdentifier() {
     return logIdentifier;
+  }
+
+  protected Object lockForInput(int inputIdentifier) {
+    int idx = (inputIdentifier & Integer.MAX_VALUE) % inputLocks.length;
+    return inputLocks[idx];
   }
 
   public ShuffleErrorCounterGroup getShuffleErrorCounterGroup() {
@@ -399,8 +415,8 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
     }
   }
 
-  // Invariant: shuffleInfoEventsMap[] is guarded
-  // The result of checkCommitRegister() is valid only while shuffleInfoEventsMap[] is guarded.
+  // Invariant: this method is part of a multi-step transaction and must run under caller-side lock.
+  // The result of checkCommitRegister() is valid only while that caller lock is held.
   protected CommitRegister checkCommitRegister(InputAttemptIdentifier srcAttemptIdentifier) {
     int inputIdentifier = srcAttemptIdentifier.getInputIdentifier();
     // assert !isInputFinished(inputIdentifier);
@@ -431,7 +447,7 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
     return new CommitRegister(isPipelined, commitAndRegister, killBecauseDifferentSpillAttemptInPipelined);
   }
 
-  // Invariant: shuffleInfoEventsMap[] is guarded
+  // Invariant: called while caller-side lock for the input is held.
   // Invariant: input.canRetrieveInputInChunks() == true
   protected boolean validateInputAttemptForPipelinedShuffleCommon(
       InputAttemptIdentifier input) {
