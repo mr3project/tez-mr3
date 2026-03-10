@@ -322,9 +322,7 @@ public class ShuffleServer implements FetcherCallback {
         f.getStage() == Fetcher.STAGE_FIRST_FETCHED);
 
     existsFetcherFromStuckToSpeculative = runningFetchers.stream().anyMatch(f -> {
-      // Do not filter by isBlockedFetching(): STUCK fetchers block their own host
-      // and still must be eligible for speculative retry.
-      if (!isInputHostReachable(f.inputHost)) {
+      if (isBlockedFetching(f.inputHost) || !isInputHostReachable(f.inputHost)) {
         return false;
       }
       FetcherConfig fetcherConfig = f.fetcherConfig;
@@ -412,9 +410,7 @@ public class ShuffleServer implements FetcherCallback {
       if (existsFetcherFromStuckToSpeculative) {
         // try to transition: from STUCK to SPECULATIVE
         runningFetchers.forEach(fetcher -> {
-          // A STUCK fetcher may have blocked this host itself, but should still
-          // transition to SPECULATIVE after the release window.
-          if (!isInputHostReachable(fetcher.inputHost)) {
+          if (isBlockedFetching(fetcher.inputHost) || !isInputHostReachable(fetcher.inputHost)) {
             return;
           }
           FetcherConfig fetcherConfig = fetcher.fetcherConfig;
