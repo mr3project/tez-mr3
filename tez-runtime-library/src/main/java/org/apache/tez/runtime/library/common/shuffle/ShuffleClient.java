@@ -34,7 +34,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.BitSet;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -149,9 +148,12 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
 
   protected final int maxNumFetchers;
 
-  // to track shuffleInfo events when finalMerge is disabled in source or pipelined shuffle is enabled in source
-  // Invariant: guard with this.synchronized in ShuffleScheduler
-  //            guard with: synchronized (shuffleInfoEventsMap) in ShuffleManager
+  // to track shuffleInfo events when finalMerge is disabled in source or pipelined shuffle is enabled in source.
+  // NOTE: ConcurrentHashMap removes the need for a single global map monitor
+  // (synchronized(shuffleInfoEventsMap)), but NOT the need for this map itself.
+  // We still need per-input ShuffleEventInfo state to validate attempts/spills and detect completion.
+  // Invariant: guard multi-step decisions with caller lock (this.synchronized in ShuffleScheduler,
+  //            lockForInput(inputIdentifier) in ShuffleManager).
   protected final Map<Integer, ShuffleEventInfo> shuffleInfoEventsMap;
 
   private int numFetchers = 0;
@@ -193,7 +195,7 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_PARALLEL_COPIES,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_PARALLEL_COPIES_DEFAULT);
 
-    this.shuffleInfoEventsMap = new HashMap<Integer, ShuffleEventInfo>();
+    this.shuffleInfoEventsMap = new ConcurrentHashMap<Integer, ShuffleEventInfo>();
 
     this.shuffleClientId = shuffleServer.register(this);
 
@@ -399,8 +401,8 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
     }
   }
 
-  // Invariant: shuffleInfoEventsMap[] is guarded
-  // The result of checkCommitRegister() is valid only while shuffleInfoEventsMap[] is guarded.
+  // Invariant: this method is part of a multi-step transaction and must run under caller-side lock.
+  // The result of checkCommitRegister() is valid only while that caller lock is held.
   protected CommitRegister checkCommitRegister(InputAttemptIdentifier srcAttemptIdentifier) {
     int inputIdentifier = srcAttemptIdentifier.getInputIdentifier();
     // assert !isInputFinished(inputIdentifier);
@@ -431,7 +433,7 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
     return new CommitRegister(isPipelined, commitAndRegister, killBecauseDifferentSpillAttemptInPipelined);
   }
 
-  // Invariant: shuffleInfoEventsMap[] is guarded
+  // Invariant: called while caller-side lock for the input is held.
   // Invariant: input.canRetrieveInputInChunks() == true
   protected boolean validateInputAttemptForPipelinedShuffleCommon(
       InputAttemptIdentifier input) {
