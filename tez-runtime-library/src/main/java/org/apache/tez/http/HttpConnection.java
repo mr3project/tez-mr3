@@ -278,7 +278,17 @@ public class HttpConnection extends BaseHttpConnection {
         // http://docs.oracle.com/javase/6/docs/technotes/guides/net/http-keepalive.html
         readErrorStream(connection.getErrorStream());
       }
-      if (connection != null && (disconnect || !httpConnParams.isKeepAlive())) {
+      boolean shouldDisconnectFailedConnection = !httpConnParams.isFaultInjectLeakFailedConnection();
+      if (!shouldDisconnectFailedConnection && !connectionSucceeed && !disconnect
+          && httpConnParams.isKeepAlive()) {
+        LOG.warn("Fault injection enabled: intentionally keeping failed keep-alive connection open on {}",
+            logIdentifier);
+      }
+      // Keep-alive applies only to successfully established connections.
+      // If connect() failed partway, force disconnect to avoid leaking a bad connection state
+      // unless fault-injection explicitly requests the legacy behavior.
+      if (connection != null && (disconnect || !httpConnParams.isKeepAlive()
+          || (!connectionSucceeed && shouldDisconnectFailedConnection))) {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Closing connection on " + logIdentifier + ", disconnectParam=" + disconnect);
         }
@@ -316,4 +326,3 @@ public class HttpConnection extends BaseHttpConnection {
     }
   }
 }
-

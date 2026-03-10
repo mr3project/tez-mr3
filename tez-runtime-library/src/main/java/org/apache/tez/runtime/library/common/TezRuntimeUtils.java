@@ -231,9 +231,13 @@ public class TezRuntimeUtils {
     boolean skipVerifyRequest = compositeFetch && conf.getBoolean(
         SecureShuffleUtils.SHUFFLE_SKIP_VERIFY_REQUEST, SecureShuffleUtils.SHUFFLE_SKIP_VERIFY_REQUEST_DEFAULT);
 
+    boolean faultInjectLeakFailedConnection = conf.getBoolean(
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_KEEP_ALIVE_FAULT_INJECT_LEAK_FAILED_CONNECTION,
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_KEEP_ALIVE_FAULT_INJECT_LEAK_FAILED_CONNECTION_DEFAULT);
+
     return new HttpConnectionParams(keepAlive,
         keepAliveMaxConnections, connectionTimeout, readTimeout, bufferSize,
-        sslShuffle, sslFactory, skipVerifyRequest);
+        sslShuffle, sslFactory, skipVerifyRequest, faultInjectLeakFailedConnection);
   }
 
   public static BaseHttpConnection getHttpConnection(

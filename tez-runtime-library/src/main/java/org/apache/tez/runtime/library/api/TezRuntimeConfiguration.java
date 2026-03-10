@@ -378,6 +378,16 @@ public class TezRuntimeConfiguration {
       TEZ_RUNTIME_PREFIX + "shuffle.keep-alive.max.connections";
   public static final int TEZ_RUNTIME_SHUFFLE_KEEP_ALIVE_MAX_CONNECTIONS_DEFAULT = 20;
 
+  /**
+   * Enables fault-injection for shuffle HTTP keep-alive cleanup by intentionally
+   * keeping failed connections undisconnected when disconnect=false.
+   * Use only for reproducing keep-alive bad-state issues in test clusters.
+   */
+  public static final String TEZ_RUNTIME_SHUFFLE_KEEP_ALIVE_FAULT_INJECT_LEAK_FAILED_CONNECTION =
+      TEZ_RUNTIME_PREFIX + "shuffle.keep-alive.fault.inject.leak.failed.connection";
+  public static final boolean
+      TEZ_RUNTIME_SHUFFLE_KEEP_ALIVE_FAULT_INJECT_LEAK_FAILED_CONNECTION_DEFAULT = false;
+
   @ConfigurationProperty(type = "integer")
   public static final String TEZ_RUNTIME_SHUFFLE_READ_TIMEOUT =
       TEZ_RUNTIME_PREFIX + "shuffle.read.timeout";

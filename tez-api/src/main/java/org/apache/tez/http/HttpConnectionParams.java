@@ -29,10 +29,12 @@ public class HttpConnectionParams {
   private final SSLFactory sslFactory;
 
   private final boolean skipVerifyRequest;
+  private final boolean faultInjectLeakFailedConnection;
 
   public HttpConnectionParams(boolean keepAlive, int keepAliveMaxConnections,
                               int connectionTimeout, int readTimeout, int bufferSize,
-                              boolean sslShuffle, SSLFactory sslFactory, boolean skipVerifyRequest) {
+                              boolean sslShuffle, SSLFactory sslFactory, boolean skipVerifyRequest,
+                              boolean faultInjectLeakFailedConnection) {
     this.keepAlive = keepAlive;
     this.keepAliveMaxConnections = keepAliveMaxConnections;
     this.connectionTimeout = connectionTimeout;
@@ -41,6 +43,7 @@ public class HttpConnectionParams {
     this.sslShuffle = sslShuffle;
     this.sslFactory = sslFactory;
     this.skipVerifyRequest = skipVerifyRequest;
+    this.faultInjectLeakFailedConnection = faultInjectLeakFailedConnection;
   }
 
   public int getBufferSize() {
@@ -75,6 +78,10 @@ public class HttpConnectionParams {
     return skipVerifyRequest;
   }
 
+  public boolean isFaultInjectLeakFailedConnection() {
+    return faultInjectLeakFailedConnection;
+  }
+
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("keepAlive=").append(keepAlive).append(", ");
@@ -82,7 +89,7 @@ public class HttpConnectionParams {
     sb.append("connectionTimeout=").append(connectionTimeout).append(", ");
     sb.append("readTimeout=").append(readTimeout).append(", ");
     sb.append("bufferSize=").append(bufferSize).append(", ");
-    sb.append("bufferSize=").append(bufferSize);
+    sb.append("faultInjectLeakFailedConnection=").append(faultInjectLeakFailedConnection);
     return sb.toString();
   }
 }
