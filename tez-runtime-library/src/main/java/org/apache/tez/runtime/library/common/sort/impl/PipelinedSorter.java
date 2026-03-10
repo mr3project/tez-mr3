@@ -1111,7 +1111,6 @@ public class PipelinedSorter extends ExternalSorter {
       return cmp;
     }
 
-
     public int compare(final int mi, final int mj) {
       final int kvi = offsetFor(mi);
       final int kvj = offsetFor(mj);

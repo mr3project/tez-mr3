@@ -33,7 +33,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.concurrent.atomic.AtomicLong;
 
 public class HttpConnection extends BaseHttpConnection {
 
@@ -44,7 +43,7 @@ public class HttpConnection extends BaseHttpConnection {
 
   protected volatile HttpURLConnection connection;
   private volatile DataInputStream input;
-  private volatile boolean connectionSucceeed;
+  private volatile boolean connectionSucceeded;
   private volatile boolean cleanup;
 
   private final JobTokenSecretManager jobTokenSecretMgr;
@@ -145,7 +144,7 @@ public class HttpConnection extends BaseHttpConnection {
       long connectStartTime = System.currentTimeMillis();
       try {
         connection.connect();   // incurs a network transmission
-        connectionSucceeed = true;
+        connectionSucceeded = true;
         break;
       } catch (IOException ioe) {
         // Don't attempt another connect if already cleanedup.
@@ -238,7 +237,7 @@ public class HttpConnection extends BaseHttpConnection {
   @Override
   public DataInputStream getInputStream() throws IOException {
     HttpURLConnection connection = this.connection;
-    if (connection == null || !connectionSucceeed) {
+    if (connection == null || !connectionSucceeded) {
       throw new IOException("Connection already cleaned up or not established");
     }
     try {
@@ -273,18 +272,19 @@ public class HttpConnection extends BaseHttpConnection {
       }
       // if disconnect == true, we call connection.disconnect() immediately after,
       // so there is no need to call readErrorStream() which is blocking.
-      if (connection != null && !disconnect && httpConnParams.isKeepAlive() && connectionSucceeed) {
+      if (connection != null && connectionSucceeded && !disconnect && httpConnParams.isKeepAlive()) {
         // Refer:
         // http://docs.oracle.com/javase/6/docs/technotes/guides/net/http-keepalive.html
         readErrorStream(connection.getErrorStream());
       }
-      if (connection != null && (disconnect || !httpConnParams.isKeepAlive())) {
+      // even if !connectionSucceeded, we should call connection.disconnect() to clean up the unsafe state
+      if (connection != null && (!connectionSucceeded || disconnect || !httpConnParams.isKeepAlive())) {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Closing connection on " + logIdentifier + ", disconnectParam=" + disconnect);
         }
         connection.disconnect();
         connection = null;
-        connectionSucceeed = false;
+        connectionSucceeded = false;
       }
     } catch (IOException e) {
       if (LOG.isDebugEnabled()) {
