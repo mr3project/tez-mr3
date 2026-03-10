@@ -112,10 +112,12 @@ public final class FastByteComparisons {
    * {@code Unsafe} isn't available.
    */
   private static class LexicographicalComparerHolder {
+
     static final String UNSAFE_COMPARER_NAME =
         LexicographicalComparerHolder.class.getName() + "$UnsafeComparer";
 
-    static final Comparer<byte[]> BEST_COMPARER = getBestComparer();
+    static final Comparer<byte[]> BEST_COMPARER = UnsafeComparer.INSTANCE;  // instead of calling getBestComparer()
+
     /**
      * Returns the Unsafe-using Comparer, or falls back to the pure-Java
      * implementation if unable to do so.

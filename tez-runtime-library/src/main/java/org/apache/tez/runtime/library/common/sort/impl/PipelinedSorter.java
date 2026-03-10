@@ -1035,7 +1035,6 @@ public class PipelinedSorter extends ExternalSorter {
     private boolean reinit = false;
     private int capacity;
 
-
     public SortSpan(ByteBuffer source, int maxItems, int perItem, RawComparator comparator) {
       capacity = source.remaining();
       int metasize = METASIZE*maxItems;
