@@ -199,13 +199,10 @@ public class HttpConnection extends BaseHttpConnection {
     TezCounter newTcpCounter = httpConnParams.getKeepAliveNewTcpConnectionsCounter();
     TezCounter reusedCounter = httpConnParams.getKeepAliveReusedFetchesCounter();
     TezCounter unknownCounter = httpConnParams.getKeepAliveReuseUnknownCounter();
-    TezCounter hitRateCounter = httpConnParams.getKeepAliveHitRateCounter();
-
     if (!httpConnParams.isKeepAlive()) {
       if (newTcpCounter != null) {
         newTcpCounter.increment(1);
       }
-      updateKeepAliveHitRateCounter(newTcpCounter, reusedCounter, hitRateCounter);
       return;
     }
 
@@ -223,22 +220,6 @@ public class HttpConnection extends BaseHttpConnection {
         unknownCounter.increment(1);
       }
     }
-    updateKeepAliveHitRateCounter(newTcpCounter, reusedCounter, hitRateCounter);
-  }
-
-  private void updateKeepAliveHitRateCounter(
-      TezCounter newTcpCounter,
-      TezCounter reusedCounter,
-      TezCounter hitRateCounter) {
-    if (newTcpCounter == null || reusedCounter == null || hitRateCounter == null) {
-      return;
-    }
-
-    long reused = reusedCounter.getValue();
-    long fresh = newTcpCounter.getValue();
-    long known = reused + fresh;
-    long hitRateBasisPoints = known == 0 ? 0L : (reused * 10000L) / known;
-    hitRateCounter.setValue(hitRateBasisPoints);
   }
 
   // Returns TRUE if reused connection is detected, FALSE if confirmed non-reused,

@@ -101,13 +101,10 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
   private static final String COUNTER_NEW_TCP_CONNECTIONS = "NEW_TCP_CONNECTIONS";
   private static final String COUNTER_REUSED_FETCHES = "REUSED_CONNECTION_FETCHES";
   private static final String COUNTER_REUSE_UNKNOWN = "REUSE_DETECTION_UNKNOWN";
-  // Basis points (1/100 of 1%), e.g. 7350 means 73.50% hit rate.
-  private static final String COUNTER_IDLE_KEEP_ALIVE_HIT_RATE_BPS = "IDLE_KEEP_ALIVE_HIT_RATE_BPS";
 
   private final TezCounter keepAliveNewTcpConnectionsCounter;
   private final TezCounter keepAliveReusedFetchesCounter;
   private final TezCounter keepAliveReuseUnknownCounter;
-  private final TezCounter keepAliveHitRateCounter;
 
   private volatile boolean stopped = false;
   private final Object cleanupLock = new Object();
@@ -141,8 +138,6 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         KEEP_ALIVE_COUNTER_GROUP, COUNTER_REUSED_FETCHES);
     this.keepAliveReuseUnknownCounter = taskContext.getCounters().findCounter(
         KEEP_ALIVE_COUNTER_GROUP, COUNTER_REUSE_UNKNOWN);
-    this.keepAliveHitRateCounter = taskContext.getCounters().findCounter(
-        KEEP_ALIVE_COUNTER_GROUP, COUNTER_IDLE_KEEP_ALIVE_HIT_RATE_BPS);
 
     // use '==' instead of 'equals' because we want to avoid conversion from long to Long
     assert this.shuffleClientId == shuffleScheduler.getShuffleClientId();
@@ -391,8 +386,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       HttpConnectionParams httpConnectionParams = fetcherConfigCommon.httpConnectionParams.withKeepAliveCounters(
           keepAliveNewTcpConnectionsCounter,
           keepAliveReusedFetchesCounter,
-          keepAliveReuseUnknownCounter,
-          keepAliveHitRateCounter);
+          keepAliveReuseUnknownCounter);
 
       String finalHost;
       boolean sslShuffle = httpConnectionParams.isSslShuffle();
