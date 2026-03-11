@@ -54,6 +54,10 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
     WRONG_REDUCE
   }
   private final static String SHUFFLE_ERR_GRP_NAME = "Shuffle Errors";
+  private static final String KEEP_ALIVE_COUNTER_GROUP = "Shuffle Keep-Alive";
+  private static final String COUNTER_NEW_TCP_CONNECTIONS = "NEW_TCP_CONNECTIONS";
+  private static final String COUNTER_REUSED_FETCHES = "REUSED_CONNECTION_FETCHES";
+  private static final String COUNTER_REUSE_UNKNOWN = "REUSE_DETECTION_UNKNOWN";
 
   public static class ShuffleErrorCounterGroup {
     public final TezCounter ioErrs;
@@ -179,6 +183,10 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
 
   private final ShuffleErrorCounterGroup shuffleErrorCounterGroup;
 
+  private final TezCounter keepAliveNewTcpConnectionsCounter;
+  private final TezCounter keepAliveReusedFetchesCounter;
+  private final TezCounter keepAliveReuseUnknownCounter;
+
   public ShuffleClient(
       InputContext inputContext,
       Configuration conf,
@@ -229,6 +237,13 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
         ioErrsCounter, wrongLengthErrsCounter,
         badIdErrsCounter, wrongMapErrsCounter,
         connectionErrsCounter, wrongReduceErrsCounter);
+
+    this.keepAliveNewTcpConnectionsCounter = counters.findCounter(
+        KEEP_ALIVE_COUNTER_GROUP, COUNTER_NEW_TCP_CONNECTIONS);
+    this.keepAliveReusedFetchesCounter = counters.findCounter(
+        KEEP_ALIVE_COUNTER_GROUP, COUNTER_REUSED_FETCHES);
+    this.keepAliveReuseUnknownCounter = counters.findCounter(
+        KEEP_ALIVE_COUNTER_GROUP, COUNTER_REUSE_UNKNOWN);
   }
 
   public int getNumInputs() {
@@ -246,6 +261,18 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
 
   public ShuffleErrorCounterGroup getShuffleErrorCounterGroup() {
     return shuffleErrorCounterGroup;
+  }
+
+  public TezCounter getKeepAliveNewTcpConnectionsCounter() {
+    return keepAliveNewTcpConnectionsCounter;
+  }
+
+  public TezCounter getKeepAliveReusedFetchesCounter() {
+    return keepAliveReusedFetchesCounter;
+  }
+
+  public TezCounter getKeepAliveReuseUnknownCounter() {
+    return keepAliveReuseUnknownCounter;
   }
 
   protected void setInputFinished(int inputIndex) {

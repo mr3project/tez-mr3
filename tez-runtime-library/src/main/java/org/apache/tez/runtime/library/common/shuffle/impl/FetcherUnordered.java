@@ -32,7 +32,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.FetcherConfigCommon;
@@ -84,15 +83,6 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
 
   private final AtomicBoolean isShutDown = new AtomicBoolean(false);
 
-  private static final String KEEP_ALIVE_COUNTER_GROUP = "Shuffle Keep-Alive";
-  private static final String COUNTER_NEW_TCP_CONNECTIONS = "NEW_TCP_CONNECTIONS";
-  private static final String COUNTER_REUSED_FETCHES = "REUSED_CONNECTION_FETCHES";
-  private static final String COUNTER_REUSE_UNKNOWN = "REUSE_DETECTION_UNKNOWN";
-
-  private final TezCounter keepAliveNewTcpConnectionsCounter;
-  private final TezCounter keepAliveReusedFetchesCounter;
-  private final TezCounter keepAliveReuseUnknownCounter;
-
   public FetcherUnordered(ShuffleServer fetcherCallback,
                           Configuration conf,
                           InputHost inputHost,
@@ -111,13 +101,6 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         shuffleManager.getLogIdentifier() + "_" + fetcherIdentifier + "-U-" + minPartition+ "=" + attempt;
 
     this.shuffleErrorCounterGroup = shuffleManager.getShuffleErrorCounterGroup();
-
-    this.keepAliveNewTcpConnectionsCounter = taskContext.getCounters().findCounter(
-        KEEP_ALIVE_COUNTER_GROUP, COUNTER_NEW_TCP_CONNECTIONS);
-    this.keepAliveReusedFetchesCounter = taskContext.getCounters().findCounter(
-        KEEP_ALIVE_COUNTER_GROUP, COUNTER_REUSED_FETCHES);
-    this.keepAliveReuseUnknownCounter = taskContext.getCounters().findCounter(
-        KEEP_ALIVE_COUNTER_GROUP, COUNTER_REUSE_UNKNOWN);
 
     // use '==' instead of 'equals' because we want to avoid conversion from long to Long
     assert this.shuffleClientId == shuffleManager.getShuffleClientId();
@@ -224,9 +207,9 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     try {
       String finalHost;
       HttpConnectionParams httpConnectionParams = fetcherConfigCommon.httpConnectionParams.withKeepAliveCounters(
-          keepAliveNewTcpConnectionsCounter,
-          keepAliveReusedFetchesCounter,
-          keepAliveReuseUnknownCounter);
+          shuffleManager.getKeepAliveNewTcpConnectionsCounter(),
+          shuffleManager.getKeepAliveReusedFetchesCounter(),
+          shuffleManager.getKeepAliveReuseUnknownCounter());
       if (httpConnectionParams.isSslShuffle()) {
         finalHost = InetAddress.getByName(host).getHostName();
       } else {

@@ -34,7 +34,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.FetcherConfigCommon;
@@ -97,15 +96,6 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
 
   private final ShuffleClient.ShuffleErrorCounterGroup shuffleErrorCounterGroup;
 
-  private static final String KEEP_ALIVE_COUNTER_GROUP = "Shuffle Keep-Alive";
-  private static final String COUNTER_NEW_TCP_CONNECTIONS = "NEW_TCP_CONNECTIONS";
-  private static final String COUNTER_REUSED_FETCHES = "REUSED_CONNECTION_FETCHES";
-  private static final String COUNTER_REUSE_UNKNOWN = "REUSE_DETECTION_UNKNOWN";
-
-  private final TezCounter keepAliveNewTcpConnectionsCounter;
-  private final TezCounter keepAliveReusedFetchesCounter;
-  private final TezCounter keepAliveReuseUnknownCounter;
-
   private volatile boolean stopped = false;
   private final Object cleanupLock = new Object();
 
@@ -131,13 +121,6 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     this.exceptionReporter = shuffleScheduler.getExceptionReporter();
 
     this.shuffleErrorCounterGroup = shuffleScheduler.getShuffleErrorCounterGroup();
-
-    this.keepAliveNewTcpConnectionsCounter = taskContext.getCounters().findCounter(
-        KEEP_ALIVE_COUNTER_GROUP, COUNTER_NEW_TCP_CONNECTIONS);
-    this.keepAliveReusedFetchesCounter = taskContext.getCounters().findCounter(
-        KEEP_ALIVE_COUNTER_GROUP, COUNTER_REUSED_FETCHES);
-    this.keepAliveReuseUnknownCounter = taskContext.getCounters().findCounter(
-        KEEP_ALIVE_COUNTER_GROUP, COUNTER_REUSE_UNKNOWN);
 
     // use '==' instead of 'equals' because we want to avoid conversion from long to Long
     assert this.shuffleClientId == shuffleScheduler.getShuffleClientId();
@@ -384,9 +367,9 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     boolean connectSucceeded = false;
     try {
       HttpConnectionParams httpConnectionParams = fetcherConfigCommon.httpConnectionParams.withKeepAliveCounters(
-          keepAliveNewTcpConnectionsCounter,
-          keepAliveReusedFetchesCounter,
-          keepAliveReuseUnknownCounter);
+          shuffleScheduler.getKeepAliveNewTcpConnectionsCounter(),
+          shuffleScheduler.getKeepAliveReusedFetchesCounter(),
+          shuffleScheduler.getKeepAliveReuseUnknownCounter());
 
       String finalHost;
       boolean sslShuffle = httpConnectionParams.isSslShuffle();
