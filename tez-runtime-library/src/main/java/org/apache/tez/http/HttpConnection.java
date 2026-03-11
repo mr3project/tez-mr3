@@ -231,7 +231,9 @@ public class HttpConnection extends BaseHttpConnection {
       // HttpsURLConnectionImpl holds delegate HttpURLConnection.
       if (target != null && target.getClass().getName().contains("HttpsURLConnectionImpl")) {
         Field delegateField = target.getClass().getDeclaredField("delegate");
-        delegateField.setAccessible(true);
+        if (!delegateField.trySetAccessible()) {
+          return null;
+        }
         target = delegateField.get(target);
       }
 
@@ -244,7 +246,9 @@ public class HttpConnection extends BaseHttpConnection {
       if (reuseClientField == null) {
         return null;
       }
-      reuseClientField.setAccessible(true);
+      if (!reuseClientField.trySetAccessible()) {
+        return null;
+      }
       return reuseClientField.getBoolean(target);
     } catch (Throwable t) {
       if (LOG.isDebugEnabled()) {
