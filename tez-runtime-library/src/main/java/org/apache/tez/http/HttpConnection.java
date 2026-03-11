@@ -249,7 +249,15 @@ public class HttpConnection extends BaseHttpConnection {
       if (!reuseClientField.trySetAccessible()) {
         return null;
       }
-      return reuseClientField.getBoolean(target);
+      Class<?> fieldType = reuseClientField.getType();
+      if (fieldType == boolean.class || fieldType == Boolean.class) {
+        return (Boolean) reuseClientField.get(target);
+      }
+
+      // In some JDK implementations this field is an HttpClient reference.
+      // A non-null value means an existing keep-alive client is being reused.
+      Object reuseClient = reuseClientField.get(target);
+      return reuseClient != null;
     } catch (Throwable t) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Unable to detect keep-alive connection reuse for {}: {}", logIdentifier, t.getMessage());
