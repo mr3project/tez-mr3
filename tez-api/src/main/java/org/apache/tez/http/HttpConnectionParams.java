@@ -18,6 +18,8 @@
 
 package org.apache.tez.http;
 
+import org.apache.tez.common.counters.TezCounter;
+
 public class HttpConnectionParams {
   private final boolean keepAlive;
   private final int keepAliveMaxConnections;
@@ -31,10 +33,28 @@ public class HttpConnectionParams {
   private final boolean skipVerifyRequest;
   private final boolean faultInjectLeakFailedConnection;
 
+  private final TezCounter keepAliveNewTcpConnectionsCounter;
+  private final TezCounter keepAliveReusedFetchesCounter;
+  private final TezCounter keepAliveReuseUnknownCounter;
+  private final TezCounter keepAliveHitRateCounter;
+
   public HttpConnectionParams(boolean keepAlive, int keepAliveMaxConnections,
                               int connectionTimeout, int readTimeout, int bufferSize,
                               boolean sslShuffle, SSLFactory sslFactory, boolean skipVerifyRequest,
                               boolean faultInjectLeakFailedConnection) {
+    this(keepAlive, keepAliveMaxConnections, connectionTimeout, readTimeout, bufferSize,
+        sslShuffle, sslFactory, skipVerifyRequest, faultInjectLeakFailedConnection,
+        null, null, null, null);
+  }
+
+  public HttpConnectionParams(boolean keepAlive, int keepAliveMaxConnections,
+                              int connectionTimeout, int readTimeout, int bufferSize,
+                              boolean sslShuffle, SSLFactory sslFactory, boolean skipVerifyRequest,
+                              boolean faultInjectLeakFailedConnection,
+                              TezCounter keepAliveNewTcpConnectionsCounter,
+                              TezCounter keepAliveReusedFetchesCounter,
+                              TezCounter keepAliveReuseUnknownCounter,
+                              TezCounter keepAliveHitRateCounter) {
     this.keepAlive = keepAlive;
     this.keepAliveMaxConnections = keepAliveMaxConnections;
     this.connectionTimeout = connectionTimeout;
@@ -44,6 +64,22 @@ public class HttpConnectionParams {
     this.sslFactory = sslFactory;
     this.skipVerifyRequest = skipVerifyRequest;
     this.faultInjectLeakFailedConnection = faultInjectLeakFailedConnection;
+    this.keepAliveNewTcpConnectionsCounter = keepAliveNewTcpConnectionsCounter;
+    this.keepAliveReusedFetchesCounter = keepAliveReusedFetchesCounter;
+    this.keepAliveReuseUnknownCounter = keepAliveReuseUnknownCounter;
+    this.keepAliveHitRateCounter = keepAliveHitRateCounter;
+  }
+
+  public HttpConnectionParams withKeepAliveCounters(
+      TezCounter keepAliveNewTcpConnectionsCounter,
+      TezCounter keepAliveReusedFetchesCounter,
+      TezCounter keepAliveReuseUnknownCounter,
+      TezCounter keepAliveHitRateCounter) {
+    return new HttpConnectionParams(
+        keepAlive, keepAliveMaxConnections, connectionTimeout, readTimeout, bufferSize,
+        sslShuffle, sslFactory, skipVerifyRequest, faultInjectLeakFailedConnection,
+        keepAliveNewTcpConnectionsCounter, keepAliveReusedFetchesCounter,
+        keepAliveReuseUnknownCounter, keepAliveHitRateCounter);
   }
 
   public int getBufferSize() {
@@ -80,6 +116,22 @@ public class HttpConnectionParams {
 
   public boolean isFaultInjectLeakFailedConnection() {
     return faultInjectLeakFailedConnection;
+  }
+
+  public TezCounter getKeepAliveNewTcpConnectionsCounter() {
+    return keepAliveNewTcpConnectionsCounter;
+  }
+
+  public TezCounter getKeepAliveReusedFetchesCounter() {
+    return keepAliveReusedFetchesCounter;
+  }
+
+  public TezCounter getKeepAliveReuseUnknownCounter() {
+    return keepAliveReuseUnknownCounter;
+  }
+
+  public TezCounter getKeepAliveHitRateCounter() {
+    return keepAliveHitRateCounter;
   }
 
   public String toString() {

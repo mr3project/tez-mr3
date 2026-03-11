@@ -34,7 +34,7 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.lang.reflect.Field;
-import java.util.concurrent.atomic.AtomicLong;
+import org.apache.tez.common.counters.TezCounter;
 
 public class HttpConnection extends BaseHttpConnection {
 
@@ -53,15 +53,6 @@ public class HttpConnection extends BaseHttpConnection {
   private String msgToEncode;
 
   private final HttpConnectionParams httpConnParams;
-
-  // Best-effort keep-alive instrumentation counters.
-  // "newTcpConnections" and "reusedFetches" are inferred from JDK internals when available.
-  // If reuse detection is unavailable in the current JVM, counts are recorded in "reuseUnknown".
-  private static final AtomicLong connectSuccessCount = new AtomicLong(0);
-  private static final AtomicLong newTcpConnections = new AtomicLong(0);
-  private static final AtomicLong reusedFetches = new AtomicLong(0);
-  private static final AtomicLong reuseUnknown = new AtomicLong(0);
-  private static final long KEEP_ALIVE_METRICS_LOG_PERIOD = 1000;
 
   /**
    * HttpConnection
@@ -205,41 +196,49 @@ public class HttpConnection extends BaseHttpConnection {
   }
 
   private void updateKeepAliveMetricsAfterConnect(HttpURLConnection connection) {
-    long total = connectSuccessCount.incrementAndGet();
+    TezCounter newTcpCounter = httpConnParams.getKeepAliveNewTcpConnectionsCounter();
+    TezCounter reusedCounter = httpConnParams.getKeepAliveReusedFetchesCounter();
+    TezCounter unknownCounter = httpConnParams.getKeepAliveReuseUnknownCounter();
+    TezCounter hitRateCounter = httpConnParams.getKeepAliveHitRateCounter();
 
     if (!httpConnParams.isKeepAlive()) {
-      // Keep-alive off: each successful connect represents a new connection attempt.
-      newTcpConnections.incrementAndGet();
-      maybeLogKeepAliveMetrics(total);
+      if (newTcpCounter != null) {
+        newTcpCounter.increment(1);
+      }
+      updateKeepAliveHitRateCounter(newTcpCounter, reusedCounter, hitRateCounter);
       return;
     }
 
     Boolean reused = detectReusedConnection(connection);
     if (Boolean.TRUE.equals(reused)) {
-      reusedFetches.incrementAndGet();
+      if (reusedCounter != null) {
+        reusedCounter.increment(1);
+      }
     } else if (Boolean.FALSE.equals(reused)) {
-      newTcpConnections.incrementAndGet();
+      if (newTcpCounter != null) {
+        newTcpCounter.increment(1);
+      }
     } else {
-      reuseUnknown.incrementAndGet();
+      if (unknownCounter != null) {
+        unknownCounter.increment(1);
+      }
     }
-
-    maybeLogKeepAliveMetrics(total);
+    updateKeepAliveHitRateCounter(newTcpCounter, reusedCounter, hitRateCounter);
   }
 
-  private void maybeLogKeepAliveMetrics(long total) {
-    if (total % KEEP_ALIVE_METRICS_LOG_PERIOD != 0) {
+  private void updateKeepAliveHitRateCounter(
+      TezCounter newTcpCounter,
+      TezCounter reusedCounter,
+      TezCounter hitRateCounter) {
+    if (newTcpCounter == null || reusedCounter == null || hitRateCounter == null) {
       return;
     }
 
-    long reused = reusedFetches.get();
-    long fresh = newTcpConnections.get();
-    long unknown = reuseUnknown.get();
+    long reused = reusedCounter.getValue();
+    long fresh = newTcpCounter.getValue();
     long known = reused + fresh;
-    double hitRate = known == 0 ? 0.0 : (100.0 * reused / known);
-
-    LOG.info("Shuffle HTTP keep-alive stats: totalConnectSuccess={}, estimatedNewTcpConnections={}, " +
-            "estimatedReusedFetches={}, reuseUnknown={}, estimatedIdleKeepAliveHitRate={}%, keepAliveEnabled={}",
-        total, fresh, reused, unknown, String.format("%.2f", hitRate), httpConnParams.isKeepAlive());
+    long hitRateBasisPoints = known == 0 ? 0L : (reused * 10000L) / known;
+    hitRateCounter.setValue(hitRateBasisPoints);
   }
 
   // Returns TRUE if reused connection is detected, FALSE if confirmed non-reused,

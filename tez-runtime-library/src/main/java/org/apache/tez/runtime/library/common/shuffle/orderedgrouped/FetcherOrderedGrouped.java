@@ -34,6 +34,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.tez.common.counters.TezCounter;
+import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.FetcherConfigCommon;
 import org.apache.tez.runtime.api.TaskContext;
@@ -95,6 +97,18 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
 
   private final ShuffleClient.ShuffleErrorCounterGroup shuffleErrorCounterGroup;
 
+  private static final String KEEP_ALIVE_COUNTER_GROUP = "Shuffle Keep-Alive";
+  private static final String COUNTER_NEW_TCP_CONNECTIONS = "NEW_TCP_CONNECTIONS";
+  private static final String COUNTER_REUSED_FETCHES = "REUSED_CONNECTION_FETCHES";
+  private static final String COUNTER_REUSE_UNKNOWN = "REUSE_DETECTION_UNKNOWN";
+  // Basis points (1/100 of 1%), e.g. 7350 means 73.50% hit rate.
+  private static final String COUNTER_IDLE_KEEP_ALIVE_HIT_RATE_BPS = "IDLE_KEEP_ALIVE_HIT_RATE_BPS";
+
+  private final TezCounter keepAliveNewTcpConnectionsCounter;
+  private final TezCounter keepAliveReusedFetchesCounter;
+  private final TezCounter keepAliveReuseUnknownCounter;
+  private final TezCounter keepAliveHitRateCounter;
+
   private volatile boolean stopped = false;
   private final Object cleanupLock = new Object();
 
@@ -120,6 +134,15 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     this.exceptionReporter = shuffleScheduler.getExceptionReporter();
 
     this.shuffleErrorCounterGroup = shuffleScheduler.getShuffleErrorCounterGroup();
+
+    this.keepAliveNewTcpConnectionsCounter = taskContext.getCounters().findCounter(
+        KEEP_ALIVE_COUNTER_GROUP, COUNTER_NEW_TCP_CONNECTIONS);
+    this.keepAliveReusedFetchesCounter = taskContext.getCounters().findCounter(
+        KEEP_ALIVE_COUNTER_GROUP, COUNTER_REUSED_FETCHES);
+    this.keepAliveReuseUnknownCounter = taskContext.getCounters().findCounter(
+        KEEP_ALIVE_COUNTER_GROUP, COUNTER_REUSE_UNKNOWN);
+    this.keepAliveHitRateCounter = taskContext.getCounters().findCounter(
+        KEEP_ALIVE_COUNTER_GROUP, COUNTER_IDLE_KEEP_ALIVE_HIT_RATE_BPS);
 
     // use '==' instead of 'equals' because we want to avoid conversion from long to Long
     assert this.shuffleClientId == shuffleScheduler.getShuffleClientId();
@@ -365,8 +388,14 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
 
     boolean connectSucceeded = false;
     try {
+      HttpConnectionParams httpConnectionParams = fetcherConfigCommon.httpConnectionParams.withKeepAliveCounters(
+          keepAliveNewTcpConnectionsCounter,
+          keepAliveReusedFetchesCounter,
+          keepAliveReuseUnknownCounter,
+          keepAliveHitRateCounter);
+
       String finalHost;
-      boolean sslShuffle = fetcherConfigCommon.httpConnectionParams.isSslShuffle();
+      boolean sslShuffle = httpConnectionParams.isSslShuffle();
       if (sslShuffle) {
         // TODO: cache in host
         finalHost = InetAddress.getByName(host).getHostName();
@@ -378,15 +407,15 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       String appIdInURI = fetcherConfigCommon.compositeFetch ? null : applicationId;
       StringBuilder baseURI = ShuffleUtils.constructBaseURIForShuffleHandler(finalHost,
           port, range, appIdInURI,
-          fetcherConfigCommon.httpConnectionParams.isSslShuffle());
+          httpConnectionParams.isSslShuffle());
 
       Collection<CompositeInputAttemptIdentifier> inputsForPathComponents =
         pendingInputsSeq.getInputs().subList(currentIndex, pendingInputsSeq.getInputs().size());
       // inputsForPathComponents[] is a View, so do not update it
       URL url = ShuffleUtils.constructInputURL(baseURI.toString(), inputsForPathComponents,
-          fetcherConfigCommon.httpConnectionParams.isKeepAlive());
+          httpConnectionParams.isKeepAlive());
 
-      httpConnection = ShuffleUtils.getHttpConnection(url, fetcherConfigCommon.httpConnectionParams,
+      httpConnection = ShuffleUtils.getHttpConnection(url, httpConnectionParams,
           logIdentifier, fetcherConfigCommon.jobTokenSecretMgr);
       connectSucceeded = httpConnection.connect();
     } catch (IOException | InterruptedException ie) {
