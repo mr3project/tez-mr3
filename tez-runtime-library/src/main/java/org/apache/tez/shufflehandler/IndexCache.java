@@ -1,0 +1,230 @@
+/*
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.tez.shufflehandler;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.tez.runtime.library.common.Constants;
+import org.apache.tez.runtime.library.common.sort.impl.TezIndexRecord;
+import org.apache.tez.runtime.library.common.sort.impl.TezSpillRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+class IndexCache {
+
+  private final Configuration conf;
+  private static final Logger LOG = LoggerFactory.getLogger(IndexCache.class);
+
+  private final ConcurrentHashMap<String, IndexInformation> cache = new ConcurrentHashMap<String,IndexInformation>();
+
+  private FileSystem fs;
+
+  public IndexCache(Configuration conf) {
+    this.conf = conf;
+    LOG.info("IndexCache created without max memory");
+    initLocalFs();
+  }
+
+  private void initLocalFs() {
+    try {
+      this.fs = FileSystem.getLocal(conf).getRaw();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  /**
+   * This method gets the spill record for the given mapId.
+   * It reads the index file into cache if it is not already present.
+   * @param mapId
+   * @param fileName The file to read the index information from if it is not
+   *                 already present in the cache
+   * @param expectedIndexOwner The expected owner of the index file
+   * @return The spill record for this map
+   * @throws IOException
+   */
+  public TezSpillRecord getSpillRecord(String mapId, Path fileName,
+                                       String expectedIndexOwner) throws IOException {
+
+    IndexInformation info = cache.get(mapId);
+
+    if (info == null) {
+      info = readIndexFileToCache(fileName, mapId, expectedIndexOwner);
+    } else {
+      synchronized(info) {
+        while (isUnderConstruction(info)) {
+          try {
+            info.wait();
+          } catch (InterruptedException e) {
+            throw new IOException("Interrupted waiting for construction", e);
+          }
+        }
+      }
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("IndexCache HIT: MapId " + mapId + " found");
+      }
+    }
+
+    if (info.mapSpillRecord.size() == 0) {
+      throw new IOException("Invalid request " +
+          " Map Id = " + mapId + " Index Info Length = " + info.mapSpillRecord.size());
+    }
+    return info.mapSpillRecord;
+  }
+
+  /**
+   * This method gets the index information for the given mapId and reduce.
+   * It reads the index file into cache if it is not already present.
+   * @param mapId
+   * @param reduce
+   * @param fileName The file to read the index information from if it is not
+   *                 already present in the cache
+   * @param expectedIndexOwner The expected owner of the index file
+   * @return The Index Information
+   * @throws IOException
+   */
+  public TezIndexRecord getIndexInformation(String mapId, int reduce, Path fileName,
+                                            String expectedIndexOwner) throws IOException {
+
+    IndexInformation info = cache.get(mapId);
+
+    if (info == null) {
+      info = readIndexFileToCache(fileName, mapId, expectedIndexOwner);
+    } else {
+      synchronized(info) {
+        while (isUnderConstruction(info)) {
+          try {
+            info.wait();
+          } catch (InterruptedException e) {
+            throw new IOException("Interrupted waiting for construction", e);
+          }
+        }
+      }
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("IndexCache HIT: MapId " + mapId + " found");
+      }
+    }
+
+    if (info.mapSpillRecord.size() == 0 ||
+        info.mapSpillRecord.size() <= reduce) {
+      throw new IOException("Invalid request " +
+          " Map Id = " + mapId + " Reducer = " + reduce +
+          " Index Info Length = " + info.mapSpillRecord.size());
+    }
+    return info.mapSpillRecord.getIndex(reduce);
+  }
+
+  private boolean isUnderConstruction(IndexInformation info) {
+    synchronized(info) {
+      return (null == info.mapSpillRecord);
+    }
+  }
+
+  private IndexInformation readIndexFileToCache(Path indexFileName, String mapId,
+                                                String expectedIndexOwner) throws IOException {
+    IndexInformation info;
+    IndexInformation newInd = new IndexInformation();
+    if ((info = cache.putIfAbsent(mapId, newInd)) != null) {
+      synchronized(info) {
+        while (isUnderConstruction(info)) {
+          try {
+            info.wait();
+          } catch (InterruptedException e) {
+            throw new IOException("Interrupted waiting for construction", e);
+          }
+        }
+      }
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("IndexCache HIT: MapId " + mapId + " found");
+      }
+      return info;
+    }
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("IndexCache MISS: MapId " + mapId + " not found");
+    }
+    TezSpillRecord tmp = null;
+    try {
+      tmp = new TezSpillRecord(indexFileName, fs);
+    } catch (Throwable e) {
+      tmp = new TezSpillRecord(0);
+      cache.remove(mapId);
+      throw new IOException("Error Reading IndexFile", e);
+    } finally {
+      synchronized (newInd) {
+        newInd.mapSpillRecord = tmp;
+        newInd.notifyAll();
+      }
+    }
+
+    return newInd;
+  }
+
+  /**
+   * This method removes the map from the cache if index information for this
+   * map is loaded(size>0), index information entry in cache will not be
+   * removed if it is in the loading phrase(size=0), this prevents corruption
+   * of totalMemoryUsed. It should be called when a map output on this tracker
+   * is discarded.
+   * @param mapId The taskID of this map.
+   */
+  public void removeMap(String mapId) {
+    IndexInformation info = cache.get(mapId);
+    if (info == null || isUnderConstruction(info)) {
+      return;
+    }
+    info = cache.remove(mapId);
+    if (info == null) {
+      LOG.info("Map ID " + mapId + " not found in cache");
+    }
+  }
+
+  public void clearIndexCache(String mapIdPrefix) {
+    List<String> mapIdsToRemove = new ArrayList<String>();
+    Iterator<Map.Entry<String, IndexInformation>> iterator = cache.entrySet().iterator();
+    while (iterator.hasNext()) {
+      Map.Entry<String, IndexInformation> entry = iterator.next();
+      String mapId = entry.getKey();
+      if (mapId.contains(mapIdPrefix)) {
+        mapIdsToRemove.add(mapId);
+      }
+    }
+
+    int numBefore = cache.size();
+    for (String mapIdToRemove: mapIdsToRemove) {
+      removeMap(mapIdToRemove);
+    }
+    int numAfter = cache.size();
+    LOG.info("Cleared IndexCache for {}, Before={}, After={}",
+        mapIdPrefix, numBefore, numAfter);
+  }
+
+  private static class IndexInformation {
+    TezSpillRecord mapSpillRecord;
+
+    int getSize() {
+      return mapSpillRecord == null
+          ? 0
+          : mapSpillRecord.size() * Constants.MAP_OUTPUT_INDEX_RECORD_LENGTH;
+    }
+  }
+}

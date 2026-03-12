@@ -1,11 +1,5 @@
 package org.apache.tez.runtime.api;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.LocalDirAllocator;
-import org.apache.hadoop.fs.RawLocalFileSystem;
-import org.apache.tez.common.security.JobTokenSecretManager;
-import org.apache.tez.http.HttpConnectionParams;
-
 // parameters required by Fetchers
 public class FetcherConfig {
 
