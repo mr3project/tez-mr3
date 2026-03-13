@@ -20,7 +20,6 @@ package org.apache.tez.runtime.library.common.shuffle.impl;
 
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.util.AbstractMap;
@@ -205,13 +204,8 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     assert currentIndex < pendingInputsSeq.getInputs().size();
 
     try {
-      String finalHost;
       HttpConnectionParams httpConnectionParams = fetcherConfigCommon.httpConnectionParams;
-      if (httpConnectionParams.isSslShuffle()) {
-        finalHost = InetAddress.getByName(host).getHostName();
-      } else {
-        finalHost = host;
-      }
+      String finalHost = inputHost.getConnectHost();
 
       InputHost.PartitionRange range = pendingInputsSeq.getPartitionRange();
       String appIdInURI = fetcherConfigCommon.compositeFetch ? null : applicationId;
