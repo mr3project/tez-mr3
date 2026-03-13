@@ -19,7 +19,6 @@ package org.apache.tez.runtime.library.common.shuffle.orderedgrouped;
 
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.util.AbstractMap;
@@ -365,14 +364,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
 
     boolean connectSucceeded = false;
     try {
-      String finalHost;
-      boolean sslShuffle = fetcherConfigCommon.httpConnectionParams.isSslShuffle();
-      if (sslShuffle) {
-        // TODO: cache in host
-        finalHost = InetAddress.getByName(host).getHostName();
-      } else {
-        finalHost = host;
-      }
+      String finalHost = inputHost.getConnectHost();
 
       InputHost.PartitionRange range = pendingInputsSeq.getPartitionRange();
       String appIdInURI = fetcherConfigCommon.compositeFetch ? null : applicationId;

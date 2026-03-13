@@ -113,15 +113,22 @@ public class InputHost {
   private final static AtomicInteger numHostBlocked = new AtomicInteger(0);
 
   private final HostPort hostPort;
+  private final String connectHost;
 
-  public InputHost(HostPort hostPort) {
+  public InputHost(HostPort hostPort, String connectHost) {
     this.hasPendingInput = false;
     this.blockingFetchers = new HashSet<Fetcher<?>>();
     this.hostPort = hostPort;
+    this.connectHost = connectHost;
   }
 
   public HostPort getHostPort() {
     return hostPort;
+  }
+
+  // Hostname/address used by fetchers to connect to ShuffleHandler.
+  public String getConnectHost() {
+    return connectHost;
   }
 
   public void addHostBlocked(Fetcher<?> fetcher) {

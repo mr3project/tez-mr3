@@ -25,6 +25,7 @@ import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.conf.Configuration;
+
 import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.FetcherConfigCommon;
@@ -42,6 +43,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
@@ -141,6 +144,8 @@ public class ShuffleServer implements FetcherCallback {
 
   private final ListeningExecutorService fetcherExecutor;
   private final FetcherConfigCommon fetcherConfigCommon;
+  private final boolean sslShuffle;
+  private final ConcurrentMap<String, String> resolvedHosts;
 
   private final int maxTaskOutputAtOnce;
   private final RangesScheme rangesScheme;
@@ -195,6 +200,7 @@ public class ShuffleServer implements FetcherCallback {
         .build());
     this.fetcherExecutor = MoreExecutors.listeningDecorator(fetcherRawExecutor);
     this.fetcherConfigCommon = CodecUtils.constructFetcherConfigCommon(conf, taskContext);
+    this.sslShuffle = fetcherConfigCommon.httpConnectionParams.isSslShuffle();
 
     /**
      * Setting to very high val can lead to Http 400 error. Cap it to 75; every attempt id would
@@ -213,6 +219,7 @@ public class ShuffleServer implements FetcherCallback {
         RangesScheme.SCHEME_PRIORITY;
 
     knownSrcHosts = new ConcurrentHashMap<HostPort, InputHost>();
+    resolvedHosts = new ConcurrentHashMap<String, String>();
 
     shuffleClients = new ConcurrentHashMap<Long, ShuffleClient<?>>();
     pendingHosts = new LinkedBlockingQueue<InputHost>();
@@ -676,7 +683,25 @@ public class ShuffleServer implements FetcherCallback {
     HostPort identifier = new HostPort(hostName, containerId, port);
     InputHost host = knownSrcHosts.get(identifier);
     if (host == null) {
-      host = new InputHost(identifier);
+      String connectHost = hostName;
+      if (sslShuffle) {
+        String resolved = resolvedHosts.get(hostName);
+        if (resolved == null) {
+          try {
+            resolved = InetAddress.getByName(hostName).getHostName();
+          } catch (UnknownHostException e) {
+            LOG.warn("Failed to resolve host {} for SSL shuffle. Using original host.", hostName, e);
+            resolved = hostName;
+          }
+          String prev = resolvedHosts.putIfAbsent(hostName, resolved);
+          if (prev != null) {
+            resolved = prev;
+          }
+        }
+        connectHost = resolved;
+      }
+
+      host = new InputHost(identifier, connectHost);
       InputHost old = knownSrcHosts.putIfAbsent(identifier, host);
       if (old != null) {
         host = old;
