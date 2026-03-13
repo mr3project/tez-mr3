@@ -1175,10 +1175,11 @@ public class ShuffleHandler {
       TezIndexRecord firstIndex = null;
       TezIndexRecord lastIndex = null;
 
-      DataOutputBuffer dobRange = new DataOutputBuffer();
+      DataOutputBuffer dob = new DataOutputBuffer();
       // Indicate how many record to be written
-      dobRange.writeInt(reduceRange.getLast() - reduceRange.getFirst() + 1);
-      ch.writeAndFlush(wrappedBuffer(dobRange.getData(), 0, dobRange.getLength()));
+      dob.writeInt(reduceRange.getLast() - reduceRange.getFirst() + 1);
+      // DataOutputBuffer is reused below, so copy bytes before enqueuing async channel write.
+      ChannelFuture writeFuture = ch.write(Unpooled.copiedBuffer(dob.getData(), 0, dob.getLength()));
       for (int reduce = reduceRange.getFirst(); reduce <= reduceRange.getLast(); reduce++) {
         TezIndexRecord index = outputInfo.getIndex(reduce);
         // Records are only valid if they have a non-zero part length
@@ -1190,10 +1191,10 @@ public class ShuffleHandler {
         }
 
         ShuffleHeader header = new ShuffleHeader(mapId, index.getPartLength(), index.getRawLength(), reduce);
-        DataOutputBuffer dob = new DataOutputBuffer();
+        dob.reset();
         header.write(dob);
         // Free the memory needed to store the spill and index records
-        ch.writeAndFlush(wrappedBuffer(dob.getData(), 0, dob.getLength()));
+        writeFuture = ch.write(Unpooled.copiedBuffer(dob.getData(), 0, dob.getLength()));
       }
       outputInfo.finish();
 
@@ -1211,27 +1212,29 @@ public class ShuffleHandler {
           LOG.info(spillFile + " not found");
           return null;
         }
-        ChannelFuture writeFuture;
         if (ch.pipeline().get(SslHandler.class) == null) {
           final FadvisedFileRegion partition = new FadvisedFileRegion(spill,
               rangeOffset, rangePartLength, manageOsCache, readaheadLength,
               readaheadPool, spillFile.getAbsolutePath(),
               shuffleBufferSize, shuffleTransferToAllowed);
-          writeFuture = ch.writeAndFlush(partition);
+          writeFuture = ch.write(partition);
         } else {
           // HTTPS cannot be done with zero copy.
           final FadvisedChunkedFile chunk = new FadvisedChunkedFile(spill,
               rangeOffset, rangePartLength, sslFileBufferSize,
               manageOsCache, readaheadLength, readaheadPool,
               spillFile.getAbsolutePath());
-          writeFuture = ch.writeAndFlush(chunk);
+          writeFuture = ch.write(chunk);
         }
+        ch.flush();
         return writeFuture;
       } else {
         assert outputInfo.byteArrayOutput != null;
-        return outputInfo.byteArrayOutput.writeData(
+        writeFuture = outputInfo.byteArrayOutput.writeData(
             rangeOffset, rangePartLength, ch, manageOsCache, readaheadLength,
             shuffleBufferSize, shuffleTransferToAllowed, sslFileBufferSize, readaheadPool);
+        ch.flush();
+        return writeFuture;
       }
     }
 

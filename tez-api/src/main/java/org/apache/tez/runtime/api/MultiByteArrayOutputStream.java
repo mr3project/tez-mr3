@@ -186,7 +186,7 @@ public class MultiByteArrayOutputStream extends OutputStream {
       ReadaheadPool readaheadPool) throws IOException {
 
     if (rangePartLength <= 0) {
-      return ch.writeAndFlush(Unpooled.EMPTY_BUFFER);
+      return ch.write(Unpooled.EMPTY_BUFFER);
     }
 
     // global window: [start, end)
@@ -212,6 +212,7 @@ public class MultiByteArrayOutputStream extends OutputStream {
     }
 
     // 1) In-memory buffers
+    ChannelFuture writeFuture = null;
     long bufBase = 0;
     for (int i = 0; i < buffersFinal.size(); i++) {
       byte[] bufferElement = buffersFinal.get(i);
@@ -233,7 +234,7 @@ public class MultiByteArrayOutputStream extends OutputStream {
         int lengthToWrite = (int)(overlapEnd   - overlapStart);
         assert lengthToWrite > 0;
 
-        ch.write(Unpooled.wrappedBuffer(bufferElement, offsetInBuf, lengthToWrite));
+        writeFuture = ch.write(Unpooled.wrappedBuffer(bufferElement, offsetInBuf, lengthToWrite));
       }
 
       bufBase += bufLen;
@@ -252,20 +253,19 @@ public class MultiByteArrayOutputStream extends OutputStream {
         long fileOffset  = Math.max(0, start - bufBase);
         long filePartLen = end - Math.max(start, bufBase);
 
-        ChannelFuture writeFuture;
         if (ch.pipeline().get(SslHandler.class) == null) {
           FadvisedFileRegion region = new FadvisedFileRegion(
               raf, fileOffset, filePartLen,
               manageOsCache, readaheadLength, readaheadPool,
               spillFile.getAbsolutePath(),
               shuffleBufferSize, shuffleTransferToAllowed);
-          writeFuture = ch.writeAndFlush(region);
+          writeFuture = ch.write(region);
         } else {
           FadvisedChunkedFile chunk = new FadvisedChunkedFile(
               raf, fileOffset, filePartLen, sslFileBufferSize,
               manageOsCache, readaheadLength, readaheadPool,
               spillFile.getAbsolutePath());
-          writeFuture = ch.writeAndFlush(chunk);
+          writeFuture = ch.write(chunk);
         }
 
         final RandomAccessFile rafFinal = raf;
@@ -287,7 +287,11 @@ public class MultiByteArrayOutputStream extends OutputStream {
     }
 
     // 3) Nothing left on disk
-    return ch.writeAndFlush(Unpooled.EMPTY_BUFFER);
+    if (writeFuture != null) {
+      return writeFuture;
+    }
+
+    return ch.write(Unpooled.EMPTY_BUFFER);
   }
 
   // 3. called from ShuffleHandlerDaemonProcessor thread
