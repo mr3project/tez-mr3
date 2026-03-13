@@ -19,7 +19,6 @@ package org.apache.tez.runtime.library.common.shuffle.orderedgrouped;
 
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.util.AbstractMap;
@@ -34,6 +33,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.FetcherConfigCommon;
 import org.apache.tez.runtime.api.TaskContext;
@@ -365,28 +365,21 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
 
     boolean connectSucceeded = false;
     try {
-      String finalHost;
-      boolean sslShuffle = fetcherConfigCommon.httpConnectionParams.isSslShuffle();
-      if (sslShuffle) {
-        // TODO: cache in host
-        finalHost = InetAddress.getByName(host).getHostName();
-      } else {
-        finalHost = host;
-      }
+      HttpConnectionParams httpConnectionParams = fetcherConfigCommon.httpConnectionParams;
+      String finalHost = inputHost.getConnectHost();
 
       InputHost.PartitionRange range = pendingInputsSeq.getPartitionRange();
       String appIdInURI = fetcherConfigCommon.compositeFetch ? null : applicationId;
       StringBuilder baseURI = ShuffleUtils.constructBaseURIForShuffleHandler(finalHost,
-          port, range, appIdInURI,
-          fetcherConfigCommon.httpConnectionParams.isSslShuffle());
+          port, range, appIdInURI, httpConnectionParams.isSslShuffle());
 
       Collection<CompositeInputAttemptIdentifier> inputsForPathComponents =
         pendingInputsSeq.getInputs().subList(currentIndex, pendingInputsSeq.getInputs().size());
       // inputsForPathComponents[] is a View, so do not update it
       URL url = ShuffleUtils.constructInputURL(baseURI.toString(), inputsForPathComponents,
-          fetcherConfigCommon.httpConnectionParams.isKeepAlive());
+          httpConnectionParams.isKeepAlive());
 
-      httpConnection = ShuffleUtils.getHttpConnection(url, fetcherConfigCommon.httpConnectionParams,
+      httpConnection = ShuffleUtils.getHttpConnection(url, httpConnectionParams,
           logIdentifier, fetcherConfigCommon.jobTokenSecretMgr);
       connectSucceeded = httpConnection.connect();
     } catch (IOException | InterruptedException ie) {
