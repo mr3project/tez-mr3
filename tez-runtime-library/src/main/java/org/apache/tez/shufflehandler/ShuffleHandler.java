@@ -1046,11 +1046,12 @@ public class ShuffleHandler {
         if (mapOutputInfoMap.size() < mapOutputMetaInfoCacheSize) {
           mapOutputInfoMap.put(mapId, outputInfo);
         }
+        int lengthInitial = Text.encode(mapId).limit();
         for (int reduce = reduceRange.getFirst(); reduce <= reduceRange.getLast(); reduce++) {
           TezIndexRecord indexRecord = outputInfo.getIndex(reduce);
 
           // contentLength += (new ShuffleHeader(mapId, indexRecord.getPartLength(), indexRecord.getRawLength(), reduce)).writeLength();
-          int length = Text.encode(mapId).limit();
+          int length = lengthInitial;
           length += 4 + 8 + 8 + 4;  // encoding of mapIdLength, compressedLength, uncompressedLength, forReduce
           contentLength += length;
 
