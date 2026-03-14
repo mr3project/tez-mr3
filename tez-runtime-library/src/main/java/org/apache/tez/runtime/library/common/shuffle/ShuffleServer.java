@@ -90,12 +90,18 @@ public class ShuffleServer implements FetcherCallback {
 
   public static class PathPartition {
 
-    final String path;
-    final int partition;
+    String path;
+    int partition;
 
     public PathPartition(String path, int partition) {
       this.path = path;
       this.partition = partition;
+    }
+
+    public PathPartition set(String path, int partition) {
+      this.path = path;
+      this.partition = partition;
+      return this;
     }
 
     @Override
