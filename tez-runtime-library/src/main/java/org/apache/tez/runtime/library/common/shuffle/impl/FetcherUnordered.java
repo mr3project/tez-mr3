@@ -439,10 +439,9 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       Path inputFilePath = null;
 
       boolean hasFailures = false;  // set to true if errors occur inside the inner loop
-      PathPartition lookupKey = new PathPartition(pathComponent, partitionId);
       for (int k = 0; k < partitionCount; k++) {
         int reduceId = partitionId + k;
-        InputAttemptIdentifier srcAttemptId = pathToAttemptMap.get(lookupKey.set(pathComponent, reduceId));
+        InputAttemptIdentifier srcAttemptId = pathToAttemptMap.get(new PathPartition(pathComponent, reduceId));
         long startTime = System.currentTimeMillis();
 
         FetchedInput fetchedInput = null;
@@ -601,7 +600,6 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
 
       // read the second part - ShuffleHeader[]
       ShuffleHeader header = new ShuffleHeader(fetcherConfigCommon.compositeFetch);
-      PathPartition lookupKey = new PathPartition(null, -1);
       InputAttemptIdentifier[] srcAttemptIds = new InputAttemptIdentifier[partitionCount];
       long[] decompressedLengths = new long[partitionCount];
       long[] compressedLengths = new long[partitionCount];
@@ -628,7 +626,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
                 + " while fetching " + inputAttemptIdentifier);
           }
 
-          srcAttemptId = pathToAttemptMap.get(lookupKey.set(pathComponent, header.getPartition()));
+          srcAttemptId = pathToAttemptMap.get(new PathPartition(pathComponent, header.getPartition()));
           if (srcAttemptId == null) {
             throw new IllegalArgumentException("Source attempt not found for map id: " + header.getMapId() +
                 ", partition: " + header.getPartition() + " while fetching " + inputAttemptIdentifier);

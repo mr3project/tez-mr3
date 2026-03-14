@@ -459,7 +459,6 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         partitionCount = input.readInt();
       }
       ShuffleHeader header = new ShuffleHeader(fetcherConfigCommon.compositeFetch);
-      PathPartition lookupKey = new PathPartition(null, -1);
       InputAttemptIdentifier[] srcAttemptIds = new InputAttemptIdentifier[partitionCount];
       long[] decompressedLengths = new long[partitionCount];
       long[] compressedLengths = new long[partitionCount];
@@ -496,7 +495,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
             continue;
           }
 
-          srcAttemptId = pathToAttemptMap.get(lookupKey.set(header.mapId, header.forReduce));
+          srcAttemptId = pathToAttemptMap.get(new PathPartition(header.mapId, header.forReduce));
           decompressedLength = header.uncompressedLength;
           compressedLength = header.compressedLength;
           srcAttemptIds[statCount] = srcAttemptId;
@@ -671,11 +670,10 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
 
       MapOutput mapOutput = null;
       boolean hasFailures = false;
-      PathPartition lookupKey = new PathPartition(pathComponent, partitionId);
       // Fetch partition count number of map outputs (handles auto-reduce case)
       for (int k = 0; k < partitionCount; k++) {
         int reduceId = partitionId + k;
-        InputAttemptIdentifier srcAttemptId = pathToAttemptMap.get(lookupKey.set(pathComponent, reduceId));
+        InputAttemptIdentifier srcAttemptId = pathToAttemptMap.get(new PathPartition(pathComponent, reduceId));
 
         try {
           long startTime = System.currentTimeMillis();
