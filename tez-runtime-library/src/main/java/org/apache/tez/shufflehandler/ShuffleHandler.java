@@ -816,7 +816,16 @@ public class ShuffleHandler {
       }
       final List<String> ret = new ArrayList<>();
       for (String s : mapq) {
-        Collections.addAll(ret, s.split(","));
+        // equivalent to the original code, but faster:
+        //   Collections.addAll(ret, s.split(","));
+        // assumes that s is not empty
+        int start = 0;
+        int idx;
+        while ((idx = s.indexOf(',', start)) >= 0) {
+          ret.add(s.substring(start, idx));
+          start = idx + 1;
+        }
+        ret.add(s.substring(start));
       }
       return ret;
     }
