@@ -188,10 +188,12 @@ public class ShuffleHandler {
       "tez.shuffle.connection-keep-alive.timeout";
   public static final int DEFAULT_SHUFFLE_CONNECTION_KEEP_ALIVE_TIME_OUT = 5; //seconds
 
+  // only for keep-alive connections
+  // requirement:
+  //  DEFAULT_SHUFFLE_MAPOUTPUT_META_INFO_CACHE_SIZE >= TEZ_RUNTIME_SHUFFLE_FETCH_MAX_TASK_OUTPUT_AT_ONCE_DEFAULT
   public static final String SHUFFLE_MAPOUTPUT_META_INFO_CACHE_SIZE =
       "tez.shuffle.mapoutput-info.meta.cache.size";
-  public static final int DEFAULT_SHUFFLE_MAPOUTPUT_META_INFO_CACHE_SIZE =
-      1000;
+  public static final int DEFAULT_SHUFFLE_MAPOUTPUT_META_INFO_CACHE_SIZE = 1000;
 
   public static final String CONNECTION_CLOSE = "close";
 
@@ -861,7 +863,7 @@ public class ShuffleHandler {
       }
       // Check whether the shuffle version is compatible
       if (!ShuffleHeader.DEFAULT_HTTP_HEADER_NAME.equals(
-          request.headers().get(ShuffleHeader.HTTP_HEADER_NAME))
+              request.headers().get(ShuffleHeader.HTTP_HEADER_NAME))
           || !ShuffleHeader.DEFAULT_HTTP_HEADER_VERSION.equals(
               request.headers().get(ShuffleHeader.HTTP_HEADER_VERSION))) {
         sendError(ctx, "Incompatible shuffle request version", BAD_REQUEST);
@@ -1027,7 +1029,7 @@ public class ShuffleHandler {
         throws IOException {
 
       long contentLength = 0;
-      // Content-Length only needs calculated for keep-alive keep alive
+      // Content-Length only needs calculated for keep-alive
       if (connectionKeepAliveEnabled || keepAliveParam) {
         contentLength = getContentLength(mapIds, reduceRange, mapOutputInfoMap);
       }
