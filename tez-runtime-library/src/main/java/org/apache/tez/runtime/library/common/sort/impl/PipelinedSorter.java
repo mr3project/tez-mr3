@@ -1065,12 +1065,11 @@ public class PipelinedSorter extends ExternalSorter {
     }
 
     public SpanIterator sort(IndexedSorter sorter) {
-      long start = System.currentTimeMillis();
       if (length() > 1) {
         sorter.sort(this, 0, length(), progressable);
       }
-      if (isDebugEnabled) { LOG.debug("{}: done sorting span={}, length={}, time={}",
-          outputContext.getDestinationVertexName(), index, length(), System.currentTimeMillis() - start); }
+      if (isDebugEnabled) { LOG.debug("{}: done sorting span={}, length={}",
+          outputContext.getDestinationVertexName(), index, length()); }
       return new SpanIterator((SortSpan)this);
     }
 
