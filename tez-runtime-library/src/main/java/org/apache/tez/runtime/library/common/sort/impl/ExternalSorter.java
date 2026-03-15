@@ -54,9 +54,7 @@ import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration.ReportPartitionStats;
 import org.apache.tez.runtime.library.common.ConfigUtils;
 import org.apache.tez.runtime.library.common.TezRuntimeUtils;
-import org.apache.tez.runtime.library.common.combine.Combiner;
 import org.apache.tez.runtime.library.common.serializer.SerializationContext;
-import org.apache.tez.runtime.library.common.sort.impl.IFile.Writer;
 import org.apache.tez.runtime.api.TezTaskOutput;
 import org.apache.tez.runtime.library.utils.CodecUtils;
 import org.apache.tez.common.Preconditions;
@@ -95,7 +93,6 @@ public abstract class ExternalSorter {
   protected final RawComparator comparator;
 
   protected final Partitioner partitioner;
-  protected final Combiner combiner;
 
   protected final SerializationContext serializationContext;
   protected final Serializer keySerializer;
@@ -186,7 +183,6 @@ public abstract class ExternalSorter {
 
     this.conf.setInt(TezRuntimeFrameworkConfigs.TEZ_RUNTIME_NUM_EXPECTED_PARTITIONS, this.partitions);
     this.partitioner = TezRuntimeUtils.instantiatePartitioner(this.conf);
-    this.combiner = TezRuntimeUtils.instantiateCombiner(this.conf, outputContext);
 
     // k/v serialization
     this.serializationContext = new SerializationContext(this.conf);
@@ -279,16 +275,6 @@ public abstract class ExternalSorter {
 
   public Path getFinalOutputFile() {
     return finalOutputFile;
-  }
-
-  protected void runCombineProcessor(
-      TezRawKeyValueIterator kvIter, Writer writer) throws IOException {
-    try {
-      combiner.combine(kvIter, writer);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new IOInterruptedException("Combiner interrupted", e);
-    }
   }
 
   public static long getInitialMemoryRequirement(Configuration conf, long maxAvailableTaskMemory) {

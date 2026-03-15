@@ -57,7 +57,6 @@ import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.dag.api.UserPayload;
 import org.apache.tez.mapreduce.committer.MROutputCommitter;
 import org.apache.tez.mapreduce.hadoop.MRConfig;
-import org.apache.tez.mapreduce.hadoop.MRHelpers;
 import org.apache.tez.mapreduce.hadoop.MRJobConfig;
 import org.apache.tez.mapreduce.hadoop.mapred.MRReporter;
 import org.apache.tez.mapreduce.hadoop.mapreduce.TaskAttemptContextImpl;
@@ -274,7 +273,6 @@ public class MROutput extends AbstractLogicalOutput {
           conf.set("mapred.output.format.class", outputFormat.getName());
         }
       }
-      MRHelpers.translateMRConfToTez(conf);
       try {
         return TezUtils.createUserPayloadFromConf(conf);
       } catch (IOException e) {

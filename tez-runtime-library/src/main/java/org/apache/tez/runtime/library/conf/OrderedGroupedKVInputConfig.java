@@ -166,20 +166,6 @@ public class OrderedGroupedKVInputConfig {
       return this;
     }
 
-    public Builder setCombiner(String combinerClassName) {
-      return setCombiner(combinerClassName, null);
-    }
-
-    public Builder setCombiner(String combinerClassName, Map<String, String> combinerConf) {
-      this.conf.set(TezRuntimeConfiguration.TEZ_RUNTIME_COMBINER_CLASS, combinerClassName);
-      if (combinerConf != null) {
-        // Merging the confs for now. Change to be specific in the future.
-        ConfigUtils.mergeConfsWithExclusions(this.conf, combinerConf,
-            TezRuntimeConfiguration.getRuntimeConfigKeySet());
-      }
-      return this;
-    }
-
     /**
      * Set the key comparator class
      *

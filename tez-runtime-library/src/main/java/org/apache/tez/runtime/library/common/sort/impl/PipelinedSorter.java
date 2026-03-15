@@ -92,8 +92,6 @@ public class PipelinedSorter extends ExternalSorter {
   private final boolean isPipelinedShuffle;
   private final boolean isFinalMergeEnabled;
 
-  private final int minSpillsForCombine;
-
   private final ProxyComparator hasher;
 
   private long currentAllocatableMemory;
@@ -167,9 +165,6 @@ public class PipelinedSorter extends ExternalSorter {
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT);
     // We do not use TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT.
     this.isFinalMergeEnabled = !this.isPipelinedShuffle;
-
-    this.minSpillsForCombine = this.conf.getInt(
-        TezRuntimeConfiguration.TEZ_RUNTIME_COMBINE_MIN_SPILLS, 3);
 
     initialSetupLogLine.append(", UsingHashComparator=");
     // k/v serialization
@@ -640,14 +635,8 @@ public class PipelinedSorter extends ExternalSorter {
               codec, spilledRecordsCounter, null, merger.needsRLE(),
               writeBuffer, compressorExternal);
         }
-        if (combiner == null) {
-          while (kvIter.next()) {
-            writer.append(kvIter.getKey(), kvIter.getValue());
-          }
-        } else {
-          if (hasNext) {
-            runCombineProcessor(kvIter, writer);
-          }
+        while (kvIter.next()) {
+          writer.append(kvIter.getKey(), kvIter.getValue());
         }
 
         long rawLength = 0;
@@ -901,12 +890,8 @@ public class PipelinedSorter extends ExternalSorter {
               serializationContext.getKeyClass(), serializationContext.getValueClass(),
               codec, spilledRecordsCounter, null, merger.needsRLE(),
               writeBuffer, null);
-          if (combiner == null || numSpills < minSpillsForCombine) {
-            TezMerger.writeFile(kvIter, writer, progressable,
-                TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
-          } else {
-            runCombineProcessor(kvIter, writer);
-          }
+          TezMerger.writeFile(kvIter, writer, progressable,
+              TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
 
           //close
           writer.close();
