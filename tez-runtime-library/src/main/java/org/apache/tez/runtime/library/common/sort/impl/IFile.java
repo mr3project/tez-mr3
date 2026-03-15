@@ -38,7 +38,6 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
-import org.apache.tez.runtime.library.utils.BufferUtils;
 import org.apache.tez.runtime.library.utils.CodecUtils;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.compress.CodecPool;
@@ -64,10 +63,6 @@ public class IFile {
   private static final boolean isDebugEnabled = LOG.isDebugEnabled();
 
   public static final int EOF_MARKER = -1; // End of File Marker
-  public static final int RLE_MARKER = -2; // Repeat same key marker
-  public static final int V_END_MARKER = -3; // End of values marker
-
-  public static final DataInputBuffer REPEAT_KEY = new DataInputBuffer();
   static final byte[] HEADER = new byte[] { (byte) 'T', (byte) 'I',
     (byte) 'F' , (byte) 0};
 
@@ -230,28 +225,13 @@ public class IFile {
     protected void writeKVPair(byte[] keyData, int keyPos, int keyLength,
         byte[] valueData, int valPos, int valueLength) throws IOException {
       if (!bufferFull) {
-        // Compute actual payload size: write RLE marker, length info and then entire data.
-        totalSize += ((prevKey == REPEAT_KEY) ? V_END_MARKER_SIZE : 0)
-            + INT_SIZE + keyLength
-            + INT_SIZE + valueLength;
+        totalSize += INT_SIZE + keyLength + INT_SIZE + valueLength;
 
         if (shouldWriteToDisk()) {
           resetToFileBasedWriter();
         }
       }
       super.writeKVPair(keyData, keyPos, keyLength, valueData, valPos, valueLength);
-    }
-
-    @Override
-    protected void writeValue(byte[] data, int offset, int length) throws IOException {
-      if (!bufferFull) {
-        totalSize += ((prevKey != REPEAT_KEY) ? RLE_MARKER_SIZE : 0) + INT_SIZE + length;
-
-        if (shouldWriteToDisk()) {
-          resetToFileBasedWriter();
-        }
-      }
-      super.writeValue(data, offset, length);
     }
 
     /**
@@ -308,8 +288,6 @@ public class IFile {
 
     // Count records written to disk
     private long numRecordsWritten = 0;
-    private long rleWritten = 0; //number of RLE markers written
-    private long totalKeySaving = 0; //number of keys saved due to multi KV writes + RLE
     private final TezCounter writtenRecordsCounter;
     private final TezCounter serializedUncompressedBytes;
 
@@ -318,15 +296,7 @@ public class IFile {
     private Serializer valueSerializer = null;
 
     private final DataOutputBuffer buffer = new DataOutputBuffer();
-    private final DataOutputBuffer previous = new DataOutputBuffer();
-    protected Object prevKey = null;
     protected boolean headerWritten = false;
-
-    final int RLE_MARKER_SIZE = INT_SIZE;
-    final int V_END_MARKER_SIZE = INT_SIZE;
-
-    // de-dup keys or not
-    protected final boolean rle;
 
     // We use writeBuffer[] to reduce the number of writes to 'out' and thus
     // to reduce the number of writes to 'compressedOut'.
@@ -353,15 +323,13 @@ public class IFile {
                   FSDataOutputStream outputStream,
                   Class keyClass, Class valueClass,
                   CompressionCodec codec, TezCounter writesCounter, TezCounter serializedBytesCounter,
-                  boolean rle,
+                  boolean rle,  // TODO: to implement for the efficiency of SpanMerger
                   byte[] writeBuffer,
                   @Nullable Compressor compressorExternal) throws IOException {
       this.rawOut = outputStream;
       this.writtenRecordsCounter = writesCounter;
       this.serializedUncompressedBytes = serializedBytesCounter;
       this.start = this.rawOut.getPos();
-      this.rle = rle;
-
       this.writeBuffer = writeBuffer;
       this.writeBufferLength = writeBuffer.length;
       this.writeByteBuffer = ByteBuffer.wrap(writeBuffer).order(ByteOrder.BIG_ENDIAN);
@@ -426,9 +394,6 @@ public class IFile {
         valueSerializer.close();
       }
 
-      // write V_END_MARKER as needed
-      writeValueMarker();
-
       // Write EOF_MARKER for key/value length
       // bufferWriteInt(EOF_MARKER);
       // bufferWriteInt(EOF_MARKER);
@@ -471,109 +436,41 @@ public class IFile {
         writtenRecordsCounter.increment(numRecordsWritten);
       }
       if (isDebugEnabled) {
-        LOG.debug("Total keys written=" + numRecordsWritten + "; rleEnabled=" + rle + "; Savings" +
-            "(due to multi-kv/rle)=" + totalKeySaving + "; number of RLEs written=" +
-            rleWritten + "; compressedLen=" + compressedBytesWritten + "; rawLen="
-            + decompressedBytesWritten);
+        LOG.debug("Total records written=" + numRecordsWritten + "; compressedLen=" +
+            compressedBytesWritten + "; rawLen=" + decompressedBytesWritten);
       }
     }
 
-    /**
-     * Send key/value to be appended to IFile. To represent same key as previous
-     * one, send IFile.REPEAT_KEY as key parameter.  Should not call this method with
-     * IFile.REPEAT_KEY as the first key. It is caller's responsibility to ensure that correct
-     * key/value type checks and key/value length (non-negative) checks are done properly.
-     *
-     * @param key
-     * @param value
-     * @throws IOException
-     */
     public void append(Object key, Object value) throws IOException {
-      int keyLength = 0;
-      boolean sameKey = (key == REPEAT_KEY);
-      if (!sameKey) {
-        keySerializer.serialize(key);
-        keyLength = buffer.getLength();
-        assert(keyLength >= 0);
-        if (rle && (keyLength == previous.getLength())) {
-          sameKey = BufferUtils.compareEqual(previous, buffer);
-        }
-      }
+      keySerializer.serialize(key);
+      int keyLength = buffer.getLength();
+      assert(keyLength >= 0);
 
       // Append the 'value'
       valueSerializer.serialize(value);
       int valueLength = buffer.getLength() - keyLength;
       assert(valueLength >= 0);
-      if (!sameKey) {
-        //dump entire key value pair
-        writeKVPair(buffer.getData(), 0, keyLength, buffer.getData(),
-            keyLength, buffer.getLength() - keyLength);
-        if (rle) {
-          previous.reset();
-          previous.write(buffer.getData(), 0, keyLength); //store the key
-        }
-      } else {
-        writeValue(buffer.getData(), keyLength, valueLength);
-      }
+      writeKVPair(buffer.getData(), 0, keyLength, buffer.getData(),
+          keyLength, valueLength);
 
-      prevKey = sameKey ? REPEAT_KEY : key;
       // Reset
       buffer.reset();
       ++numRecordsWritten;
     }
 
-    /**
-     * Send key/value to be appended to IFile. To represent same key as previous
-     * one, send IFile.REPEAT_KEY as key parameter.  Should not call this method with
-     * IFile.REPEAT_KEY as the first key. It is caller's responsibility to pass non-negative
-     * key/value lengths. Otherwise,IndexOutOfBoundsException could be thrown at runtime.
-     *
-     *
-     * @param key
-     * @param value
-     * @throws IOException
-     */
     public void append(DataInputBuffer key, DataInputBuffer value) throws IOException {
       int keyLength = key.getLength() - key.getPosition();
-      assert(key == REPEAT_KEY || keyLength >=0);
+      assert(keyLength >= 0);
 
       int valueLength = value.getLength() - value.getPosition();
       assert(valueLength >= 0);
-
-      boolean sameKey = (key == REPEAT_KEY);
-      if (!sameKey && rle) {
-        sameKey = (keyLength != 0) && BufferUtils.compareEqual(previous, key);
-      }
-
-      if (!sameKey) {
-        writeKVPair(key.getData(), key.getPosition(), keyLength,
-            value.getData(), value.getPosition(), valueLength);
-        if (rle) {
-          BufferUtils.copy(key, previous);
-        }
-      } else {
-        writeValue(value.getData(), value.getPosition(), valueLength);
-      }
-      prevKey = sameKey ? REPEAT_KEY : key;
+      writeKVPair(key.getData(), key.getPosition(), keyLength,
+          value.getData(), value.getPosition(), valueLength);
       ++numRecordsWritten;
-    }
-
-    protected void writeValue(byte[] data, int offset, int length) throws IOException {
-      writeRLE();
-      bufferWriteInt(length); // value length
-      bufferWriteBytes(data, offset, length);
-      // Update bytes written
-      decompressedBytesWritten += length + INT_SIZE;
-      if (serializedUncompressedBytes != null) {
-        serializedUncompressedBytes.increment(length);
-      }
-      totalKeySaving++;
     }
 
     protected void writeKVPair(byte[] keyData, int keyPos, int keyLength,
         byte[] valueData, int valPos, int valueLength) throws IOException {
-      writeValueMarker();
-
       // bufferWriteInt(keyLength);
       // bufferWriteLong(valueLength);
       long combined = ((long) keyLength << 32) | (valueLength & 0xFFFFFFFFL);
@@ -586,33 +483,6 @@ public class IFile {
       decompressedBytesWritten += keyLength + valueLength + INT_SIZE + INT_SIZE;
       if (serializedUncompressedBytes != null) {
         serializedUncompressedBytes.increment(keyLength + valueLength);
-      }
-    }
-
-    private void writeRLE() throws IOException {
-      /**
-       * To strike a balance between 2 use cases (lots of unique KV in stream
-       * vs lots of identical KV in stream), we start off by writing KV pair.
-       * If subsequent KV is identical, we write RLE marker along with V_END_MARKER
-       * {KL1, VL1, K1, V1}
-       * {RLE, VL2, V2, VL3, V3, ...V_END_MARKER}
-       */
-      if (prevKey != REPEAT_KEY) {
-        bufferWriteInt(RLE_MARKER);
-        decompressedBytesWritten += RLE_MARKER_SIZE;
-        rleWritten++;
-      }
-    }
-
-    protected void writeValueMarker() throws IOException {
-      /**
-       * Write V_END_MARKER only in RLE scenario. This will
-       * save space in conditions where lots of unique KV pairs are found in the
-       * stream.
-       */
-      if (prevKey == REPEAT_KEY) {
-        bufferWriteInt(V_END_MARKER);
-        decompressedBytesWritten += V_END_MARKER_SIZE;
       }
     }
 
@@ -670,7 +540,7 @@ public class IFile {
    */
   public static class Reader {
 
-    public enum KeyState {NO_KEY, NEW_KEY, SAME_KEY}
+    public enum KeyState {NO_KEY, NEW_KEY}
 
     private static final int MAX_BUFFER_SIZE
             = Integer.MAX_VALUE - 8;  // The maximum array size is a little less than the
@@ -693,8 +563,6 @@ public class IFile {
     protected DataInputStream dataIn = null;
 
     protected int recNo = 1;
-    protected int originalKeyLength;
-    protected int prevKeyLength;
     byte keyBytes[] = new byte[0];
 
     protected int currentKeyLength;
@@ -916,25 +784,12 @@ public class IFile {
       return len;
     }
 
-    protected void readValueLength(DataInput dIn) throws IOException {
-      currentValueLength = dIn.readInt();
-      bytesRead += INT_SIZE;
-      if (currentValueLength == V_END_MARKER) {
-        readKeyValueLength(dIn);
-      }
-    }
-
     protected void readKeyValueLength(DataInput dIn) throws IOException {
       currentKeyLength = dIn.readInt();
       currentValueLength = dIn.readInt();
       // long combined = dIn.readLong();
       // currentKeyLength = (int) (combined >> 32);
       // currentValueLength = (int) combined;
-
-      if (currentKeyLength != RLE_MARKER) {
-        // original key length
-        originalKeyLength = currentKeyLength;
-      }
       bytesRead += INT_SIZE + INT_SIZE;
     }
 
@@ -951,14 +806,7 @@ public class IFile {
       if (eof) {
         throw new IOException(String.format("Reached EOF. Completed reading %d", bytesRead));
       }
-      prevKeyLength = currentKeyLength;
-
-      if (prevKeyLength == RLE_MARKER) {
-        // Same key as previous one. Just read value length alone
-        readValueLength(dIn);
-      } else {
-        readKeyValueLength(dIn);
-      }
+      readKeyValueLength(dIn);
 
       // Check for EOF
       if (currentKeyLength == EOF_MARKER && currentValueLength == EOF_MARKER) {
@@ -967,9 +815,9 @@ public class IFile {
       }
 
       // Sanity check
-      if (currentKeyLength != RLE_MARKER && currentKeyLength < 0) {
+      if (currentKeyLength < 0) {
         throw new IOException("Rec# " + recNo + ": Negative key-length: " +
-                              currentKeyLength + " PreviousKeyLen: " + prevKeyLength);
+                              currentKeyLength);
       }
       if (currentValueLength < 0) {
         throw new IOException("Rec# " + recNo + ": Negative value-length: " +
@@ -1006,11 +854,6 @@ public class IFile {
               ", length=" + fileLength);
         }
         return KeyState.NO_KEY;
-      }
-      if(currentKeyLength == RLE_MARKER) {
-        // get key length from original key
-        key.reset(keyBytes, originalKeyLength);
-        return KeyState.SAME_KEY;
       }
       if (keyBytes.length < currentKeyLength) {
         keyBytes = createLargerArray(currentKeyLength);

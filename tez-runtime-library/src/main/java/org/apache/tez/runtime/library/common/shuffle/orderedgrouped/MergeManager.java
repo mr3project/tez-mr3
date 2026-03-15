@@ -781,6 +781,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
             progressable, false, null, null, null, true, inputContext);
       TezMerger.writeFile(rIter, writer, progressable, TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
       writer.close();
+      // writer never used again
 
       if (isDebugEnabled) {
         LOG.debug("{} Memory-to-Memory merge of the {} files in-memory complete with mergeOutputSize={}",
@@ -885,6 +886,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       } finally {
         if (writer != null) {
           writer.close();
+          // writer never used again
         }
       }
 
@@ -996,6 +998,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         TezMerger.writeFile(iter, writer, progressable, TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
         writer.close();
         additionalSpillBytesWritten.increment(writer.getCompressedLength());
+        // writer never used again
       } catch (IOException e) {
         localFS.delete(outputPath, true);
         throw e;
@@ -1071,7 +1074,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         final int klen = kb.getLength() - kp;
         key.reset(kb.getData(), kp, klen);
         bytesRead += klen;
-        return kvIter.isSameKey() ? KeyState.SAME_KEY : KeyState.NEW_KEY;
+        return KeyState.NEW_KEY;
       }
       return KeyState.NO_KEY;
     }
@@ -1152,6 +1155,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
           if (null != writer) {
             writer.close();
             additionalSpillBytesWritten.increment(writer.getCompressedLength());
+            // writer never used again
           }
         }
 
