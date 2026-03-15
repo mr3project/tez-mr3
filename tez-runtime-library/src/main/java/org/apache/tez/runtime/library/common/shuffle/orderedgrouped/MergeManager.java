@@ -1074,7 +1074,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         final int klen = kb.getLength() - kp;
         key.reset(kb.getData(), kp, klen);
         bytesRead += klen;
-        return kvIter.isSameKey() ? KeyState.SAME_KEY : KeyState.NEW_KEY;
+        return KeyState.NEW_KEY;
       }
       return KeyState.NO_KEY;
     }
