@@ -26,7 +26,6 @@ import java.io.IOException;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.tez.common.io.NonSyncByteArrayInputStream;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
-import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader;
 
 /**
@@ -150,8 +149,6 @@ public class InMemoryReader extends Reader {
 
   private final MergeManager merger;
   private final InputAttemptIdentifier taskAttemptId;
-  private int originalKeyPos;
-
   private byte[] buffer = null;
   private final int bufferSize;
   private final ByteArrayDataInput memDataIn;
@@ -216,13 +213,6 @@ public class InMemoryReader extends Reader {
     }
   }
 
-  protected void readKeyValueLength(DataInput dIn) throws IOException {
-    super.readKeyValueLength(dIn);
-    if (currentKeyLength != IFile.RLE_MARKER) {
-      originalKeyPos = memDataIn.getPosition();
-    }
-  }
-
   public KeyState readRawKey(DataInputBuffer key) throws IOException {
     try {
       if (!positionToNextRecord(memDataIn)) {
@@ -231,11 +221,6 @@ public class InMemoryReader extends Reader {
       // Setup the key
       int pos = memDataIn.getPosition();
       byte[] data = memDataIn.getData();
-      if (currentKeyLength == IFile.RLE_MARKER) {
-        // get key length from original key
-        key.reset(data, originalKeyPos, originalKeyLength);
-        return KeyState.SAME_KEY;
-      }
       key.reset(data, pos, currentKeyLength);
       // Position for the next value
       long skipped = memDataIn.skip(currentKeyLength);

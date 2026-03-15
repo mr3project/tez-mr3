@@ -41,6 +41,7 @@ import org.apache.tez.common.Preconditions;
  */
 
 public class ValuesIterator<KEY,VALUE> {
+
   protected TezRawKeyValueIterator in; //input iterator
   private KEY key;               // current key
   private KEY nextKey;
@@ -61,13 +62,12 @@ public class ValuesIterator<KEY,VALUE> {
 
   private boolean completedProcessing;
   
-  public ValuesIterator (TezRawKeyValueIterator in, 
-                         RawComparator<KEY> comparator, 
-                         Class<KEY> keyClass,
-                         Class<VALUE> valClass, Configuration conf,
-                         TezCounter inputKeyCounter,
-                         TezCounter inputValueCounter)
-    throws IOException {
+  public ValuesIterator(TezRawKeyValueIterator in,
+                        RawComparator<KEY> comparator,
+                        Class<KEY> keyClass,
+                        Class<VALUE> valClass, Configuration conf,
+                        TezCounter inputKeyCounter,
+                        TezCounter inputValueCounter) throws IOException {
     this.in = in;
     this.comparator = comparator;
     this.inputKeyCounter = inputKeyCounter;
@@ -129,10 +129,8 @@ public class ValuesIterator<KEY,VALUE> {
             if (!hasMoreValues) {
               throw new NoSuchElementException("iterate past last value");
             }
-            Preconditions
-                .checkState(
-                    keyNumber == keyCtr,
-                    "Cannot use values iterator on the previous K-V pair after moveToNext has been invoked to move to the next K-V pair");
+            Preconditions.checkState(keyNumber == keyCtr,
+                "Cannot use values iterator on the previous K-V pair after moveToNext has been invoked to move to the next K-V pair");
             
             try {
               readNextValue();
@@ -152,8 +150,6 @@ public class ValuesIterator<KEY,VALUE> {
       }
     };
   }
-  
-  
 
   /** Start processing next unique key. */
   private void nextKey() throws IOException {
@@ -185,7 +181,7 @@ public class ValuesIterator<KEY,VALUE> {
         if (key == null || false == hasMoreValues) {
           // invariant: more=true & there are no more values in an existing key group
           // so this indicates start of new key group
-          if(inputKeyCounter != null) {
+          if (inputKeyCounter != null) {
             inputKeyCounter.increment(1);
           }
           ++keyCtr;
