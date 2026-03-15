@@ -48,7 +48,6 @@ import org.apache.tez.dag.api.VertexLocationHint;
 import org.apache.tez.mapreduce.common.MRInputAMSplitGenerator;
 import org.apache.tez.mapreduce.common.MRInputSplitDistributor;
 import org.apache.tez.mapreduce.hadoop.InputSplitInfo;
-import org.apache.tez.mapreduce.hadoop.MRHelpers;
 import org.apache.tez.mapreduce.hadoop.MRInputHelpers;
 import org.apache.tez.mapreduce.hadoop.MRJobConfig;
 import org.apache.tez.mapreduce.input.base.MRInputBase;
@@ -266,7 +265,6 @@ public class MRInput extends MRInputBase {
       } catch (Exception e) {
         throw new TezUncheckedException(e);
       }
-      MRHelpers.translateMRConfToTez(conf);
 
       UserPayload payload = MRInputHelpersInternal.createMRInputPayload(conf,
           inputSplitInfo.getSplitsProto());
@@ -286,8 +284,6 @@ public class MRInput extends MRInputBase {
     private DataSourceDescriptor createCustomDataSource() throws IOException {
       setupBasicConf(conf);
 
-      MRHelpers.translateMRConfToTez(conf);
-
       Collection<URI> uris = maybeGetURIsForCredentials();
 
       UserPayload payload = MRInputHelpersInternal.createMRInputPayload(
@@ -305,8 +301,7 @@ public class MRInput extends MRInputBase {
 
     private DataSourceDescriptor createGeneratorDataSource() throws IOException {
       setupBasicConf(conf);
-      MRHelpers.translateMRConfToTez(conf);
-      
+
       Collection<URI> uris = maybeGetURIsForCredentials();
 
       UserPayload payload = MRInputHelpersInternal.createMRInputPayload(

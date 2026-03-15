@@ -78,12 +78,6 @@ public class TezRuntimeConfiguration {
       TEZ_RUNTIME_PREFIX + "io.sort.mb";
   public static final int TEZ_RUNTIME_IO_SORT_MB_DEFAULT = 100;
 
-  // TODO Use the default value
-  @ConfigurationProperty(type = "integer")
-  public static final String TEZ_RUNTIME_COMBINE_MIN_SPILLS =
-      TEZ_RUNTIME_PREFIX + "combine.min.spills";
-  public static final int TEZ_RUNTIME_COMBINE_MIN_SPILLS_DEFAULT = 3;
-
   /**
    * Tries to allocate @link{#TEZ_RUNTIME_IO_SORT_MB} in chunks specified in
    * this parameter.
@@ -436,7 +430,6 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_IFILE_READAHEAD_BYTES);
     tezRuntimeKeys.add(TEZ_RUNTIME_IO_SORT_FACTOR);
     tezRuntimeKeys.add(TEZ_RUNTIME_IO_SORT_MB);
-    tezRuntimeKeys.add(TEZ_RUNTIME_COMBINE_MIN_SPILLS);
     tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SORTER_MIN_BLOCK_SIZE_IN_MB);
     tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SORTER_USE_SOFT_REFERENCE);
     tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SORTER_LAZY_ALLOCATE_MEMORY);

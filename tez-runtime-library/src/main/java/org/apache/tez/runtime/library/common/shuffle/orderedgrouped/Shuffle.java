@@ -44,8 +44,6 @@ import org.apache.tez.dag.api.TezException;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
-import org.apache.tez.runtime.library.common.TezRuntimeUtils;
-import org.apache.tez.runtime.library.common.combine.Combiner;
 import org.apache.tez.runtime.library.common.sort.impl.TezRawKeyValueIterator;
 import org.apache.tez.runtime.library.exceptions.InputAlreadyClosedException;
 import org.apache.tez.runtime.library.utils.CodecUtils;
@@ -105,8 +103,6 @@ public class Shuffle implements ExceptionReporter {
           TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_BYTES_DEFAULT);
     }
 
-    Combiner combiner = TezRuntimeUtils.instantiateCombiner(conf, inputContext);
-
     FileSystem localFS = FileSystem.getLocal(conf);
     LocalDirAllocator localDirAllocator =
         new LocalDirAllocator(TezRuntimeFrameworkConfigs.LOCAL_DIRS);
@@ -123,7 +119,6 @@ public class Shuffle implements ExceptionReporter {
         localFS,
         localDirAllocator,
         inputContext,
-        combiner,
         spilledRecordsCounter,
         mergedMapOutputsCounter,
         this,

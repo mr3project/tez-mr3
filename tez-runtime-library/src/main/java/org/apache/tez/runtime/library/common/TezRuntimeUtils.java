@@ -36,21 +36,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.tez.runtime.api.OutputContext;
-import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.library.api.Partitioner;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
-import org.apache.tez.runtime.library.common.combine.Combiner;
 import org.apache.tez.runtime.api.TezTaskOutput;
 import org.apache.tez.runtime.library.common.task.local.output.TezTaskOutputFiles;
 
 public class TezRuntimeUtils {
 
-  private static final Logger LOG = LoggerFactory
-      .getLogger(TezRuntimeUtils.class);
+  private static final Logger LOG = LoggerFactory.getLogger(TezRuntimeUtils.class);
+
   // Shared by multiple threads
   private static volatile SSLFactory sslFactory;
-  // ShufflePort by default for ContainerLaunchers
-  public static final int INVALID_PORT = -1;
 
   public static String getTaskIdentifier(String vertexName, int taskIndex) {
     return String.format("%s_%06d", vertexName, taskIndex);
@@ -67,44 +63,6 @@ public class TezRuntimeUtils {
         taskAttemptNumber);
   }
 
-  @SuppressWarnings("unchecked")
-  public static Combiner instantiateCombiner(Configuration conf, TaskContext taskContext) throws IOException {
-    Class<? extends Combiner> clazz;
-    String className = conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_COMBINER_CLASS);
-    if (className == null) {
-      return null;
-    }
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Using Combiner class: " + className);
-    }
-    try {
-      clazz = (Class<? extends Combiner>) conf.getClassByName(className);
-    } catch (ClassNotFoundException e) {
-      throw new IOException("Unable to load combiner class: " + className);
-    }
-    
-    Combiner combiner = null;
-    
-      Constructor<? extends Combiner> ctor;
-      try {
-        ctor = clazz.getConstructor(TaskContext.class);
-        combiner = ctor.newInstance(taskContext);
-      } catch (SecurityException e) {
-        throw new IOException(e);
-      } catch (NoSuchMethodException e) {
-        throw new IOException(e);
-      } catch (IllegalArgumentException e) {
-        throw new IOException(e);
-      } catch (InstantiationException e) {
-        throw new IOException(e);
-      } catch (IllegalAccessException e) {
-        throw new IOException(e);
-      } catch (InvocationTargetException e) {
-        throw new IOException(e);
-      }
-      return combiner;
-  }
-  
   @SuppressWarnings("unchecked")
   public static Partitioner instantiatePartitioner(Configuration conf)
       throws IOException {

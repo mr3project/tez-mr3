@@ -39,7 +39,6 @@ import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.ConfigUtils;
 import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
-import org.apache.tez.runtime.library.common.combine.Combiner;
 import org.apache.tez.runtime.library.common.serializer.SerializationContext;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
@@ -85,8 +84,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     public void progress() {
     }
   };
-  private final Combiner combiner;  
-  
+
   final Set<MapOutput> inMemoryMergedMapOutputs =
     new TreeSet<MapOutput>(new MapOutput.MapOutputComparator());
   private final IntermediateMemoryToMemoryMerger memToMemMerger;
@@ -163,7 +161,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
                       FileSystem localFS,
                       LocalDirAllocator localDirAllocator,  
                       InputContext inputContext,
-                      Combiner combiner,
                       TezCounter spilledRecordsCounter,
                       TezCounter mergedMapOutputsCounter,
                       ExceptionReporter exceptionReporter,
@@ -175,8 +172,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     this.conf = conf;
     this.localDirAllocator = localDirAllocator;
     this.exceptionReporter = exceptionReporter;
-
-    this.combiner = combiner;
 
     this.spilledRecordsCounter = spilledRecordsCounter;
     this.mergedMapOutputsCounter = mergedMapOutputsCounter;
@@ -683,11 +678,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     }
   }
 
-  void runCombineProcessor(TezRawKeyValueIterator kvIter, Writer writer)
-      throws IOException, InterruptedException {
-    combiner.combine(kvIter, writer);
-  }
-
   /**
    * Merges multiple in-memory segment to another in-memory segment
    */
@@ -880,11 +870,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         // read from each of the segments being merged - which is essentially
         // what will be written to disk.
 
-        if (null == combiner) {
-          TezMerger.writeFile(rIter, writer, progressable, TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
-        } else {
-          runCombineProcessor(rIter, writer);
-        }
+        TezMerger.writeFile(rIter, writer, progressable, TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
         writer.close();
         additionalSpillBytesWritten.increment(writer.getCompressedLength());
         writer = null;
