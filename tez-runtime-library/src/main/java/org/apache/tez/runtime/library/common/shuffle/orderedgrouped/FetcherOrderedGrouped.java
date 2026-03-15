@@ -464,6 +464,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       long[] compressedLengths = new long[partitionCount];
       int statCount = 0;
       for (int mapOutputIndex = 0; mapOutputIndex < partitionCount; mapOutputIndex++) {
+        int responsePartition = -1;
         try {
           // Read the shuffle header
           // TODO Review: Multiple header reads in case of status WAIT ?
@@ -495,7 +496,8 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
             continue;
           }
 
-          srcAttemptId = pathToAttemptMap.get(new PathPartition(header.mapId, header.forReduce));
+          responsePartition = header.forReduce;
+          srcAttemptId = pathToAttemptMap.get(new PathPartition(header.mapId, responsePartition));
           decompressedLength = header.uncompressedLength;
           compressedLength = header.compressedLength;
           srcAttemptIds[statCount] = srcAttemptId;
@@ -520,7 +522,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
 
         // Do some basic sanity verification
         if (!verifySanity(compressedLength, decompressedLength,
-                          header.forReduce, srcAttemptId)) {
+                          responsePartition, srcAttemptId)) {
           if (!stopped) {
             if (srcAttemptId == null) {
               LOG.warn("{}: Was expecting {} but got null", logIdentifier, inputAttemptIdentifier);
