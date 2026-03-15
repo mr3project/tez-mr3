@@ -63,29 +63,6 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
 
   private static final CompositeInputAttemptIdentifier[] EMPTY_ATTEMPT_ID_ARRAY = new CompositeInputAttemptIdentifier[0];
 
-  private static class MapOutputStat {
-    final InputAttemptIdentifier srcAttemptId;
-    final long decompressedLength;
-    final long compressedLength;
-    final int forReduce;
-
-    MapOutputStat(InputAttemptIdentifier srcAttemptId, long decompressedLength, long compressedLength,
-        int forReduce) {
-      this.srcAttemptId = srcAttemptId;
-      this.decompressedLength = decompressedLength;
-      this.compressedLength = compressedLength;
-      this.forReduce = forReduce;
-    }
-
-    @Override
-    public String toString() {
-      return "id: " + srcAttemptId +
-          ", decompressed length: " + decompressedLength +
-          ", compressed length: " + compressedLength +
-          ", reduce: " + forReduce;
-    }
-  }
-
   private final ShuffleScheduler shuffleScheduler;
   private final int fetcherIdentifier;
   private final String logIdentifier;
@@ -481,12 +458,15 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         // Multiple partitions are fetched
         partitionCount = input.readInt();
       }
-      ArrayList<MapOutputStat> mapOutputStats = new ArrayList<>(partitionCount);
+      ShuffleHeader header = new ShuffleHeader(fetcherConfigCommon.compositeFetch);
+      InputAttemptIdentifier[] srcAttemptIds = new InputAttemptIdentifier[partitionCount];
+      long[] decompressedLengths = new long[partitionCount];
+      long[] compressedLengths = new long[partitionCount];
+      int statCount = 0;
       for (int mapOutputIndex = 0; mapOutputIndex < partitionCount; mapOutputIndex++) {
-        MapOutputStat mapOutputStat = null;
+        int responsePartition = -1;
         try {
           // Read the shuffle header
-          ShuffleHeader header = new ShuffleHeader(fetcherConfigCommon.compositeFetch);
           // TODO Review: Multiple header reads in case of status WAIT ?
           header.readFields(input);
           if (!header.mapId.startsWith(InputAttemptIdentifier.PATH_PREFIX_MR3) && !header.mapId.startsWith(InputAttemptIdentifier.PATH_PREFIX)) {
@@ -516,12 +496,14 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
             continue;
           }
 
-          mapOutputStat = new MapOutputStat(
-              pathToAttemptMap.get(new PathPartition(header.mapId, header.forReduce)),
-              header.uncompressedLength,
-              header.compressedLength,
-              header.forReduce);
-          mapOutputStats.add(mapOutputStat);
+          responsePartition = header.forReduce;
+          srcAttemptId = pathToAttemptMap.get(new PathPartition(header.mapId, responsePartition));
+          decompressedLength = header.uncompressedLength;
+          compressedLength = header.compressedLength;
+          srcAttemptIds[statCount] = srcAttemptId;
+          decompressedLengths[statCount] = decompressedLength;
+          compressedLengths[statCount] = compressedLength;
+          statCount++;
         } catch (IllegalArgumentException e) {
           if (!stopped) {
             shuffleErrorCounterGroup.badIdErrs.increment(1);
@@ -539,10 +521,9 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         }
 
         // Do some basic sanity verification
-        if (!verifySanity(mapOutputStat.compressedLength, mapOutputStat.decompressedLength,
-                          mapOutputStat.forReduce, mapOutputStat.srcAttemptId)) {
+        if (!verifySanity(compressedLength, decompressedLength,
+                          responsePartition, srcAttemptId)) {
           if (!stopped) {
-            srcAttemptId = mapOutputStat.srcAttemptId;
             if (srcAttemptId == null) {
               LOG.warn("{}: Was expecting {} but got null", logIdentifier, inputAttemptIdentifier);
               return new CompositeInputAttemptIdentifier[]{ inputAttemptIdentifier};
@@ -558,16 +539,16 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         }
 
         if (isDebugEnabled) {
-          LOG.debug("header: " + mapOutputStat.srcAttemptId + ", len: " + mapOutputStat.compressedLength +
-              ", decomp len: " + mapOutputStat.decompressedLength);
+          LOG.debug("header: " + srcAttemptId + ", len: " + compressedLength +
+              ", decomp len: " + decompressedLength);
         }
       }
 
-      for (MapOutputStat mapOutputStat : mapOutputStats) {
+      for (int statIndex = 0; statIndex < statCount; statIndex++) {
         // Get the location for the map output - either in-memory or on-disk
-        srcAttemptId = mapOutputStat.srcAttemptId;
-        decompressedLength = mapOutputStat.decompressedLength;
-        compressedLength = mapOutputStat.compressedLength;
+        srcAttemptId = srcAttemptIds[statIndex];
+        decompressedLength = decompressedLengths[statIndex];
+        compressedLength = compressedLengths[statIndex];
         try {
           mapOutput = allocator.reserve(srcAttemptId, decompressedLength, compressedLength, fetcherIdentifier);
         } catch (IOException e) {

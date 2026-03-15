@@ -578,25 +578,6 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     }
   }
 
-  private static class MapOutputStat {
-    final InputAttemptIdentifier srcAttemptId;
-    final long decompressedLength;
-    final long compressedLength;
-    final int forReduce;
-
-    MapOutputStat(InputAttemptIdentifier srcAttemptId, long decompressedLength, long compressedLength, int forReduce) {
-      assert srcAttemptId != null;
-      this.srcAttemptId = srcAttemptId;
-      this.decompressedLength = decompressedLength;
-      this.compressedLength = compressedLength;
-      this.forReduce = forReduce;
-    }
-
-    @Override
-    public String toString() {
-      return "id: " + srcAttemptId + ", decompressed length: " + decompressedLength + ", compressed length: " + compressedLength + ", reduce: " + forReduce;
-    }
-  }
 
   // return failedInputs[]
   private CompositeInputAttemptIdentifier[] fetchInputs(
@@ -618,16 +599,18 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       }
 
       // read the second part - ShuffleHeader[]
-      ArrayList<MapOutputStat> mapOutputStats = new ArrayList<>(partitionCount);
+      ShuffleHeader header = new ShuffleHeader(fetcherConfigCommon.compositeFetch);
+      InputAttemptIdentifier[] srcAttemptIds = new InputAttemptIdentifier[partitionCount];
+      long[] decompressedLengths = new long[partitionCount];
+      long[] compressedLengths = new long[partitionCount];
+      int statCount = 0;
       for (int mapOutputIndex = 0; mapOutputIndex < partitionCount; mapOutputIndex++) {
-        MapOutputStat mapOutputStat = null;
         int responsePartition = -1;
         // read the shuffle header
         String pathComponent = null;
 
-        // build srcAttemptId and MapOutputStat
+        // build srcAttemptId and collect stats
         try {
-          ShuffleHeader header = new ShuffleHeader(fetcherConfigCommon.compositeFetch);
           header.readFields(input);
           pathComponent = header.getMapId();
           if (!pathComponent.startsWith(InputAttemptIdentifier.PATH_PREFIX_MR3) && !pathComponent.startsWith(InputAttemptIdentifier.PATH_PREFIX)) {
@@ -654,10 +637,13 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
             continue;
           }
 
-          mapOutputStat = new MapOutputStat(srcAttemptId,
-              header.getUncompressedLength(), header.getCompressedLength(), header.getPartition());
-          mapOutputStats.add(mapOutputStat);
+          decompressedLength = header.getUncompressedLength();
+          compressedLength = header.getCompressedLength();
           responsePartition = header.getPartition();
+          srcAttemptIds[statCount] = srcAttemptId;
+          decompressedLengths[statCount] = decompressedLength;
+          compressedLengths[statCount] = compressedLength;
+          statCount++;
         } catch (IllegalArgumentException e) {
           if (!isShutDown.get()) {
             shuffleErrorCounterGroup.badIdErrs.increment(1);
@@ -672,11 +658,10 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
           }
         }
 
-        // Do some basic sanity verification on MapOutputStat
-        if (!verifySanity(mapOutputStat.compressedLength, mapOutputStat.decompressedLength,
-                responsePartition, mapOutputStat.srcAttemptId, pathComponent)) {
+        // Do some basic sanity verification on parsed header
+        if (!verifySanity(compressedLength, decompressedLength,
+                responsePartition, srcAttemptId, pathComponent)) {
           if (!isShutDown.get()) {
-            srcAttemptId = mapOutputStat.srcAttemptId;
             assert srcAttemptId != null;
             return new CompositeInputAttemptIdentifier[]{ new CompositeInputAttemptIdentifier(srcAttemptId) };
           } else {
@@ -688,17 +673,17 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         }
 
         if (isDebugEnabled) {
-          LOG.debug("header: " + mapOutputStat.srcAttemptId + ", len: " + mapOutputStat.compressedLength
-              + ", decomp len: " + mapOutputStat.decompressedLength);
+          LOG.debug("header: " + srcAttemptId + ", len: " + compressedLength
+              + ", decomp len: " + decompressedLength);
         }
       }
 
       // read the third part - payload
-      for (MapOutputStat mapOutputStat : mapOutputStats) {
+      for (int statIndex = 0; statIndex < statCount; statIndex++) {
         // Get the location for the map output - either in-memory or on-disk
-        srcAttemptId = mapOutputStat.srcAttemptId;
-        decompressedLength = mapOutputStat.decompressedLength;
-        compressedLength = mapOutputStat.compressedLength;
+        srcAttemptId = srcAttemptIds[statIndex];
+        decompressedLength = decompressedLengths[statIndex];
+        compressedLength = compressedLengths[statIndex];
         // TODO TEZ-957. handle IOException here when Broadcast has better error checking
         {
           fetchedInput = shuffleManager.getInputManager().allocate(
