@@ -186,14 +186,8 @@ public class TezMerger {
       Progressable progressable, long recordsBeforeProgress)
       throws IOException, InterruptedException {
     long recordCtr = 0;
-    // long count = 0;
     while (records.next()) {
-      if (records.isSameKey()) {
-        writer.append(IFile.REPEAT_KEY, records.getValue());
-        // count++;
-      } else {
-        writer.append(records.getKey(), records.getValue());
-      }
+      writer.append(records.getKey(), records.getValue());
       
       if (((recordCtr++) % recordsBeforeProgress) == 0) {
         progressable.progress();
@@ -208,9 +202,6 @@ public class TezMerger {
         }
       }
     }
-    /* if ((count > 0) && LOG.isTraceEnabled()) {
-      LOG.trace("writeFile SAME_KEY count=" + count);
-    } */
   }
 
   static class KeyValueBuffer {
@@ -467,6 +458,7 @@ public class TezMerger {
     };
 
     KeyState hasNext;
+    boolean sameKey = false;
     DataOutputBuffer prevKey = new DataOutputBuffer();
 
     public MergeQueue(Configuration conf, FileSystem fs,
@@ -521,29 +513,23 @@ public class TezMerger {
       BufferUtils.copy(key, prevKey);
     }
 
+    private void compareKeyWithNextTopKey() throws IOException {
+      sameKey = false;
+      if (!checkForSameKeys || size() == 0) {
+        return;
+      }
+
+      KeyValueBuffer nextTopKey = top().getKey();
+      int compare = compare(nextTopKey, prevKey);
+      if (compare == 0) {
+        sameKey = true;
+      }
+    }
+
     private void adjustPriorityQueue(Segment reader) throws IOException{
       long startPos = reader.getPosition();
       if (checkForSameKeys) {
-        if (hasNext == null) {
-          /**
-           * hasNext can be null during first iteration & prevKey is initialized here.
-           * In cases of NO_KEY/NEW_KEY, we readjust the queue later. If new segment/file is found
-           * during this process, we need to compare keys for RLE across segment boundaries.
-           * prevKey can't be empty at that time (e.g custom comparators)
-           */
-          populatePreviousKey();
-        } else {
-          //indicates a key has been read already
-          if (hasNext != KeyState.SAME_KEY) {
-            /**
-             * Store previous key before reading next for later key comparisons.
-             * If all keys in a segment are unique, it would always hit this code path and key copies
-             * are wasteful in such condition, as these comparisons are mainly done for RLE.
-             * TODO: When better stats are available, this condition can be avoided.
-             */
-            populatePreviousKey();
-          }
-        }
+        populatePreviousKey();
       }
       hasNext = reader.readRawKey(nextKey);
       long endPos = reader.getPosition();
@@ -551,34 +537,22 @@ public class TezMerger {
       mergeProgress.set(totalBytesProcessed * progPerByte);
       if (hasNext == KeyState.NEW_KEY) {
         adjustTop();
-        compareKeyWithNextTopKey(reader);
+        compareKeyWithNextTopKey();
       } else if(hasNext == KeyState.NO_KEY) {
         pop();
         reader.close();
-        compareKeyWithNextTopKey(null);
-      } else if(hasNext == KeyState.SAME_KEY) {
-        // do not rebalance the priority queue
+        compareKeyWithNextTopKey();
       }
     }
 
-    /**
-     * Check if the previous key is same as the next top segment's key.
-     * This would be useful to compute whether same key is spread across multiple segments.
-     *
-     * @param current
-     * @throws IOException
-     */
-    void compareKeyWithNextTopKey(Segment current) throws IOException {
-      Segment nextTop = top();
-      if (checkForSameKeys && nextTop != current) {
-        //we have a different file. Compare it with previous key
-        KeyValueBuffer nextKey = nextTop.getKey();
-        int compare = compare(nextKey, prevKey);
-        if (compare == 0) {
-          //Same key is available in the next segment.
-          hasNext = KeyState.SAME_KEY;
-        }
-      }
+    int compare(KeyValueBuffer nextKey, DataOutputBuffer buf2) {
+      byte[] b1 = nextKey.getData();
+      byte[] b2 = buf2.getData();
+      int s1 = nextKey.getPosition();
+      int s2 = 0;
+      int l1 = nextKey.getLength();
+      int l2 = buf2.getLength();
+      return comparator.compare(b1, s1, l1, b2, s2, l2);
     }
 
     public boolean next() throws IOException {
@@ -610,16 +584,6 @@ public class TezMerger {
       mergeProgress.set(totalBytesProcessed * progPerByte);
 
       return true;
-    }
-
-    int compare(KeyValueBuffer nextKey, DataOutputBuffer buf2) {
-      byte[] b1 = nextKey.getData();
-      byte[] b2 = buf2.getData();
-      int s1 = nextKey.getPosition();
-      int s2 = 0;
-      int l1 = nextKey.getLength();
-      int l2 = buf2.getLength();
-      return comparator.compare(b1, s1, l1, b2, s2, l2);
     }
 
     protected boolean lessThan(Object a, Object b) {
@@ -969,7 +933,7 @@ public class TezMerger {
 
     @Override
     public boolean isSameKey() throws IOException {
-      return (hasNext != null) && (hasNext == KeyState.SAME_KEY);
+      return sameKey;
     }
 
     public boolean hasNext() throws IOException {

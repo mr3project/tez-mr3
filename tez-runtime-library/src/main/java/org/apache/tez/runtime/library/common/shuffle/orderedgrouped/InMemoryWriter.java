@@ -37,8 +37,6 @@ public class InMemoryWriter implements IFile.WriterAppend {
 
   private DataOutputStream out;
 
-  private Object prevKey = null;
-
   // InMemoryWriter does not use another byte[] buffer, unlike IFile.Writer
   public InMemoryWriter(byte[] array) {
     BoundedByteArrayOutputStream arrayStream = new InMemoryBoundedByteArrayOutputStream(array);
@@ -49,41 +47,14 @@ public class InMemoryWriter implements IFile.WriterAppend {
       int keyLength = key.getLength() - key.getPosition();
       int valueLength = value.getLength() - value.getPosition();
 
-      boolean sameKey = (key == IFile.REPEAT_KEY);
+      long combined = ((long) keyLength << 32) | (valueLength & 0xFFFFFFFFL);
+      out.writeLong(combined);
 
-      if (!sameKey) {
-          // Normal key-value pair
-          // Write V_END_MARKER if needed (if previous was a REPEAT_KEY)
-          if (prevKey == IFile.REPEAT_KEY) {
-              out.writeInt(IFile.V_END_MARKER);
-          }
-
-          long combined = ((long) keyLength << 32) | (valueLength & 0xFFFFFFFFL);
-          out.writeLong(combined);
-
-          out.write(key.getData(), key.getPosition(), keyLength);
-          out.write(value.getData(), value.getPosition(), valueLength);
-      } else {
-          // Repeated key
-          if (prevKey != IFile.REPEAT_KEY) {
-              // First repeated key, write RLE marker
-              out.writeInt(IFile.RLE_MARKER);
-          }
-
-          // Write just the value length and value
-          out.writeInt(valueLength);
-          out.write(value.getData(), value.getPosition(), valueLength);
-      }
-
-      prevKey = sameKey ? IFile.REPEAT_KEY : key;
+      out.write(key.getData(), key.getPosition(), keyLength);
+      out.write(value.getData(), value.getPosition(), valueLength);
   }
 
   public void close() throws IOException {
-      // Write V_END_MARKER if needed
-      if (prevKey == IFile.REPEAT_KEY) {
-          out.writeInt(IFile.V_END_MARKER);
-      }
-
       // Write EOF_MARKER for key/value length
       long combined = ((long) IFile.EOF_MARKER << 32) | (IFile.EOF_MARKER & 0xFFFFFFFFL);
       out.writeLong(combined);
