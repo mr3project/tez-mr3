@@ -309,12 +309,11 @@ public class IFile {
     private long logicalKeyBytesWritten = 0;
     private long logicalLengthBytesWritten = 0;
 
-    // Count records written to disk
-    private long numRecordsWritten = 0;
+    private long numRecordsWritten = 0;   // TODO: with RLE, we should use numKeysWritten
     private final TezCounter writtenRecordsCounter;
     private final TezCounter serializedUncompressedBytes;
 
-    private boolean closeSerializers = false;
+    private final boolean closeSerializers;
     private Serializer keySerializer = null;
     private Serializer valueSerializer = null;
 
@@ -465,14 +464,12 @@ public class IFile {
       int keyLength = buffer.getLength();
       assert(keyLength >= 0);
 
-      // Append the 'value'
       valueSerializer.serialize(value);
       int valueLength = buffer.getLength() - keyLength;
       assert(valueLength >= 0);
       writeKVPair(buffer.getData(), 0, keyLength, buffer.getData(),
           keyLength, valueLength);
 
-      // Reset
       buffer.reset();
       ++numRecordsWritten;
     }
@@ -590,6 +587,10 @@ public class IFile {
       return sectionTotalLength - IFileOutputStream.getCheckSumSize();
     }
 
+    public long getNumRecordsWritten() {
+      return numRecordsWritten;
+    }
+
     // Cf. corresponds to TezIndexRecord.rawLength
     public long getRawLength() {
       return decompressedBytesWritten;
@@ -640,96 +641,134 @@ public class IFile {
                                       // will result in an OOM exception. The exact value
                                       // is JVM dependent so setting it to max int - 8 to be safe.
 
-    // Count records read from disk
-    private long numRecordsRead = 0;
+    private final CompressionCodec codec;
     private final TezCounter readRecordsCounter;
     private final TezCounter bytesReadCounter;
+    private final DecompressorPool taskContext;
 
-    final InputStream in;        // Possibly decompressed stream that we read
-    Decompressor decompressor;
+    private final boolean isCompressed;
+    private final long valuesLength;
+    private final long keysLength;
+    private final long lengthsLength;
+
+    private final long fileLength;
+    private final long numRecordsWritten;   // total number of records (or keys) in the input stream
+
+    private IFileInputStream valuesChecksumIn;
+    private IFileInputStream keysChecksumIn;
+    private IFileInputStream lengthsChecksumIn;
+
+    private Decompressor valuesDecompressor;
+    private Decompressor keysDecompressor;
+    private Decompressor lengthsDecompressor;
+
+    private final InputStream valuesIn;
+    private final InputStream keysIn;
+    private final InputStream lengthsIn;
+
+    protected DataInputStream valuesDataIn = null;
+    protected DataInputStream keysDataIn = null;
+    protected DataInputStream lengthsDataIn = null;
+
+    private long valuesStartPos;
+    private long keysStartPos;
+    private long lengthsStartPos;
+
+    private byte keyBytes[] = new byte[0];
+
     public long bytesRead = 0;
-    final long fileLength;
-    protected boolean eof = false;
-    IFileInputStream checksumIn;
-
-    protected DataInputStream dataIn = null;
-
-    protected int recNo = 1;
-    byte keyBytes[] = new byte[0];
+    private long numRecordsRead = 0;
+    protected boolean isEof = false;  // set to true when numRecordsRead == numRecordsWritten
 
     protected int currentKeyLength;
     protected int currentValueLength;
-    long startPos;
-
-    private CompressionCodec codec;
-    private DecompressorPool taskContext;
 
     /**
      * Construct an IFile Reader.
      *
-     * @param in   The input stream
-     * @param length Length of the data in the stream, including the checksum
-     *               bytes.
      * @param codec codec
      * @param readsCounter Counter for records read from disk
      * @throws IOException
      */
-    public Reader(InputStream in, long length,
-        CompressionCodec codec,
-        TezCounter readsCounter, TezCounter bytesReadCounter,
-        boolean readAhead, int readAheadLength,
-        DecompressorPool taskContext) throws IOException {
-      this(in, ((in != null) ? (length - HEADER.length) : length), codec,
-          readsCounter, bytesReadCounter, readAhead, readAheadLength,
-          taskContext, ((in != null) ? isCompressedFlagEnabled(in) : false));
-      if (in != null && bytesReadCounter != null) {
-        bytesReadCounter.increment(IFile.HEADER.length);
-      }
-    }
+    private Reader(InputStream headerValuesIn, long valueBytesWritten,
+                   InputStream keysIn, long keyBytesWritten,
+                   InputStream lengthsIn, long lengthBytesWritten,
+                   long numRecordsWritten,
+                   CompressionCodec codec,
+                   TezCounter readsCounter, TezCounter bytesReadCounter,
+                   boolean readAhead, int readAheadLength,
+                   DecompressorPool taskContext) throws IOException {
+      final boolean allNull = headerValuesIn == null && keysIn == null && lengthsIn == null;
+      assert allNull || (headerValuesIn != null && keysIn != null && lengthsIn != null);
 
-    /**
-     * Construct an IFile Reader.
-     *
-     * @param in   The input stream
-     * @param length Length of the data in the stream, including the checksum
-     *               bytes.
-     * @param codec codec
-     * @param readsCounter Counter for records read from disk
-     * @throws IOException
-     */
-    private Reader(InputStream in, long length,
-                  CompressionCodec codec,
-                  TezCounter readsCounter, TezCounter bytesReadCounter,
-                  boolean readAhead, int readAheadLength,
-                  DecompressorPool taskContext, boolean isCompressed) throws IOException {
-      if (in != null) {
-        checksumIn = new IFileInputStream(in, length, readAhead,
-            readAheadLength/* , isCompressed */);
-        if (isCompressed && codec != null) {
-          assert taskContext != null;
-          this.codec = codec;
-          this.taskContext = taskContext;
-          decompressor = taskContext.getDecompressor(codec);
-          if (decompressor != null) {
-            this.in = CodecUtils.createInputStream(codec, checksumIn, decompressor);
-          } else {
-            LOG.warn("Could not obtain decompressor from CodecPool");
-            this.in = checksumIn;
-          }
-        } else {
-          this.in = checksumIn;
-        }
-        startPos = checksumIn.getPosition();
-      } else {
-        this.in = null;
-      }
-
-      if (in != null) {
-        this.dataIn = new DataInputStream(this.in);
-      }
+      this.codec = codec;
       this.readRecordsCounter = readsCounter;
       this.bytesReadCounter = bytesReadCounter;
-      this.fileLength = length;
+      this.taskContext = taskContext;
+
+      if (allNull) {
+        this.isCompressed = false;
+        this.valuesLength = 0;
+        this.keysLength = 0;
+        this.lengthsLength = 0;
+        this.fileLength = 0;
+        this.numRecordsWritten = 0;
+        this.valuesIn = null;
+        this.keysIn = null;
+        this.lengthsIn = null;
+        return;
+      }
+
+      byte[] header = new byte[HEADER.length];
+      IOUtils.readFully(headerValuesIn, header, 0, HEADER.length);
+      verifyHeaderMagic(header);
+      this.isCompressed = (header[3] == 1);
+
+      this.valuesLength = valueBytesWritten + checksumSize;
+      this.keysLength = keyBytesWritten + checksumSize;
+      this.lengthsLength = lengthBytesWritten + checksumSize;
+
+      this.fileLength = HEADER.length + valuesLength + keysLength + lengthsLength;
+      this.numRecordsWritten = numRecordsWritten;
+
+      this.valuesChecksumIn = new IFileInputStream(headerValuesIn, valuesLength, readAhead, readAheadLength);
+      this.keysChecksumIn = new IFileInputStream(keysIn, keysLength, readAhead, readAheadLength);
+      this.lengthsChecksumIn = new IFileInputStream(lengthsIn, lengthsLength, readAhead, readAheadLength);
+
+      if (isCompressed) {
+        if (codec == null) {
+          throw new IOException("IFile is compressed but no codec was provided");
+        }
+        assert taskContext != null;
+
+        this.valuesDecompressor = taskContext.getDecompressor(codec);
+        this.keysDecompressor = taskContext.getDecompressor(codec);
+        this.lengthsDecompressor = taskContext.getDecompressor(codec);
+
+        if (this.valuesDecompressor == null || this.keysDecompressor == null || this.lengthsDecompressor == null) {
+          throw new IOException("Could not obtain decompressor from CodecPool for values section");
+        }
+
+        this.valuesIn = CodecUtils.createInputStream(codec, valuesChecksumIn, valuesDecompressor);
+        this.keysIn = CodecUtils.createInputStream(codec, keysChecksumIn, keysDecompressor);
+        this.lengthsIn = CodecUtils.createInputStream(codec, lengthsChecksumIn, lengthsDecompressor);
+      } else {
+        this.valuesIn = valuesChecksumIn;
+        this.keysIn = keysChecksumIn;
+        this.lengthsIn = lengthsChecksumIn;
+      }
+
+      this.valuesDataIn = new DataInputStream(this.valuesIn);
+      this.keysDataIn = new DataInputStream(this.keysIn);
+      this.lengthsDataIn = new DataInputStream(this.lengthsIn);
+
+      this.valuesStartPos = valuesChecksumIn.getPosition();
+      this.keysStartPos = keysChecksumIn.getPosition();
+      this.lengthsStartPos = lengthsChecksumIn.getPosition();
+
+      if (bytesReadCounter != null) {
+        bytesReadCounter.increment(IFile.HEADER.length);
+      }
     }
 
     /**
@@ -895,25 +934,23 @@ public class IFile {
      */
     protected boolean positionToNextRecord(DataInput dIn) throws IOException {
       // Sanity check
-      if (eof) {
+      if (isEof) {
         throw new IOException(String.format("Reached EOF. Completed reading %d", bytesRead));
       }
       readKeyValueLength(dIn);
 
       // Check for EOF
       if (currentKeyLength == EOF_MARKER && currentValueLength == EOF_MARKER) {
-        eof = true;
+        isEof = true;
         return false;
       }
 
       // Sanity check
       if (currentKeyLength < 0) {
-        throw new IOException("Rec# " + recNo + ": Negative key-length: " +
-                              currentKeyLength);
+        throw new IOException("Negative key-length: " + currentKeyLength);
       }
       if (currentValueLength < 0) {
-        throw new IOException("Rec# " + recNo + ": Negative value-length: " +
-                              currentValueLength);
+        throw new IOException("Negative value-length: " + currentValueLength);
       }
       return true;
     }
@@ -976,13 +1013,15 @@ public class IFile {
       // Record the bytes read
       bytesRead += currentValueLength;
 
-      ++recNo;
       ++numRecordsRead;
+
+      if (numRecordsRead == numRecordsWritten) {
+        isEof = true;
+      }
     }
 
     private static void verifyHeaderMagic(byte[] header) throws IOException {
-      if (!(header[0] == 'T' && header[1] == 'I'
-          && header[2] == 'F')) {
+      if (!(header[0] == 'T' && header[1] == 'I' && header[2] == 'F')) {
         throw new IOException("Not a valid ifile header");
       }
     }

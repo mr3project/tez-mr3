@@ -19,8 +19,6 @@
 package org.apache.tez.runtime.library.common.shuffle.orderedgrouped;
 
 import java.io.DataInput;
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 
 import org.apache.hadoop.io.DataInputBuffer;
@@ -176,7 +174,7 @@ public class InMemoryReader extends Reader {
   public void reset(int offset) {
     memDataIn.reset(buffer, start + offset, length);
     bytesRead = offset;
-    eof = false;
+    isEof = false;
   }
 
   @Override
@@ -192,71 +190,40 @@ public class InMemoryReader extends Reader {
     return length;
   }
 
-  private void dumpOnError() {
-    File dumpFile = new File("../output/" + taskAttemptId + ".dump");
-    System.err.println("Dumping corrupt map-output of " + taskAttemptId +
-                       " to " + dumpFile.getAbsolutePath());
-    FileOutputStream fos = null;
-    try {
-      fos = new FileOutputStream(dumpFile);
-      fos.write(buffer, 0, bufferSize);
-    } catch (IOException ioe) {
-      System.err.println("Failed to dump map-output of " + taskAttemptId);
-    } finally {
-      if (fos != null) {
-        try {
-          fos.close();
-        } catch (IOException e) {
-          System.err.println("Failed to dump map-output of " + taskAttemptId);
-        }
-      }
-    }
-  }
-
+  // TODO: when set isEof???
   public KeyState readRawKey(DataInputBuffer key) throws IOException {
-    try {
-      if (!positionToNextRecord(memDataIn)) {
-        return KeyState.NO_KEY;
-      }
-      // Setup the key
-      int pos = memDataIn.getPosition();
-      byte[] data = memDataIn.getData();
-      key.reset(data, pos, currentKeyLength);
-      // Position for the next value
-      long skipped = memDataIn.skip(currentKeyLength);
-      if (skipped != currentKeyLength) {
-        throw new IOException("Rec# " + recNo +
-            ": Failed to skip past key of length: " +
-            currentKeyLength);
-      }
-      bytesRead += currentKeyLength;
-      return KeyState.NEW_KEY;
-    } catch (IOException ioe) {
-      dumpOnError();
-      throw ioe;
+    if (!positionToNextRecord(memDataIn)) {
+      return KeyState.NO_KEY;
     }
+
+    // Setup the key
+    int pos = memDataIn.getPosition();
+    byte[] data = memDataIn.getData();
+    key.reset(data, pos, currentKeyLength);
+
+    // Position for the next value
+    long skipped = memDataIn.skip(currentKeyLength);
+    if (skipped != currentKeyLength) {
+      throw new IOException("Failed to skip past key of length: " + currentKeyLength);
+    }
+
+    bytesRead += currentKeyLength;
+    return KeyState.NEW_KEY;
   }
 
   public void nextRawValue(DataInputBuffer value) throws IOException {
-    try {
-      int pos = memDataIn.getPosition();
-      byte[] data = memDataIn.getData();
-      value.reset(data, pos, currentValueLength);
+    int pos = memDataIn.getPosition();
+    byte[] data = memDataIn.getData();
+    value.reset(data, pos, currentValueLength);
 
-      // Position for the next record
-      long skipped = memDataIn.skip(currentValueLength);
-      if (skipped != currentValueLength) {
-        throw new IOException("Rec# " + recNo +
-            ": Failed to skip past value of length: " +
-            currentValueLength);
-      }
-      // Record the byte
-      bytesRead += currentValueLength;
-      ++recNo;
-    } catch (IOException ioe) {
-      dumpOnError();
-      throw ioe;
+    // Position for the next record
+    long skipped = memDataIn.skip(currentValueLength);
+    if (skipped != currentValueLength) {
+      throw new IOException("Failed to skip past value of length: " + currentValueLength);
     }
+
+    // Record the byte
+    bytesRead += currentValueLength;
   }
 
   public void close() {

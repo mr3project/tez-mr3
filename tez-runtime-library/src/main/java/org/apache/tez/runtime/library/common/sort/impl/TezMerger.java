@@ -746,9 +746,7 @@ public class TezMerger {
           //available under the space constraints
           long approxOutputSize = 0; 
           for (Segment s : segmentsToMerge) {
-            approxOutputSize += s.getLength() + 
-                                ChecksumFileSystem.getApproxChkSumLength(
-                                s.getLength());
+            approxOutputSize += s.getLength() + ChecksumFileSystem.getApproxChkSumLength(s.getLength());
           }
           Path tmpFilename = new Path(tmpDir, "intermediate").suffix("." + passNo);
 
