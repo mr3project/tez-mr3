@@ -416,12 +416,13 @@ public class IFile {
       writeBufferedSection(keySectionBuffer);
       writeBufferedSection(lengthsSectionBuffer);
 
+      // header bytes are already included in rawOut
+      compressedBytesWritten = rawOut.getPos() - start;
+
       // Close the underlying stream iff we own it
       if (ownOutputStream) {
         rawOut.close();
       }
-      //header bytes are already included in rawOut
-      compressedBytesWritten = rawOut.getPos() - start;
 
       if (compressOutput) {
         // Return back the compressor
