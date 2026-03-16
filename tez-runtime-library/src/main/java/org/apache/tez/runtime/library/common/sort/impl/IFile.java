@@ -147,7 +147,7 @@ public class IFile {
         TezCounter serializedBytesCounter, int cacheSize, byte[] writeBuffer) throws IOException {
       super(keySerialization, valSerialization,
           new FSDataOutputStream(createBoundedBuffer(cacheSize), null),
-          keyClass, valueClass, codec,
+          keyClass, valueClass, null,
           writesCounter, serializedBytesCounter, false, writeBuffer, null);
       this.fs = fs;
       this.cacheStream = (BoundedByteArrayOutputStream) this.rawOut.getWrappedStream();
@@ -213,7 +213,7 @@ public class IFile {
       int sPos = HEADER.length;
       int len = (bout.size() - checksumSize - HEADER.length);
       if (len > 0) {
-        newRawOut.write(bout.getBuffer(), sPos, len);
+        bufferWriteBytes(bout.getBuffer(), sPos, len);
       }
 
       bufferFull = true;
