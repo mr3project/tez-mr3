@@ -164,6 +164,11 @@ public class IFile {
       return totalSize >= cacheStream.getLimit();
     }
 
+    private int getRecordLogicalSize(int keyLength, int valueLength) {
+      // logical on-close payload contribution: key bytes + value bytes + (keyLength, valueLength)
+      return keyLength + valueLength + (2 * INT_SIZE);
+    }
+
     /**
      * Create in mem stream. In it is too small, adjust it's size
      *
@@ -178,18 +183,21 @@ public class IFile {
     /**
      * Flip over from memory to file based writer.
      *
-     * 1. Content format: HEADER + real data + CHECKSUM. Checksum is for real
-     * data.
-     * 2. Before flipping, close checksum stream, so that checksum is written
-     * out.
+     * 1. While appending in memory, cache stream carries HEADER + emitted-values and
+     *    checksum framing state; checksum trailer bytes are materialized only when this
+     *    stream is finalized (during spill/close).
+     *    Key bytes and (keyLength, valueLength) metadata are retained in Writer buffers
+     *    and are not present in this stream until Writer#close().
+     * 2. Before flipping, finalize and close checksum stream so trailer bytes are
+     *    written, then copy only emitted-values bytes into the new file-backed stream.
      * 3. Create relevant file based writer.
-     * 4. Write header and then real data.
+     * 4. Write header and then copy only the emitted values payload.
      *
      * @throws IOException
      */
     private void resetToFileBasedWriter() throws IOException {
-      // Close out stream, so that data checksums are written.
-      // Buf contents = HEADER + (uncompressed) real data + CHECKSUM
+      // Close out stream to finalize checksum trailer in the in-memory buffer.
+      // Finalized cache contents become: HEADER + emitted-values + CHECKSUM
       flushWriteBuffer();
       this.out.close();
 
@@ -212,9 +220,9 @@ public class IFile {
       headerWritten = false;
       writeHeader(newRawOut);
 
-      // write real data
+      // Copy only the already-emitted values payload from cache stream.
       int sPos = HEADER.length;
-      int len = (bout.size() - checksumSize - HEADER.length);
+      int len = Math.max(0, bout.size() - checksumSize - HEADER.length);
       bufferWriteBytes(bout.getBuffer(), sPos, len);
 
       bufferFull = true;
@@ -225,7 +233,7 @@ public class IFile {
     protected void writeKVPair(byte[] keyData, int keyPos, int keyLength,
         byte[] valueData, int valPos, int valueLength) throws IOException {
       if (!bufferFull) {
-        totalSize += INT_SIZE + keyLength + INT_SIZE + valueLength;
+        totalSize += getRecordLogicalSize(keyLength, valueLength);
 
         if (shouldWriteToDisk()) {
           resetToFileBasedWriter();
