@@ -285,6 +285,11 @@ public class IFile {
 
     private long decompressedBytesWritten = 0;
     private long compressedBytesWritten = 0;
+    private long valueBytesWritten = 0;
+    private long keyBytesWritten = 0;
+    private long lengthBytesWritten = 0;
+    private long keySectionOffset = -1;
+    private long lengthSectionOffset = -1;
 
     // Count records written to disk
     private long numRecordsWritten = 0;
@@ -296,6 +301,8 @@ public class IFile {
     private Serializer valueSerializer = null;
 
     private final DataOutputBuffer buffer = new DataOutputBuffer();
+    private final DataOutputBuffer keySectionBuffer = new DataOutputBuffer();
+    private final DataOutputBuffer lengthSectionBuffer = new DataOutputBuffer();
     protected boolean headerWritten = false;
 
     // We use writeBuffer[] to reduce the number of writes to 'out' and thus
@@ -394,17 +401,26 @@ public class IFile {
         valueSerializer.close();
       }
 
-      // Write EOF_MARKER for key/value length
-      // bufferWriteInt(EOF_MARKER);
-      // bufferWriteInt(EOF_MARKER);
-      long combined = ((long) EOF_MARKER << 32) | (EOF_MARKER & 0xFFFFFFFFL);
-      bufferWriteLong(combined);
-
-      decompressedBytesWritten += 2 * INT_SIZE;
-      //account for header bytes
-      decompressedBytesWritten += HEADER.length;
-
       flushWriteBuffer();   // Ensure all buffered data is written to 'out'
+
+      keySectionOffset = rawOut.getPos();
+      if (keySectionBuffer.getLength() > 0) {
+        bufferWriteBytes(keySectionBuffer.getData(), 0, keySectionBuffer.getLength());
+      }
+
+      // Ensure key section is fully emitted before taking next section offset.
+      flushWriteBuffer();
+
+      lengthSectionOffset = rawOut.getPos();
+      if (lengthSectionBuffer.getLength() > 0) {
+        bufferWriteBytes(lengthSectionBuffer.getData(), 0, lengthSectionBuffer.getLength());
+      }
+
+      // Ensure all length metadata bytes are emitted before stream finalization.
+      flushWriteBuffer();
+
+      // account for all uncompressed bytes, including header and all sections
+      decompressedBytesWritten = HEADER.length + valueBytesWritten + keyBytesWritten + lengthBytesWritten;
 
       // Close the underlying stream iff we own it
       if (ownOutputStream) {
@@ -471,16 +487,21 @@ public class IFile {
 
     protected void writeKVPair(byte[] keyData, int keyPos, int keyLength,
         byte[] valueData, int valPos, int valueLength) throws IOException {
-      // bufferWriteInt(keyLength);
-      // bufferWriteLong(valueLength);
-      long combined = ((long) keyLength << 32) | (valueLength & 0xFFFFFFFFL);
-      bufferWriteLong(combined);
+      if (keyLength < 0 || valueLength < 0) {
+        throw new IOException("Negative key/value length not allowed: keyLength=" + keyLength
+            + ", valueLength=" + valueLength);
+      }
 
-      bufferWriteBytes(keyData, keyPos, keyLength);
       bufferWriteBytes(valueData, valPos, valueLength);
 
+      keySectionBuffer.write(keyData, keyPos, keyLength);
+      lengthSectionBuffer.writeInt(keyLength);
+      lengthSectionBuffer.writeInt(valueLength);
+
       // Update bytes written
-      decompressedBytesWritten += keyLength + valueLength + INT_SIZE + INT_SIZE;
+      valueBytesWritten += valueLength;
+      keyBytesWritten += keyLength;
+      lengthBytesWritten += (2L * INT_SIZE);
       if (serializedUncompressedBytes != null) {
         serializedUncompressedBytes.increment(keyLength + valueLength);
       }
@@ -532,6 +553,14 @@ public class IFile {
 
     public long getCompressedLength() {
       return compressedBytesWritten;
+    }
+
+    public long getKeySectionOffset() {
+      return keySectionOffset;
+    }
+
+    public long getLengthSectionOffset() {
+      return lengthSectionOffset;
     }
   }
 
