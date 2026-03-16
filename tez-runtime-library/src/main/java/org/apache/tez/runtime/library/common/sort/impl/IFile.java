@@ -850,6 +850,13 @@ public class IFile {
       }
     }
 
+    private static boolean isCompressedFlagEnabled(InputStream in) throws IOException {
+      byte[] header = new byte[HEADER.length];
+      IOUtils.readFully(in, header, 0, HEADER.length);
+      verifyHeaderMagic(header);
+      return (header[3] == 1);
+    }
+
     /**
      * Read entire IFile content to disk.
      *
@@ -888,11 +895,19 @@ public class IFile {
     }
 
     public long getLength() {
-      return fileLength - checksumIn.getSize();
+      if (valuesChecksumIn == null) {
+        return 0;
+      }
+      return valuesLength + keysLength + lengthsLength - 3L * checksumSize;
     }
 
     public long getPosition() throws IOException {
-      return checksumIn.getPosition();
+      if (valuesChecksumIn == null) {
+        return 0;
+      }
+      return (valuesChecksumIn.getPosition() - valuesStartPos)
+          + (keysChecksumIn.getPosition() - keysStartPos)
+          + (lengthsChecksumIn.getPosition() - lengthsStartPos);
     }
 
     /**
@@ -903,10 +918,10 @@ public class IFile {
      * @return the no. of bytes read
      * @throws IOException
      */
-    private int readData(byte[] buf, int len) throws IOException {
+    private int readData(InputStream sectionIn, byte[] buf, int len) throws IOException {
       int bytesRead = 0;
       while (bytesRead < len) {
-        int n = IOUtils.wrappedReadForCompressedData(in, buf, bytesRead, len - bytesRead);
+        int n = IOUtils.wrappedReadForCompressedData(sectionIn, buf, bytesRead, len - bytesRead);
         if (n < 0) {
           return bytesRead;
         }
@@ -918,9 +933,6 @@ public class IFile {
     protected void readKeyValueLength(DataInput dIn) throws IOException {
       currentKeyLength = dIn.readInt();
       currentValueLength = dIn.readInt();
-      // long combined = dIn.readLong();
-      // currentKeyLength = (int) (combined >> 32);
-      // currentValueLength = (int) combined;
       bytesRead += INT_SIZE + INT_SIZE;
     }
 
@@ -933,19 +945,13 @@ public class IFile {
      * @throws IOException
      */
     protected boolean positionToNextRecord(DataInput dIn) throws IOException {
-      // Sanity check
-      if (isEof) {
-        throw new IOException(String.format("Reached EOF. Completed reading %d", bytesRead));
-      }
-      readKeyValueLength(dIn);
-
-      // Check for EOF
-      if (currentKeyLength == EOF_MARKER && currentValueLength == EOF_MARKER) {
+      if (numRecordsRead >= numRecordsWritten) {
         isEof = true;
         return false;
       }
 
-      // Sanity check
+      readKeyValueLength(dIn);
+
       if (currentKeyLength < 0) {
         throw new IOException("Negative key-length: " + currentKeyLength);
       }
@@ -975,7 +981,7 @@ public class IFile {
     }
 
     public KeyState readRawKey(DataInputBuffer key) throws IOException {
-      if (!positionToNextRecord(dataIn)) {
+      if (!positionToNextRecord(lengthsDataIn)) {
         if (isDebugEnabled) {
           LOG.debug("currentKeyLength=" + currentKeyLength +
               ", currentValueLength=" + currentValueLength +
@@ -987,7 +993,7 @@ public class IFile {
       if (keyBytes.length < currentKeyLength) {
         keyBytes = createLargerArray(currentKeyLength);
       }
-      int i = readData(keyBytes, currentKeyLength);
+      int i = readData(keysIn, keyBytes, currentKeyLength);
       if (i != currentKeyLength) {
         throw new IOException(String.format(INCOMPLETE_READ, currentKeyLength, i));
       }
@@ -997,14 +1003,16 @@ public class IFile {
     }
 
     public void nextRawValue(DataInputBuffer value) throws IOException {
+      assert value.getData() == keyBytes;   // if true, we should not use value.getData()
+
       final byte[] valBytes;
-      if ((value.getData().length < currentValueLength) || (value.getData() == keyBytes)) {
+      if (value.getData().length < currentValueLength) {
         valBytes = createLargerArray(currentValueLength);
       } else {
         valBytes = value.getData();
       }
 
-      int i = readData(valBytes, currentValueLength);
+      int i = readData(valuesIn, valBytes, currentValueLength);
       if (i != currentValueLength) {
         throw new IOException(String.format(INCOMPLETE_READ, currentValueLength, i));
       }
@@ -1024,13 +1032,6 @@ public class IFile {
       if (!(header[0] == 'T' && header[1] == 'I' && header[2] == 'F')) {
         throw new IOException("Not a valid ifile header");
       }
-    }
-
-    public static boolean isCompressedFlagEnabled(InputStream in) throws IOException {
-      byte[] header = new byte[HEADER.length];
-      IOUtils.readFully(in, header, 0, HEADER.length);
-      verifyHeaderMagic(header);
-      return (header[3] == 1);
     }
 
     public void close() throws IOException {

@@ -47,7 +47,7 @@ public class IFileInputStream extends InputStream {
   private long currentOffset = 0;
   private final byte b[] = new byte[1];
   private byte csum[] = null;
-  private int checksumSize;
+  private final int checksumSize;
   private byte[] buffer;
   private int offset;
 
