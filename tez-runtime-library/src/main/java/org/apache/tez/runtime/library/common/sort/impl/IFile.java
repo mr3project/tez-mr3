@@ -101,6 +101,14 @@ public class IFile {
   }
 
   /**
+   * Base size estimate used by FileBackedInMemIFileWriter spill accounting for
+   * a full partition: header + checksums for values, keys and lengths sections.
+   */
+  static int getBasePartitionSizeEstimate() {
+    return HEADER.length + (3 * checksumSize);
+  }
+
+  /**
    * IFileWriter which stores data in memory for specified limit, beyond
    * which it falls back to file based writer. It creates files lazily on
    * need basis and avoids any disk hit (in cases, where data fits entirely in mem).
@@ -108,12 +116,10 @@ public class IFile {
    * This class should not make any changes to IFile logic and should just flip streams
    * from mem to disk on need basis.
    *
-   * During write, it verifies whether uncompressed payload can fit in memory. If so, it would
-   * store in buffer. Otherwise, it falls back to file based writer. Note that data stored
-   * internally would be in compressed format (if codec is provided). However, for easier
-   * comparison and spill over, uncompressed payload check is done. This is
-   * done intentionally, as it is not possible to know compressed data length
-   * upfront.
+   * During write, it verifies whether the final logical partition can fit in memory.
+   * The bounded in-memory stream stores only values-section bytes (header + values +
+   * values checksum). Spill decision is based on an estimated final partition size
+   * (header + values/keys/lengths logical bytes + section checksum overhead).
    */
   public static class FileBackedInMemIFileWriter extends Writer {
 
@@ -153,7 +159,7 @@ public class IFile {
       this.cacheStream = (BoundedByteArrayOutputStream) this.rawOut.getWrappedStream();
       this.taskOutput = taskOutput;
       this.bufferFull = (cacheStream == null);
-      this.totalSize = HEADER.length + (3 * checksumSize);
+      this.totalSize = getBasePartitionSizeEstimate();
       this.fileCodec = codec;
     }
 
@@ -162,7 +168,8 @@ public class IFile {
     }
 
     /**
-     * Create in mem stream. In it is too small, adjust it's size
+     * Create in-memory values buffer. If requested size is too small, adjust to
+     * the minimum needed for header + values-section checksum trailer.
      *
      * @param size
      * @return in memory stream
@@ -175,8 +182,7 @@ public class IFile {
     /**
      * Flip over from memory to file based writer.
      *
-     * 1. Content format: HEADER + real data + CHECKSUM. Checksum is for real
-     * data.
+     * 1. Values buffer format at spill time: HEADER + values payload + CHECKSUM.
      * 2. Before flipping, close checksum stream, so that checksum is written
      * out.
      * 3. Create relevant file based writer.
