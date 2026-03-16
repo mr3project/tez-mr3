@@ -25,7 +25,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.io.BoundedByteArrayOutputStream;
 import org.apache.tez.runtime.api.DecompressorPool;
@@ -291,8 +290,6 @@ public class IFile {
     // if true, close() closes rawOut.
     protected boolean ownOutputStream = false;
 
-    private final AtomicBoolean closed = new AtomicBoolean(false);
-
     // initialized to HEADER.length because the header is already part of that logical length from the start
     private long decompressedBytesWritten = HEADER.length;
     private long compressedBytesWritten = 0;
@@ -408,10 +405,6 @@ public class IFile {
     }
 
     public void close() throws IOException {
-      if (closed.getAndSet(true)) {
-        throw new IOException("Writer was already closed earlier");
-      }
-
       // When IFile writer is created by BackupStore, we do not have
       // Key and Value classes set. So, check before closing the
       // serializers
