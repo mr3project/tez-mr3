@@ -276,7 +276,7 @@ public class IFile {
     // Values section output (written during append):
     // rawOut <-- valuesChecksumOut <-- valuesCompressedOut <-- valuesOut <-- [writeBuffer]
     protected DataOutputStream valuesOut;
-    private long start = 0;
+    private final long start;
 
     private CompressionOutputStream valuesCompressedOut;
     private Compressor valuesCompressor;
@@ -290,9 +290,21 @@ public class IFile {
     // if true, close() closes rawOut.
     protected boolean ownOutputStream = false;
 
+    // Output layout:
+    //   HEADER ++ [values, checksum] ++ [keys, checksum] ++ [lengths, checksum]
+    //
+    // logicalValueBytesWritten, compressedValueBytesWritten = only for values, not including checksum
+    // logicalKeyBytesWritten, compressedKeyBytesWritten = only for keys, not including checksum
+    // logicalKeyLengthWritten, compressedLengthBytesWritten = only for lengths, not including checksum
+
     // initialized to HEADER.length because the header is already part of that logical length from the start
+    // length of the entire output (from HEADER to the last checksum)
     private long decompressedBytesWritten = HEADER.length;
-    private long compressedBytesWritten = 0;
+
+    private long compressedValueBytesWritten = 0;
+    private long compressedKeyBytesWritten = 0;
+    private long compressedLengthBytesWritten = 0;
+
     private long logicalValueBytesWritten = 0;
     private long logicalKeyBytesWritten = 0;
     private long logicalLengthBytesWritten = 0;
@@ -414,17 +426,19 @@ public class IFile {
       }
 
       finishValuesSection();
+      compressedValueBytesWritten = extractSectionPayloadLength(rawOut.getPos() - (start + HEADER.length));
 
       // values section is complete; compressor object can now be reused
       valuesOut = null;
       valuesCompressedOut = null;
       valuesChecksumOut = null;
 
-      writeBufferedSection(keySectionBuffer, compressOutput ? valuesCompressor : null);
-      writeBufferedSection(lengthsSectionBuffer, compressOutput ? valuesCompressor : null);
+      compressedKeyBytesWritten = writeBufferedSection(keySectionBuffer,
+          compressOutput ? valuesCompressor : null);
+      compressedLengthBytesWritten = writeBufferedSection(lengthsSectionBuffer,
+          compressOutput ? valuesCompressor : null);
 
-      // header bytes are already included in rawOut
-      compressedBytesWritten = rawOut.getPos() - start;
+      decompressedBytesWritten += 3L * IFileOutputStream.getCheckSumSize();
 
       // Close the underlying stream iff we own it
       if (ownOutputStream) {
@@ -441,13 +455,8 @@ public class IFile {
         valuesCompressor = null;
       }
 
-      valuesOut = null;
       if (writtenRecordsCounter != null) {
         writtenRecordsCounter.increment(numRecordsWritten);
-      }
-      if (isDebugEnabled) {
-        LOG.debug("Total records written=" + numRecordsWritten + "; compressedLen=" +
-            compressedBytesWritten + "; rawLen=" + decompressedBytesWritten);
       }
     }
 
@@ -491,11 +500,11 @@ public class IFile {
       lengthsSectionBuffer.writeInt(valueLength);
       bufferWriteBytes(valueData, valPos, valueLength);
 
-      // Update bytes written
       logicalKeyBytesWritten += keyLength;
       logicalValueBytesWritten += valueLength;
       logicalLengthBytesWritten += (2L * INT_SIZE);
       decompressedBytesWritten += keyLength + valueLength + (2L * INT_SIZE);
+
       if (serializedUncompressedBytes != null) {
         serializedUncompressedBytes.increment(keyLength + valueLength);
       }
@@ -550,9 +559,11 @@ public class IFile {
       valuesChecksumOut.finish();
     }
 
-    private void writeBufferedSection(DataOutputBuffer sectionBuffer, @Nullable Compressor compressor)
+    private long writeBufferedSection(DataOutputBuffer sectionBuffer, @Nullable Compressor compressor)
         throws IOException {
       assert (compressOutput && compressor != null) || (!compressOutput && compressor == null);
+
+      final long sectionStart = rawOut.getPos();
 
       IFileOutputStream sectionChecksumOut = new IFileOutputStream(rawOut);
       DataOutputStream sectionOut = new DataOutputStream(sectionChecksumOut);
@@ -571,6 +582,24 @@ public class IFile {
         sectionCompressedOut.resetState();
       }
       sectionChecksumOut.finish();
+
+      return extractSectionPayloadLength(rawOut.getPos() - sectionStart);
+    }
+
+    private long extractSectionPayloadLength(long sectionTotalLength) {
+      return sectionTotalLength - IFileOutputStream.getCheckSumSize();
+    }
+
+    // Cf. corresponds to TezIndexRecord.rawLength
+    public long getRawLength() {
+      return decompressedBytesWritten;
+    }
+
+    // Cf. corresponds to TezIndexRecord.partLength (which factors in checksums and compression)
+    public long getCompressedLength() {
+      return HEADER.length
+        + compressedValueBytesWritten + compressedKeyBytesWritten + compressedLengthBytesWritten
+        + 3L * IFileOutputStream.getCheckSumSize();
     }
 
     protected long getLogicalValueBytesWritten() {
@@ -585,12 +614,16 @@ public class IFile {
       return logicalLengthBytesWritten;
     }
 
-    public long getRawLength() {
-      return decompressedBytesWritten;
+    public long getCompressedValueBytes() {
+      return compressedValueBytesWritten;
     }
 
-    public long getCompressedLength() {
-      return compressedBytesWritten;
+    public long getCompressedKeyBytes() {
+      return compressedKeyBytesWritten;
+    }
+
+    public long getCompressedLengthBytes() {
+      return compressedLengthBytesWritten;
     }
   }
 
