@@ -293,6 +293,9 @@ public class IFile {
     // initialized to HEADER.length because the header is already part of that logical length from the start
     private long decompressedBytesWritten = HEADER.length;
     private long compressedBytesWritten = 0;
+    private long compressedValueBytesWritten = 0;
+    private long compressedKeyBytesWritten = 0;
+    private long compressedLengthBytesWritten = 0;
     private long logicalValueBytesWritten = 0;
     private long logicalKeyBytesWritten = 0;
     private long logicalLengthBytesWritten = 0;
@@ -414,14 +417,17 @@ public class IFile {
       }
 
       finishValuesSection();
+      compressedValueBytesWritten = extractSectionPayloadLength(rawOut.getPos() - (start + HEADER.length));
 
       // values section is complete; compressor object can now be reused
       valuesOut = null;
       valuesCompressedOut = null;
       valuesChecksumOut = null;
 
-      writeBufferedSection(keySectionBuffer, compressOutput ? valuesCompressor : null);
-      writeBufferedSection(lengthsSectionBuffer, compressOutput ? valuesCompressor : null);
+      compressedKeyBytesWritten = writeBufferedSection(keySectionBuffer,
+          compressOutput ? valuesCompressor : null);
+      compressedLengthBytesWritten = writeBufferedSection(lengthsSectionBuffer,
+          compressOutput ? valuesCompressor : null);
 
       // header bytes are already included in rawOut
       compressedBytesWritten = rawOut.getPos() - start;
@@ -550,9 +556,11 @@ public class IFile {
       valuesChecksumOut.finish();
     }
 
-    private void writeBufferedSection(DataOutputBuffer sectionBuffer, @Nullable Compressor compressor)
+    private long writeBufferedSection(DataOutputBuffer sectionBuffer, @Nullable Compressor compressor)
         throws IOException {
       assert (compressOutput && compressor != null) || (!compressOutput && compressor == null);
+
+      final long sectionStart = rawOut.getPos();
 
       IFileOutputStream sectionChecksumOut = new IFileOutputStream(rawOut);
       DataOutputStream sectionOut = new DataOutputStream(sectionChecksumOut);
@@ -571,6 +579,17 @@ public class IFile {
         sectionCompressedOut.resetState();
       }
       sectionChecksumOut.finish();
+
+      return extractSectionPayloadLength(rawOut.getPos() - sectionStart);
+    }
+
+    private long extractSectionPayloadLength(long sectionTotalLength) throws IOException {
+      final long checksumLength = IFileOutputStream.getCheckSumSize();
+      if (sectionTotalLength < checksumLength) {
+        throw new IOException("Invalid section length " + sectionTotalLength
+            + ": must be at least checksum length " + checksumLength);
+      }
+      return sectionTotalLength - checksumLength;
     }
 
     protected long getLogicalValueBytesWritten() {
@@ -591,6 +610,18 @@ public class IFile {
 
     public long getCompressedLength() {
       return compressedBytesWritten;
+    }
+
+    public long getCompressedValueBytes() {
+      return compressedValueBytesWritten;
+    }
+
+    public long getCompressedKeyBytes() {
+      return compressedKeyBytesWritten;
+    }
+
+    public long getCompressedLengthBytes() {
+      return compressedLengthBytesWritten;
     }
   }
 
