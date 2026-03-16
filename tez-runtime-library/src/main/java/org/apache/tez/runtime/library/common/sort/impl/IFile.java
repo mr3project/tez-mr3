@@ -17,7 +17,6 @@
  */
 package org.apache.tez.runtime.library.common.sort.impl;
 
-import java.io.ByteArrayInputStream;
 import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -154,7 +153,7 @@ public class IFile {
         TezCounter serializedBytesCounter, int cacheSize, byte[] writeBuffer) throws IOException {
       super(keySerialization, valSerialization,
           new FSDataOutputStream(createBoundedBuffer(cacheSize), null),
-          keyClass, valueClass, codec,
+          keyClass, valueClass, null,
           writesCounter, serializedBytesCounter, false, writeBuffer, null);
       this.fs = fs;
       this.cacheStream = (BoundedByteArrayOutputStream) this.rawOut.getWrappedStream();
@@ -193,7 +192,7 @@ public class IFile {
      */
     private void resetToFileBasedWriter() throws IOException {
       // Close out stream, so that data checksums are written.
-      // Buf contents = HEADER + (uncompressed) real data + CHECKSUM
+      // Temporary in-memory values section = HEADER + (uncompressed) values payload + CHECKSUM
       flushWriteBuffer();
       finishValuesSectionForSpill();
 
@@ -226,38 +225,8 @@ public class IFile {
     }
 
     private void replayValuesPayload(byte[] data, int offset, int length) throws IOException {
-      if (length <= 0) {
-        return;
-      }
-      if (fileCodec == null) {
+      if (length > 0) {
         bufferWriteBytes(data, offset, length);
-        return;
-      }
-
-      Decompressor sectionDecompressor = null;
-      InputStream replayIn = null;
-      byte[] replayBuffer = allocateWriteBuffer();
-      try {
-        sectionDecompressor = CodecUtils.getDecompressor(fileCodec);
-        if (sectionDecompressor == null) {
-          throw new IOException("Could not obtain decompressor from CodecPool for spill replay");
-        }
-        sectionDecompressor.reset();
-        replayIn = CodecUtils.createInputStream(fileCodec,
-            new ByteArrayInputStream(data, offset, length), sectionDecompressor);
-        int bytesRead;
-        while ((bytesRead = replayIn.read(replayBuffer)) != -1) {
-          if (bytesRead > 0) {
-            bufferWriteBytes(replayBuffer, 0, bytesRead);
-          }
-        }
-      } finally {
-        if (replayIn != null) {
-          replayIn.close();
-        }
-        if (sectionDecompressor != null) {
-          CodecPool.returnDecompressor(sectionDecompressor);
-        }
       }
     }
 
