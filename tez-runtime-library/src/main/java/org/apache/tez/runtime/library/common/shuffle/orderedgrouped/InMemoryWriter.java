@@ -21,6 +21,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 
 import org.apache.hadoop.io.BoundedByteArrayOutputStream;
+import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.tez.common.io.NonSyncDataOutputStream;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
@@ -35,31 +36,56 @@ public class InMemoryWriter implements IFile.WriterAppend {
     }
   }
 
+  private final BoundedByteArrayOutputStream arrayStream;
+  private final DataOutputBuffer keySectionBuffer = new DataOutputBuffer();
+  private final DataOutputBuffer lengthsSectionBuffer = new DataOutputBuffer();
+
+  private IFileOutputStream valuesChecksumOut;
   private DataOutputStream out;
 
   // InMemoryWriter does not use another byte[] buffer, unlike IFile.Writer
   public InMemoryWriter(byte[] array) {
-    BoundedByteArrayOutputStream arrayStream = new InMemoryBoundedByteArrayOutputStream(array);
-    this.out = new NonSyncDataOutputStream(new IFileOutputStream(arrayStream));
+    this.arrayStream = new InMemoryBoundedByteArrayOutputStream(array);
+    try {
+      arrayStream.write(IFile.HEADER, 0, IFile.HEADER.length);  // assume uncompressed
+      this.valuesChecksumOut = new IFileOutputStream(arrayStream);
+      this.out = new NonSyncDataOutputStream(valuesChecksumOut);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to initialize InMemoryWriter", e);
+    }
   }
 
   public void append(DataInputBuffer key, DataInputBuffer value) throws IOException {
       int keyLength = key.getLength() - key.getPosition();
       int valueLength = value.getLength() - value.getPosition();
+      if (keyLength < 0 || valueLength < 0) {
+        throw new IOException("Negative key/value lengths are not allowed. keyLength=" + keyLength
+            + ", valueLength=" + valueLength);
+      }
 
-      long combined = ((long) keyLength << 32) | (valueLength & 0xFFFFFFFFL);
-      out.writeLong(combined);
-
-      out.write(key.getData(), key.getPosition(), keyLength);
       out.write(value.getData(), value.getPosition(), valueLength);
+
+      keySectionBuffer.write(key.getData(), key.getPosition(), keyLength);
+      lengthsSectionBuffer.writeInt(keyLength);
+      lengthsSectionBuffer.writeInt(valueLength);
   }
 
   public void close() throws IOException {
-      // Write EOF_MARKER for key/value length
-      long combined = ((long) IFile.EOF_MARKER << 32) | (IFile.EOF_MARKER & 0xFFFFFFFFL);
-      out.writeLong(combined);
+      out.flush();
+      valuesChecksumOut.finish();
 
-      out.close();
+      writeSection(keySectionBuffer);
+      writeSection(lengthsSectionBuffer);
+
       out = null;
+      valuesChecksumOut = null;
+  }
+
+  private void writeSection(DataOutputBuffer sectionBuffer) throws IOException {
+    IFileOutputStream sectionChecksumOut = new IFileOutputStream(arrayStream);
+    DataOutputStream sectionOut = new NonSyncDataOutputStream(sectionChecksumOut);
+    sectionOut.write(sectionBuffer.getData(), 0, sectionBuffer.getLength());
+    sectionOut.flush();
+    sectionChecksumOut.finish();
   }
 }

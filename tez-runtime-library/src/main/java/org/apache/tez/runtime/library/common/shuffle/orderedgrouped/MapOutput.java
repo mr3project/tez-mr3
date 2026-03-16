@@ -60,8 +60,7 @@ public abstract class MapOutput implements ShuffleInput {
   public static MapOutput createDiskMapOutput(InputAttemptIdentifier attemptIdentifier,
                                               FetchedInputAllocatorOrderedGrouped callback, long size, Configuration conf,
                                               int fetcher, boolean primaryMapOutput,
-                                              TezTaskOutputFiles mapOutputFile) throws
-      IOException {
+                                              TezTaskOutputFiles mapOutputFile) throws IOException {
     FileSystem fs = FileSystem.getLocal(conf).getRaw();
     Path outputPath = mapOutputFile.getInputFileForWrite(
         attemptIdentifier.getInputIdentifier(), attemptIdentifier.getSpillEventId(), size);
