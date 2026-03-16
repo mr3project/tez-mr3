@@ -692,6 +692,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           } finally {
             if (writer != null) {
               writer.close();
+              // writer never used again
             }
           }
         }
@@ -1218,6 +1219,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         } finally {
           if (writer != null) {
             writer.close();
+            // write never used again
           }
         }
       }
@@ -1321,6 +1323,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           } finally {
             if (writer != null) {
               writer.close();
+              // write never used again
             }
           }
         } else {

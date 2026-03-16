@@ -765,6 +765,7 @@ public class TezMerger {
 
           writeFile(this, writer, reporter, recordsBeforeProgress);
           writer.close();
+          // write never used again
           
           //we finished one single level merge; now clean up the priority 
           //queue

@@ -531,15 +531,16 @@ public class PipelinedSorter extends ExternalSorter {
             writer.close();
             rawLength = writer.getRawLength();
             partLength = writer.getCompressedLength();
+            writer = null;
           }
           adjustSpillCounters(rawLength, partLength);
           // record offsets
           final TezIndexRecord rec = new TezIndexRecord(segmentStart, rawLength, partLength);
           spillRec.putIndex(rec, i);
-          writer = null;
         } finally {
           if (null != writer) {
             writer.close();
+            // write never used again
           }
         }
       }
@@ -645,6 +646,7 @@ public class PipelinedSorter extends ExternalSorter {
           writer.close();
           rawLength = writer.getRawLength();
           partLength = writer.getCompressedLength();
+          // write never used again
         }
         adjustSpillCounters(rawLength, partLength);
         sumPartLength += partLength;
@@ -897,6 +899,7 @@ public class PipelinedSorter extends ExternalSorter {
           writer.close();
           rawLength = writer.getRawLength();
           partLength = writer.getCompressedLength();
+          // write never used again
         }
         outputBytesWithOverheadCounter.increment(rawLength);
 
