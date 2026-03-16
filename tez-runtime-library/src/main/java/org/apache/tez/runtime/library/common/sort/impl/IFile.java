@@ -1035,33 +1035,58 @@ public class IFile {
     }
 
     public void close() throws IOException {
-      // Close the underlying stream
-      in.close();
+      IOException thrown = null;
 
-      // Release the buffer
-      dataIn = null;
       if (readRecordsCounter != null) {
         readRecordsCounter.increment(numRecordsRead);
       }
 
-      if (bytesReadCounter != null) {
-        bytesReadCounter.increment(checksumIn.getPosition() - startPos + checksumIn.getSize());
+      if (bytesReadCounter != null && valuesChecksumIn != null) {
+        bytesReadCounter.increment(getPosition() + (3L * checksumSize));
       }
 
-      // Return the decompressor
-      if (decompressor != null) {
-        decompressor.reset();
-        if (taskContext != null) {
-          taskContext.returnDecompressor(codec.getCompressorType(), decompressor);
-        } else {
-          CodecPool.returnDecompressor(decompressor);
-        }
-        decompressor = null;
+      // Release section readers
+      valuesDataIn = null;
+      keysDataIn = null;
+      lengthsDataIn = null;
+
+      try { closeSection(valuesIn); } catch (IOException e) { thrown = e; }
+      try { closeSection(keysIn); } catch (IOException e) { thrown = e; }
+      try { closeSection(lengthsIn); } catch (IOException e) { thrown = e; }
+
+      // Return decompressors (all-or-none when compressed)
+      if (isCompressed) {
+        assert keysDecompressor != null && valuesDecompressor != null && lengthsDecompressor != null;
+        assert taskContext != null;
+
+        valuesDecompressor.reset();
+        keysDecompressor.reset();
+        lengthsDecompressor.reset();
+        taskContext.returnDecompressor(codec.getCompressorType(), valuesDecompressor);
+        taskContext.returnDecompressor(codec.getCompressorType(), keysDecompressor);
+        taskContext.returnDecompressor(codec.getCompressorType(), lengthsDecompressor);
+
+        valuesDecompressor = null;
+        keysDecompressor = null;
+        lengthsDecompressor = null;
+      }
+
+      valuesChecksumIn = null;
+      keysChecksumIn = null;
+      lengthsChecksumIn = null;
+
+      if (thrown != null) {
+        throw thrown;
+      }
+    }
+
+    private void closeSection(InputStream sectionIn) throws IOException {
+      if (sectionIn != null) {
+        sectionIn.close();
       }
     }
 
     public void reset(int offset) {
-      return;
     }
   }
 }
