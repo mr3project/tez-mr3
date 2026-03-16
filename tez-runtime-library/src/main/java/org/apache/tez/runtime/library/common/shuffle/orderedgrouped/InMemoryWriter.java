@@ -88,4 +88,28 @@ public class InMemoryWriter implements IFile.WriterAppend {
     sectionOut.flush();
     sectionChecksumOut.finish();
   }
+
+  // should be called after close()
+  public IFile.SectionLayout getSectionLayout() {
+    long keysLength = keySectionBuffer.getLength();
+    long lengthsLength = lengthsSectionBuffer.getLength();
+    long totalLength = arrayStream.size();
+
+    long valuesLength = totalLength
+        - IFile.HEADER.length
+        - keysLength
+        - lengthsLength
+        - 3L * IFile.checksumSize;
+    assert valuesLength >= 0;
+
+    long valuesStart = IFile.HEADER.length;
+    long keysStart = valuesStart + valuesLength + IFile.checksumSize;
+    long lengthsStart = keysStart + keysLength + IFile.checksumSize;
+
+    return new IFile.SectionLayout(
+        valuesStart, valuesLength,
+        keysStart, keysLength,
+        lengthsStart, lengthsLength,
+        totalLength);
+  }
 }

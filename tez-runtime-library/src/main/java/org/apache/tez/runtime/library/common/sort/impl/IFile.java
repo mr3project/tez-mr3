@@ -61,9 +61,7 @@ public class IFile {
   private static final Logger LOG = LoggerFactory.getLogger(IFile.class);
   private static final boolean isDebugEnabled = LOG.isDebugEnabled();
 
-  public static final int EOF_MARKER = -1;  // TODO: Remove
-
-  // HEADER default = uncompressed
+  // HEADER default = uncompressed (0)
   public static final byte[] HEADER = new byte[] { (byte) 'T', (byte) 'I', (byte) 'F' , (byte) 0};
 
   private static final String INCOMPLETE_READ = "Requested to read %d got %d";
@@ -87,9 +85,10 @@ public class IFile {
   public interface WriterAppend {
     void append(DataInputBuffer key, DataInputBuffer value) throws IOException;
     void close() throws IOException;
+    SectionLayout getSectionLayout();   // valid after close()
   }
 
-  private static final int checksumSize = IFileOutputStream.getCheckSumSize();
+  public static final int checksumSize = IFileOutputStream.getCheckSumSize();
 
   /**
    * For basic cache size checks: header + one section checksum trailer.
@@ -107,6 +106,35 @@ public class IFile {
    */
   static int getBasePartitionSizeEstimate() {
     return HEADER.length + (3 * checksumSize);
+  }
+
+  // Output layout:
+  //   HEADER ++ [values, checksum] ++ [keys, checksum] ++ [lengths, checksum]
+  //             ^                     ^                   ^                  ^
+  //             valuesStart           keysStart           lengthsStart       totalLength
+  //
+  // valuesLength, keysLength, lengthsLength do not include checksum.
+
+  public static final class SectionLayout {
+
+    public final long valuesStart, valuesLength;
+    public final long keysStart, keysLength;
+    public final long lengthsStart, lengthsLength;
+    public final long totalLength;
+
+    public SectionLayout(
+        long valuesStart, long valuesLength,
+        long keysStart, long keysLength,
+        long lengthsStart, long lengthsLength,
+        long totalLength) {
+      this.valuesStart = valuesStart;
+      this.valuesLength = valuesLength;
+      this.keysStart = keysStart;
+      this.keysLength = keysLength;
+      this.lengthsStart = lengthsStart;
+      this.lengthsLength = lengthsLength;
+      this.totalLength = totalLength;
+    }
   }
 
   /**
@@ -290,20 +318,15 @@ public class IFile {
     // if true, close() closes rawOut.
     protected boolean ownOutputStream = false;
 
-    // Output layout:
-    //   HEADER ++ [values, checksum] ++ [keys, checksum] ++ [lengths, checksum]
-    //
-    // logicalValueBytesWritten, compressedValueBytesWritten = only for values, not including checksum
-    // logicalKeyBytesWritten, compressedKeyBytesWritten = only for keys, not including checksum
-    // logicalKeyLengthWritten, compressedLengthBytesWritten = only for lengths, not including checksum
+    // logicalValueBytesWritten, storedValueBytesWritten = only for values, not including checksum
+    // logicalKeyBytesWritten, storedKeyBytesWritten = only for keys, not including checksum
+    // logicalKeyLengthWritten, storedLengthBytesWritten = only for lengths, not including checksum
 
-    // initialized to HEADER.length because the header is already part of that logical length from the start
-    // length of the entire output (from HEADER to the last checksum)
-    private long decompressedBytesWritten = HEADER.length;
-
-    private long compressedValueBytesWritten = 0;
-    private long compressedKeyBytesWritten = 0;
-    private long compressedLengthBytesWritten = 0;
+    // the actual number of bytes written to disk/memory, excluding checksum
+    // without compression, stored???BytesWritten = logical???BytesWritten
+    private long storedValueBytesWritten = 0;
+    private long storedKeyBytesWritten = 0;
+    private long storedLengthBytesWritten = 0;
 
     private long logicalValueBytesWritten = 0;
     private long logicalKeyBytesWritten = 0;
@@ -425,19 +448,17 @@ public class IFile {
       }
 
       finishValuesSection();
-      compressedValueBytesWritten = extractSectionPayloadLength(rawOut.getPos() - (start + HEADER.length));
+      storedValueBytesWritten = extractSectionPayloadLength(rawOut.getPos() - (start + HEADER.length));
 
       // values section is complete; compressor object can now be reused
       valuesOut = null;
       valuesCompressedOut = null;
       valuesChecksumOut = null;
 
-      compressedKeyBytesWritten = writeBufferedSection(keySectionBuffer,
+      storedKeyBytesWritten = writeBufferedSection(keySectionBuffer,
           compressOutput ? valuesCompressor : null);
-      compressedLengthBytesWritten = writeBufferedSection(lengthsSectionBuffer,
+      storedLengthBytesWritten = writeBufferedSection(lengthsSectionBuffer,
           compressOutput ? valuesCompressor : null);
-
-      decompressedBytesWritten += 3L * IFileOutputStream.getCheckSumSize();
 
       // Close the underlying stream iff we own it
       if (ownOutputStream) {
@@ -499,8 +520,7 @@ public class IFile {
 
       logicalKeyBytesWritten += keyLength;
       logicalValueBytesWritten += valueLength;
-      logicalLengthBytesWritten += (2L * INT_SIZE);
-      decompressedBytesWritten += keyLength + valueLength + (2L * INT_SIZE);
+      logicalLengthBytesWritten += 2L * INT_SIZE;
 
       if (serializedUncompressedBytes != null) {
         serializedUncompressedBytes.increment(keyLength + valueLength);
@@ -584,7 +604,7 @@ public class IFile {
     }
 
     private long extractSectionPayloadLength(long sectionTotalLength) {
-      return sectionTotalLength - IFileOutputStream.getCheckSumSize();
+      return sectionTotalLength - checksumSize;
     }
 
     public long getNumRecordsWritten() {
@@ -593,38 +613,41 @@ public class IFile {
 
     // Cf. corresponds to TezIndexRecord.rawLength
     public long getRawLength() {
-      return decompressedBytesWritten;
+      return HEADER.length
+        + logicalKeyBytesWritten + logicalValueBytesWritten + logicalLengthBytesWritten
+        + 3L * checksumSize;
     }
 
     // Cf. corresponds to TezIndexRecord.partLength (which factors in checksums and compression)
     public long getCompressedLength() {
       return HEADER.length
-        + compressedValueBytesWritten + compressedKeyBytesWritten + compressedLengthBytesWritten
-        + 3L * IFileOutputStream.getCheckSumSize();
+        + storedValueBytesWritten + storedKeyBytesWritten + storedLengthBytesWritten
+        + 3L * checksumSize;
     }
 
-    protected long getLogicalValueBytesWritten() {
+    public long getLogicalValueBytesWritten() {
       return logicalValueBytesWritten;
     }
 
-    protected long getLogicalKeyBytesWritten() {
+    public long getLogicalKeyBytesWritten() {
       return logicalKeyBytesWritten;
     }
 
-    protected long getLogicalLengthBytesWritten() {
+    public long getLogicalLengthBytesWritten() {
       return logicalLengthBytesWritten;
     }
 
-    public long getCompressedValueBytes() {
-      return compressedValueBytesWritten;
-    }
-
-    public long getCompressedKeyBytes() {
-      return compressedKeyBytesWritten;
-    }
-
-    public long getCompressedLengthBytes() {
-      return compressedLengthBytesWritten;
+    // should be called after close()
+    public SectionLayout getSectionLayout() {
+      long valuesStart = HEADER.length;
+      long keysStart = valuesStart + storedValueBytesWritten + checksumSize;
+      long lengthsStart = keysStart + storedKeyBytesWritten + checksumSize;
+      long totalLength = lengthsStart + storedLengthBytesWritten + checksumSize;
+      return new SectionLayout(
+          valuesStart, storedValueBytesWritten,
+          keysStart, storedKeyBytesWritten,
+          lengthsStart, storedLengthBytesWritten,
+          totalLength);
     }
   }
 
