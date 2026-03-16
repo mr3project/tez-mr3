@@ -55,7 +55,7 @@ import javax.annotation.Nullable;
  * <code>IFile</code> is the simple <key-len, value-len, key, value> format
  * for the intermediate map-outputs in Map-Reduce.
  *
- * There is a <code>Writer</code> to write out map-outputs in this format and 
+ * There is a <code>Writer</code> to write out map-outputs in this format and
  * a <code>Reader</code> to read files of this format.
  */
 public class IFile {
@@ -86,8 +86,8 @@ public class IFile {
   }
 
   public interface WriterAppend {
-    public void append(DataInputBuffer key, DataInputBuffer value) throws IOException;
-    public void close() throws IOException;
+    void append(DataInputBuffer key, DataInputBuffer value) throws IOException;
+    void close() throws IOException;
   }
 
   private static final int checksumSize = IFileOutputStream.getCheckSumSize();
@@ -421,8 +421,14 @@ public class IFile {
       }
 
       finishValuesSection();
-      writeBufferedSection(keySectionBuffer);
-      writeBufferedSection(lengthsSectionBuffer);
+
+      // values section is complete; compressor object can now be reused
+      valuesOut = null;
+      valuesCompressedOut = null;
+      valuesChecksumOut = null;
+
+      writeBufferedSection(keySectionBuffer, compressOutput ? valuesCompressor : null);
+      writeBufferedSection(lengthsSectionBuffer, compressOutput ? valuesCompressor : null);
 
       // header bytes are already included in rawOut
       compressedBytesWritten = rawOut.getPos() - start;
@@ -551,33 +557,27 @@ public class IFile {
       valuesChecksumOut.finish();
     }
 
-    private void writeBufferedSection(DataOutputBuffer sectionBuffer) throws IOException {
+    private void writeBufferedSection(DataOutputBuffer sectionBuffer, @Nullable Compressor compressor)
+        throws IOException {
+      assert (compressOutput && compressor != null) || (!compressOutput && compressor == null);
+
       IFileOutputStream sectionChecksumOut = new IFileOutputStream(rawOut);
       DataOutputStream sectionOut = new DataOutputStream(sectionChecksumOut);
       CompressionOutputStream sectionCompressedOut = null;
-      Compressor sectionCompressor = null;
-      if (compressOutput) {
-        sectionCompressor = CodecUtils.getCompressor(codec);
-        if (sectionCompressor == null) {
-          throw new IOException("Could not obtain compressor from CodecPool for section write");
-        }
-        sectionCompressor.reset();
-        sectionCompressedOut = CodecUtils.createOutputStream(codec, sectionChecksumOut, sectionCompressor);
+
+      if (compressor != null) {
+        compressor.reset();
+        sectionCompressedOut = CodecUtils.createOutputStream(codec, sectionChecksumOut, compressor);
         sectionOut = new DataOutputStream(sectionCompressedOut);
       }
-      try {
-        sectionOut.write(sectionBuffer.getData(), 0, sectionBuffer.getLength());
-        sectionOut.flush();
-        if (sectionCompressedOut != null) {
-          sectionCompressedOut.finish();
-          sectionCompressedOut.resetState();
-        }
-        sectionChecksumOut.finish();
-      } finally {
-        if (sectionCompressor != null) {
-          CodecPool.returnCompressor(sectionCompressor);
-        }
+
+      sectionOut.write(sectionBuffer.getData(), 0, sectionBuffer.getLength());
+      sectionOut.flush();
+      if (sectionCompressedOut != null) {
+        sectionCompressedOut.finish();
+        sectionCompressedOut.resetState();
       }
+      sectionChecksumOut.finish();
     }
 
     protected long getLogicalValueBytesWritten() {
@@ -998,5 +998,4 @@ public class IFile {
       return;
     }
   }
-
 }
