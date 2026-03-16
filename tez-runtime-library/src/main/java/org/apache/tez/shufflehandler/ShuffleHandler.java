@@ -1190,7 +1190,8 @@ public class ShuffleHandler {
           lastIndex = index;
         }
 
-        ShuffleHeader header = new ShuffleHeader(mapId, index.getPartLength(), index.getRawLength(), reduce);
+        ShuffleHeader header = new ShuffleHeader(mapId, index.getPartLength(), index.getRawLength(), reduce,
+            index.getKeySectionOffset(), index.getLengthSectionOffset());
         dob.reset();
         header.write(dob);
         // Free the memory needed to store the spill and index records

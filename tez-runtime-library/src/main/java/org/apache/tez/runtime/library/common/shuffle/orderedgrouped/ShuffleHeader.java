@@ -47,6 +47,8 @@ public class ShuffleHeader implements Writable {
   String mapId;
   long uncompressedLength;
   long compressedLength;
+  long keySectionOffset;
+  long lengthSectionOffset;
   int forReduce;
 
   private boolean compositeFetch;
@@ -63,10 +65,18 @@ public class ShuffleHeader implements Writable {
   // ShuffleHeader created used by MR3 ShuffleHandler (but not by Hadoop shuffle service)
   public ShuffleHeader(String mapId, long compressedLength,
       long uncompressedLength, int forReduce) {
+    this(mapId, compressedLength, uncompressedLength, forReduce, -1, -1);
+  }
+
+  public ShuffleHeader(String mapId, long compressedLength,
+      long uncompressedLength, int forReduce,
+      long keySectionOffset, long lengthSectionOffset) {
     this.mapId = mapId;
     this.compressedLength = compressedLength;
     this.uncompressedLength = uncompressedLength;
     this.forReduce = forReduce;
+    this.keySectionOffset = keySectionOffset;
+    this.lengthSectionOffset = lengthSectionOffset;
   }
   
   public String getMapId() {
@@ -85,6 +95,14 @@ public class ShuffleHeader implements Writable {
     return compressedLength;
   }
 
+  public long getKeySectionOffset() {
+    return keySectionOffset;
+  }
+
+  public long getLengthSectionOffset() {
+    return lengthSectionOffset;
+  }
+
   public void readFields(DataInput in) throws IOException {
     if (compositeFetch) {   // ShuffleHeader created by MR3 ShuffleHandler
       int length = in.readInt();  // Cf. WritableUtils.readStringSafely() calls readVInt()
@@ -99,11 +117,15 @@ public class ShuffleHeader implements Writable {
       compressedLength = in.readLong();
       uncompressedLength = in.readLong();
       forReduce = in.readInt();
+      keySectionOffset = in.readLong();
+      lengthSectionOffset = in.readLong();
     } else {  // ShuffleHeader created by Hadoop shuffle service
       mapId = WritableUtils.readStringSafely(in, MAX_ID_LENGTH);
       compressedLength = WritableUtils.readVLong(in);
       uncompressedLength = WritableUtils.readVLong(in);
       forReduce = WritableUtils.readVInt(in);
+      keySectionOffset = -1;
+      lengthSectionOffset = -1;
     }
   }
 
@@ -111,7 +133,7 @@ public class ShuffleHeader implements Writable {
   // do not use WritableUtils.writeVLong/Int()
   public int writeLength() throws IOException {
     int length = Text.encode(mapId).limit();
-    length += 4 + 8 + 8 + 4;  // encoding of mapIdLength, compressedLength, uncompressedLength, forReduce
+    length += 4 + 8 + 8 + 4 + 8 + 8;  // encoding of mapIdLength, compressedLength, uncompressedLength, forReduce, keySectionOffset, lengthSectionOffset
     return length;
   }
 
@@ -127,5 +149,7 @@ public class ShuffleHeader implements Writable {
     out.writeLong(compressedLength);
     out.writeLong(uncompressedLength);
     out.writeInt(forReduce);
+    out.writeLong(keySectionOffset);
+    out.writeLong(lengthSectionOffset);
   }
 }

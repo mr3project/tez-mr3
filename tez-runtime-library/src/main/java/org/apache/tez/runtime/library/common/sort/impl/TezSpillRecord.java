@@ -37,6 +37,7 @@ import org.apache.hadoop.util.functional.FutureIO;
 import org.apache.tez.runtime.library.common.Constants;
 
 public class TezSpillRecord {
+  private static final int LONGS_PER_ENTRY = Constants.MAP_OUTPUT_INDEX_RECORD_LENGTH / Long.BYTES;
   public static final FsPermission SPILL_FILE_PERMS = new FsPermission((short) 0640);
 
   /** Backing store */
@@ -101,25 +102,28 @@ public class TezSpillRecord {
    * Return number of IndexRecord entries in this spill.
    */
   public int size() {
-    return entries.capacity() / (Constants.MAP_OUTPUT_INDEX_RECORD_LENGTH / 8);
+    return entries.capacity() / LONGS_PER_ENTRY;
   }
 
   /**
    * Get spill offsets for given partition.
    */
   public TezIndexRecord getIndex(int partition) {
-    final int pos = partition * Constants.MAP_OUTPUT_INDEX_RECORD_LENGTH / 8;
-    return new TezIndexRecord(entries.get(pos), entries.get(pos + 1), entries.get(pos + 2));
+    final int pos = partition * LONGS_PER_ENTRY;
+    return new TezIndexRecord(entries.get(pos), entries.get(pos + 1), entries.get(pos + 2),
+        entries.get(pos + 3), entries.get(pos + 4));
   }
 
   /**
    * Set spill offsets for given partition.
    */
   public void putIndex(TezIndexRecord rec, int partition) {
-    final int pos = partition * Constants.MAP_OUTPUT_INDEX_RECORD_LENGTH / 8;
+    final int pos = partition * LONGS_PER_ENTRY;
     entries.put(pos, rec.getStartOffset());
     entries.put(pos + 1, rec.getRawLength());
     entries.put(pos + 2, rec.getPartLength());
+    entries.put(pos + 3, rec.getKeySectionOffset());
+    entries.put(pos + 4, rec.getLengthSectionOffset());
   }
 
   /**
