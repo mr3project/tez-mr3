@@ -92,12 +92,12 @@ public class IFile {
   private static final int checksumSize = IFileOutputStream.getCheckSumSize();
 
   /**
-   * For basic cache size checks: header + checksum + EOF marker
+   * For basic cache size checks: header + one section checksum trailer.
    *
    * @return size of the base cache needed
    */
   static int getBaseCacheSize() {
-    return (HEADER.length + checksumSize + (2 * INT_SIZE));
+    return (HEADER.length + checksumSize);
   }
 
   /**
@@ -129,9 +129,6 @@ public class IFile {
     private final BoundedByteArrayOutputStream cacheStream;
 
     /**
-     * Note that we do not allow compression in in-mem stream.
-     * When spilled over to file, compression gets enabled.
-     *
      * @param keySerialization
      * @param valSerialization
      * @param fs
@@ -150,13 +147,13 @@ public class IFile {
         TezCounter serializedBytesCounter, int cacheSize, byte[] writeBuffer) throws IOException {
       super(keySerialization, valSerialization,
           new FSDataOutputStream(createBoundedBuffer(cacheSize), null),
-          keyClass, valueClass, null,
+          keyClass, valueClass, codec,
           writesCounter, serializedBytesCounter, false, writeBuffer, null);
       this.fs = fs;
       this.cacheStream = (BoundedByteArrayOutputStream) this.rawOut.getWrappedStream();
       this.taskOutput = taskOutput;
       this.bufferFull = (cacheStream == null);
-      this.totalSize = getBaseCacheSize();
+      this.totalSize = HEADER.length + (3 * checksumSize);
       this.fileCodec = codec;
     }
 
@@ -191,7 +188,7 @@ public class IFile {
       // Close out stream, so that data checksums are written.
       // Buf contents = HEADER + (uncompressed) real data + CHECKSUM
       flushWriteBuffer();
-      this.out.close();
+      finishValuesSectionForSpill();
 
       // Get the buffer which contains data in memory
       BoundedByteArrayOutputStream bout =
@@ -206,16 +203,18 @@ public class IFile {
       this.rawOut = newRawOut;
       this.ownOutputStream = true;  // because of fs.create(outputPath)
 
-      setupOutputStream(fileCodec);
+      resetValuesSectionOutput(fileCodec);
 
       // Write header to file
       headerWritten = false;
       writeHeader(newRawOut);
 
-      // write real data
+      // write values section payload produced so far (without header and checksum)
       int sPos = HEADER.length;
       int len = (bout.size() - checksumSize - HEADER.length);
-      bufferWriteBytes(bout.getBuffer(), sPos, len);
+      if (len > 0) {
+        newRawOut.write(bout.getBuffer(), sPos, len);
+      }
 
       bufferFull = true;
       bout.reset();
@@ -265,16 +264,17 @@ public class IFile {
    */
   @SuppressWarnings({"unchecked", "rawtypes"})
   public static class Writer implements WriterAppend {
-    // DataOutput: rawOut <-- checksumOut <-- compressedOut <-- out <-- [writeBuffer]
-
-    protected DataOutputStream out;
+    // Values section output (written during append):
+    // rawOut <-- valuesChecksumOut <-- valuesCompressedOut <-- valuesOut <-- [writeBuffer]
+    protected DataOutputStream valuesOut;
     private long start = 0;
 
-    private CompressionOutputStream compressedOut;
-    private Compressor compressor;
+    private CompressionOutputStream valuesCompressedOut;
+    private Compressor valuesCompressor;
     private boolean compressOutput = false;
 
-    private IFileOutputStream checksumOut;
+    private IFileOutputStream valuesChecksumOut;
+    private final CompressionCodec codec;
 
     protected FSDataOutputStream rawOut;
     // true iff this Writer created and owns rawOut
@@ -283,8 +283,11 @@ public class IFile {
 
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
-    private long decompressedBytesWritten = 0;
+    private long decompressedBytesWritten = HEADER.length;
     private long compressedBytesWritten = 0;
+    private long logicalValueBytesWritten = 0;
+    private long logicalKeyBytesWritten = 0;
+    private long logicalLengthBytesWritten = 0;
 
     // Count records written to disk
     private long numRecordsWritten = 0;
@@ -296,6 +299,8 @@ public class IFile {
     private Serializer valueSerializer = null;
 
     private final DataOutputBuffer buffer = new DataOutputBuffer();
+    private final DataOutputBuffer keySectionBuffer = new DataOutputBuffer();
+    private final DataOutputBuffer lengthsSectionBuffer = new DataOutputBuffer();
     protected boolean headerWritten = false;
 
     // We use writeBuffer[] to reduce the number of writes to 'out' and thus
@@ -336,6 +341,7 @@ public class IFile {
       this.writeOffset = 0;
 
       this.compressorExternal = compressorExternal;
+      this.codec = codec;
 
       setupOutputStream(codec);
       writeHeader(outputStream);
@@ -352,25 +358,37 @@ public class IFile {
     }
 
     void setupOutputStream(CompressionCodec codec) throws IOException {
-      this.checksumOut = new IFileOutputStream(this.rawOut);
+      this.valuesChecksumOut = new IFileOutputStream(this.rawOut);
       if (codec != null) {
         if (compressorExternal != null) {
-          this.compressor = compressorExternal;
+          this.valuesCompressor = compressorExternal;
         } else {
-          this.compressor = CodecUtils.getCompressor(codec);
+          this.valuesCompressor = CodecUtils.getCompressor(codec);
         }
-        if (this.compressor != null) {
-          this.compressor.reset();
-          this.compressedOut = CodecUtils.createOutputStream(codec, checksumOut, compressor);
-          this.out = new DataOutputStream(this.compressedOut);
+        if (this.valuesCompressor != null) {
+          this.valuesCompressor.reset();
+          this.valuesCompressedOut = CodecUtils.createOutputStream(codec, valuesChecksumOut, valuesCompressor);
+          this.valuesOut = new DataOutputStream(this.valuesCompressedOut);
           this.compressOutput = true;
         } else {
-          LOG.warn("Could not obtain compressor from CodecPool");
-          this.out = new DataOutputStream(checksumOut);
+          throw new IOException("Could not obtain compressor from CodecPool for values section");
         }
       } else {
-        this.out = new DataOutputStream(checksumOut);
+        this.valuesOut = new DataOutputStream(valuesChecksumOut);
       }
+    }
+
+
+    protected void resetValuesSectionOutput(CompressionCodec codec) throws IOException {
+      if (compressOutput && compressorExternal == null && valuesCompressor != null) {
+        CodecPool.returnCompressor(valuesCompressor);
+      }
+      this.valuesOut = null;
+      this.valuesCompressedOut = null;
+      this.valuesChecksumOut = null;
+      this.valuesCompressor = null;
+      this.compressOutput = false;
+      setupOutputStream(codec);
     }
 
     protected void writeHeader(OutputStream outputStream) throws IOException {
@@ -394,29 +412,13 @@ public class IFile {
         valueSerializer.close();
       }
 
-      // Write EOF_MARKER for key/value length
-      // bufferWriteInt(EOF_MARKER);
-      // bufferWriteInt(EOF_MARKER);
-      long combined = ((long) EOF_MARKER << 32) | (EOF_MARKER & 0xFFFFFFFFL);
-      bufferWriteLong(combined);
-
-      decompressedBytesWritten += 2 * INT_SIZE;
-      //account for header bytes
-      decompressedBytesWritten += HEADER.length;
-
-      flushWriteBuffer();   // Ensure all buffered data is written to 'out'
+      finishValuesSection();
+      writeBufferedSection(keySectionBuffer);
+      writeBufferedSection(lengthsSectionBuffer);
 
       // Close the underlying stream iff we own it
       if (ownOutputStream) {
-        out.close();
-      } else {
-        if (compressOutput) {
-          // Flush
-          compressedOut.finish();
-          compressedOut.resetState();
-        }
-        // Write the checksum and flush the buffer
-        checksumOut.finish();
+        rawOut.close();
       }
       //header bytes are already included in rawOut
       compressedBytesWritten = rawOut.getPos() - start;
@@ -426,12 +428,12 @@ public class IFile {
         // if compressorExternal != null, this Writer does not own compressor, so do not return it to CodecPool
         if (compressorExternal == null) {
           // this Writer owns compressor
-          CodecPool.returnCompressor(compressor);
+          CodecPool.returnCompressor(valuesCompressor);
         }
-        compressor = null;
+        valuesCompressor = null;
       }
 
-      out = null;
+      valuesOut = null;
       if (writtenRecordsCounter != null) {
         writtenRecordsCounter.increment(numRecordsWritten);
       }
@@ -471,16 +473,21 @@ public class IFile {
 
     protected void writeKVPair(byte[] keyData, int keyPos, int keyLength,
         byte[] valueData, int valPos, int valueLength) throws IOException {
-      // bufferWriteInt(keyLength);
-      // bufferWriteLong(valueLength);
-      long combined = ((long) keyLength << 32) | (valueLength & 0xFFFFFFFFL);
-      bufferWriteLong(combined);
+      if (keyLength < 0 || valueLength < 0) {
+        throw new IOException("Negative key/value lengths are not allowed. keyLength=" + keyLength
+            + ", valueLength=" + valueLength);
+      }
 
-      bufferWriteBytes(keyData, keyPos, keyLength);
+      keySectionBuffer.write(keyData, keyPos, keyLength);
+      lengthsSectionBuffer.writeInt(keyLength);
+      lengthsSectionBuffer.writeInt(valueLength);
       bufferWriteBytes(valueData, valPos, valueLength);
 
       // Update bytes written
-      decompressedBytesWritten += keyLength + valueLength + INT_SIZE + INT_SIZE;
+      logicalKeyBytesWritten += keyLength;
+      logicalValueBytesWritten += valueLength;
+      logicalLengthBytesWritten += (2L * INT_SIZE);
+      decompressedBytesWritten += keyLength + valueLength + (2L * INT_SIZE);
       if (serializedUncompressedBytes != null) {
         serializedUncompressedBytes.increment(keyLength + valueLength);
       }
@@ -511,7 +518,7 @@ public class IFile {
       if (len > remaining) {
         flushWriteBuffer();
         if (len >= writeBufferLength) {
-          out.write(data, off, len);
+          valuesOut.write(data, off, len);
           return;
         }
       }
@@ -521,9 +528,63 @@ public class IFile {
 
     protected void flushWriteBuffer() throws IOException {
       if (writeOffset > 0) {
-        out.write(writeBuffer, 0, writeOffset);
+        valuesOut.write(writeBuffer, 0, writeOffset);
         writeOffset = 0;
       }
+    }
+
+    private void finishValuesSection() throws IOException {
+      flushWriteBuffer();
+      if (compressOutput) {
+        valuesCompressedOut.finish();
+        valuesCompressedOut.resetState();
+      }
+      valuesChecksumOut.finish();
+    }
+
+    private void writeBufferedSection(DataOutputBuffer sectionBuffer) throws IOException {
+      IFileOutputStream sectionChecksumOut = new IFileOutputStream(rawOut);
+      DataOutputStream sectionOut = new DataOutputStream(sectionChecksumOut);
+      CompressionOutputStream sectionCompressedOut = null;
+      Compressor sectionCompressor = null;
+      if (compressOutput) {
+        sectionCompressor = CodecUtils.getCompressor(codec);
+        if (sectionCompressor == null) {
+          throw new IOException("Could not obtain compressor from CodecPool for section write");
+        }
+        sectionCompressor.reset();
+        sectionCompressedOut = CodecUtils.createOutputStream(codec, sectionChecksumOut, sectionCompressor);
+        sectionOut = new DataOutputStream(sectionCompressedOut);
+      }
+      try {
+        sectionOut.write(sectionBuffer.getData(), 0, sectionBuffer.getLength());
+        sectionOut.flush();
+        if (sectionCompressedOut != null) {
+          sectionCompressedOut.finish();
+          sectionCompressedOut.resetState();
+        }
+        sectionChecksumOut.finish();
+      } finally {
+        if (sectionCompressor != null) {
+          CodecPool.returnCompressor(sectionCompressor);
+        }
+      }
+    }
+
+    protected long getLogicalValueBytesWritten() {
+      return logicalValueBytesWritten;
+    }
+
+    protected long getLogicalKeyBytesWritten() {
+      return logicalKeyBytesWritten;
+    }
+
+    protected long getLogicalLengthBytesWritten() {
+      return logicalLengthBytesWritten;
+    }
+
+    protected void finishValuesSectionForSpill() throws IOException {
+      finishValuesSection();
     }
 
     public long getRawLength() {
