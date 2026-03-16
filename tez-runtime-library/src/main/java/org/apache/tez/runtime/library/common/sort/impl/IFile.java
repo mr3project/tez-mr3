@@ -742,11 +742,7 @@ public class IFile {
         return;
       }
 
-      byte[] header = new byte[HEADER.length];
-      IOUtils.readFully(headerValuesIn, header, 0, HEADER.length);
-      verifyHeaderMagic(header);
-      this.isCompressed = (header[3] == 1);
-
+      this.isCompressed = isCompressedFlagEnabled(headerValuesIn);
       this.valuesLength = valueBytesWritten + checksumSize;
       this.keysLength = keyBytesWritten + checksumSize;
       this.lengthsLength = lengthBytesWritten + checksumSize;
