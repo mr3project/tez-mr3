@@ -108,12 +108,11 @@ public class IFile {
     return HEADER.length + (3 * checksumSize);
   }
 
-  // Output layout:
+  // IFile layout with three sections:
   //   HEADER ++ [values, checksum] ++ [keys, checksum] ++ [lengths, checksum]
   //             ^                     ^                   ^                  ^
   //             valuesStart           keysStart           lengthsStart       totalLength
   // where valuesStart == HEADER.length
-
   public static final class SectionLayout {
 
     public final long valuesStart;
@@ -126,19 +125,39 @@ public class IFile {
     // valuesLength, keysLength, lengthsLength do NOT include checksum.
     public final long valuesLength, keysLength, lengthsLength;
 
+    // number of bytes of each section when decompressed
+    // equal to valuesLength, keysLength, lengthsLength if not compressed
+    public final long valuesRawLength;
+    public final long keysRawLength;
+    public final long lengthsRawLength;
+
+    // derived value
+    // total number of bytes (including HEADER and three checksums) when decompressed
+    // totalLength == totalRawLength if not compressed
+    public final long totalRawLength;
+
     public SectionLayout(
         long valuesStart, long keysStart, long lengthsStart,
         long totalLength,
-        long totalNumRecordsWritten) {
+        long totalNumRecordsWritten,
+        long valuesRawLength, long keysRawLength, long lengthsRawLength) {
       this.valuesStart = valuesStart;
       this.keysStart = keysStart;
       this.lengthsStart = lengthsStart;
       this.totalLength = totalLength;
       this.totalNumRecordsWritten = totalNumRecordsWritten;
 
+      // derived values
       this.valuesLength = keysStart - valuesStart - checksumSize;
       this.keysLength = lengthsStart - keysStart - checksumSize;
       this.lengthsLength = totalLength - lengthsStart - checksumSize;
+
+      this.valuesRawLength = valuesRawLength;
+      this.keysRawLength = keysRawLength;
+      this.lengthsRawLength = lengthsRawLength;
+
+      // derived value
+      this.totalRawLength = HEADER.length + valuesRawLength + keysRawLength + lengthsRawLength + 3L * checksumSize;
 
       assert valuesStart == HEADER.length;
       assert valuesLength >= 0L && keysLength >= 0L && lengthsLength >= 0L;
@@ -341,11 +360,11 @@ public class IFile {
     private long storedKeyBytesWritten = 0;
     private long storedLengthBytesWritten = 0;
 
-    private long logicalValueBytesWritten = 0;
-    private long logicalKeyBytesWritten = 0;
-    private long logicalLengthBytesWritten = 0;
+    private long valuesRawLength = 0;
+    private long keysRawLength = 0;
+    private long lengthsRawLength = 0;
 
-    private long numRecordsWritten = 0;   // TODO: with RLE, we should use numKeysWritten
+    private long totalNumRecordsWritten = 0;   // TODO: with RLE, we should use numKeysWritten
     private final TezCounter writtenRecordsCounter;
     private final TezCounter serializedUncompressedBytes;
 
@@ -489,7 +508,7 @@ public class IFile {
       }
 
       if (writtenRecordsCounter != null) {
-        writtenRecordsCounter.increment(numRecordsWritten);
+        writtenRecordsCounter.increment(totalNumRecordsWritten);
       }
     }
 
@@ -505,7 +524,7 @@ public class IFile {
           keyLength, valueLength);
 
       buffer.reset();
-      ++numRecordsWritten;
+      ++totalNumRecordsWritten;
     }
 
     public void append(DataInputBuffer key, DataInputBuffer value) throws IOException {
@@ -516,7 +535,7 @@ public class IFile {
       assert(valueLength >= 0);
       writeKVPair(key.getData(), key.getPosition(), keyLength,
           value.getData(), value.getPosition(), valueLength);
-      ++numRecordsWritten;
+      ++totalNumRecordsWritten;
     }
 
     protected void writeKVPair(byte[] keyData, int keyPos, int keyLength,
@@ -531,9 +550,9 @@ public class IFile {
       lengthsSectionBuffer.writeInt(valueLength);
       bufferWriteBytes(valueData, valPos, valueLength);
 
-      logicalKeyBytesWritten += keyLength;
-      logicalValueBytesWritten += valueLength;
-      logicalLengthBytesWritten += 2L * INT_SIZE;
+      keysRawLength += keyLength;
+      valuesRawLength += valueLength;
+      lengthsRawLength += 2L * INT_SIZE;
 
       if (serializedUncompressedBytes != null) {
         serializedUncompressedBytes.increment(keyLength + valueLength);
@@ -616,14 +635,10 @@ public class IFile {
       return rawOut.getPos() - sectionStart - checksumSize;
     }
 
-    public long getNumRecordsWritten() {
-      return numRecordsWritten;
-    }
-
     // Cf. corresponds to TezIndexRecord.rawLength
     public long getRawLength() {
       return HEADER.length
-        + logicalKeyBytesWritten + logicalValueBytesWritten + logicalLengthBytesWritten
+        + keysRawLength + valuesRawLength + lengthsRawLength
         + 3L * checksumSize;
     }
 
@@ -634,26 +649,18 @@ public class IFile {
         + 3L * checksumSize;
     }
 
-    public long getLogicalValueBytesWritten() {
-      return logicalValueBytesWritten;
-    }
-
-    public long getLogicalKeyBytesWritten() {
-      return logicalKeyBytesWritten;
-    }
-
-    public long getLogicalLengthBytesWritten() {
-      return logicalLengthBytesWritten;
-    }
-
     // should be called after close()
     public SectionLayout getSectionLayout() {
       long valuesStart = HEADER.length;
       long keysStart = valuesStart + storedValueBytesWritten + checksumSize;
       long lengthsStart = keysStart + storedKeyBytesWritten + checksumSize;
       long totalLength = lengthsStart + storedLengthBytesWritten + checksumSize;
+
       return new SectionLayout(
-          valuesStart, keysStart, lengthsStart, totalLength, numRecordsWritten);
+          valuesStart, keysStart, lengthsStart,
+          totalLength,
+          totalNumRecordsWritten,
+          valuesRawLength, keysRawLength, lengthsRawLength);
     }
   }
 
@@ -800,15 +807,16 @@ public class IFile {
     }
 
     /**
-     * Read entire IFile content to memory
-     * Decompress if the IFile header indicates compression
+     * Read the entire IFile contents to memory (byte[] array).
+     * If the IFile header indicates compression, decompress all the three sections.
      */
     public static void readToMemory(byte[] buffer, InputStream in, SectionLayout layout,
         CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLength,
         TaskContext taskContext, boolean useThreadLocalDecompressor)
         throws IOException {
-      // TODO
+      assert buffer.length >= layout.totalRawLength;
       boolean isCompressed = Reader.isCompressedFlagEnabled(in);
+      // TODO
     }
 
     private static void readSectionToMemory(byte[] buffer, int offset,
@@ -879,8 +887,9 @@ public class IFile {
     }
 
     /**
-     * Read entire IFile content to disk
-     * Do not decompress even if the IFile header indicates compression, i.e., preserve on-wire representation
+     * Read the entire IFile contents to disk.
+     * Do not decompress even if the IFile header indicates compression, i.e., preserve on-wire representation.
+     * Hence, the input SectionLayout can be used for the data written to disk as well.
      */
     public static long readToDisk(OutputStream out,
         InputStream in, SectionLayout layout,
@@ -980,12 +989,12 @@ public class IFile {
 
     private static byte[] createLargerArray(int currentLength) {
       if (currentLength > MAX_BUFFER_SIZE) {
-        throw new IllegalArgumentException(
-                String.format(REQ_BUFFER_SIZE_TOO_LARGE, currentLength, MAX_BUFFER_SIZE));
+        throw new IllegalArgumentException(String.format(
+            REQ_BUFFER_SIZE_TOO_LARGE, currentLength, MAX_BUFFER_SIZE));
       }
       int newLength;
       if (currentLength > (MAX_BUFFER_SIZE - currentLength)) {
-        // possible overflow: if (2*currentLength > MAX_BUFFER_SIZE)
+        // possible overflow: if (2 * currentLength > MAX_BUFFER_SIZE)
         newLength = currentLength;
       } else {
         newLength = currentLength << 1;
@@ -1016,7 +1025,7 @@ public class IFile {
     }
 
     public void nextRawValue(DataInputBuffer value) throws IOException {
-      assert value.getData() == keyBytes;   // if true, we should not use value.getData()
+      assert value.getData() != keyBytes;   // if true, we should not use value.getData()
 
       final byte[] valBytes;
       if (value.getData().length < currentValueLength) {
