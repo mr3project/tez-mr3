@@ -259,14 +259,16 @@ public class HttpConnection extends BaseHttpConnection {
   @Override
   public void cleanup(boolean disconnect) throws IOException {
     cleanup = true;
+    boolean shouldDisconnect = disconnect || !connectionSucceeded || !httpConnParams.isKeepAlive();
+    HttpURLConnection connection = this.connection;
     try {
       if (input != null) {
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Closing input on " + logIdentifier);
+          LOG.debug("Closing input on {}", logIdentifier);
         }
         // input.close() can block even on a stalled connection (for several 10s of seconds).
         // Ex. ShuffleServer.unregister() --> Fetcher.shutdown() --> Fetcher???.cleanupCurrentConnection() --> here
-        // This call sequence can block because the fetcher is likely stalled
+        // This call sequence can block because the fetcher is likely stalled.
         input.close();
         input = null;
       }
@@ -277,20 +279,25 @@ public class HttpConnection extends BaseHttpConnection {
         // http://docs.oracle.com/javase/6/docs/technotes/guides/net/http-keepalive.html
         readErrorStream(connection.getErrorStream());
       }
-      // even if !connectionSucceeded, we should call connection.disconnect() to clean up the unsafe state
-      if (connection != null && (!connectionSucceeded || disconnect || !httpConnParams.isKeepAlive())) {
+    } catch (Exception e) {
+      // If cleanup fails midway (e.g. input.close()),
+      // force disconnect to avoid reusing a potentially corrupted keep-alive connection.
+      shouldDisconnect = true;
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Exception while shutting down fetcher {}", logIdentifier, e);
+      } else {
+        LOG.info("Exception while shutting down fetcher {}: {}", logIdentifier, e.getMessage());
+      }
+    } finally {
+      if (connection != null && shouldDisconnect) {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Closing connection on " + logIdentifier + ", disconnectParam=" + disconnect);
         }
         connection.disconnect();
-        connection = null;
+        if (this.connection == connection) {
+          this.connection = null;
+        }
         connectionSucceeded = false;
-      }
-    } catch (IOException e) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Exception while shutting down fetcher " + logIdentifier, e);
-      } else {
-        LOG.info("Exception while shutting down fetcher " + logIdentifier + ": " + e.getMessage());
       }
     }
   }
@@ -316,4 +323,3 @@ public class HttpConnection extends BaseHttpConnection {
     }
   }
 }
-
