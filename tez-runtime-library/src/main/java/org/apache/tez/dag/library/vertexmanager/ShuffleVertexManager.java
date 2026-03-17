@@ -309,18 +309,16 @@ public class ShuffleVertexManager extends ShuffleVertexManagerBase {
       // assert currentParallelism == entry.getValue().statsInMB.length;
       int min = Integer.MAX_VALUE;
       int max = Integer.MIN_VALUE;
-      for(int index = 0; index < currentParallelism; index++) {
+      for (int index = 0; index < currentParallelism; index++) {
         int stat = entry.getValue().statsInKB[index];
         if (stat < min) { min = stat; }
         if (stat > max) { max = stat; }
       }
       if (min == max) {
         numMinEqualsMax++;
-      } else {
-        assert max > 0;
-        for(int index = 0; index < currentParallelism; index++) {
-          totalStatsInKB[index] += entry.getValue().statsInKB[index];
-        }
+      }
+      for (int index = 0; index < currentParallelism; index++) {
+        totalStatsInKB[index] += entry.getValue().statsInKB[index];
       }
     }
 
