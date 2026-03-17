@@ -815,12 +815,70 @@ public class IFile {
         TaskContext taskContext, boolean useThreadLocalDecompressor)
         throws IOException {
       assert buffer.length >= layout.totalRawLength;
-      boolean isCompressed = Reader.isCompressedFlagEnabled(in);
-      // TODO
+      byte[] header = new byte[HEADER.length];
+      IOUtils.readFully(in, header, 0, HEADER.length);
+      verifyHeaderMagic(header);
+      final boolean isCompressed = (header[3] == 1);
+
+      final int valuesLength = toIntExact(layout.valuesLength, "valuesLength");
+      final int keysLength = toIntExact(layout.keysLength, "keysLength");
+      final int lengthsLength = toIntExact(layout.lengthsLength, "lengthsLength");
+
+      final int valuesRawLength = toIntExact(layout.valuesRawLength, "valuesRawLength");
+      final int keysRawLength = toIntExact(layout.keysRawLength, "keysRawLength");
+      final int lengthsRawLength = toIntExact(layout.lengthsRawLength, "lengthsRawLength");
+
+      if (!isCompressed) {
+        System.arraycopy(header, 0, buffer, 0, HEADER.length);
+        int offset = HEADER.length;
+        offset = readStoredSectionToBuffer(buffer, offset, in, valuesLength + checksumSize,
+            ifileReadAhead, ifileReadAheadLength);
+        offset = readStoredSectionToBuffer(buffer, offset, in, keysLength + checksumSize,
+            ifileReadAhead, ifileReadAheadLength);
+        readStoredSectionToBuffer(buffer, offset, in, lengthsLength + checksumSize,
+            ifileReadAhead, ifileReadAheadLength);
+        return;
+      }
+
+      if (codec == null) {
+        throw new IOException("IFile is compressed but no codec was provided");
+      }
+
+      // Buffer stores decompressed payloads; header must indicate uncompressed data.
+      System.arraycopy(HEADER, 0, buffer, 0, HEADER.length);
+
+      int valuesOffset = HEADER.length;
+      int keysOffset = valuesOffset + valuesRawLength + checksumSize;
+      int lengthsOffset = keysOffset + keysRawLength + checksumSize;
+      if (lengthsOffset + lengthsRawLength + checksumSize > buffer.length) {
+        throw new IOException("Insufficient destination buffer for decompressed IFile");
+      }
+
+      readSectionToMemory(buffer, valuesOffset,
+          in, valuesLength + checksumSize, valuesRawLength,
+          true, codec, ifileReadAhead, ifileReadAheadLength,
+          taskContext, useThreadLocalDecompressor);
+      IFileOutputStream.writeChecksumTrailer(buffer, valuesOffset, valuesRawLength,
+          buffer, valuesOffset + valuesRawLength);
+
+      readSectionToMemory(buffer, keysOffset,
+          in, keysLength + checksumSize, keysRawLength,
+          true, codec, ifileReadAhead, ifileReadAheadLength,
+          taskContext, useThreadLocalDecompressor);
+      IFileOutputStream.writeChecksumTrailer(buffer, keysOffset, keysRawLength,
+          buffer, keysOffset + keysRawLength);
+
+      readSectionToMemory(buffer, lengthsOffset,
+          in, lengthsLength + checksumSize, lengthsRawLength,
+          true, codec, ifileReadAhead, ifileReadAheadLength,
+          taskContext, useThreadLocalDecompressor);
+      IFileOutputStream.writeChecksumTrailer(buffer, lengthsOffset, lengthsRawLength,
+          buffer, lengthsOffset + lengthsRawLength);
     }
 
     private static void readSectionToMemory(byte[] buffer, int offset,
         InputStream in, int sectionChecksumLength,
+        int sectionRawLength,
         boolean isCompressed, CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLength,
         TaskContext taskContext, boolean useThreadLocalDecompressor)
         throws IOException {
@@ -845,12 +903,11 @@ public class IFile {
           in = CodecUtils.getDecompressedInputStreamWithBufferSize(codec, checksumIn, decompressor,
               sectionChecksumLength);
         } else {
-          LOG.warn("Could not obtain decompressor from CodecPool");
-          in = checksumIn;
+          throw new IOException("Could not obtain decompressor from CodecPool");
         }
       }
       try {
-        IOUtils.readFully(in, buffer, offset, buffer.length);
+        IOUtils.readFully(in, buffer, offset, sectionRawLength);
         /*
          * We've gotten the amount of data we were expecting. Verify the
          * decompressor has nothing more to offer. This action also forces the
@@ -885,6 +942,30 @@ public class IFile {
         }
       }
     }
+
+    private static int readStoredSectionToBuffer(byte[] buffer, int offset, InputStream in,
+        int sectionChecksumLength, boolean ifileReadAhead, int ifileReadAheadLength) throws IOException {
+      IFileInputStream checksumIn = new IFileInputStream(in, sectionChecksumLength,
+          ifileReadAhead, ifileReadAheadLength);
+      int bytesRead = 0;
+      while (bytesRead < sectionChecksumLength) {
+        int n = checksumIn.readWithChecksum(buffer, offset + bytesRead,
+            sectionChecksumLength - bytesRead);
+        if (n < 0) {
+          throw new IOException("read past end of stream");
+        }
+        bytesRead += n;
+      }
+      return offset + sectionChecksumLength;
+    }
+
+    private static int toIntExact(long value, String fieldName) throws IOException {
+      if (value < 0 || value > Integer.MAX_VALUE) {
+        throw new IOException("Invalid section length for " + fieldName + ": " + value);
+      }
+      return (int) value;
+    }
+
 
     /**
      * Read the entire IFile contents to disk.

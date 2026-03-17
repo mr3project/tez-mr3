@@ -59,6 +59,13 @@ public class IFileOutputStream extends FilterOutputStream {
     return DataChecksum.Type.CRC32.size;
   }
 
+  public static void writeChecksumTrailer(byte[] source, int offset, int length,
+      byte[] destination, int destinationOffset) throws IOException {
+    DataChecksum sum = DataChecksum.newDataChecksum(DataChecksum.Type.CRC32, Integer.MAX_VALUE);
+    sum.update(source, offset, length);
+    sum.writeValue(destination, destinationOffset, false);
+  }
+
   @Override
   public void close() throws IOException {
     if (closed) {
