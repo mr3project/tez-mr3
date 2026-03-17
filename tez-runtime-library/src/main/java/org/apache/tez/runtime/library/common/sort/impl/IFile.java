@@ -112,32 +112,36 @@ public class IFile {
   //   HEADER ++ [values, checksum] ++ [keys, checksum] ++ [lengths, checksum]
   //             ^                     ^                   ^                  ^
   //             valuesStart           keysStart           lengthsStart       totalLength
-  //
-  // valuesLength, keysLength, lengthsLength do not include checksum.
+  // where valuesStart == HEADER.length
 
   public static final class SectionLayout {
 
-    public final long valuesStart, valuesLength;
-    public final long keysStart, keysLength;
-    public final long lengthsStart, lengthsLength;
+    public final long valuesStart;
+    public final long keysStart;
+    public final long lengthsStart;
     public final long totalLength;
-    private final long totalNumRecordsWritten;   // total number of records (or keys) in the input stream
+    public final long totalNumRecordsWritten;   // total number of records (or keys) in the input stream
+
+    // derived values
+    // valuesLength, keysLength, lengthsLength do NOT include checksum.
+    public final long valuesLength, keysLength, lengthsLength;
 
     public SectionLayout(
-        long valuesStart, long valuesLength,
-        long keysStart, long keysLength,
-        long lengthsStart, long lengthsLength,
+        long valuesStart, long keysStart, long lengthsStart,
         long totalLength,
         long totalNumRecordsWritten) {
       this.valuesStart = valuesStart;
-      this.valuesLength = valuesLength;
       this.keysStart = keysStart;
-      this.keysLength = keysLength;
       this.lengthsStart = lengthsStart;
-      this.lengthsLength = lengthsLength;
       this.totalLength = totalLength;
       this.totalNumRecordsWritten = totalNumRecordsWritten;
 
+      this.valuesLength = keysStart - valuesStart - checksumSize;
+      this.keysLength = lengthsStart - keysStart - checksumSize;
+      this.lengthsLength = totalLength - lengthsStart - checksumSize;
+
+      assert valuesStart == HEADER.length;
+      assert valuesLength >= 0L && keysLength >= 0L && lengthsLength >= 0L;
       assert totalLength == HEADER.length + valuesLength + keysLength + lengthsLength + 3L * checksumSize;
     }
 
@@ -457,7 +461,7 @@ public class IFile {
       }
 
       finishValuesSection();
-      storedValueBytesWritten = extractSectionPayloadLength(rawOut.getPos() - (start + HEADER.length));
+      storedValueBytesWritten = rawOut.getPos() - (start + HEADER.length) - checksumSize;
 
       // values section is complete; compressor object can now be reused
       valuesOut = null;
@@ -609,11 +613,7 @@ public class IFile {
       }
       sectionChecksumOut.finish();
 
-      return extractSectionPayloadLength(rawOut.getPos() - sectionStart);
-    }
-
-    private long extractSectionPayloadLength(long sectionTotalLength) {
-      return sectionTotalLength - checksumSize;
+      return rawOut.getPos() - sectionStart - checksumSize;
     }
 
     public long getNumRecordsWritten() {
@@ -653,27 +653,32 @@ public class IFile {
       long lengthsStart = keysStart + storedKeyBytesWritten + checksumSize;
       long totalLength = lengthsStart + storedLengthBytesWritten + checksumSize;
       return new SectionLayout(
-          valuesStart, storedValueBytesWritten,
-          keysStart, storedKeyBytesWritten,
-          lengthsStart, storedLengthBytesWritten,
-          totalLength, numRecordsWritten);
+          valuesStart, keysStart, lengthsStart, totalLength, numRecordsWritten);
     }
   }
+
+  public interface ReaderRead {
+    long getPosition() throws IOException;
+    long getLength();
+    KeyState readRawKey(DataInputBuffer key) throws IOException;
+    boolean nextRawKey(DataInputBuffer key) throws IOException;
+    void nextRawValue(DataInputBuffer value) throws IOException;
+    void close() throws IOException;
+  }
+
+  public enum KeyState {NO_KEY, NEW_KEY}
 
   /**
    * <code>IFile.Reader</code> to read intermediate map-outputs.
    */
-  public static class Reader {
+  public static class Reader implements ReaderRead {
 
-    public enum KeyState {NO_KEY, NEW_KEY}
+    // The maximum array size is a little less than the max integer value.
+    // Trying to create a larger array will result in an OOM exception.
+    // The exact value is JVM dependent so setting it to max int - 8 to be safe.
+    private static final int MAX_BUFFER_SIZE = Integer.MAX_VALUE - 8;
 
-    private static final int MAX_BUFFER_SIZE
-            = Integer.MAX_VALUE - 8;  // The maximum array size is a little less than the
-                                      // max integer value. Trying to create a larger array
-                                      // will result in an OOM exception. The exact value
-                                      // is JVM dependent so setting it to max int - 8 to be safe.
-
-    protected final SectionLayout layout;
+    private final SectionLayout layout;
     private final CompressionCodec codec;
     private final TezCounter readRecordsCounter;
     private final TezCounter bytesReadCounter;
@@ -693,9 +698,9 @@ public class IFile {
     private final InputStream keysIn;
     private final InputStream lengthsIn;
 
-    protected DataInputStream valuesDataIn = null;
-    protected DataInputStream keysDataIn = null;
-    protected DataInputStream lengthsDataIn = null;
+    private DataInputStream valuesDataIn = null;
+    private DataInputStream keysDataIn = null;
+    private DataInputStream lengthsDataIn = null;
 
     private long valuesStartPos;
     private long keysStartPos;
@@ -703,12 +708,12 @@ public class IFile {
 
     private byte keyBytes[] = new byte[0];
 
-    public long bytesRead = 0;
+    public long bytesRead = 0;      // TODO: convert to an accessor method
     private long numRecordsRead = 0;
-    protected boolean isEof = false;  // set to true when numRecordsRead == totalNumRecordsWritten
+    private boolean isEof = false;  // set to true when numRecordsRead == totalNumRecordsWritten
 
-    protected int currentKeyLength;
-    protected int currentValueLength;
+    private int currentKeyLength;
+    private int currentValueLength;
 
     /**
      * Construct an IFile Reader.
@@ -787,25 +792,32 @@ public class IFile {
       }
     }
 
+    private static boolean isCompressedFlagEnabled(InputStream in) throws IOException {
+      byte[] header = new byte[HEADER.length];
+      IOUtils.readFully(in, header, 0, HEADER.length);
+      verifyHeaderMagic(header);
+      return (header[3] == 1);
+    }
+
     /**
-     * Read entire ifile content to memory.
-     *
-     * @param buffer
-     * @param in
-     * @param compressedLength
-     * @param codec
-     * @param ifileReadAhead
-     * @param ifileReadAheadLength
-     * @throws IOException
+     * Read entire IFile content to memory
+     * Decompress if the IFile header indicates compression
      */
-    public static void readToMemory(byte[] buffer, InputStream in, int compressedLength,
+    public static void readToMemory(byte[] buffer, InputStream in, SectionLayout layout,
         CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLength,
         TaskContext taskContext, boolean useThreadLocalDecompressor)
         throws IOException {
-      boolean isCompressed = IFile.Reader.isCompressedFlagEnabled(in);
-      IFileInputStream checksumIn = new IFileInputStream(in,
-          compressedLength - IFile.HEADER.length, ifileReadAhead,
-          ifileReadAheadLength);
+      // TODO
+      boolean isCompressed = Reader.isCompressedFlagEnabled(in);
+    }
+
+    private static void readSectionToMemory(byte[] buffer, int offset,
+        InputStream in, int sectionChecksumLength,
+        boolean isCompressed, CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLength,
+        TaskContext taskContext, boolean useThreadLocalDecompressor)
+        throws IOException {
+      IFileInputStream checksumIn = new IFileInputStream(
+          in, sectionChecksumLength, ifileReadAhead, ifileReadAheadLength);
       in = checksumIn;
       Decompressor decompressor = null;
       if (isCompressed && codec != null) {
@@ -823,14 +835,14 @@ public class IFile {
         if (decompressor != null) {
           decompressor.reset();
           in = CodecUtils.getDecompressedInputStreamWithBufferSize(codec, checksumIn, decompressor,
-              compressedLength);
+              sectionChecksumLength);
         } else {
           LOG.warn("Could not obtain decompressor from CodecPool");
           in = checksumIn;
         }
       }
       try {
-        IOUtils.readFully(in, buffer, 0, buffer.length - IFile.HEADER.length);
+        IOUtils.readFully(in, buffer, offset, buffer.length);
         /*
          * We've gotten the amount of data we were expecting. Verify the
          * decompressor has nothing more to offer. This action also forces the
@@ -866,32 +878,18 @@ public class IFile {
       }
     }
 
-    private static boolean isCompressedFlagEnabled(InputStream in) throws IOException {
-      byte[] header = new byte[HEADER.length];
-      IOUtils.readFully(in, header, 0, HEADER.length);
-      verifyHeaderMagic(header);
-      return (header[3] == 1);
-    }
-
     /**
-     * Read entire IFile content to disk.
-     *
-     * @param out the output stream that will receive the data
-     * @param in the input stream containing the IFile data
-     * @param length the amount of data to read from the input
-     * @return the number of bytes copied
-     * @throws IOException
+     * Read entire IFile content to disk
+     * Do not decompress even if the IFile header indicates compression, i.e., preserve on-wire representation
      */
-    public static long readToDisk(OutputStream out, InputStream in, long length,
+    public static long readToDisk(OutputStream out,
+        InputStream in, SectionLayout layout,
         boolean ifileReadAhead, int ifileReadAheadLength)
         throws IOException {
+      final long length = layout.totalLength;
       final int BYTES_TO_READ = 64 * 1024;
       byte[] buf = new byte[BYTES_TO_READ];
 
-      // copy the IFile header
-      if (length < HEADER.length) {
-        throw new IOException("Missing IFile header");
-      }
       IOUtils.readFully(in, buf, 0, HEADER.length);
       verifyHeaderMagic(buf);
       out.write(buf, 0, HEADER.length);
@@ -946,7 +944,7 @@ public class IFile {
       return len;
     }
 
-    protected void readKeyValueLength(DataInput dIn) throws IOException {
+    private void readKeyValueLength(DataInput dIn) throws IOException {
       currentKeyLength = dIn.readInt();
       currentValueLength = dIn.readInt();
       bytesRead += INT_SIZE + INT_SIZE;
@@ -955,12 +953,11 @@ public class IFile {
     /**
      * Reset key length and value length for next record in the file
      *
-     * @param dIn
      * @return true if key length and value length were set to the next
      *         false if end of file (EOF) marker was reached
      * @throws IOException
      */
-    protected boolean positionToNextRecord(DataInput dIn) throws IOException {
+    private boolean positionToNextRecord(DataInput dIn) throws IOException {
       if (numRecordsRead >= layout.totalNumRecordsWritten) {
         isEof = true;
         return false;
@@ -1100,9 +1097,6 @@ public class IFile {
       if (sectionIn != null) {
         sectionIn.close();
       }
-    }
-
-    public void reset(int offset) {
     }
   }
 }

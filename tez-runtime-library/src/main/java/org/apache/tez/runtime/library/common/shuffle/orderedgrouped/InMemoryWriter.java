@@ -25,6 +25,7 @@ import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.tez.common.io.NonSyncDataOutputStream;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
+import org.apache.tez.runtime.library.common.sort.impl.IFile.SectionLayout;
 import org.apache.tez.runtime.library.common.sort.impl.IFileOutputStream;
 
 public class InMemoryWriter implements IFile.WriterAppend {
@@ -94,7 +95,7 @@ public class InMemoryWriter implements IFile.WriterAppend {
   }
 
   // should be called after close()
-  public IFile.SectionLayout getSectionLayout() {
+  public SectionLayout getSectionLayout() {
     long keysLength = keySectionBuffer.getLength();
     long lengthsLength = lengthsSectionBuffer.getLength();
     long totalLength = arrayStream.size();
@@ -110,7 +111,7 @@ public class InMemoryWriter implements IFile.WriterAppend {
     long keysStart = valuesStart + valuesLength + IFile.checksumSize;
     long lengthsStart = keysStart + keysLength + IFile.checksumSize;
 
-    return new IFile.SectionLayout(
+    return new SectionLayout(
         valuesStart, valuesLength,
         keysStart, keysLength,
         lengthsStart, lengthsLength,

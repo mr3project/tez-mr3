@@ -25,11 +25,10 @@ import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.tez.common.io.NonSyncByteArrayInputStream;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
+import org.apache.tez.runtime.library.common.sort.impl.IFile.SectionLayout;
+import org.apache.tez.runtime.library.common.sort.impl.IFile.KeyState;
 
-/**
- * <code>IFile.InMemoryReader</code> to read map-outputs present in-memory.
- */
-public class InMemoryReader extends IFile.Reader {
+public class InMemoryReader implements IFile.ReaderRead {
 
   private static class ByteArrayDataInput extends NonSyncByteArrayInputStream implements DataInput {
 
@@ -147,37 +146,30 @@ public class InMemoryReader extends IFile.Reader {
 
   private final MergeManager merger;
   private final InputAttemptIdentifier taskAttemptId;
+
   private byte[] buffer = null;
-  private final int bufferSize;
   private final ByteArrayDataInput memDataIn;
   private final int start;
   private final int length;
+  private final SectionLayout layout;
+
   private final int usedMemoryForMergeManager;
 
   public InMemoryReader(MergeManager merger, InputAttemptIdentifier taskAttemptId,
-                        byte[] data, IFile.SectionLayout layout, int usedMemoryForMergeManager)
-      throws IOException {
-    super(null, null, null, layout, null, null,  false, 0, 0, null);
+                        byte[] data, int start, int length, SectionLayout layout,
+                        int usedMemoryForMergeManager) {
     this.merger = merger;
     this.taskAttemptId = taskAttemptId;
 
     this.buffer = data;
-    this.bufferSize = (int) length;
     this.memDataIn = new ByteArrayDataInput(buffer, start, length);
     this.start = start;
     this.length = length;
+    this.layout = layout;
 
     this.usedMemoryForMergeManager = usedMemoryForMergeManager;
   }
 
-  @Override
-  public void reset(int offset) {
-    memDataIn.reset(buffer, start + offset, length);
-    bytesRead = offset;
-    isEof = false;
-  }
-
-  @Override
   public long getPosition() throws IOException {
     // InMemoryReader does not initialize streams like Reader, so in.getPos()
     // would not work. Instead, return the number of uncompressed bytes read,
@@ -185,12 +177,10 @@ public class InMemoryReader extends IFile.Reader {
     return bytesRead;
   }
 
-  @Override
   public long getLength() {
-    return length;
+    return layout.payloadLength();
   }
 
-  // TODO: when set isEof???
   public KeyState readRawKey(DataInputBuffer key) throws IOException {
     if (!positionToNextRecord(memDataIn)) {
       return KeyState.NO_KEY;
@@ -209,6 +199,10 @@ public class InMemoryReader extends IFile.Reader {
 
     bytesRead += currentKeyLength;
     return KeyState.NEW_KEY;
+  }
+
+  public final boolean nextRawKey(DataInputBuffer key) throws IOException {
+    return readRawKey(key) != KeyState.NO_KEY;
   }
 
   public void nextRawValue(DataInputBuffer value) throws IOException {
@@ -231,7 +225,7 @@ public class InMemoryReader extends IFile.Reader {
     buffer = null;
     // Inform the MergeManager
     if (merger != null) {
-      merger.releaseCommittedMemory(bufferSize, usedMemoryForMergeManager);
+      merger.releaseCommittedMemory(length, usedMemoryForMergeManager);
     }
   }
 }

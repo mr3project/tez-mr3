@@ -196,7 +196,6 @@ public class IFileInputStream extends InputStream {
    * these bytes appropriately
    */
   public int readWithChecksum(byte[] b, int off, int len) throws IOException {
-
     if (currentOffset == length) {
       return -1;
     }

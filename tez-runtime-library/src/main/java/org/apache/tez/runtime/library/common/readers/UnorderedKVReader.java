@@ -64,7 +64,7 @@ public class UnorderedKVReader<K, V> extends KeyValueReader {
   private V value;
   
   private FetchedInput currentFetchedInput;
-  private IFile.Reader currentReader;
+  private IFile.ReaderRead currentReader;
   
   // TODO Remove this once per I/O counters are separated properly. Relying on
   // the counter at the moment will generate aggregate numbers. 
@@ -206,7 +206,7 @@ public class UnorderedKVReader<K, V> extends KeyValueReader {
     }
   }
 
-  private IFile.Reader openIFileReader(FetchedInput fetchedInput)
+  private IFile.ReaderRead openIFileReader(FetchedInput fetchedInput)
       throws IOException {
     if (fetchedInput.getType() == Type.MEMORY) {
       MemoryFetchedInput mfi = (MemoryFetchedInput) fetchedInput;

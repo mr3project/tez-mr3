@@ -42,6 +42,7 @@ import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.serializer.SerializationContext;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
+import org.apache.tez.runtime.library.common.sort.impl.IFile.KeyState;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Writer;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger.DiskSegment;
@@ -725,7 +726,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
             }
           } else {
             mergeOutputSize += mo.getSize();
-            IFile.Reader reader = new InMemoryReader(MergeManager.this,
+            IFile.ReaderRead reader = new InMemoryReader(MergeManager.this,
                 mo.getAttemptIdentifier(), mo.getMemory(), 0, mo.getMemory().length,
                 (int)mo.getUsedMemoryForMergeManager());
             inMemorySegments.add(new Segment(reader,
@@ -1045,7 +1046,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       long size = data.length;
       totalSize += size;
       fullSize -= size;
-      IFile.Reader reader = new InMemoryReader(MergeManager.this, 
+      IFile.ReaderRead reader = new InMemoryReader(MergeManager.this,
           mo.getAttemptIdentifier(), data, 0, (int)size,
           (int)mo.getUsedMemoryForMergeManager());
       inMemorySegments.add(new Segment(reader,
@@ -1056,15 +1057,12 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     return totalSize;
   }
 
-  class RawKVIteratorReader extends IFile.Reader {
+  class RawKVIteratorReader implements IFile.ReaderRead {
 
     private final TezRawKeyValueIterator kvIter;
     private final long size;
 
-    public RawKVIteratorReader(TezRawKeyValueIterator kvIter, long size)
-        throws IOException {
-      super(null, size, null, spilledRecordsCounter, null, ifileReadAhead,
-          ifileReadAheadLength, inputContext);
+    public RawKVIteratorReader(TezRawKeyValueIterator kvIter, long size) {
       this.kvIter = kvIter;
       this.size = size;
     }
