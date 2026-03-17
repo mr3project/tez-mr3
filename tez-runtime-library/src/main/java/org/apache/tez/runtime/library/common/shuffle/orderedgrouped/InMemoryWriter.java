@@ -43,6 +43,8 @@ public class InMemoryWriter implements IFile.WriterAppend {
   private IFileOutputStream valuesChecksumOut;
   private DataOutputStream out;
 
+  private long numRecordsWritten = 0;   // TODO: with RLE, we should use numKeysWritten
+
   // InMemoryWriter does not use another byte[] buffer, unlike IFile.Writer
   public InMemoryWriter(byte[] array) {
     this.arrayStream = new InMemoryBoundedByteArrayOutputStream(array);
@@ -56,18 +58,20 @@ public class InMemoryWriter implements IFile.WriterAppend {
   }
 
   public void append(DataInputBuffer key, DataInputBuffer value) throws IOException {
-      int keyLength = key.getLength() - key.getPosition();
-      int valueLength = value.getLength() - value.getPosition();
-      if (keyLength < 0 || valueLength < 0) {
-        throw new IOException("Negative key/value lengths are not allowed. keyLength=" + keyLength
-            + ", valueLength=" + valueLength);
-      }
+    int keyLength = key.getLength() - key.getPosition();
+    int valueLength = value.getLength() - value.getPosition();
+    if (keyLength < 0 || valueLength < 0) {
+      throw new IOException("Negative key/value lengths are not allowed. keyLength=" + keyLength
+          + ", valueLength=" + valueLength);
+    }
 
-      out.write(value.getData(), value.getPosition(), valueLength);
+    out.write(value.getData(), value.getPosition(), valueLength);
 
-      keySectionBuffer.write(key.getData(), key.getPosition(), keyLength);
-      lengthsSectionBuffer.writeInt(keyLength);
-      lengthsSectionBuffer.writeInt(valueLength);
+    keySectionBuffer.write(key.getData(), key.getPosition(), keyLength);
+    lengthsSectionBuffer.writeInt(keyLength);
+    lengthsSectionBuffer.writeInt(valueLength);
+
+    ++numRecordsWritten;
   }
 
   public void close() throws IOException {
@@ -110,6 +114,6 @@ public class InMemoryWriter implements IFile.WriterAppend {
         valuesStart, valuesLength,
         keysStart, keysLength,
         lengthsStart, lengthsLength,
-        totalLength);
+        totalLength, numRecordsWritten);
   }
 }

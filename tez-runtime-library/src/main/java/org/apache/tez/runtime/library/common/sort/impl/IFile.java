@@ -121,12 +121,14 @@ public class IFile {
     public final long keysStart, keysLength;
     public final long lengthsStart, lengthsLength;
     public final long totalLength;
+    private final long totalNumRecordsWritten;   // total number of records (or keys) in the input stream
 
     public SectionLayout(
         long valuesStart, long valuesLength,
         long keysStart, long keysLength,
         long lengthsStart, long lengthsLength,
-        long totalLength) {
+        long totalLength,
+        long totalNumRecordsWritten) {
       this.valuesStart = valuesStart;
       this.valuesLength = valuesLength;
       this.keysStart = keysStart;
@@ -134,6 +136,13 @@ public class IFile {
       this.lengthsStart = lengthsStart;
       this.lengthsLength = lengthsLength;
       this.totalLength = totalLength;
+      this.totalNumRecordsWritten = totalNumRecordsWritten;
+
+      assert totalLength == HEADER.length + valuesLength + keysLength + lengthsLength + 3L * checksumSize;
+    }
+
+    public long payloadLength() {
+      return valuesLength + keysLength + lengthsLength;
     }
   }
 
@@ -647,7 +656,7 @@ public class IFile {
           valuesStart, storedValueBytesWritten,
           keysStart, storedKeyBytesWritten,
           lengthsStart, storedLengthBytesWritten,
-          totalLength);
+          totalLength, numRecordsWritten);
     }
   }
 
@@ -664,18 +673,13 @@ public class IFile {
                                       // will result in an OOM exception. The exact value
                                       // is JVM dependent so setting it to max int - 8 to be safe.
 
+    protected final SectionLayout layout;
     private final CompressionCodec codec;
     private final TezCounter readRecordsCounter;
     private final TezCounter bytesReadCounter;
     private final DecompressorPool taskContext;
 
     private final boolean isCompressed;
-    private final long valuesLength;
-    private final long keysLength;
-    private final long lengthsLength;
-
-    private final long fileLength;
-    private final long numRecordsWritten;   // total number of records (or keys) in the input stream
 
     private IFileInputStream valuesChecksumIn;
     private IFileInputStream keysChecksumIn;
@@ -701,7 +705,7 @@ public class IFile {
 
     public long bytesRead = 0;
     private long numRecordsRead = 0;
-    protected boolean isEof = false;  // set to true when numRecordsRead == numRecordsWritten
+    protected boolean isEof = false;  // set to true when numRecordsRead == totalNumRecordsWritten
 
     protected int currentKeyLength;
     protected int currentValueLength;
@@ -713,17 +717,18 @@ public class IFile {
      * @param readsCounter Counter for records read from disk
      * @throws IOException
      */
-    private Reader(InputStream headerValuesIn, long valueBytesWritten,
-                   InputStream keysIn, long keyBytesWritten,
-                   InputStream lengthsIn, long lengthBytesWritten,
-                   long numRecordsWritten,
-                   CompressionCodec codec,
-                   TezCounter readsCounter, TezCounter bytesReadCounter,
-                   boolean readAhead, int readAheadLength,
-                   DecompressorPool taskContext) throws IOException {
+    public Reader(InputStream headerValuesIn,
+                  InputStream keysIn,
+                  InputStream lengthsIn,
+                  SectionLayout layout,
+                  CompressionCodec codec,
+                  TezCounter readsCounter, TezCounter bytesReadCounter,
+                  boolean readAhead, int readAheadLength,
+                  DecompressorPool taskContext) throws IOException {
       final boolean allNull = headerValuesIn == null && keysIn == null && lengthsIn == null;
       assert allNull || (headerValuesIn != null && keysIn != null && lengthsIn != null);
 
+      this.layout = layout;
       this.codec = codec;
       this.readRecordsCounter = readsCounter;
       this.bytesReadCounter = bytesReadCounter;
@@ -731,11 +736,6 @@ public class IFile {
 
       if (allNull) {
         this.isCompressed = false;
-        this.valuesLength = 0;
-        this.keysLength = 0;
-        this.lengthsLength = 0;
-        this.fileLength = 0;
-        this.numRecordsWritten = 0;
         this.valuesIn = null;
         this.keysIn = null;
         this.lengthsIn = null;
@@ -743,16 +743,13 @@ public class IFile {
       }
 
       this.isCompressed = isCompressedFlagEnabled(headerValuesIn);
-      this.valuesLength = valueBytesWritten + checksumSize;
-      this.keysLength = keyBytesWritten + checksumSize;
-      this.lengthsLength = lengthBytesWritten + checksumSize;
 
-      this.fileLength = HEADER.length + valuesLength + keysLength + lengthsLength;
-      this.numRecordsWritten = numRecordsWritten;
-
-      this.valuesChecksumIn = new IFileInputStream(headerValuesIn, valuesLength, readAhead, readAheadLength);
-      this.keysChecksumIn = new IFileInputStream(keysIn, keysLength, readAhead, readAheadLength);
-      this.lengthsChecksumIn = new IFileInputStream(lengthsIn, lengthsLength, readAhead, readAheadLength);
+      long valuesChecksumLength = layout.valuesLength + checksumSize;
+      long keysChecksumLength = layout.keysLength + checksumSize;
+      long lengthsChecksumLength = layout.lengthsLength + checksumSize;
+      this.valuesChecksumIn = new IFileInputStream(headerValuesIn, valuesChecksumLength, readAhead, readAheadLength);
+      this.keysChecksumIn = new IFileInputStream(keysIn, keysChecksumLength, readAhead, readAheadLength);
+      this.lengthsChecksumIn = new IFileInputStream(lengthsIn, lengthsChecksumLength, readAhead, readAheadLength);
 
       if (isCompressed) {
         if (codec == null) {
@@ -917,7 +914,7 @@ public class IFile {
       if (valuesChecksumIn == null) {
         return 0;
       }
-      return valuesLength + keysLength + lengthsLength - 3L * checksumSize;
+      return layout.payloadLength();
     }
 
     public long getPosition() throws IOException {
@@ -964,7 +961,7 @@ public class IFile {
      * @throws IOException
      */
     protected boolean positionToNextRecord(DataInput dIn) throws IOException {
-      if (numRecordsRead >= numRecordsWritten) {
+      if (numRecordsRead >= layout.totalNumRecordsWritten) {
         isEof = true;
         return false;
       }
@@ -1005,7 +1002,7 @@ public class IFile {
           LOG.debug("currentKeyLength=" + currentKeyLength +
               ", currentValueLength=" + currentValueLength +
               ", bytesRead=" + bytesRead +
-              ", length=" + fileLength);
+              ", length=" + layout.totalLength);
         }
         return KeyState.NO_KEY;
       }
@@ -1042,7 +1039,7 @@ public class IFile {
 
       ++numRecordsRead;
 
-      if (numRecordsRead == numRecordsWritten) {
+      if (numRecordsRead == layout.totalNumRecordsWritten) {
         isEof = true;
       }
     }

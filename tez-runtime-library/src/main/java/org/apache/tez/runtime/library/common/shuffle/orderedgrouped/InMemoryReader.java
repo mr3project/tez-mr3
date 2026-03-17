@@ -24,12 +24,12 @@ import java.io.IOException;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.tez.common.io.NonSyncByteArrayInputStream;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
-import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader;
+import org.apache.tez.runtime.library.common.sort.impl.IFile;
 
 /**
  * <code>IFile.InMemoryReader</code> to read map-outputs present in-memory.
  */
-public class InMemoryReader extends Reader {
+public class InMemoryReader extends IFile.Reader {
 
   private static class ByteArrayDataInput extends NonSyncByteArrayInputStream implements DataInput {
 
@@ -155,9 +155,9 @@ public class InMemoryReader extends Reader {
   private final int usedMemoryForMergeManager;
 
   public InMemoryReader(MergeManager merger, InputAttemptIdentifier taskAttemptId,
-                        byte[] data, int start, int length, int usedMemoryForMergeManager)
+                        byte[] data, IFile.SectionLayout layout, int usedMemoryForMergeManager)
       throws IOException {
-    super(null, length - start, null, null, null, false, 0, null);
+    super(null, null, null, layout, null, null,  false, 0, 0, null);
     this.merger = merger;
     this.taskAttemptId = taskAttemptId;
 
