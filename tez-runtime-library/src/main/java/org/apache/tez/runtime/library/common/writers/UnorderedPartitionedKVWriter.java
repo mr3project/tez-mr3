@@ -687,6 +687,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
               TezIndexRecord indexRecord = new TezIndexRecord(segmentStart, writer.getSectionLayout());
               spillRecord.putIndex(indexRecord, i);
               writer = null;
+            } else {
+              spillRecord.putIndex(TezIndexRecord.empty(segmentStart), i);
             }
           } finally {
             if (writer != null) {
@@ -733,6 +735,42 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       pos = wrappedBuffer.metaBuffer.get(metaIndex + INDEX_NEXT);
     }
     return numRecords;
+  }
+
+  private IFile.Reader openSpillReader(SpillInfo spillInfo, TezIndexRecord indexRecord)
+      throws IOException {
+    IFile.SectionLayout layout = indexRecord.getLayout();
+    Preconditions.checkState(layout != null,
+        "Expected section layout for non-empty spill partition at offset %s in %s",
+        indexRecord.getStartOffset(), spillInfo.outPath);
+
+    FSDataInputStream headerValuesIn = null;
+    FSDataInputStream keysIn = null;
+    FSDataInputStream lengthsIn = null;
+    boolean success = false;
+    try {
+      headerValuesIn = rfs.open(spillInfo.outPath);
+      headerValuesIn.seek(indexRecord.getStartOffset());
+
+      keysIn = rfs.open(spillInfo.outPath);
+      keysIn.seek(indexRecord.getStartOffset() + layout.keysStart);
+
+      lengthsIn = rfs.open(spillInfo.outPath);
+      lengthsIn.seek(indexRecord.getStartOffset() + layout.lengthsStart);
+
+      IFile.Reader reader = new IFile.Reader(
+          headerValuesIn, keysIn, lengthsIn, layout,
+          codec, null, additionalSpillBytesReadCounter,
+          ifileReadAhead, ifileReadAheadLength, outputContext);
+      success = true;
+      return reader;
+    } finally {
+      if (!success) {
+        IOUtils.closeStream(headerValuesIn);
+        IOUtils.closeStream(keysIn);
+        IOUtils.closeStream(lengthsIn);
+      }
+    }
   }
 
   public static long getInitialMemoryRequirement(Configuration conf, long maxAvailableTaskMemory) {
@@ -1166,6 +1204,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           if (isDebugEnabled) {
             LOG.debug(destNameTrimmed + ": " + "Skipping partition: " + i + " in final merge since it has no records");
           }
+          finalSpillRecord.putIndex(TezIndexRecord.empty(segmentStart), i);
           continue;
         }
         // inside close()
@@ -1187,25 +1226,21 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
                 // Skip empty partitions within a spill
                 continue;
               }
-              FSDataInputStream in = rfs.open(spillInfo.outPath);
-              in.seek(indexRecord.getStartOffset());
-              IFile.Reader reader = new IFile.Reader(in, indexRecord.getPartLength(), codec, null,
-                  additionalSpillBytesReadCounter, ifileReadAhead, ifileReadAheadLength,
-                  outputContext);
-              // reader.close() may not be called if the following while{} block throws IOException.
-              // In this case, reader.decompressor is not returned to the pool.
-              // However, this is not memory leak because reader is eventually garbage collected, at which point
-              // reader.decompressor is also garbage collected. It is just that reader.decompressor is not reused.
-              // Note that reader.close() itself may throw IOException and reader.decompressor may not be returned to the pool.
-              // For the same reason, this not memory leak because reader.decompressor is eventually garbage collected.
-              while (reader.nextRawKey(keyBufferIFile)) {
-                // TODO Inefficient. If spills are not compressed, a direct copy should be possible
-                // given the current IFile format. Also exteremely inefficient for large records,
-                // since the entire record will be read into memory.
-                reader.nextRawValue(valBufferIFile);
-                writer.append(keyBufferIFile, valBufferIFile);
+              IFile.Reader reader = null;
+              try {
+                reader = openSpillReader(spillInfo, indexRecord);
+                while (reader.nextRawKey(keyBufferIFile)) {
+                  // TODO Inefficient. If spills are not compressed, a direct copy should be possible
+                  // given the current IFile format. Also exteremely inefficient for large records,
+                  // since the entire record will be read into memory.
+                  reader.nextRawValue(valBufferIFile);
+                  writer.append(keyBufferIFile, valBufferIFile);
+                }
+              } finally {
+                if (reader != null) {
+                  reader.close();
+                }
               }
-              reader.close();
             }
           }
           writer.close();
@@ -1324,6 +1359,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
             }
           }
         } else {
+          spillRecord.putIndex(TezIndexRecord.empty(recordStart), i);
           if (emptyPartitions != null) {
             emptyPartitions.set(i);
           }
