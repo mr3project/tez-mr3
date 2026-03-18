@@ -684,8 +684,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
               }
               writer.close();   // write does not own fsOutput, so fsOutput.close() is not called
               compressedLength += writer.getCompressedLength();
-              TezIndexRecord indexRecord = new TezIndexRecord(segmentStart, writer.getRawLength(),
-                  writer.getCompressedLength());
+              TezIndexRecord indexRecord = new TezIndexRecord(segmentStart, writer.getSectionLayout());
               spillRecord.putIndex(indexRecord, i);
               writer = null;
             }
@@ -844,7 +843,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
           if (!canSendDataOverDME()) {
             // the final data was written to disk, so increment fileOutputBytesCounter
-            TezIndexRecord rec = new TezIndexRecord(0, rawLen, compLen);
+            TezIndexRecord rec = new TezIndexRecord(0, this.writer.getSectionLayout());
             TezSpillRecord sr = new TezSpillRecord(1);
             sr.putIndex(rec, 0);
             if (writeSpillRecord) {
@@ -1212,8 +1211,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           writer.close();
           // written to local disk, so increment fileOutputBytesCounter
           fileOutputBytesCounter.increment(writer.getCompressedLength());
-          TezIndexRecord indexRecord = new TezIndexRecord(segmentStart, writer.getRawLength(),
-              writer.getCompressedLength());
+          TezIndexRecord indexRecord = new TezIndexRecord(segmentStart, writer.getSectionLayout());
           writer = null;
           finalSpillRecord.putIndex(indexRecord, i);
         } finally {
@@ -1315,8 +1313,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
                 additionalSpillBytesWrittenCounter.increment(writer.getCompressedLength());
               }
             }
-            TezIndexRecord indexRecord = new TezIndexRecord(recordStart, writer.getRawLength(),
-                writer.getCompressedLength());
+            TezIndexRecord indexRecord = new TezIndexRecord(recordStart, writer.getSectionLayout());
             spillRecord.putIndex(indexRecord, i);
             outSize = writer.getCompressedLength();
             writer = null;

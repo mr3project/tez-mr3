@@ -52,6 +52,7 @@ import org.apache.hadoop.util.IndexedSorter;
 import org.apache.tez.common.TezCommonUtils;
 import org.apache.tez.runtime.api.OutputContext;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
+import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.ConfigUtils;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Writer;
@@ -71,7 +72,7 @@ public class PipelinedSorter extends ExternalSorter {
   /**
    * The size of each record in the index file for the map-outputs.
    */
-  public static final int MAP_OUTPUT_INDEX_RECORD_LENGTH = 24;
+  public static final int MAP_OUTPUT_INDEX_RECORD_LENGTH = Constants.MAP_OUTPUT_INDEX_RECORD_LENGTH;
   private final static int APPROX_HEADER_LENGTH = 150;
 
   private final int partitionBits;
@@ -525,15 +526,19 @@ public class PipelinedSorter extends ExternalSorter {
           }
           long rawLength = 0;
           long partLength = 0;
+          IFile.SectionLayout layout = null;
           if (writer != null) {
             writer.close();
             rawLength = writer.getRawLength();
             partLength = writer.getCompressedLength();
+            layout = writer.getSectionLayout();
             writer = null;
           }
           adjustSpillCounters(rawLength, partLength);
           // record offsets
-          final TezIndexRecord rec = new TezIndexRecord(segmentStart, rawLength, partLength);
+          final TezIndexRecord rec = layout == null
+              ? TezIndexRecord.empty(segmentStart)
+              : new TezIndexRecord(segmentStart, layout);
           spillRec.putIndex(rec, i);
         } finally {
           if (null != writer) {
@@ -640,17 +645,21 @@ public class PipelinedSorter extends ExternalSorter {
 
         long rawLength = 0;
         long partLength = 0;
+        IFile.SectionLayout layout = null;
         if (writer != null) {
           writer.close();
           rawLength = writer.getRawLength();
           partLength = writer.getCompressedLength();
+          layout = writer.getSectionLayout();
           // writer never used again
         }
         adjustSpillCounters(rawLength, partLength);
         sumPartLength += partLength;
 
         // record offsets
-        final TezIndexRecord rec = new TezIndexRecord(segmentStart, rawLength, partLength);
+        final TezIndexRecord rec = layout == null
+            ? TezIndexRecord.empty(segmentStart)
+            : new TezIndexRecord(segmentStart, layout);
         spillRec.putIndex(rec, i);
         if (!isFinalMergeEnabled && reportPartitionStats()) {
           partitionStats[i] += rawLength;
@@ -881,6 +890,7 @@ public class PipelinedSorter extends ExternalSorter {
         long segmentStart = finalOut.getPos();
         long rawLength = 0;
         long partLength = 0;
+        IFile.SectionLayout layout = null;
         if (shouldWrite) {
           Writer writer = new Writer(
               serializationContext.getKeySerialization(), serializationContext.getValSerialization(),
@@ -895,12 +905,15 @@ public class PipelinedSorter extends ExternalSorter {
           writer.close();
           rawLength = writer.getRawLength();
           partLength = writer.getCompressedLength();
+          layout = writer.getSectionLayout();
           // writer never used again
         }
         outputBytesWithOverheadCounter.increment(rawLength);
 
         // record offsets
-        final TezIndexRecord rec = new TezIndexRecord(segmentStart, rawLength, partLength);
+        final TezIndexRecord rec = layout == null
+            ? TezIndexRecord.empty(segmentStart)
+            : new TezIndexRecord(segmentStart, layout);
         spillRec.putIndex(rec, parts);
         if (reportPartitionStats()) {
           partitionStats[parts] += rawLength;

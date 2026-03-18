@@ -19,36 +19,39 @@
 package org.apache.tez.runtime.library.common.sort.impl;
 
 public class TezIndexRecord {
-  private long startOffset;
-  private long rawLength;
-  private long partLength;
+  private final long startOffset;
+  private final IFile.SectionLayout layout;
 
   /**
    * @param startOffset start offset within the data file
-   * @param rawLength raw data length - typically uncompressed
-   * @param partLength actual data length in file - factors in checksums and compression
+   * @param layout IFile section layout, or null for omitted empty partitions
    */
-  public TezIndexRecord(long startOffset, long rawLength, long partLength) {
+  public TezIndexRecord(long startOffset, IFile.SectionLayout layout) {
     this.startOffset = startOffset;
-    this.rawLength = rawLength;
-    this.partLength = partLength;
+    this.layout = layout;
+  }
+
+  public static TezIndexRecord empty(long startOffset) {
+    return new TezIndexRecord(startOffset, null);
   }
 
   public long getStartOffset() {
     return startOffset;
   }
 
+  public IFile.SectionLayout getLayout() {
+    return layout;
+  }
+
   public long getRawLength() {
-    return rawLength;
+    return layout == null ? 0 : layout.totalRawLength;
   }
 
   public long getPartLength() {
-    return partLength;
+    return layout == null ? 0 : layout.totalLength;
   }
 
   public boolean hasData() {
-    //TEZ-941 - Avoid writing out empty partitions
-    //EOF_MARKER + Header bytes
-    return !(rawLength <= (IFile.HEADER.length + 2));
+    return layout != null && layout.totalNumRecordsWritten > 0;
   }
 }
