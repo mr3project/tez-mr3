@@ -31,7 +31,7 @@ public class FileChunk implements Comparable<FileChunk> {
   private final boolean isLocalFile;
   private final Path path;
   private final InputAttemptIdentifier identifier;
-  private final IFile.SectionLayout sectionLayout;
+  private IFile.SectionLayout sectionLayout;
 
   public FileChunk(Path path, long offset, long length, boolean isLocalFile,
                    InputAttemptIdentifier identifier) {
@@ -124,5 +124,9 @@ public class FileChunk implements Comparable<FileChunk> {
 
   public IFile.SectionLayout getSectionLayout() {
     return sectionLayout;
+  }
+
+  public void setSectionLayout(IFile.SectionLayout sectionLayout) {
+    this.sectionLayout = sectionLayout;
   }
 }
