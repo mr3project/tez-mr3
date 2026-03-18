@@ -191,12 +191,7 @@ public abstract class MapOutput implements ShuffleInput {
     private DiskDirectMapOutput(InputAttemptIdentifier attemptIdentifier, FetchedInputAllocatorOrderedGrouped callback,
                       long size, Path outputPath, long offset, boolean primaryMapOutput) {
       super(attemptIdentifier, callback, primaryMapOutput);
-      this.outputPath = new FileChunk(outputPath, offset, size, true, attemptIdentifier);
-    }
-
-    @Override
-    public FileChunk getOutputPath() {
-      return outputPath;
+      this.outputPath = new FileChunk(outputPath, offset, size, true, attemptIdentifier, getSectionLayout());
     }
 
     @Override
@@ -206,7 +201,7 @@ public abstract class MapOutput implements ShuffleInput {
 
     @Override
     public void commit() throws IOException {
-      callback.closeOnDiskFile(outputPath);
+      callback.closeOnDiskFile(getOutputPath());
     }
 
     @Override
@@ -217,6 +212,12 @@ public abstract class MapOutput implements ShuffleInput {
     @Override
     public Type getType() {
       return Type.DISK_DIRECT;
+    }
+
+    @Override
+    public FileChunk getOutputPath() {
+      return new FileChunk(outputPath.getPath(), outputPath.getOffset(), outputPath.getLength(),
+          outputPath.isLocalFile(), outputPath.getInputAttemptIdentifier(), getSectionLayout());
     }
   }
 
@@ -230,12 +231,13 @@ public abstract class MapOutput implements ShuffleInput {
 
       this.tmpOutputPath = tmpOutputPath;
       this.disk = null;
-      this.outputPath = new FileChunk(outputPath, offset, size, false, attemptIdentifier);
+      this.outputPath = new FileChunk(outputPath, offset, size, false, attemptIdentifier, getSectionLayout());
     }
 
     @Override
     public FileChunk getOutputPath() {
-      return outputPath;
+      return new FileChunk(outputPath.getPath(), outputPath.getOffset(), outputPath.getLength(),
+          outputPath.isLocalFile(), outputPath.getInputAttemptIdentifier(), getSectionLayout());
     }
 
     @Override
@@ -251,7 +253,7 @@ public abstract class MapOutput implements ShuffleInput {
     @Override
     public void commit() throws IOException {
       callback.getLocalFileSystem().rename(tmpOutputPath, outputPath.getPath());
-      callback.closeOnDiskFile(outputPath);
+      callback.closeOnDiskFile(getOutputPath());
     }
 
     @Override

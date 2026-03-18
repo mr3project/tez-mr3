@@ -870,7 +870,7 @@ public class PipelinedSorter extends ExternalSorter {
             shouldWrite = true;
             DiskSegment s =
                 new DiskSegment(localFs, spillFilename, indexRecord.getStartOffset(),
-                    indexRecord.getPartLength(), codec, ifileReadAhead,
+                    indexRecord.getPartLength(), indexRecord.getLayout(), codec, ifileReadAhead,
                     ifileReadAheadLength, true, outputContext);
             segmentList.add(s);
           }
