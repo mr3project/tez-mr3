@@ -22,6 +22,7 @@ import java.util.Objects;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
+import org.apache.tez.runtime.library.common.sort.impl.IFile;
 
 public class FileChunk implements Comparable<FileChunk> {
 
@@ -30,21 +31,23 @@ public class FileChunk implements Comparable<FileChunk> {
   private final boolean isLocalFile;
   private final Path path;
   private final InputAttemptIdentifier identifier;
+  private IFile.SectionLayout sectionLayout;
+
+  public FileChunk(Path path, long offset, long length, IFile.SectionLayout sectionLayout) {
+    this(path, offset, length, false, null, sectionLayout);
+  }
 
   public FileChunk(Path path, long offset, long length, boolean isLocalFile,
-                   InputAttemptIdentifier identifier) {
+                   InputAttemptIdentifier identifier, IFile.SectionLayout sectionLayout) {
     this.path = path;
     this.offset = offset;
     this.length = length;
     this.isLocalFile = isLocalFile;
     this.identifier = identifier;
+    this.sectionLayout = sectionLayout;
     if (isLocalFile) {
       Objects.requireNonNull(identifier);
     }
-  }
-
-  public FileChunk(Path path, long offset, long length) {
-    this(path, offset, length, false, null);
   }
 
   @Override
@@ -108,5 +111,13 @@ public class FileChunk implements Comparable<FileChunk> {
 
   public InputAttemptIdentifier getInputAttemptIdentifier() {
     return this.identifier;
+  }
+
+  public IFile.SectionLayout getSectionLayout() {
+    return sectionLayout;
+  }
+
+  public void setSectionLayout(IFile.SectionLayout sectionLayout) {
+    this.sectionLayout = sectionLayout;
   }
 }

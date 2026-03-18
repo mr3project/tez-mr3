@@ -671,6 +671,8 @@ public class IFile {
     }
   }
 
+  public enum KeyState {NO_KEY, NEW_KEY}
+
   public interface ReaderRead {
     // for reporting progress in consuming payload
     long getPosition() throws IOException;
@@ -683,8 +685,6 @@ public class IFile {
     void nextRawValue(DataInputBuffer value) throws IOException;
     void close() throws IOException;
   }
-
-  public enum KeyState {NO_KEY, NEW_KEY}
 
   /**
    * <code>IFile.Reader</code> to read intermediate map-outputs.
