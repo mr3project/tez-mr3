@@ -109,7 +109,16 @@ public class TezSpillRecord {
    */
   public TezIndexRecord getIndex(int partition) {
     final int pos = partition * Constants.MAP_OUTPUT_INDEX_RECORD_LENGTH / 8;
-    return new TezIndexRecord(entries.get(pos), entries.get(pos + 1), entries.get(pos + 2));
+    long startOffset = entries.get(pos);
+    long totalLength = entries.get(pos + 1);
+    if (totalLength == 0) {
+      return TezIndexRecord.empty(startOffset);
+    }
+    return new TezIndexRecord(startOffset, new IFile.SectionLayout(
+        entries.get(pos + 2), entries.get(pos + 3), entries.get(pos + 4),
+        totalLength,
+        entries.get(pos + 5),
+        entries.get(pos + 6), entries.get(pos + 7), entries.get(pos + 8)));
   }
 
   /**
@@ -118,8 +127,21 @@ public class TezSpillRecord {
   public void putIndex(TezIndexRecord rec, int partition) {
     final int pos = partition * Constants.MAP_OUTPUT_INDEX_RECORD_LENGTH / 8;
     entries.put(pos, rec.getStartOffset());
-    entries.put(pos + 1, rec.getRawLength());
-    entries.put(pos + 2, rec.getPartLength());
+    IFile.SectionLayout layout = rec.getLayout();
+    if (layout == null) {
+      for (int i = 1; i < Constants.MAP_OUTPUT_INDEX_RECORD_LENGTH / 8; i++) {
+        entries.put(pos + i, 0L);
+      }
+      return;
+    }
+    entries.put(pos + 1, layout.totalLength);
+    entries.put(pos + 2, layout.valuesStart);
+    entries.put(pos + 3, layout.keysStart);
+    entries.put(pos + 4, layout.lengthsStart);
+    entries.put(pos + 5, layout.totalNumRecordsWritten);
+    entries.put(pos + 6, layout.valuesRawLength);
+    entries.put(pos + 7, layout.keysRawLength);
+    entries.put(pos + 8, layout.lengthsRawLength);
   }
 
   /**
