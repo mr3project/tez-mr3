@@ -1056,53 +1056,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     return totalSize;
   }
 
-  class RawKVIteratorReader extends IFile.Reader {
-
-    private final TezRawKeyValueIterator kvIter;
-    private final long size;
-
-    public RawKVIteratorReader(TezRawKeyValueIterator kvIter, long size)
-        throws IOException {
-      super(null, size, null, spilledRecordsCounter, null, ifileReadAhead,
-          ifileReadAheadLength, inputContext);
-      this.kvIter = kvIter;
-      this.size = size;
-    }
-
-    @Override
-    public KeyState readRawKey(DataInputBuffer key) throws IOException {
-      if (kvIter.next()) {
-        final DataInputBuffer kb = kvIter.getKey();
-        final int kp = kb.getPosition();
-        final int klen = kb.getLength() - kp;
-        key.reset(kb.getData(), kp, klen);
-        bytesRead += klen;
-        return KeyState.NEW_KEY;
-      }
-      return KeyState.NO_KEY;
-    }
-
-    public void nextRawValue(DataInputBuffer value) throws IOException {
-      final DataInputBuffer vb = kvIter.getValue();
-      final int vp = vb.getPosition();
-      final int vlen = vb.getLength() - vp;
-      value.reset(vb.getData(), vp, vlen);
-      bytesRead += vlen;
-    }
-
-    public long getPosition() throws IOException {
-      return bytesRead;
-    }
-
-    public void close() throws IOException {
-      kvIter.close();
-    }
-
-    @Override public long getLength() {
-      return size;
-    }
-  }
-
   private TezRawKeyValueIterator finalMerge(Configuration job, FileSystem fs,
                                        List<MapOutput> inMemoryMapOutputs,
                                        List<FileChunk> onDiskMapOutputs
