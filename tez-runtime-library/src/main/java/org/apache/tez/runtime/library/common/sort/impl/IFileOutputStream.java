@@ -49,8 +49,7 @@ public class IFileOutputStream extends FilterOutputStream {
    */
   public IFileOutputStream(OutputStream out) {
     super(out);
-    sum = DataChecksum.newDataChecksum(DataChecksum.Type.CRC32,
-        Integer.MAX_VALUE);
+    sum = DataChecksum.newDataChecksum(DataChecksum.Type.CRC32, Integer.MAX_VALUE);
     barray = new byte[sum.getChecksumSize()];
     buffer = new byte[4096];
     offset = 0;
@@ -58,6 +57,13 @@ public class IFileOutputStream extends FilterOutputStream {
 
   public static int getCheckSumSize() {
     return DataChecksum.Type.CRC32.size;
+  }
+
+  public static void writeChecksumTrailer(byte[] source, int offset, int length,
+      byte[] destination, int destinationOffset) throws IOException {
+    DataChecksum sum = DataChecksum.newDataChecksum(DataChecksum.Type.CRC32, Integer.MAX_VALUE);
+    sum.update(source, offset, length);
+    sum.writeValue(destination, destinationOffset, false);
   }
 
   @Override
@@ -98,15 +104,6 @@ public class IFileOutputStream extends FilterOutputStream {
       sum.update(buffer, 0, offset);
       offset = 0;
     }
-    /*
-    // FIXME if needed re-enable this in debug mode
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("XXX checksum" +
-          " b=" + b + " off=" + off +
-          " buffer=" + " offset=" + offset +
-          " len=" + len);
-    }
-    */
     /* now we should have len < buffer.length */
     System.arraycopy(b, off, buffer, offset, len);
     offset += len;
@@ -126,5 +123,4 @@ public class IFileOutputStream extends FilterOutputStream {
     barray[0] = (byte) (b & 0xFF);
     write(barray,0,1);
   }
-
 }

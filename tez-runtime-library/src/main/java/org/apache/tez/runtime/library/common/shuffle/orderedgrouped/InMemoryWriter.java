@@ -21,9 +21,11 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 
 import org.apache.hadoop.io.BoundedByteArrayOutputStream;
+import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.tez.common.io.NonSyncDataOutputStream;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
+import org.apache.tez.runtime.library.common.sort.impl.IFile.SectionLayout;
 import org.apache.tez.runtime.library.common.sort.impl.IFileOutputStream;
 
 public class InMemoryWriter implements IFile.WriterAppend {
@@ -35,31 +37,85 @@ public class InMemoryWriter implements IFile.WriterAppend {
     }
   }
 
+  private final BoundedByteArrayOutputStream arrayStream;
+  private final DataOutputBuffer keySectionBuffer = new DataOutputBuffer();
+  private final DataOutputBuffer lengthsSectionBuffer = new DataOutputBuffer();
+
+  private IFileOutputStream valuesChecksumOut;
   private DataOutputStream out;
+
+  private long numRecordsWritten = 0;   // TODO: with RLE, we should use numRecordsWritten
 
   // InMemoryWriter does not use another byte[] buffer, unlike IFile.Writer
   public InMemoryWriter(byte[] array) {
-    BoundedByteArrayOutputStream arrayStream = new InMemoryBoundedByteArrayOutputStream(array);
-    this.out = new NonSyncDataOutputStream(new IFileOutputStream(arrayStream));
+    this.arrayStream = new InMemoryBoundedByteArrayOutputStream(array);
+    try {
+      arrayStream.write(IFile.HEADER, 0, IFile.HEADER.length);  // assume uncompressed
+      this.valuesChecksumOut = new IFileOutputStream(arrayStream);
+      this.out = new NonSyncDataOutputStream(valuesChecksumOut);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to initialize InMemoryWriter", e);
+    }
   }
 
   public void append(DataInputBuffer key, DataInputBuffer value) throws IOException {
-      int keyLength = key.getLength() - key.getPosition();
-      int valueLength = value.getLength() - value.getPosition();
+    int keyLength = key.getLength() - key.getPosition();
+    int valueLength = value.getLength() - value.getPosition();
+    if (keyLength < 0 || valueLength < 0) {
+      throw new IOException("Negative key/value lengths are not allowed. keyLength=" + keyLength
+          + ", valueLength=" + valueLength);
+    }
 
-      long combined = ((long) keyLength << 32) | (valueLength & 0xFFFFFFFFL);
-      out.writeLong(combined);
+    out.write(value.getData(), value.getPosition(), valueLength);
 
-      out.write(key.getData(), key.getPosition(), keyLength);
-      out.write(value.getData(), value.getPosition(), valueLength);
+    keySectionBuffer.write(key.getData(), key.getPosition(), keyLength);
+    lengthsSectionBuffer.writeInt(keyLength);
+    lengthsSectionBuffer.writeInt(valueLength);
+
+    ++numRecordsWritten;
   }
 
   public void close() throws IOException {
-      // Write EOF_MARKER for key/value length
-      long combined = ((long) IFile.EOF_MARKER << 32) | (IFile.EOF_MARKER & 0xFFFFFFFFL);
-      out.writeLong(combined);
+    out.flush();
+    valuesChecksumOut.finish();
 
-      out.close();
-      out = null;
+    writeSection(keySectionBuffer);
+    writeSection(lengthsSectionBuffer);
+
+    out = null;
+    valuesChecksumOut = null;
+  }
+
+  private void writeSection(DataOutputBuffer sectionBuffer) throws IOException {
+    IFileOutputStream sectionChecksumOut = new IFileOutputStream(arrayStream);
+    DataOutputStream sectionOut = new NonSyncDataOutputStream(sectionChecksumOut);
+    sectionOut.write(sectionBuffer.getData(), 0, sectionBuffer.getLength());
+    sectionOut.flush();
+    sectionChecksumOut.finish();
+  }
+
+  // should be called after close()
+  public SectionLayout getSectionLayout() {
+    assert out == null;
+
+    long keysLength = keySectionBuffer.getLength();
+    long lengthsLength = lengthsSectionBuffer.getLength();
+    long totalLength = arrayStream.size();
+
+    long valuesLength = totalLength
+        - IFile.HEADER.length
+        - keysLength
+        - lengthsLength
+        - 3L * IFile.checksumSize;
+
+    long valuesStart = IFile.HEADER.length;
+    long keysStart = valuesStart + valuesLength + IFile.checksumSize;
+    long lengthsStart = keysStart + keysLength + IFile.checksumSize;
+
+    return new SectionLayout(
+        valuesStart, keysStart, lengthsStart,
+        totalLength,
+        numRecordsWritten,
+        valuesLength, keysLength, lengthsLength);
   }
 }

@@ -19,252 +19,239 @@
 package org.apache.tez.runtime.library.common.shuffle.orderedgrouped;
 
 import java.io.DataInput;
-import java.io.File;
-import java.io.FileOutputStream;
+import java.io.DataInputStream;
 import java.io.IOException;
 
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.tez.common.io.NonSyncByteArrayInputStream;
-import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
-import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader;
+import org.apache.tez.runtime.library.common.sort.impl.IFile;
+import org.apache.tez.runtime.library.common.sort.impl.IFile.SectionLayout;
+import org.apache.tez.runtime.library.common.sort.impl.IFile.KeyState;
 
-/**
- * <code>IFile.InMemoryReader</code> to read map-outputs present in-memory.
- */
-public class InMemoryReader extends Reader {
+public class InMemoryReader implements IFile.ReaderRead {
+
+  private static final String INCOMPLETE_READ = "Requested to read %d, but got %d";
 
   private static class ByteArrayDataInput extends NonSyncByteArrayInputStream implements DataInput {
 
-    public ByteArrayDataInput(byte buf[], int offset, int length) {
+    private final DataInputStream dataIn;
+
+    ByteArrayDataInput(byte[] buf, int offset, int length) {
       super(buf, offset, length);
+      this.dataIn = new DataInputStream(this);
     }
 
-    public void reset(byte[] input, int start, int length) {
+    void reset(byte[] input, int start, int length) {
       this.buf = input;
-      this.count = start+length;
-      this.mark = start;
       this.pos = start;
+      this.mark = start;
+      this.count = start + length;
     }
 
-    public byte[] getData() { return buf; }
-    public int getPosition() { return pos; }
-    public int getLength() { return count; }
-    public int getMark() { return mark; }
+    byte[] getData() {
+      return buf;
+    }
+
+    int getPosition() {
+      return pos;
+    }
 
     @Override
     public void readFully(byte[] b) throws IOException {
-      throw new UnsupportedOperationException();
+      dataIn.readFully(b);
     }
 
     @Override
     public void readFully(byte[] b, int off, int len) throws IOException {
-      throw new UnsupportedOperationException();
+      dataIn.readFully(b, off, len);
     }
 
     @Override
     public int skipBytes(int n) throws IOException {
-      throw new UnsupportedOperationException();
+      return dataIn.skipBytes(n);
     }
 
     @Override
     public boolean readBoolean() throws IOException {
-      throw new UnsupportedOperationException();
+      return dataIn.readBoolean();
     }
 
     @Override
     public byte readByte() throws IOException {
-      return (byte)read();
+      return dataIn.readByte();
     }
 
     @Override
     public int readUnsignedByte() throws IOException {
-      throw new UnsupportedOperationException();
+      return dataIn.readUnsignedByte();
     }
 
     @Override
     public short readShort() throws IOException {
-      throw new UnsupportedOperationException();
+      return dataIn.readShort();
     }
 
     @Override
     public int readUnsignedShort() throws IOException {
-      throw new UnsupportedOperationException();
+      return dataIn.readUnsignedShort();
     }
 
     @Override
     public char readChar() throws IOException {
-      throw new UnsupportedOperationException();
+      return dataIn.readChar();
     }
 
     @Override
-    public int readInt() {
-      if (pos + 4 > count) {
-        throw new RuntimeException("Not enough bytes to read an int");
-      }
-      int value = ((buf[pos] & 0xFF) << 24) |
-                  ((buf[pos + 1] & 0xFF) << 16) |
-                  ((buf[pos + 2] & 0xFF) << 8) |
-                  (buf[pos + 3] & 0xFF);
-      pos += 4;
-      return value;
+    public int readInt() throws IOException {
+      return dataIn.readInt();
     }
 
     @Override
-    public long readLong() {
-      if (pos + 8 > count) {
-        throw new RuntimeException("Not enough bytes to read a long");
-      }
-      long value = ((long)(buf[pos] & 0xFF) << 56) |
-                   ((long)(buf[pos + 1] & 0xFF) << 48) |
-                   ((long)(buf[pos + 2] & 0xFF) << 40) |
-                   ((long)(buf[pos + 3] & 0xFF) << 32) |
-                   ((long)(buf[pos + 4] & 0xFF) << 24) |
-                   ((long)(buf[pos + 5] & 0xFF) << 16) |
-                   ((long)(buf[pos + 6] & 0xFF) << 8) |
-                   (buf[pos + 7] & 0xFF);
-      pos += 8;
-      return value;
+    public long readLong() throws IOException {
+      return dataIn.readLong();
     }
 
     @Override
     public float readFloat() throws IOException {
-      throw new UnsupportedOperationException();
+      return dataIn.readFloat();
     }
 
     @Override
     public double readDouble() throws IOException {
-      throw new UnsupportedOperationException();
+      return dataIn.readDouble();
     }
 
     @Override
     public String readLine() throws IOException {
-      throw new UnsupportedOperationException();
+      return dataIn.readLine();
     }
 
     @Override
     public String readUTF() throws IOException {
-      throw new UnsupportedOperationException();
+      return dataIn.readUTF();
     }
   }
 
   private final MergeManager merger;
-  private final InputAttemptIdentifier taskAttemptId;
-  private byte[] buffer = null;
-  private final int bufferSize;
-  private final ByteArrayDataInput memDataIn;
-  private final int start;
   private final int length;
+  private final SectionLayout layout;
   private final int usedMemoryForMergeManager;
 
-  public InMemoryReader(MergeManager merger, InputAttemptIdentifier taskAttemptId,
-                        byte[] data, int start, int length, int usedMemoryForMergeManager)
-      throws IOException {
-    super(null, length - start, null, null, null, false, 0, null);
+  private final ByteArrayDataInput valuesIn;
+  private final ByteArrayDataInput keysIn;
+  private final ByteArrayDataInput lengthsIn;
+
+  private long bytesRead = 0;
+  private long numRecordsRead = 0;
+  private boolean isEof = false;
+  private boolean closed = false;
+
+  private int currentKeyLength = 0;
+  private int currentValueLength = 0;
+
+  public InMemoryReader(MergeManager merger,
+                        byte[] data, int start, int length, SectionLayout layout,
+                        int usedMemoryForMergeManager) {
+    assert start >= 0 && length > 0 && start + length <= data.length;
+    assert data[start] == 'T' && data[start + 1] == 'I' && data[start + 2] == 'F';
+    assert data[start + 3] == 0;
+    assert layout.totalLength <= length;
+    assert (long)start + layout.totalLength <= data.length;
+
     this.merger = merger;
-    this.taskAttemptId = taskAttemptId;
-
-    this.buffer = data;
-    this.bufferSize = (int) length;
-    this.memDataIn = new ByteArrayDataInput(buffer, start, length);
-    this.start = start;
     this.length = length;
-
+    this.layout = layout;
     this.usedMemoryForMergeManager = usedMemoryForMergeManager;
+
+    final int valuesOffset = start + (int)layout.valuesStart;
+    final int keysOffset = start + (int)layout.keysStart;
+    final int lengthsOffset = start + (int)layout.lengthsStart;
+
+    this.valuesIn = new ByteArrayDataInput(data, valuesOffset, (int)layout.valuesLength);
+    this.keysIn = new ByteArrayDataInput(data, keysOffset, (int)layout.keysLength);
+    this.lengthsIn = new ByteArrayDataInput(data, lengthsOffset, (int)layout.lengthsLength);
   }
 
   @Override
-  public void reset(int offset) {
-    memDataIn.reset(buffer, start + offset, length);
-    bytesRead = offset;
-    eof = false;
-  }
-
-  @Override
-  public long getPosition() throws IOException {
-    // InMemoryReader does not initialize streams like Reader, so in.getPos()
-    // would not work. Instead, return the number of uncompressed bytes read,
-    // which will be correct since in-memory data is not compressed.
-    return bytesRead;
+  public long getPosition() {
+    return closed ? 0 : bytesRead;
   }
 
   @Override
   public long getLength() {
-    return length;
+    return closed ? 0 : layout.payloadLength();
   }
 
-  private void dumpOnError() {
-    File dumpFile = new File("../output/" + taskAttemptId + ".dump");
-    System.err.println("Dumping corrupt map-output of " + taskAttemptId +
-                       " to " + dumpFile.getAbsolutePath());
-    FileOutputStream fos = null;
-    try {
-      fos = new FileOutputStream(dumpFile);
-      fos.write(buffer, 0, bufferSize);
-    } catch (IOException ioe) {
-      System.err.println("Failed to dump map-output of " + taskAttemptId);
-    } finally {
-      if (fos != null) {
-        try {
-          fos.close();
-        } catch (IOException e) {
-          System.err.println("Failed to dump map-output of " + taskAttemptId);
-        }
-      }
-    }
-  }
-
+  @Override
   public KeyState readRawKey(DataInputBuffer key) throws IOException {
-    try {
-      if (!positionToNextRecord(memDataIn)) {
-        return KeyState.NO_KEY;
-      }
-      // Setup the key
-      int pos = memDataIn.getPosition();
-      byte[] data = memDataIn.getData();
-      key.reset(data, pos, currentKeyLength);
-      // Position for the next value
-      long skipped = memDataIn.skip(currentKeyLength);
-      if (skipped != currentKeyLength) {
-        throw new IOException("Rec# " + recNo +
-            ": Failed to skip past key of length: " +
-            currentKeyLength);
-      }
-      bytesRead += currentKeyLength;
-      return KeyState.NEW_KEY;
-    } catch (IOException ioe) {
-      dumpOnError();
-      throw ioe;
+    if (!positionToNextRecord()) {
+      return KeyState.NO_KEY;
     }
+
+    final int keyPos = keysIn.getPosition();
+    final int n = keysIn.skipBytes(currentKeyLength);
+    if (n != currentKeyLength) {
+      throw new IOException(String.format(INCOMPLETE_READ, currentKeyLength, n));
+    }
+
+    key.reset(keysIn.getData(), keyPos, currentKeyLength);
+    bytesRead += currentKeyLength;
+    return KeyState.NEW_KEY;
   }
 
+  @Override
+  public boolean nextRawKey(DataInputBuffer key) throws IOException {
+    return readRawKey(key) != KeyState.NO_KEY;
+  }
+
+  @Override
   public void nextRawValue(DataInputBuffer value) throws IOException {
-    try {
-      int pos = memDataIn.getPosition();
-      byte[] data = memDataIn.getData();
-      value.reset(data, pos, currentValueLength);
+    final int valuePos = valuesIn.getPosition();
+    final int n = valuesIn.skipBytes(currentValueLength);
+    if (n != currentValueLength) {
+      throw new IOException(String.format(INCOMPLETE_READ, currentValueLength, n));
+    }
 
-      // Position for the next record
-      long skipped = memDataIn.skip(currentValueLength);
-      if (skipped != currentValueLength) {
-        throw new IOException("Rec# " + recNo +
-            ": Failed to skip past value of length: " +
-            currentValueLength);
-      }
-      // Record the byte
-      bytesRead += currentValueLength;
-      ++recNo;
-    } catch (IOException ioe) {
-      dumpOnError();
-      throw ioe;
+    value.reset(valuesIn.getData(), valuePos, currentValueLength);
+
+    bytesRead += currentValueLength;
+    ++numRecordsRead;
+
+    if (numRecordsRead == layout.totalNumRecordsWritten) {
+      isEof = true;
     }
   }
 
+  @Override
   public void close() {
-    // Release
-    buffer = null;
-    // Inform the MergeManager
+    assert !closed;
+    closed = true;
+
     if (merger != null) {
-      merger.releaseCommittedMemory(bufferSize, usedMemoryForMergeManager);
+      merger.releaseCommittedMemory(length, usedMemoryForMergeManager);
     }
+  }
+
+  private boolean positionToNextRecord() throws IOException {
+    if (isEof || numRecordsRead >= layout.totalNumRecordsWritten) {
+      isEof = true;
+      return false;
+    }
+
+    readKeyValueLength(lengthsIn);
+
+    if (currentKeyLength < 0) {
+      throw new IOException("Negative key-length: " + currentKeyLength);
+    }
+    if (currentValueLength < 0) {
+      throw new IOException("Negative value-length: " + currentValueLength);
+    }
+    return true;
+  }
+
+  private void readKeyValueLength(DataInput in) throws IOException {
+    currentKeyLength = in.readInt();
+    currentValueLength = in.readInt();
+    bytesRead += 2L * IFile.INT_SIZE;
   }
 }

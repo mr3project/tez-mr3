@@ -33,6 +33,7 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.ReadaheadPool;
 import org.apache.hadoop.io.ReadaheadPool.ReadaheadRequest;
 import org.apache.hadoop.util.DataChecksum;
+
 /**
  * A checksum input stream, used for IFiles.
  * Used to validate the checksum of files created by {@link IFileOutputStream}. 
@@ -47,7 +48,7 @@ public class IFileInputStream extends InputStream {
   private long currentOffset = 0;
   private final byte b[] = new byte[1];
   private byte csum[] = null;
-  private int checksumSize;
+  private final int checksumSize;
   private byte[] buffer;
   private int offset;
 
@@ -78,8 +79,7 @@ public class IFileInputStream extends InputStream {
    */
   public IFileInputStream(InputStream in, long len, boolean readAhead, int readAheadLength) {
     this.in = in;
-    sum = DataChecksum.newDataChecksum(DataChecksum.Type.CRC32,
-        Integer.MAX_VALUE);
+    sum = DataChecksum.newDataChecksum(DataChecksum.Type.CRC32, Integer.MAX_VALUE);
     checksumSize = sum.getChecksumSize();
     buffer = new byte[4096];
     offset = 0;
@@ -136,7 +136,7 @@ public class IFileInputStream extends InputStream {
   
   @Override
   public long skip(long n) throws IOException {
-   throw new IOException("Skip not supported for IFileInputStream");
+    throw new IOException("Skip not supported for IFileInputStream");
   }
   
   public long getPosition() {
@@ -197,7 +197,6 @@ public class IFileInputStream extends InputStream {
    * these bytes appropriately
    */
   public int readWithChecksum(byte[] b, int off, int len) throws IOException {
-
     if (currentOffset == length) {
       return -1;
     }
@@ -224,6 +223,7 @@ public class IFileInputStream extends InputStream {
         currentOffset += checksumSize;
       }
     }
+
     return bytesRead;
   }
 
@@ -280,9 +280,9 @@ public class IFileInputStream extends InputStream {
         throw new ChecksumException("Checksum Error: " + mesg, 0);
       }
     }
+
     return bytesRead;
   }
-
 
   @Override
   public int read() throws IOException {    
