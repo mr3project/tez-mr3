@@ -30,6 +30,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.FileChunk;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
+import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.apache.tez.runtime.library.common.task.local.output.TezTaskOutputFiles;
 
 public abstract class MapOutput implements ShuffleInput {
@@ -45,6 +46,7 @@ public abstract class MapOutput implements ShuffleInput {
 
   private final int id;
   private InputAttemptIdentifier attemptIdentifier;
+  private IFile.SectionLayout sectionLayout;
 
   private final boolean primaryMapOutput;
   protected final FetchedInputAllocatorOrderedGrouped callback;
@@ -81,8 +83,12 @@ public abstract class MapOutput implements ShuffleInput {
 
   public static MapOutput createLocalDiskMapOutput(InputAttemptIdentifier attemptIdentifier,
                                                    FetchedInputAllocatorOrderedGrouped callback, Path path,  long offset,
-                                                   long size, boolean primaryMapOutput)  {
-    return new DiskDirectMapOutput(attemptIdentifier, callback, size, path, offset, primaryMapOutput);
+                                                   long size, boolean primaryMapOutput,
+                                                   IFile.SectionLayout sectionLayout)  {
+    DiskDirectMapOutput mapOutput =
+        new DiskDirectMapOutput(attemptIdentifier, callback, size, path, offset, primaryMapOutput);
+    mapOutput.setSectionLayout(sectionLayout);
+    return mapOutput;
   }
 
   // may throw OutOfMemoryError
@@ -132,6 +138,14 @@ public abstract class MapOutput implements ShuffleInput {
   }
 
   public abstract Type getType();
+
+  public IFile.SectionLayout getSectionLayout() {
+    return sectionLayout;
+  }
+
+  public void setSectionLayout(IFile.SectionLayout sectionLayout) {
+    this.sectionLayout = sectionLayout;
+  }
 
   public long getSize() {
     return -1;

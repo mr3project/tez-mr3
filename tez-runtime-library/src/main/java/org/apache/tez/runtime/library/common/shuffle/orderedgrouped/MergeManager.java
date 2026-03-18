@@ -725,9 +725,9 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
             }
           } else {
             mergeOutputSize += mo.getSize();
-            IFile.Reader reader = new InMemoryReader(MergeManager.this,
-                mo.getAttemptIdentifier(), mo.getMemory(), 0, mo.getMemory().length,
-                (int)mo.getUsedMemoryForMergeManager());
+            IFile.ReaderRead reader = new InMemoryReader(MergeManager.this,
+                mo.getMemory(), 0, mo.getMemory().length,
+                mo.getSectionLayout(), (int)mo.getUsedMemoryForMergeManager());
             inMemorySegments.add(new Segment(reader,
                 (mo.isPrimaryMapOutput() ? mergedMapOutputsCounter : null)));
             lastAddedMapOutput = mo;
@@ -1045,8 +1045,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       long size = data.length;
       totalSize += size;
       fullSize -= size;
-      IFile.Reader reader = new InMemoryReader(MergeManager.this, 
-          mo.getAttemptIdentifier(), data, 0, (int)size,
+      IFile.ReaderRead reader = new InMemoryReader(MergeManager.this,
+          data, 0, (int)size, mo.getSectionLayout(),
           (int)mo.getUsedMemoryForMergeManager());
       inMemorySegments.add(new Segment(reader,
           (mo.isPrimaryMapOutput() ? mergedMapOutputsCounter : null)));

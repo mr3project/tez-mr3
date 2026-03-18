@@ -118,12 +118,12 @@ public class ShuffleUtils {
   }
 
   public static void shuffleToMemory(byte[] shuffleData,
-      InputStream input, int decompressedLength, int compressedLength,
+      InputStream input, IFile.SectionLayout layout, int decompressedLength, int compressedLength,
       CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLength,
       Logger LOG, InputAttemptIdentifier identifier,
       TaskContext taskContext, boolean useThreadLocalDecompressor) throws IOException {
     try {
-      IFile.Reader.readToMemory(shuffleData, input, compressedLength, codec,
+      IFile.Reader.readToMemory(shuffleData, input, layout, codec,
           ifileReadAhead, ifileReadAheadLength, taskContext, useThreadLocalDecompressor);
       // metrics.inputBytes(shuffleData.length);
       // finished reading shuffleData.length bytes from identifier
@@ -149,13 +149,14 @@ public class ShuffleUtils {
   }
   
   public static void shuffleToDisk(OutputStream output, String hostIdentifier,
-      InputStream input, long compressedLength, long decompressedLength, Logger LOG, InputAttemptIdentifier identifier,
+      InputStream input, IFile.SectionLayout layout, long compressedLength, long decompressedLength, Logger LOG,
+      InputAttemptIdentifier identifier,
       boolean ifileReadAhead, int ifileReadAheadLength, boolean verifyChecksum) throws IOException {
     // Copy data to local-disk
     long bytesLeft = compressedLength;
     try {
       if (verifyChecksum) {
-        bytesLeft -= IFile.Reader.readToDisk(output, input, compressedLength,
+        bytesLeft -= IFile.Reader.readToDisk(output, input, layout,
             ifileReadAhead, ifileReadAheadLength);
       } else {
         final int BYTES_TO_READ = 64 * 1024;

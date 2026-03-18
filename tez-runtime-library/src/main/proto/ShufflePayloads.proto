@@ -39,6 +39,13 @@ message DataProto {
   optional int32 compressed_length = 2;
   optional bytes data = 3;
   optional int32 uncompressed_length = 4;
+  optional int64 values_start = 5;
+  optional int64 keys_start = 6;
+  optional int64 lengths_start = 7;
+  optional int64 total_records_written = 8;
+  optional int64 values_raw_length = 9;
+  optional int64 keys_raw_length = 10;
+  optional int64 lengths_raw_length = 11;
 }
 
 message InputInformationEventPayloadProto {

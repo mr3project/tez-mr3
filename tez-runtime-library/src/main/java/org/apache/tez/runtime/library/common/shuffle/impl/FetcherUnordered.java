@@ -59,6 +59,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.ShuffleHeader;  // TODO: relocate
+import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.apache.tez.runtime.library.common.sort.impl.TezIndexRecord;
 import org.apache.tez.runtime.library.common.sort.impl.TezSpillRecord;
 import org.apache.tez.runtime.library.exceptions.FetcherReadTimeoutException;
@@ -525,6 +526,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         public void freeResources(FetchedInput fetchedInput) {
         }
       });
+    fetchedInput.setSectionLayout(indexRecord.getLayout());
     if (isDebugEnabled) {
       LOG.debug("fetcher" + " about to shuffle output of srcAttempt (direct disk)" + srcAttemptId
         + " decomp: " + indexRecord.getRawLength() + " len: " + indexRecord.getPartLength()
@@ -583,13 +585,16 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     final long decompressedLength;
     final long compressedLength;
     final int forReduce;
+    final IFile.SectionLayout layout;
 
-    MapOutputStat(InputAttemptIdentifier srcAttemptId, long decompressedLength, long compressedLength, int forReduce) {
+    MapOutputStat(InputAttemptIdentifier srcAttemptId, long decompressedLength, long compressedLength,
+        int forReduce, IFile.SectionLayout layout) {
       assert srcAttemptId != null;
       this.srcAttemptId = srcAttemptId;
       this.decompressedLength = decompressedLength;
       this.compressedLength = compressedLength;
       this.forReduce = forReduce;
+      this.layout = layout;
     }
 
     @Override
@@ -655,7 +660,8 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
           }
 
           mapOutputStat = new MapOutputStat(srcAttemptId,
-              header.getUncompressedLength(), header.getCompressedLength(), header.getPartition());
+              header.getUncompressedLength(), header.getCompressedLength(), header.getPartition(),
+              header.getSectionLayout());
           mapOutputStats.add(mapOutputStat);
           responsePartition = header.getPartition();
         } catch (IllegalArgumentException e) {
@@ -704,6 +710,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
           fetchedInput = shuffleManager.getInputManager().allocate(
               decompressedLength, compressedLength, srcAttemptId, false);
         }
+        fetchedInput.setSectionLayout(mapOutputStat.layout);
         if (fetchedInput.getType() == Type.WAIT) {
           if (isDebugEnabled) {
             LOG.debug("Waiting for memory to be freed: {}, {}, {}",
@@ -722,12 +729,12 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
 
         if (fetchedInput.getType() == Type.MEMORY) {
           ShuffleUtils.shuffleToMemory(((MemoryFetchedInput) fetchedInput).getBytes(),
-              input, (int) decompressedLength, (int) compressedLength, codec,
+              input, mapOutputStat.layout, (int) decompressedLength, (int) compressedLength, codec,
               fetcherConfig.ifileReadAhead, fetcherConfig.ifileReadAheadLength, LOG,
               fetchedInput.getInputAttemptIdentifier(), taskContext, true);
         } else if (fetchedInput.getType() == Type.DISK) {
           ShuffleUtils.shuffleToDisk(((DiskFetchedInput) fetchedInput).getOutputStream(),
-              (host + ":" + port), input, compressedLength, decompressedLength, LOG,
+              (host + ":" + port), input, mapOutputStat.layout, compressedLength, decompressedLength, LOG,
               fetchedInput.getInputAttemptIdentifier(),
               fetcherConfig.ifileReadAhead, fetcherConfig.ifileReadAheadLength, fetcherConfigCommon.verifyDiskChecksum);
         } else {

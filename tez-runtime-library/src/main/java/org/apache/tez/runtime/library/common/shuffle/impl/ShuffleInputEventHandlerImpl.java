@@ -48,6 +48,7 @@ import org.apache.tez.runtime.library.shuffle.impl.ShuffleUserPayloads.DataProto
 import org.apache.tez.runtime.library.shuffle.impl.ShuffleUserPayloads.DataMovementEventPayloadProto;
 import org.apache.tez.runtime.library.common.shuffle.DiskFetchedInput;
 import org.apache.tez.runtime.library.common.shuffle.MemoryFetchedInput;
+import org.apache.tez.runtime.library.common.sort.impl.IFile;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 
@@ -207,10 +208,15 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
 
   private void moveDataToFetchedInput(DataProto dataProto,
       FetchedInput fetchedInput, String hostIdentifier) throws IOException {
+    IFile.SectionLayout layout = new IFile.SectionLayout(
+        dataProto.getValuesStart(), dataProto.getKeysStart(), dataProto.getLengthsStart(),
+        dataProto.getCompressedLength(), dataProto.getTotalRecordsWritten(),
+        dataProto.getValuesRawLength(), dataProto.getKeysRawLength(), dataProto.getLengthsRawLength());
+    fetchedInput.setSectionLayout(layout);
     switch (fetchedInput.getType()) {
     case DISK:
       ShuffleUtils.shuffleToDisk(((DiskFetchedInput) fetchedInput).getOutputStream(),
-          hostIdentifier, dataProto.getData().newInput(),
+          hostIdentifier, dataProto.getData().newInput(), layout,
           dataProto.getCompressedLength(),
           dataProto.getUncompressedLength(), LOG,
           fetchedInput.getInputAttemptIdentifier(), ifileReadAhead,
@@ -219,7 +225,7 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
     case MEMORY:
       // set useThreadLocalDecompressor = false because we are inside an EventHandler thread, not a Fetcher thread
       ShuffleUtils.shuffleToMemory(((MemoryFetchedInput) fetchedInput).getBytes(),
-          dataProto.getData().newInput(), dataProto.getRawLength(),
+          dataProto.getData().newInput(), layout, dataProto.getRawLength(),
           dataProto.getCompressedLength(),
           codec, ifileReadAhead, ifileReadAheadLength, LOG,
           fetchedInput.getInputAttemptIdentifier(), inputContext, false);
