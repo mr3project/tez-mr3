@@ -24,6 +24,7 @@ import java.io.OutputStream;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
+import org.apache.tez.runtime.library.common.sort.impl.IFile;
 
 public abstract class FetchedInput implements ShuffleInput {
   
@@ -45,6 +46,7 @@ public abstract class FetchedInput implements ShuffleInput {
   private final InputAttemptIdentifier inputAttemptIdentifier;
   private final FetchedInputCallback callback;
   private final int id;
+  private IFile.SectionLayout sectionLayout;
   private byte state;
 
   protected FetchedInput(InputAttemptIdentifier inputAttemptIdentifier,
@@ -90,6 +92,14 @@ public abstract class FetchedInput implements ShuffleInput {
 
   public InputAttemptIdentifier getInputAttemptIdentifier() {
     return this.inputAttemptIdentifier;
+  }
+
+  public IFile.SectionLayout getSectionLayout() {
+    return sectionLayout;
+  }
+
+  public void setSectionLayout(IFile.SectionLayout sectionLayout) {
+    this.sectionLayout = sectionLayout;
   }
 
   /**

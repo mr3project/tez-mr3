@@ -1022,11 +1022,20 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
     if (canSendDataOverDME()) {
       ShuffleUserPayloads.DataProto.Builder dataProtoBuilder = ShuffleUserPayloads.DataProto.newBuilder();
+      IFile.SectionLayout layout = this.writer.getSectionLayout();
 
       // this.writer.close() was called in close() with skipBuffers = true
       dataProtoBuilder.setData(UnsafeByteOperations.unsafeWrap(readDataForDME()));
       dataProtoBuilder.setRawLength((int)this.writer.getRawLength());
       dataProtoBuilder.setCompressedLength((int)this.writer.getCompressedLength());
+      dataProtoBuilder.setUncompressedLength((int)this.writer.getRawLength());
+      dataProtoBuilder.setValuesStart(layout.valuesStart);
+      dataProtoBuilder.setKeysStart(layout.keysStart);
+      dataProtoBuilder.setLengthsStart(layout.lengthsStart);
+      dataProtoBuilder.setTotalRecordsWritten(layout.totalNumRecordsWritten);
+      dataProtoBuilder.setValuesRawLength(layout.valuesRawLength);
+      dataProtoBuilder.setKeysRawLength(layout.keysRawLength);
+      dataProtoBuilder.setLengthsRawLength(layout.lengthsRawLength);
       payloadBuilder.setData(dataProtoBuilder.build());
 
       this.shuffleDataViaEventSize.increment(this.writer.getCompressedLength());

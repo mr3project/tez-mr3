@@ -19,6 +19,8 @@
 package org.apache.tez.runtime.library.common.readers;
 
 import java.io.IOException;
+import java.io.InputStream;
+
 import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
 import org.slf4j.Logger;
@@ -62,7 +64,7 @@ public class UnorderedKVReader<K, V> extends KeyValueReader {
   private V value;
   
   private FetchedInput currentFetchedInput;
-  private IFile.Reader currentReader;
+  private IFile.ReaderRead currentReader;
   
   // TODO Remove this once per I/O counters are separated properly. Relying on
   // the counter at the moment will generate aggregate numbers. 
@@ -191,17 +193,60 @@ public class UnorderedKVReader<K, V> extends KeyValueReader {
     }
   }
 
-  private IFile.Reader openIFileReader(FetchedInput fetchedInput)
+  private IFile.ReaderRead openIFileReader(FetchedInput fetchedInput)
       throws IOException {
+    IFile.SectionLayout layout = fetchedInput.getSectionLayout();
+    if (layout == null) {
+      throw new IOException("Missing IFile section layout for fetched input: " + fetchedInput);
+    }
     if (fetchedInput.getType() == Type.MEMORY) {
       MemoryFetchedInput mfi = (MemoryFetchedInput) fetchedInput;
 
-      return new InMemoryReader(null, mfi.getInputAttemptIdentifier(),
-          mfi.getBytes(), 0, (int) mfi.getSize(), 0);
+      return new InMemoryReader(null, mfi.getBytes(), 0, (int) mfi.getSize(), layout, 0);
     } else {
-      return new IFile.Reader(fetchedInput.getInputStream(),
-          fetchedInput.getSize(), codec, null, null,
-          ifileReadAhead, ifileReadAheadLength, context);
+      InputStream headerValuesIn = null;
+      InputStream keysIn = null;
+      InputStream lengthsIn = null;
+      boolean success = false;
+      try {
+        headerValuesIn = fetchedInput.getInputStream();
+        keysIn = fetchedInput.getInputStream();
+        skipFully(keysIn, layout.keysStart);
+        lengthsIn = fetchedInput.getInputStream();
+        skipFully(lengthsIn, layout.lengthsStart);
+
+        IFile.Reader reader = new IFile.Reader(
+            headerValuesIn, keysIn, lengthsIn, layout,
+            codec, null, null, ifileReadAhead, ifileReadAheadLength, context);
+        success = true;
+        return reader;
+      } finally {
+        if (!success) {
+          if (headerValuesIn != null) {
+            headerValuesIn.close();
+          }
+          if (keysIn != null) {
+            keysIn.close();
+          }
+          if (lengthsIn != null) {
+            lengthsIn.close();
+          }
+        }
+      }
+    }
+  }
+
+  private static void skipFully(InputStream in, long bytesToSkip) throws IOException {
+    long remaining = bytesToSkip;
+    while (remaining > 0) {
+      long skipped = in.skip(remaining);
+      if (skipped <= 0) {
+        if (in.read() < 0) {
+          throw new IOException("Premature EOF while skipping " + bytesToSkip + " bytes");
+        }
+        skipped = 1;
+      }
+      remaining -= skipped;
     }
   }
 }

@@ -1057,14 +1057,12 @@ public class ShuffleHandler {
         if (mapOutputInfoMap.size() < mapOutputMetaInfoCacheSize) {
           mapOutputInfoMap.put(mapId, outputInfo);
         }
-        int lengthInitial = Text.encode(mapId).limit();
         for (int reduce = reduceRange.getFirst(); reduce <= reduceRange.getLast(); reduce++) {
           TezIndexRecord indexRecord = outputInfo.getIndex(reduce);
 
-          // contentLength += (new ShuffleHeader(mapId, indexRecord.getPartLength(), indexRecord.getRawLength(), reduce)).writeLength();
-          int length = lengthInitial;
-          length += 4 + 8 + 8 + 4;  // encoding of mapIdLength, compressedLength, uncompressedLength, forReduce
-          contentLength += length;
+          // TODO: Optimize by pre-calculating Text.encode(mapId).limit()
+          contentLength += new ShuffleHeader(mapId, indexRecord.getPartLength(),
+              indexRecord.getRawLength(), reduce, indexRecord.getLayout()).writeLength();
 
           contentLength += indexRecord.getPartLength();
         }
@@ -1190,7 +1188,8 @@ public class ShuffleHandler {
           lastIndex = index;
         }
 
-        ShuffleHeader header = new ShuffleHeader(mapId, index.getPartLength(), index.getRawLength(), reduce);
+        ShuffleHeader header = new ShuffleHeader(mapId, index.getPartLength(), index.getRawLength(),
+            reduce, index.getLayout());
         dob.reset();
         header.write(dob);
         // Free the memory needed to store the spill and index records

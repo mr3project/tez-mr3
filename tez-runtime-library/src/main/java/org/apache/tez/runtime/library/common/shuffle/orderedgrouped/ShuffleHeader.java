@@ -25,6 +25,7 @@ import java.nio.ByteBuffer;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
+import org.apache.tez.runtime.library.common.sort.impl.IFile;
 
 /**
  * Shuffle Header information that is sent by the TaskTracker and 
@@ -48,6 +49,7 @@ public class ShuffleHeader implements Writable {
   long uncompressedLength;
   long compressedLength;
   int forReduce;
+  IFile.SectionLayout sectionLayout;
 
   private boolean compositeFetch;
 
@@ -63,10 +65,16 @@ public class ShuffleHeader implements Writable {
   // ShuffleHeader created used by MR3 ShuffleHandler (but not by Hadoop shuffle service)
   public ShuffleHeader(String mapId, long compressedLength,
       long uncompressedLength, int forReduce) {
+    this(mapId, compressedLength, uncompressedLength, forReduce, null);
+  }
+
+  public ShuffleHeader(String mapId, long compressedLength,
+      long uncompressedLength, int forReduce, IFile.SectionLayout sectionLayout) {
     this.mapId = mapId;
     this.compressedLength = compressedLength;
     this.uncompressedLength = uncompressedLength;
     this.forReduce = forReduce;
+    this.sectionLayout = sectionLayout;
   }
   
   public String getMapId() {
@@ -85,6 +93,10 @@ public class ShuffleHeader implements Writable {
     return compressedLength;
   }
 
+  public IFile.SectionLayout getSectionLayout() {
+    return sectionLayout;
+  }
+
   public void readFields(DataInput in) throws IOException {
     if (compositeFetch) {   // ShuffleHeader created by MR3 ShuffleHandler
       int length = in.readInt();  // Cf. WritableUtils.readStringSafely() calls readVInt()
@@ -99,11 +111,27 @@ public class ShuffleHeader implements Writable {
       compressedLength = in.readLong();
       uncompressedLength = in.readLong();
       forReduce = in.readInt();
+      if (compressedLength > 0) {
+        long valuesStart = in.readLong();
+        long keysStart = in.readLong();
+        long lengthsStart = in.readLong();
+        long totalNumRecordsWritten = in.readLong();
+        long valuesRawLength = in.readLong();
+        long keysRawLength = in.readLong();
+        long lengthsRawLength = in.readLong();
+        sectionLayout = new IFile.SectionLayout(
+            valuesStart, keysStart, lengthsStart,
+            compressedLength, totalNumRecordsWritten,
+            valuesRawLength, keysRawLength, lengthsRawLength);
+      } else {
+        sectionLayout = null;
+      }
     } else {  // ShuffleHeader created by Hadoop shuffle service
       mapId = WritableUtils.readStringSafely(in, MAX_ID_LENGTH);
       compressedLength = WritableUtils.readVLong(in);
       uncompressedLength = WritableUtils.readVLong(in);
       forReduce = WritableUtils.readVInt(in);
+      sectionLayout = null;
     }
   }
 
@@ -112,6 +140,9 @@ public class ShuffleHeader implements Writable {
   public int writeLength() throws IOException {
     int length = Text.encode(mapId).limit();
     length += 4 + 8 + 8 + 4;  // encoding of mapIdLength, compressedLength, uncompressedLength, forReduce
+    if (compressedLength > 0) {
+      length += 7 * 8;
+    }
     return length;
   }
 
@@ -127,5 +158,17 @@ public class ShuffleHeader implements Writable {
     out.writeLong(compressedLength);
     out.writeLong(uncompressedLength);
     out.writeInt(forReduce);
+    if (compressedLength > 0) {
+      if (sectionLayout == null) {
+        throw new IOException("SectionLayout is required for non-empty shuffle header");
+      }
+      out.writeLong(sectionLayout.valuesStart);
+      out.writeLong(sectionLayout.keysStart);
+      out.writeLong(sectionLayout.lengthsStart);
+      out.writeLong(sectionLayout.totalNumRecordsWritten);
+      out.writeLong(sectionLayout.valuesRawLength);
+      out.writeLong(sectionLayout.keysRawLength);
+      out.writeLong(sectionLayout.lengthsRawLength);
+    }
   }
 }

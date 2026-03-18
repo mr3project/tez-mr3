@@ -49,6 +49,7 @@ import org.apache.tez.runtime.library.common.shuffle.ShuffleServer.PathPartition
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.shuffle.api.ShuffleHandlerError;
 import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.MapOutput.Type;
+import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.apache.tez.runtime.library.common.sort.impl.TezIndexRecord;
 import org.apache.tez.runtime.library.common.sort.impl.TezSpillRecord;
 import org.apache.tez.runtime.library.exceptions.FetcherReadTimeoutException;
@@ -68,13 +69,15 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     final long decompressedLength;
     final long compressedLength;
     final int forReduce;
+    final IFile.SectionLayout layout;
 
     MapOutputStat(InputAttemptIdentifier srcAttemptId, long decompressedLength, long compressedLength,
-        int forReduce) {
+        int forReduce, IFile.SectionLayout layout) {
       this.srcAttemptId = srcAttemptId;
       this.decompressedLength = decompressedLength;
       this.compressedLength = compressedLength;
       this.forReduce = forReduce;
+      this.layout = layout;
     }
 
     @Override
@@ -520,7 +523,8 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
               pathToAttemptMap.get(new PathPartition(header.mapId, header.forReduce)),
               header.uncompressedLength,
               header.compressedLength,
-              header.forReduce);
+              header.forReduce,
+              header.getSectionLayout());
           mapOutputStats.add(mapOutputStat);
         } catch (IllegalArgumentException e) {
           if (!stopped) {
@@ -583,6 +587,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
           }
           return EMPTY_ATTEMPT_ID_ARRAY;
         }
+        mapOutput.setSectionLayout(mapOutputStat.layout);
 
         // Check if we can shuffle *now* ...
         if (mapOutput.getType() == Type.WAIT) {
@@ -599,13 +604,14 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         }
 
         if (mapOutput.getType() == Type.MEMORY) {
-          ShuffleUtils.shuffleToMemory(mapOutput.getMemory(), input, (int) decompressedLength,
+          ShuffleUtils.shuffleToMemory(mapOutput.getMemory(), input, mapOutputStat.layout, (int) decompressedLength,
               (int) compressedLength, codec, fetcherConfig.ifileReadAhead,
               fetcherConfig.ifileReadAheadLength, LOG,
               mapOutput.getAttemptIdentifier(), taskContext, true);
         } else if (mapOutput.getType() == Type.DISK) {
           ShuffleUtils.shuffleToDisk(mapOutput.getDisk(), host,
-              input, compressedLength, decompressedLength, LOG, mapOutput.getAttemptIdentifier(),
+              input, mapOutputStat.layout, compressedLength, decompressedLength, LOG,
+              mapOutput.getAttemptIdentifier(),
               fetcherConfig.ifileReadAhead, fetcherConfig.ifileReadAheadLength,
               fetcherConfigCommon.verifyDiskChecksum);
         } else {
@@ -770,7 +776,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
   private MapOutput getMapOutputForDirectDiskFetch(InputAttemptIdentifier srcAttemptId, Path filename,
       TezIndexRecord indexRecord) throws IOException {
     return MapOutput.createLocalDiskMapOutput(srcAttemptId, allocator, filename,
-        indexRecord.getStartOffset(), indexRecord.getPartLength(), true);
+        indexRecord.getStartOffset(), indexRecord.getPartLength(), true, indexRecord.getLayout());
   }
 
   private boolean verifySanity(long compressedLength, long decompressedLength,
