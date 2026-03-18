@@ -34,6 +34,7 @@ import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
+import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.RawComparator;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.util.PriorityQueue;
@@ -43,7 +44,7 @@ import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.serializer.SerializationContext;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader;
-import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader.KeyState;
+import org.apache.tez.runtime.library.common.sort.impl.IFile.KeyState;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Writer;
 import org.apache.tez.runtime.library.utils.BufferUtils;
 
@@ -214,6 +215,7 @@ public class TezMerger {
     Path file = null;
     boolean preserve = false; // Signifies whether the segment should be kept after a merge is complete. Checked in the close method.
     CompressionCodec codec = null;
+    IFile.SectionLayout sectionLayout = null;
     long segmentOffset = 0;
     long segmentLength = -1;
     boolean ifileReadAhead;
@@ -222,33 +224,36 @@ public class TezMerger {
     final DecompressorPool inputContext;
 
     public DiskSegment(FileSystem fs, Path file,
+        IFile.SectionLayout sectionLayout,
         CompressionCodec codec, boolean ifileReadAhead,
         int ifileReadAheadLength, boolean preserve, DecompressorPool inputContext)
     throws IOException {
-      this(fs, file, codec, ifileReadAhead, ifileReadAheadLength,
+      this(fs, file, sectionLayout, codec, ifileReadAhead, ifileReadAheadLength,
           preserve, null, inputContext);
     }
 
     public DiskSegment(FileSystem fs, Path file,
+                   IFile.SectionLayout sectionLayout,
                    CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLenth,
                    boolean preserve, TezCounter mergedMapOutputsCounter, DecompressorPool inputContext)
     throws IOException {
-      this(fs, file, 0, fs.getFileStatus(file).getLen(), codec,
+      this(fs, file, 0, fs.getFileStatus(file).getLen(), sectionLayout, codec,
           ifileReadAhead, ifileReadAheadLenth, preserve,
           mergedMapOutputsCounter, inputContext);
     }
 
     public DiskSegment(FileSystem fs, Path file,
                    long segmentOffset, long segmentLength,
+                   IFile.SectionLayout sectionLayout,
                    CompressionCodec codec, boolean ifileReadAhead,
                    int ifileReadAheadLength,
                    boolean preserve, DecompressorPool inputContext) throws IOException {
-      this(fs, file, segmentOffset, segmentLength, codec, ifileReadAhead,
+      this(fs, file, segmentOffset, segmentLength, sectionLayout, codec, ifileReadAhead,
           ifileReadAheadLength, preserve, null, inputContext);
     }
 
     public DiskSegment(FileSystem fs, Path file,
-        long segmentOffset, long segmentLength, CompressionCodec codec,
+        long segmentOffset, long segmentLength, IFile.SectionLayout sectionLayout, CompressionCodec codec,
         boolean ifileReadAhead, int ifileReadAheadLength,
         boolean preserve, TezCounter mergedMapOutputsCounter, DecompressorPool inputContext)
     throws IOException {
@@ -256,6 +261,7 @@ public class TezMerger {
       this.fs = fs;
       this.file = file;
       this.codec = codec;
+      this.sectionLayout = sectionLayout;
       this.preserve = preserve;
       this.ifileReadAhead = ifileReadAhead;
       this.ifileReadAheadLength = ifileReadAheadLength;
@@ -269,10 +275,35 @@ public class TezMerger {
     @Override
     void init(TezCounter readsCounter, TezCounter bytesReadCounter) throws IOException {
       super.init(readsCounter, bytesReadCounter);
-      FSDataInputStream in = fs.open(file);
-      in.seek(segmentOffset);
-      reader = new Reader(in, segmentLength, codec, readsCounter, bytesReadCounter, ifileReadAhead,
-          ifileReadAheadLength, inputContext);
+      if (sectionLayout == null) {
+        throw new IOException("SectionLayout is required for DiskSegment: file=" + file
+            + ", offset=" + segmentOffset + ", length=" + segmentLength);
+      }
+
+      FSDataInputStream headerValuesIn = null;
+      FSDataInputStream keysIn = null;
+      FSDataInputStream lengthsIn = null;
+      boolean success = false;
+      try {
+        headerValuesIn = fs.open(file);
+        headerValuesIn.seek(segmentOffset);
+
+        keysIn = fs.open(file);
+        keysIn.seek(segmentOffset + sectionLayout.keysStart);
+
+        lengthsIn = fs.open(file);
+        lengthsIn.seek(segmentOffset + sectionLayout.lengthsStart);
+
+        reader = new Reader(headerValuesIn, keysIn, lengthsIn, sectionLayout, codec,
+            readsCounter, bytesReadCounter, ifileReadAhead, ifileReadAheadLength, inputContext);
+        success = true;
+      } finally {
+        if (!success) {
+          IOUtils.closeStream(headerValuesIn);
+          IOUtils.closeStream(keysIn);
+          IOUtils.closeStream(lengthsIn);
+        }
+      }
     }
 
     @Override
@@ -308,6 +339,7 @@ public class TezMerger {
         closeReader();
         segmentOffset = offset;
         segmentLength = fs.getFileStatus(file).getLen() - segmentOffset;
+        sectionLayout = null;
         init(null, null);
       }
     }
@@ -592,6 +624,9 @@ public class TezMerger {
 
           writeFile(this, writer, reporter, recordsBeforeProgress);
           writer.close();
+          // Merge passes emit a three-section IFile, so preserve the section metadata
+          // produced on close and carry it into the follow-on DiskSegment reader.
+          final IFile.SectionLayout mergedLayout = writer.getSectionLayout();
           // writer never used again
           
           //we finished one single level merge; now clean up the priority 
@@ -600,7 +635,7 @@ public class TezMerger {
 
           // Add the newly create segment to the list of segments to be merged
           Segment tempSegment = 
-            new DiskSegment(fs, outputFile, codec, ifileReadAhead,
+            new DiskSegment(fs, outputFile, mergedLayout, codec, ifileReadAhead,
                 ifileReadAheadLength, false, inputContext);
 
           // Insert new merged segment into the sorted list

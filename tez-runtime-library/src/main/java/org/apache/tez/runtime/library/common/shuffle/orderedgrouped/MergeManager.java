@@ -849,6 +849,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
           mergeOutputSize).suffix(Constants.MERGED_OUTPUT_PREFIX);
 
       Writer writer = null;
+      IFile.SectionLayout outputLayout = null;
       long outFileLen = 0;
       try {
         writer = new Writer(serializationContext.getKeySerialization(),
@@ -872,6 +873,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
         TezMerger.writeFile(rIter, writer, progressable, TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
         writer.close();
+        outputLayout = writer.getSectionLayout();
         additionalSpillBytesWritten.increment(writer.getCompressedLength());
         writer = null;
 
@@ -891,7 +893,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       }
 
       // Note the output of the merge
-      closeOnDiskFile(new FileChunk(outputPath, 0, outFileLen));
+      closeOnDiskFile(new FileChunk(outputPath, 0, outFileLen, outputLayout));
     }
 
     @Override
@@ -953,8 +955,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         }
         final Path file = fileChunk.getPath();
         approxOutputSize += size;
-        DiskSegment segment = new DiskSegment(rfs, file, offset, size, codec, ifileReadAhead,
-            ifileReadAheadLength, preserve, inputContext);
+        DiskSegment segment = new DiskSegment(rfs, file, offset, size, fileChunk.getSectionLayout(), codec,
+            ifileReadAhead, ifileReadAheadLength, preserve, inputContext);
         inputSegments.add(segment);
       }
 
@@ -985,6 +987,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
           serializationContext.getValSerialization(), rfs, outputPath,
           serializationContext.getKeyClass(), serializationContext.getValueClass(), codec, null,
           null, writeBuffer);
+      IFile.SectionLayout outputLayout = null;
       tmpDir = new Path(inputContext.getUniqueIdentifier());
       try {
         TezRawKeyValueIterator iter = TezMerger.merge(conf, rfs,
@@ -997,6 +1000,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         // the finalMerge (i.e. final mem available may be different from initial merge mem)
         TezMerger.writeFile(iter, writer, progressable, TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
         writer.close();
+        outputLayout = writer.getSectionLayout();
         additionalSpillBytesWritten.increment(writer.getCompressedLength());
         // writer never used again
       } catch (IOException e) {
@@ -1005,7 +1009,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       }
 
       final long outputLen = localFS.getFileStatus(outputPath).getLen();
-      closeOnDiskFile(new FileChunk(outputPath, 0, outputLen));
+      closeOnDiskFile(new FileChunk(outputPath, 0, outputLen, outputLayout));
 
       LOG.info("{} Finished merging {} map output files on disk of total-size {}. Local output file is {} of size {}",
           inputContext.getSourceVertexName(), inputs.size(), approxOutputSize, outputPath, outputLen);
@@ -1093,6 +1097,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         final Writer writer = new Writer(serContext.getKeySerialization(),
             serContext.getValSerialization(), fs, outputPath, serContext.getKeyClass(),
             serContext.getValueClass(), codec, null, null, writeBuffer);
+        IFile.SectionLayout outputLayout = null;
         try {
           TezMerger.writeFile(rIter, writer, progressable, TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
         } catch (IOException e) {
@@ -1107,6 +1112,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         } finally {
           if (null != writer) {
             writer.close();
+            outputLayout = writer.getSectionLayout();
             additionalSpillBytesWritten.increment(writer.getCompressedLength());
             // writer never used again
           }
@@ -1114,7 +1120,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
         final FileStatus fStatus = localFS.getFileStatus(outputPath);
         // add to list of final disk outputs.
-        onDiskMapOutputs.add(new FileChunk(outputPath, 0, fStatus.getLen()));
+        onDiskMapOutputs.add(new FileChunk(outputPath, 0, fStatus.getLen(), outputLayout));
 
         if (isDebugEnabled) {
           LOG.debug("MemMerged: Merged " + numMemDiskSegments + "segments, size=" +
@@ -1151,8 +1157,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
       final long fileOffset = fileChunk.getOffset();
       final boolean preserve = fileChunk.isLocalFile();
-      diskSegments.add(new DiskSegment(fs, file, fileOffset, fileLength, codec, ifileReadAhead,
-                                   ifileReadAheadLength, preserve, counter, inputContext));
+      diskSegments.add(new DiskSegment(fs, file, fileOffset, fileLength, fileChunk.getSectionLayout(), codec,
+                                   ifileReadAhead, ifileReadAheadLength, preserve, counter, inputContext));
     }
     if (isDebugEnabled) {
       LOG.debug("DiskSeg: Merging " + onDisk.length + " files, " +

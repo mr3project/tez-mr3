@@ -145,6 +145,10 @@ public abstract class MapOutput implements ShuffleInput {
 
   public void setSectionLayout(IFile.SectionLayout sectionLayout) {
     this.sectionLayout = sectionLayout;
+    FileChunk outputPath = getOutputPath();
+    if (outputPath != null) {
+      outputPath.setSectionLayout(sectionLayout);
+    }
   }
 
   public long getSize() {
@@ -191,12 +195,7 @@ public abstract class MapOutput implements ShuffleInput {
     private DiskDirectMapOutput(InputAttemptIdentifier attemptIdentifier, FetchedInputAllocatorOrderedGrouped callback,
                       long size, Path outputPath, long offset, boolean primaryMapOutput) {
       super(attemptIdentifier, callback, primaryMapOutput);
-      this.outputPath = new FileChunk(outputPath, offset, size, true, attemptIdentifier);
-    }
-
-    @Override
-    public FileChunk getOutputPath() {
-      return outputPath;
+      this.outputPath = new FileChunk(outputPath, offset, size, true, attemptIdentifier, null);
     }
 
     @Override
@@ -206,7 +205,7 @@ public abstract class MapOutput implements ShuffleInput {
 
     @Override
     public void commit() throws IOException {
-      callback.closeOnDiskFile(outputPath);
+      callback.closeOnDiskFile(getOutputPath());
     }
 
     @Override
@@ -217,6 +216,11 @@ public abstract class MapOutput implements ShuffleInput {
     @Override
     public Type getType() {
       return Type.DISK_DIRECT;
+    }
+
+    @Override
+    public FileChunk getOutputPath() {
+      return outputPath;
     }
   }
 
@@ -230,7 +234,7 @@ public abstract class MapOutput implements ShuffleInput {
 
       this.tmpOutputPath = tmpOutputPath;
       this.disk = null;
-      this.outputPath = new FileChunk(outputPath, offset, size, false, attemptIdentifier);
+      this.outputPath = new FileChunk(outputPath, offset, size, false, attemptIdentifier, null);
     }
 
     @Override
@@ -251,7 +255,7 @@ public abstract class MapOutput implements ShuffleInput {
     @Override
     public void commit() throws IOException {
       callback.getLocalFileSystem().rename(tmpOutputPath, outputPath.getPath());
-      callback.closeOnDiskFile(outputPath);
+      callback.closeOnDiskFile(getOutputPath());
     }
 
     @Override
