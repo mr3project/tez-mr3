@@ -201,7 +201,6 @@ public class UnorderedKVReader<K, V> extends KeyValueReader {
     }
     if (fetchedInput.getType() == Type.MEMORY) {
       MemoryFetchedInput mfi = (MemoryFetchedInput) fetchedInput;
-
       return new InMemoryReader(null, mfi.getBytes(), 0, (int) mfi.getSize(), layout, 0);
     } else {
       InputStream headerValuesIn = null;

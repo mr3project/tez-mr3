@@ -64,11 +64,6 @@ public class ShuffleHeader implements Writable {
 
   // ShuffleHeader created used by MR3 ShuffleHandler (but not by Hadoop shuffle service)
   public ShuffleHeader(String mapId, long compressedLength,
-      long uncompressedLength, int forReduce) {
-    this(mapId, compressedLength, uncompressedLength, forReduce, null);
-  }
-
-  public ShuffleHeader(String mapId, long compressedLength,
       long uncompressedLength, int forReduce, IFile.SectionLayout sectionLayout) {
     this.mapId = mapId;
     this.compressedLength = compressedLength;
