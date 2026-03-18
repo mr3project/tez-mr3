@@ -72,7 +72,6 @@ public class PipelinedSorter extends ExternalSorter {
   /**
    * The size of each record in the index file for the map-outputs.
    */
-  public static final int MAP_OUTPUT_INDEX_RECORD_LENGTH = Constants.MAP_OUTPUT_INDEX_RECORD_LENGTH;
   private final static int APPROX_HEADER_LENGTH = 150;
 
   private final int partitionBits;
@@ -550,7 +549,7 @@ public class PipelinedSorter extends ExternalSorter {
 
       if (writeSpillRecord) {
         Path indexFilename = mapOutputFile.getSpillIndexFileForWrite(
-            numSpills, partitions * MAP_OUTPUT_INDEX_RECORD_LENGTH);
+            numSpills, partitions * Constants.MAP_OUTPUT_INDEX_RECORD_LENGTH);
         spillFileIndexPaths.put(numSpills, indexFilename);
         spillRec.writeToFile(indexFilename, localFs, localFsSpillFilePerms);
       } else {
@@ -676,7 +675,7 @@ public class PipelinedSorter extends ExternalSorter {
 
     if (writeSpillRecord) {
       Path indexFilename = mapOutputFile.getSpillIndexFileForWrite(
-          numSpills, partitions * MAP_OUTPUT_INDEX_RECORD_LENGTH);
+          numSpills, partitions * Constants.MAP_OUTPUT_INDEX_RECORD_LENGTH);
       spillFileIndexPaths.put(numSpills, indexFilename);
       spillRec.writeToFile(indexFilename, localFs, localFsSpillFilePerms);
     } else {
