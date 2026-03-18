@@ -746,9 +746,7 @@ public class TezMerger {
           //available under the space constraints
           long approxOutputSize = 0; 
           for (Segment s : segmentsToMerge) {
-            approxOutputSize += s.getLength() + 
-                                ChecksumFileSystem.getApproxChkSumLength(
-                                s.getLength());
+            approxOutputSize += s.getLength() + ChecksumFileSystem.getApproxChkSumLength(s.getLength());
           }
           Path tmpFilename = new Path(tmpDir, "intermediate").suffix("." + passNo);
 
@@ -765,6 +763,7 @@ public class TezMerger {
 
           writeFile(this, writer, reporter, recordsBeforeProgress);
           writer.close();
+          // writer never used again
           
           //we finished one single level merge; now clean up the priority 
           //queue

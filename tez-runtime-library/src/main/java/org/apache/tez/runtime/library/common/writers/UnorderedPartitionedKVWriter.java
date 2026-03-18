@@ -692,6 +692,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           } finally {
             if (writer != null) {
               writer.close();
+              // writer never used again
             }
           }
         }
@@ -764,7 +765,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       }
     }
 
-    // write != null iff. numPartitions == 1 && !pipelinedShuffle
+    // writer != null iff. numPartitions == 1 && !pipelinedShuffle
+    // writer.close() was called already
     return (writer != null) && dataViaEventsEnabled
             && (writer.getCompressedLength() <= dataViaEventsMaxSize);
   }
@@ -983,9 +985,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
     if (canSendDataOverDME()) {
       ShuffleUserPayloads.DataProto.Builder dataProtoBuilder = ShuffleUserPayloads.DataProto.newBuilder();
+
+      // this.writer.close() was called in close() with skipBuffers = true
       dataProtoBuilder.setData(UnsafeByteOperations.unsafeWrap(readDataForDME()));
       dataProtoBuilder.setRawLength((int)this.writer.getRawLength());
-
       dataProtoBuilder.setCompressedLength((int)this.writer.getCompressedLength());
       payloadBuilder.setData(dataProtoBuilder.build());
 
@@ -1216,6 +1219,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         } finally {
           if (writer != null) {
             writer.close();
+            // writer never used again
           }
         }
       }
@@ -1301,10 +1305,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
             writer.append(key, value);
             outputLargeRecordsCounter.increment(1);
             numRecordsPerPartition[i]++;
+            writer.close();
             if (reportPartitionStats()) {
               sizePerPartition[i] += writer.getRawLength();
             }
-            writer.close();
             if (!isPipelinedShuffle) {
               // this is an intermediate spill, so increment additionalSpillBytesWrittenCounter.
               synchronized (additionalSpillBytesWrittenCounter) {
@@ -1319,6 +1323,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           } finally {
             if (writer != null) {
               writer.close();
+              // writer never used again
             }
           }
         } else {
