@@ -1253,7 +1253,7 @@ public class ShuffleHandler {
           new DefaultFullHttpResponse(response.getProtocolVersion(), response.getStatus());
       fullResponse.headers().set(response.headers());
 
-      ShuffleHeader header = new ShuffleHeader(message, -1, -1, -1);
+      ShuffleHeader header = new ShuffleHeader(message, -1, -1, -1, null);
       DataOutputBuffer out = new DataOutputBuffer();
       // TODO: check if writing a fake partitionCount is necessary
       out.writeInt(127);  // write 127 as a fake partitionCount

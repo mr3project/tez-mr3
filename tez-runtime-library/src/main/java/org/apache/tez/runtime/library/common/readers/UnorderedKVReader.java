@@ -144,10 +144,9 @@ public class UnorderedKVReader<K, V> extends KeyValueReader {
   public float getProgress() throws IOException, InterruptedException {
     final int numInputs = shuffleManager.getNumInputs();
     if (totalFileBytes.get() > 0 && numInputs > 0) {
-      return ((1.0f) * (totalBytesRead.get() + ((currentReader != null) ? currentReader.getPosition() :
-      0.0f)) /
-          totalFileBytes.get()) * (shuffleManager.getNumCompletedInputsFloat() /
-          (1.0f * numInputs));
+      return
+        ((totalBytesRead.get() + (currentReader != null ? currentReader.getPosition() : 0.0f)) / totalFileBytes.get()) *
+        (shuffleManager.getNumCompletedInputsFloat() / (1.0f * numInputs));
     }
     return 0.0f;
   }
@@ -215,7 +214,6 @@ public class UnorderedKVReader<K, V> extends KeyValueReader {
     }
     if (fetchedInput.getType() == Type.MEMORY) {
       MemoryFetchedInput mfi = (MemoryFetchedInput) fetchedInput;
-
       return new InMemoryReader(null, mfi.getBytes(), 0, (int) mfi.getSize(), layout, 0);
     } else {
       InputStream headerValuesIn = null;
