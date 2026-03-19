@@ -206,6 +206,7 @@ public class TezMerger {
   }
 
   static class KeyValueBuffer {
+
     private byte[] buf;
     private int position;
     private int length;
@@ -234,10 +235,11 @@ public class TezMerger {
   }
 
   public static class Segment {
+
     static final byte[] EMPTY_BYTES = new byte[0];
-    IFile.ReaderRead reader = null;
+    IFile.ReaderRead reader;
     final KeyValueBuffer key = new KeyValueBuffer(EMPTY_BYTES, 0, 0);
-    TezCounter mapOutputsCounter = null;
+    TezCounter mapOutputsCounter;
 
     public Segment(IFile.ReaderRead reader, TezCounter mapOutputsCounter) {
       this.reader = reader;
@@ -295,21 +297,6 @@ public class TezMerger {
     public long getPosition() throws IOException {
       return reader.getPosition();
     }
-
-    // This method is used by BackupStore to extract the
-    // absolute position after a reset
-    long getActualPosition() throws IOException {
-      return reader.getPosition();
-    }
-
-    IFile.ReaderRead getReader() {
-      return reader;
-    }
-
-    // This method is used by BackupStore to reinitialize the
-    // reader to start reading from a different segment offset
-    void reinitReader(int offset) throws IOException {
-    }
   }
 
   public static class DiskSegment extends Segment {
@@ -317,8 +304,8 @@ public class TezMerger {
     FileSystem fs = null;
     Path file = null;
     boolean preserve = false; // Signifies whether the segment should be kept after a merge is complete. Checked in the close method.
-    CompressionCodec codec = null;
-    IFile.SectionLayout sectionLayout = null;
+    final CompressionCodec codec;
+    final IFile.SectionLayout sectionLayout;
     long segmentOffset = 0;
     long segmentLength = -1;
     boolean ifileReadAhead;
@@ -329,8 +316,7 @@ public class TezMerger {
     public DiskSegment(FileSystem fs, Path file,
         long segmentOffset, long segmentLength, IFile.SectionLayout sectionLayout, CompressionCodec codec,
         boolean ifileReadAhead, int ifileReadAheadLength,
-        boolean preserve, TezCounter mergedMapOutputsCounter, DecompressorPool inputContext)
-    throws IOException {
+        boolean preserve, TezCounter mergedMapOutputsCounter, DecompressorPool inputContext) {
       super(null, mergedMapOutputsCounter);
       this.fs = fs;
       this.file = file;
@@ -396,25 +382,6 @@ public class TezMerger {
       super.close();
       if (!preserve && fs != null) {
         fs.delete(file, false);
-      }
-    }
-    // This method is used by BackupStore to extract the
-    // absolute position after a reset
-    @Override
-    long getActualPosition() throws IOException {
-      return segmentOffset + reader.getPosition();
-    }
-
-    // This method is used by BackupStore to reinitialize the
-    // reader to start reading from a different segment offset
-    @Override
-    void reinitReader(int offset) throws IOException {
-      if (!inMemory()) {
-        closeReader();
-        segmentOffset = offset;
-        segmentLength = fs.getFileStatus(file).getLen() - segmentOffset;
-        sectionLayout = null;
-        init(null, null);
       }
     }
   }
@@ -662,8 +629,7 @@ public class TezMerger {
         while (true) {
           //extract the smallest 'factor' number of segments  
           //Call cleanup on the empty segments (no key/value data)
-          List<Segment> mStream = 
-            getSegmentDescriptors(numSegmentsToConsider);
+          List<Segment> mStream = getSegmentDescriptors(numSegmentsToConsider);
           for (Segment segment : mStream) {
             // Initialize the segment at the last possible moment;
             // this helps in ensuring we don't use buffers until we need them
