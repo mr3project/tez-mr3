@@ -1197,7 +1197,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
           comparator, progressable, false, spilledRecordsCounter, null,
           additionalSpillBytesRead, true, inputContext);
       diskSegments.clear();
-      if (0 == finalSegments.size()) {
+      if (finalSegments.isEmpty()) {
         return diskMerge;
       }
       finalSegments.add(new Segment(
