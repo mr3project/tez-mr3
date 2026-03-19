@@ -787,6 +787,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
                        progressable, null, null, null, null, inputContext);
       TezMerger.writeFile(rIter, writer, progressable, TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
       writer.close();
+      mergedMapOutputs.setSectionLayout(writer.getSectionLayout());
       // writer never used again
 
       if (isDebugEnabled) {
