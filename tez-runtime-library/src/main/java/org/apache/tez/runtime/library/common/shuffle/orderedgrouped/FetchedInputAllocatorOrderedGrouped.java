@@ -19,6 +19,7 @@ import java.io.IOException;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.io.FileChunk;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
+import org.apache.tez.runtime.library.common.sort.impl.IFile;
 
 public interface FetchedInputAllocatorOrderedGrouped {
 
@@ -26,7 +27,8 @@ public interface FetchedInputAllocatorOrderedGrouped {
   public MapOutput reserve(InputAttemptIdentifier srcAttemptIdentifier,
                            long requestedSize,
                            long compressedLength,
-                           int fetcherId) throws IOException;
+                           int fetcherId,
+                           IFile.SectionLayout sectionLayout) throws IOException;
 
   void closeInMemoryFile(MapOutput mapOutput);
 

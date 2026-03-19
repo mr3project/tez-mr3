@@ -573,7 +573,8 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         decompressedLength = mapOutputStat.decompressedLength;
         compressedLength = mapOutputStat.compressedLength;
         try {
-          mapOutput = allocator.reserve(srcAttemptId, decompressedLength, compressedLength, fetcherIdentifier);
+          mapOutput = allocator.reserve(srcAttemptId, decompressedLength, compressedLength,
+              fetcherIdentifier, mapOutputStat.layout);
         } catch (IOException e) {
           if (!stopped) {
             // Kill the reduce attempt
@@ -587,8 +588,6 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
           }
           return EMPTY_ATTEMPT_ID_ARRAY;
         }
-        mapOutput.setSectionLayout(mapOutputStat.layout);
-
         // Check if we can shuffle *now* ...
         if (mapOutput.getType() == Type.WAIT) {
           LOG.info("{}: MergerManager returned Status.WAIT...", logIdentifier);
