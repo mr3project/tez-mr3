@@ -573,8 +573,8 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         decompressedLength = mapOutputStat.decompressedLength;
         compressedLength = mapOutputStat.compressedLength;
         try {
-          mapOutput = allocator.reserve(srcAttemptId, decompressedLength, compressedLength,
-              fetcherIdentifier, mapOutputStat.layout);
+          mapOutput = allocator.reserve(srcAttemptId, mapOutputStat.layout, decompressedLength,
+              compressedLength, fetcherIdentifier);
         } catch (IOException e) {
           if (!stopped) {
             // Kill the reduce attempt
@@ -774,8 +774,8 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
 
   private MapOutput getMapOutputForDirectDiskFetch(InputAttemptIdentifier srcAttemptId, Path filename,
       TezIndexRecord indexRecord) throws IOException {
-    return MapOutput.createLocalDiskMapOutput(srcAttemptId, allocator, filename,
-        indexRecord.getStartOffset(), indexRecord.getPartLength(), true, indexRecord.getLayout());
+    return MapOutput.createLocalDiskMapOutput(srcAttemptId, allocator, indexRecord.getLayout(), filename,
+        indexRecord.getStartOffset(), indexRecord.getPartLength(), true);
   }
 
   private boolean verifySanity(long compressedLength, long decompressedLength,
