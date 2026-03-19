@@ -864,7 +864,7 @@ public class PipelinedSorter extends ExternalSorter {
         for (int i = 0; i < numSpills; i++) {
           Path spillFilename = spillFilePaths.get(i);
           TezIndexRecord indexRecord = indexCacheList.get(i).getIndex(parts);
-          if (indexRecord.hasData() || !sendEmptyPartitionDetails) {
+          if (indexRecord.hasData()) {
             shouldWrite = true;
             DiskSegment s =
                 new DiskSegment(localFs, spillFilename, indexRecord.getStartOffset(),
