@@ -72,7 +72,6 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
   private boolean sendEmptyPartitionDetails;
 
   private String auxiliaryService;
-  private boolean compositeFetch;
 
   public OrderedPartitionedKVOutput(OutputContext outputContext, int numPhysicalOutputs) {
     super(outputContext, numPhysicalOutputs);
@@ -97,7 +96,6 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
         TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED_DEFAULT);
 
     auxiliaryService = ShuffleUtils.getTezShuffleHandlerServiceId(conf);
-    compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
 
     return Collections.emptyList();
   }
@@ -174,7 +172,7 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
       String pathComponent = (sorter.getNumSpills() == 1) ?
           getContext().getUniqueIdentifier() + "_0" :   // use original output directory ".../...10031_0"
           getContext().getUniqueIdentifier();           // use renamed output directory ".../...10031"
-      String pathComponentExpanded = ShuffleUtils.expandPathComponent(getContext(), compositeFetch, pathComponent);
+      String pathComponentExpanded = ShuffleUtils.expandPathComponent(getContext(), pathComponent);
       TezSpillRecord tezSpillRecord = ShuffleUtils.getTezSpillRecord(
           getContext(), pathComponentExpanded, sorter.getFinalIndexFile(), localFs);
 
@@ -183,7 +181,7 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
           getContext(), 0, tezSpillRecord,
           getNumPhysicalOutputs(), sendEmptyPartitionDetails, pathComponent,
           sorter.getPartitionStats(), sorter.reportDetailedPartitionStats(), auxiliaryService, deflater,
-          compositeFetch);
+          true);
     }
     return eventList;
   }

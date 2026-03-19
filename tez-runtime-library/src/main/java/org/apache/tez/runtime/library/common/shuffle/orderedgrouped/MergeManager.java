@@ -40,7 +40,6 @@ import org.apache.tez.runtime.library.common.ConfigUtils;
 import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.serializer.SerializationContext;
-import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Writer;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger;
@@ -176,13 +175,11 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     this.spilledRecordsCounter = spilledRecordsCounter;
     this.mergedMapOutputsCounter = mergedMapOutputsCounter;
 
-    boolean compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
     this.mapOutputFile = new TezTaskOutputFiles(conf,
         inputContext.getUniqueIdentifier(),
         inputContext.getDagIdentifier(),
         inputContext.getExecutionContext().getEnvContainerId(),
-        inputContext.getTaskVertexIndex(),
-        compositeFetch);
+        inputContext.getTaskVertexIndex());
 
     this.localFS = localFS;
     this.rfs = ((LocalFileSystem)localFS).getRaw();

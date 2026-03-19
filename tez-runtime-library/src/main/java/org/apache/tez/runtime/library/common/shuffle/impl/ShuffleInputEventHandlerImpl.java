@@ -66,7 +66,6 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
   private final boolean ifileReadAhead;
   private final int ifileReadAheadLength;
   private final InputContext inputContext;
-  private final boolean compositeFetch;
   private final Inflater inflater;
 
   private final AtomicInteger numDmeEvents = new AtomicInteger(0);
@@ -78,14 +77,13 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
   public ShuffleInputEventHandlerImpl(InputContext inputContext,
                                       ShuffleManager shuffleManager,
                                       FetchedInputAllocator inputAllocator, CompressionCodec codec,
-                                      boolean ifileReadAhead, int ifileReadAheadLength, boolean compositeFetch) {
+                                      boolean ifileReadAhead, int ifileReadAheadLength) {
     this.inputContext = inputContext;
     this.shuffleManager = shuffleManager;
     this.inputAllocator = inputAllocator;
     this.codec = codec;
     this.ifileReadAhead = ifileReadAhead;
     this.ifileReadAheadLength = ifileReadAheadLength;
-    this.compositeFetch = compositeFetch;
     this.inflater = TezCommonUtils.newInflater();
 
     int taskIndex = inputContext.getTaskIndex();
@@ -138,15 +136,8 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
           throw new TezUncheckedException("Unable to set the empty partition to succeeded", e);
         }
       }
-      if (compositeFetch) {
-        numDmeEvents.addAndGet(crdme.getCount());
-        processCompositeRoutedDataMovementEvent(crdme, shufflePayload, emptyPartitionsBitSet);
-      } else {
-        for (int offset = 0; offset < crdme.getCount(); offset++) {
-          numDmeEvents.incrementAndGet();
-          processDataMovementEvent(crdme.expand(offset), shufflePayload, emptyPartitionsBitSet);
-        }
-      }
+      numDmeEvents.addAndGet(crdme.getCount());
+      processCompositeRoutedDataMovementEvent(crdme, shufflePayload, emptyPartitionsBitSet);
     } else if (event instanceof InputFailedEvent) {
       numObsoletionEvents.incrementAndGet();
       processInputFailedEvent((InputFailedEvent) event);
@@ -185,7 +176,7 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
     if (shufflePayload.hasEmptyPartitions()) {
       if (emptyPartitionsBitSet.get(srcIndex)) {
         CompositeInputAttemptIdentifier srcAttemptIdentifier = constructInputAttemptIdentifier(
-            dme.getTargetIndex(), 1, dme.getVersion(), compositeFetch, shufflePayload);
+            dme.getTargetIndex(), 1, dme.getVersion(), shufflePayload);
         if (LOG.isDebugEnabled()) {
           LOG.debug("Source partition: " + srcIndex + " did not generate any data. SrcAttempt: ["
               + srcAttemptIdentifier + "]. Not fetching.");
@@ -201,7 +192,7 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
     }
 
     CompositeInputAttemptIdentifier srcAttemptIdentifier = constructInputAttemptIdentifier(
-        dme.getTargetIndex(), 1, dme.getVersion(), compositeFetch, shufflePayload);
+        dme.getTargetIndex(), 1, dme.getVersion(), shufflePayload);
 
     processShufflePayload(shufflePayload, srcAttemptIdentifier, srcIndex, dme.getTargetIndex());
   }
@@ -249,7 +240,7 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
 
     if (shufflePayload.hasEmptyPartitions()) {
       CompositeInputAttemptIdentifier compositeInputAttemptIdentifier = constructInputAttemptIdentifier(
-          crdme.getTargetIndex(), crdme.getCount(), crdme.getVersion(), compositeFetch, shufflePayload);
+          crdme.getTargetIndex(), crdme.getCount(), crdme.getVersion(), shufflePayload);
 
       boolean allPartitionsEmpty = true;
       for (int i = 0; i < crdme.getCount(); i++) {
@@ -272,7 +263,7 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
     }
 
     CompositeInputAttemptIdentifier srcAttemptIdentifier = constructInputAttemptIdentifier(
-        crdme.getTargetIndex(), crdme.getCount(), crdme.getVersion(), compositeFetch, shufflePayload);
+        crdme.getTargetIndex(), crdme.getCount(), crdme.getVersion(), shufflePayload);
 
     processShufflePayload(shufflePayload, srcAttemptIdentifier, partitionId, crdme.getTargetIndex());
   }
@@ -324,11 +315,9 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
    */
   private CompositeInputAttemptIdentifier constructInputAttemptIdentifier(
       int targetIndex, int targetIndexCount, int version,
-      boolean compositeFetch,
       DataMovementEventPayloadProto shufflePayload) {
     String pathComponentRaw = (shufflePayload.hasPathComponent()) ? StringInterner.intern(shufflePayload.getPathComponent()) : null;
-    String pathComponent =
-      (pathComponentRaw == null || !compositeFetch) ? pathComponentRaw :
+    String pathComponent = pathComponentRaw == null ? null :
         ShuffleUtils.buildExpandedPathComponent(
           shufflePayload.getContainerId(), shufflePayload.getVertexId(), pathComponentRaw);
 

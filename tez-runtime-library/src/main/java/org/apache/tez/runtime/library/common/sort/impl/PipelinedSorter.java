@@ -385,7 +385,7 @@ public class PipelinedSorter extends ExternalSorter {
         outputContext, (numSpills - 1), indexCacheList.get(numSpills - 1),
         partitions, sendEmptyPartitionDetails, pathComponent, partitionStats,
         reportDetailedPartitionStats(), auxiliaryService, deflater,
-        compositeFetch);
+        true);
     outputContext.sendEvents(events);
     if (isDebugEnabled) {
       LOG.debug("{}: Added spill event for spill (final update=false), spillId={}",
@@ -780,7 +780,7 @@ public class PipelinedSorter extends ExternalSorter {
               outputContext, i, indexCacheList.get(i), partitions,
               sendEmptyPartitionDetails, pathComponent, partitionStats,
               reportDetailedPartitionStats(), auxiliaryService, deflater,
-              compositeFetch);
+              true);
           if (isDebugEnabled) {
             LOG.debug("{}: Adding spill event for spill (final update={}), spillId={}",
                 outputContext.getDestinationVertexName(), isLastEvent, i);
@@ -818,7 +818,7 @@ public class PipelinedSorter extends ExternalSorter {
         }
 
         String uniqueId = ShuffleUtils.getUniqueIdentifierSpillId(outputContext, 0);
-        String pathComponent = ShuffleUtils.expandPathComponent(outputContext, compositeFetch, uniqueId);
+        String pathComponent = ShuffleUtils.expandPathComponent(outputContext, uniqueId);
         // read back TezSpillRecord (which might be on local disk)
         TezSpillRecord spillRecord = ShuffleUtils.getTezSpillRecord(
             outputContext, pathComponent, finalIndexFile, localFs);

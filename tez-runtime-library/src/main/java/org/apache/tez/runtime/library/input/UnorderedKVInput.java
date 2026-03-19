@@ -27,7 +27,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.tez.common.TezUtilsInternal;
 import org.apache.tez.runtime.api.ProgressFailedException;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
-import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -75,7 +74,6 @@ public class UnorderedKVInput extends AbstractLogicalInput {
 
   private boolean isClosed = false;
 
-  private boolean compositeFetch;
 
   public UnorderedKVInput(InputContext inputContext, int numPhysicalInputs) {
     super(inputContext, numPhysicalInputs);
@@ -86,7 +84,6 @@ public class UnorderedKVInput extends AbstractLogicalInput {
     Preconditions.checkArgument(getNumPhysicalInputs() != -1, "Number of Inputs has not been set");
     this.conf = getContext().getConfigurationFromUserPayload(true);
 
-    this.compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
 
     if (getNumPhysicalInputs() == 0) {
       getContext().requestInitialMemory(0l, null);
@@ -132,13 +129,13 @@ public class UnorderedKVInput extends AbstractLogicalInput {
           inputContext.getTotalMemoryAvailableToTask(),
           memoryUpdateCallbackHandler.getMemoryAssigned(),
           inputContext.getExecutionContext().getEnvContainerId(),
-          inputContext.getTaskVertexIndex(), compositeFetch);
+          inputContext.getTaskVertexIndex());
 
       String srcNameTrimmed = TezUtilsInternal.cleanVertexName(inputContext.getSourceVertexName());
       this.shuffleManager = new ShuffleManager(inputContext, conf, getNumPhysicalInputs(), inputManager, srcNameTrimmed);
 
       this.inputEventHandler = new ShuffleInputEventHandlerImpl(inputContext, shuffleManager,
-          inputManager, codec, ifileReadAhead, ifileReadAheadLength, compositeFetch);
+          inputManager, codec, ifileReadAhead, ifileReadAheadLength);
 
       ////// End of Initial configuration
 

@@ -219,7 +219,7 @@ public abstract class ExternalSorter {
     this.auxiliaryService = ShuffleUtils.getTezShuffleHandlerServiceId(conf);
     this.compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
     this.mapOutputFile = TezRuntimeUtils.instantiateTaskOutputManager(
-        this.conf, outputContext, this.compositeFetch);
+        this.conf, outputContext);
 
     this.writeSpillRecord = !compositeFetch;
     this.spillFilePaths = Maps.newHashMap();

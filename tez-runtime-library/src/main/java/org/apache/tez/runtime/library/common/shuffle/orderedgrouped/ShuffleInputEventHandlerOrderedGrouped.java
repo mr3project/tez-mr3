@@ -50,7 +50,6 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
 
   private final ShuffleScheduler shuffleScheduler;
   private final InputContext inputContext;
-  private final boolean compositeFetch;
   private final Inflater inflater;
 
   private final AtomicInteger numDmeEvents = new AtomicInteger(0);
@@ -60,11 +59,9 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
   private final int portIndex;
 
   public ShuffleInputEventHandlerOrderedGrouped(InputContext inputContext,
-      ShuffleScheduler shuffleScheduler,
-      boolean compositeFetch) {
+      ShuffleScheduler shuffleScheduler) {
     this.inputContext = inputContext;
     this.shuffleScheduler = shuffleScheduler;
-    this.compositeFetch = compositeFetch;
     this.inflater = TezCommonUtils.newInflater();
 
     int taskIndex = inputContext.getTaskIndex();
@@ -128,15 +125,8 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
           throw new TezUncheckedException("Unable to set the empty partition to succeeded", e);
         }
       }
-      if (compositeFetch) {
-        numDmeEvents.addAndGet(crdme.getCount());
-        processCompositeRoutedDataMovementEvent(crdme, shufflePayload, emptyPartitionsBitSet);
-      } else {
-        for (int offset = 0; offset < crdme.getCount(); offset++) {
-          numDmeEvents.incrementAndGet();
-          processDataMovementEvent(crdme.expand(offset), shufflePayload, emptyPartitionsBitSet);
-        }
-      }
+      numDmeEvents.addAndGet(crdme.getCount());
+      processCompositeRoutedDataMovementEvent(crdme, shufflePayload, emptyPartitionsBitSet);
     } else if (event instanceof InputFailedEvent) {
       numObsoletionEvents.incrementAndGet();
       processInputFailedEvent((InputFailedEvent) event);
@@ -153,7 +143,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
       DataMovementEvent dmEvent, DataMovementEventPayloadProto shufflePayload, BitSet emptyPartitionsBitSet) {
     int partitionId = dmEvent.getSourceIndex();
     CompositeInputAttemptIdentifier srcAttemptIdentifier = constructInputAttemptIdentifier(
-        dmEvent.getTargetIndex(), 1, dmEvent.getVersion(), compositeFetch, shufflePayload);
+        dmEvent.getTargetIndex(), 1, dmEvent.getVersion(), shufflePayload);
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("DME srcIdx: " + partitionId + ", targetIdx: " + dmEvent.getTargetIndex()
@@ -189,7 +179,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
       BitSet emptyPartitionsBitSet) throws IOException {
     int partitionId = crdmEvent.getSourceIndex();
     CompositeInputAttemptIdentifier compositeInputAttemptIdentifier = constructInputAttemptIdentifier(
-        crdmEvent.getTargetIndex(), crdmEvent.getCount(), crdmEvent.getVersion(), compositeFetch, shufflePayload);
+        crdmEvent.getTargetIndex(), crdmEvent.getCount(), crdmEvent.getVersion(), shufflePayload);
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("DME srcIdx: " + partitionId + ", targetIdx: " + crdmEvent.getTargetIndex() + ", count:" + crdmEvent.getCount()
@@ -245,11 +235,9 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
    * @return CompositeInputAttemptIdentifier
    */
   private CompositeInputAttemptIdentifier constructInputAttemptIdentifier(int targetIndex, int targetIndexCount, int version,
-      boolean compositeFetch,
       DataMovementEventPayloadProto shufflePayload) {
     String pathComponentRaw = (shufflePayload.hasPathComponent()) ? StringInterner.intern(shufflePayload.getPathComponent()) : null;
-    String pathComponent =
-        (pathComponentRaw == null || !compositeFetch) ? pathComponentRaw :
+    String pathComponent = pathComponentRaw == null ? null :
         ShuffleUtils.buildExpandedPathComponent(
             shufflePayload.getContainerId(), shufflePayload.getVertexId(), pathComponentRaw);
 
