@@ -301,13 +301,13 @@ public class TezMerger {
 
   public static class DiskSegment extends Segment {
 
-    FileSystem fs = null;
-    Path file = null;
-    boolean preserve = false; // Signifies whether the segment should be kept after a merge is complete. Checked in the close method.
+    FileSystem fs;
+    Path file;
+    boolean preserve;   // Signifies whether the segment should be kept after a merge is complete. Checked in the close method.
     final CompressionCodec codec;
     final IFile.SectionLayout sectionLayout;
-    long segmentOffset = 0;
-    long segmentLength = -1;
+    long segmentOffset;
+    long segmentLength;
     boolean ifileReadAhead;
     int ifileReadAheadLength;
 
@@ -321,7 +321,10 @@ public class TezMerger {
       this.fs = fs;
       this.file = file;
       this.codec = codec;
+
+      assert sectionLayout != null;
       this.sectionLayout = sectionLayout;
+
       this.preserve = preserve;
       this.ifileReadAhead = ifileReadAhead;
       this.ifileReadAheadLength = ifileReadAheadLength;
@@ -335,10 +338,6 @@ public class TezMerger {
     @Override
     void init(TezCounter readsCounter, TezCounter bytesReadCounter) throws IOException {
       super.init(readsCounter, bytesReadCounter);
-      if (sectionLayout == null) {
-        throw new IOException("SectionLayout is required for DiskSegment: file=" + file
-            + ", offset=" + segmentOffset + ", length=" + segmentLength);
-      }
 
       FSDataInputStream headerValuesIn = null;
       FSDataInputStream keysIn = null;
