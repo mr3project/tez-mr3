@@ -25,7 +25,6 @@ import java.util.Comparator;
 import java.util.List;
 
 import org.apache.tez.runtime.api.DecompressorPool;
-import org.apache.tez.runtime.api.InputContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -65,63 +64,12 @@ public class TezMerger {
     new LocalDirAllocator(TezRuntimeFrameworkConfigs.LOCAL_DIRS);
 
   // Used by the in-memory merger.
-  public static
-  TezRawKeyValueIterator merge(Configuration conf, FileSystem fs, 
-                            SerializationContext serializationContext,
-                            List<Segment> segments, 
-                            int mergeFactor, Path tmpDir,
-                            RawComparator comparator, Progressable reporter,
-                            TezCounter readsCounter,
-                            TezCounter writesCounter,
-                            TezCounter bytesReadCounter,
-                            Progress mergePhase, DecompressorPool inputContext)
-      throws IOException, InterruptedException {
-    // Get rid of this ?
-    return merge(conf, fs, serializationContext, segments, mergeFactor, tmpDir,
-                 comparator, reporter, false, readsCounter, writesCounter, bytesReadCounter,
-                 mergePhase, inputContext);
-  }
-
-  public static <K extends Object, V extends Object>
-  TezRawKeyValueIterator merge(Configuration conf, FileSystem fs,
-                            SerializationContext serializationContext,
-                            List<Segment> segments,
-                            int mergeFactor, Path tmpDir,
-                            RawComparator comparator, Progressable reporter,
-                            boolean sortSegments,
-                            TezCounter readsCounter,
-                            TezCounter writesCounter,
-                            TezCounter bytesReadCounter,
-                            Progress mergePhase, DecompressorPool inputContext)
-      throws IOException, InterruptedException {
-    return new MergeQueue(conf, fs, segments, comparator, reporter,
-                           sortSegments, false).merge(serializationContext, mergeFactor, tmpDir,
-                                               readsCounter, writesCounter,
-                                               bytesReadCounter, mergePhase, inputContext);
-  }
-
-  public static TezRawKeyValueIterator merge(Configuration conf, FileSystem fs,
-      SerializationContext serializationContext,
-      CompressionCodec codec,
-      List<Segment> segments,
-      int mergeFactor, Path tmpDir,
-      RawComparator comparator, Progressable reporter,
-      TezCounter readsCounter,
-      TezCounter writesCounter,
-      TezCounter bytesReadCounter,
-      Progress mergePhase, DecompressorPool inputContext) throws IOException, InterruptedException {
-    return new MergeQueue(conf, fs, segments, comparator, reporter,
-        false, codec, false, false)
-        .merge(serializationContext, mergeFactor, tmpDir,
-            readsCounter, writesCounter, bytesReadCounter, mergePhase, inputContext);
-  }
-
   public static <K extends Object, V extends Object>
   TezRawKeyValueIterator merge(Configuration conf, FileSystem fs,
       SerializationContext serializationContext,
       CompressionCodec codec,
       List<Segment> segments,
-      int mergeFactor, Path tmpDir,
+      int mergeFactor, int inMemSegments, Path tmpDir,
       RawComparator comparator, Progressable reporter,
       boolean sortSegments,
       boolean considerFinalMergeForProgress,
@@ -131,57 +79,10 @@ public class TezMerger {
       Progress mergePhase, boolean checkForSameKeys, DecompressorPool inputContext)
       throws IOException, InterruptedException {
     return new MergeQueue(conf, fs, segments, comparator, reporter,
-        sortSegments, codec, considerFinalMergeForProgress, checkForSameKeys).
-        merge(serializationContext,
-            mergeFactor, tmpDir,
-            readsCounter, writesCounter,
-            bytesReadCounter,
-            mergePhase, inputContext);
+        sortSegments, codec, considerFinalMergeForProgress, checkForSameKeys)
+        .merge(serializationContext, mergeFactor, inMemSegments, tmpDir,
+            readsCounter, writesCounter, bytesReadCounter, mergePhase, inputContext);
   }
-
-  public static <K extends Object, V extends Object>
-  TezRawKeyValueIterator merge(Configuration conf, FileSystem fs,
-                            SerializationContext serializationContext,
-                            CompressionCodec codec,
-                            List<Segment> segments,
-                            int mergeFactor, Path tmpDir,
-                            RawComparator comparator, Progressable reporter,
-                            boolean sortSegments,
-                            boolean considerFinalMergeForProgress,
-                            TezCounter readsCounter,
-                            TezCounter writesCounter,
-                            TezCounter bytesReadCounter,
-                            Progress mergePhase, DecompressorPool inputContext)
-      throws IOException, InterruptedException {
-    return new MergeQueue(conf, fs, segments, comparator, reporter,
-                           sortSegments, codec, considerFinalMergeForProgress).
-                                         merge(serializationContext, mergeFactor, tmpDir,
-                                             readsCounter, writesCounter,
-                                             bytesReadCounter,
-                                             mergePhase, inputContext);
-  }
-
-  public static <K extends Object, V extends Object>
-  TezRawKeyValueIterator merge(Configuration conf, FileSystem fs,
-                          SerializationContext serializationContext,
-                          CompressionCodec codec,
-                          List<Segment> segments,
-                          int mergeFactor, int inMemSegments, Path tmpDir,
-                          RawComparator comparator, Progressable reporter,
-                          boolean sortSegments,
-                          TezCounter readsCounter,
-                          TezCounter writesCounter,
-                          TezCounter bytesReadCounter,
-                          Progress mergePhase, InputContext inputContext)
-      throws IOException, InterruptedException {
-  return new MergeQueue(conf, fs, segments, comparator, reporter,
-                         sortSegments, codec, false).merge(serializationContext,
-                                             mergeFactor, inMemSegments,
-                                             tmpDir,
-                                             readsCounter, writesCounter,
-                                             bytesReadCounter,
-                                             mergePhase, inputContext);
-}
 
   public static void writeFile(TezRawKeyValueIterator records, IFile.WriterAppend writer,
       Progressable progressable, long recordsBeforeProgress)
@@ -429,21 +330,6 @@ public class TezMerger {
     KeyState hasNext;
     boolean sameKey = false;
     DataOutputBuffer prevKey = new DataOutputBuffer();
-
-    public MergeQueue(Configuration conf, FileSystem fs,
-        List<Segment> segments, RawComparator comparator,
-        Progressable reporter, boolean sortSegments, boolean considerFinalMergeForProgress) {
-      this(conf, fs, segments, comparator, reporter, sortSegments, null,
-          considerFinalMergeForProgress);
-    }
-
-    public MergeQueue(Configuration conf, FileSystem fs,
-        List<Segment> segments, RawComparator comparator,
-        Progressable reporter, boolean sortSegments, CompressionCodec codec,
-        boolean considerFinalMergeForProgress) {
-      this(conf, fs, segments, comparator, reporter, sortSegments, codec,
-          considerFinalMergeForProgress, true);
-    }
 
     public MergeQueue(Configuration conf, FileSystem fs,
         List<Segment> segments, RawComparator comparator,

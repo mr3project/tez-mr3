@@ -883,7 +883,7 @@ public class PipelinedSorter extends ExternalSorter {
         //merge
         TezRawKeyValueIterator kvIter = TezMerger.merge(conf, localFs,
             serializationContext, codec,
-            segmentList, mergeFactor,
+            segmentList, mergeFactor, 0,
             new Path(uniqueIdentifier),
             (RawComparator) ConfigUtils.getIntermediateOutputKeyComparator(conf),
             progressable, sortSegments, true,
