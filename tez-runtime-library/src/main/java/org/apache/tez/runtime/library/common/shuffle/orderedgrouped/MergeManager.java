@@ -403,11 +403,12 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       InputAttemptIdentifier srcAttemptIdentifier,
       long requestedSize,
       long compressedLength,
-      int fetcher) throws IOException {
+      int fetcher,
+      IFile.SectionLayout sectionLayout) throws IOException {
     if (!canShuffleToMemory(requestedSize)) {
       LOG.info("Creating DiskMapOutput for {}: {} > maxSingleShuffleLimit", srcAttemptIdentifier, requestedSize);
       return MapOutput.createDiskMapOutput(srcAttemptIdentifier, this, compressedLength, conf,
-          fetcher, true, mapOutputFile);
+          fetcher, true, sectionLayout, mapOutputFile);
     }
     
     // Stall shuffle if we are above the memory limit
@@ -448,7 +449,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         }
         try {
           // usedMemoryForMergeManager = 0 because this MemoryMapOutput should not contribute to usedMemory
-          return unconditionalReserve(srcAttemptIdentifier, 0L, requestedSize, true);
+          return unconditionalReserve(srcAttemptIdentifier, 0L, requestedSize, true, sectionLayout);
         } catch (OutOfMemoryError oom) {
           LOG.error("Failed to created MemoryMapOutput, stalling instead: {}, {}",
             this.usedMemory, requestedSize, oom);
@@ -462,13 +463,14 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         }
         try {
           // usedMemoryForMergeManager == requestedSize
-          return unconditionalReserve(srcAttemptIdentifier, requestedSize, requestedSize, true);
+          return unconditionalReserve(srcAttemptIdentifier, requestedSize, requestedSize, true,
+              sectionLayout);
         } catch (OutOfMemoryError oom) {
           LOG.error("Failed to created MemoryMapOutput, returning DiskMapOutput instead: {}, {}",
             this.usedMemory, requestedSize, oom);
           // TODO: can we return stallShuffle without stalling all Fetchers?
           return MapOutput.createDiskMapOutput(srcAttemptIdentifier, this, compressedLength, conf,
-              fetcher, true, mapOutputFile);
+              fetcher, true, sectionLayout, mapOutputFile);
         }
       }
     }
@@ -484,10 +486,12 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       InputAttemptIdentifier srcAttemptIdentifier,
       long usedMemoryForMergeManager,
       long requestedSize,
-      boolean primaryMapOutput) {
+      boolean primaryMapOutput,
+      IFile.SectionLayout sectionLayout) {
     // createMemoryMapOutput() may throw OOM, so increase usedMemory only if successful
     MapOutput result = MapOutput.createMemoryMapOutput(
-        srcAttemptIdentifier, this, usedMemoryForMergeManager, requestedSize, primaryMapOutput);
+        srcAttemptIdentifier, this, usedMemoryForMergeManager, requestedSize, primaryMapOutput,
+        sectionLayout);
     this.usedMemory += usedMemoryForMergeManager;
     return result;
   }
@@ -751,7 +755,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
         try {
           // usedMemoryForMergeManager == mergeOutputSize
-          mergedMapOutputs = unconditionalReserve(dummyMapId, mergeOutputSize, mergeOutputSize, false);
+          mergedMapOutputs = unconditionalReserve(dummyMapId, mergeOutputSize, mergeOutputSize, false,
+              null);
         } catch (OutOfMemoryError err) {
           throw new IOException("Cannot perform merging in MemoryToMemoryMerger - do not use Memory-to-Memory merging", err);
         }
