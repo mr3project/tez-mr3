@@ -46,7 +46,7 @@ public abstract class MapOutput implements ShuffleInput {
 
   private final int id;
   private InputAttemptIdentifier attemptIdentifier;
-  private final IFile.SectionLayout sectionLayout;
+  private IFile.SectionLayout sectionLayout;
 
   private final boolean primaryMapOutput;
   protected final FetchedInputAllocatorOrderedGrouped callback;
@@ -150,6 +150,16 @@ public abstract class MapOutput implements ShuffleInput {
 
   public IFile.SectionLayout getSectionLayout() {
     return sectionLayout;
+  }
+
+  public void setSectionLayout(IFile.SectionLayout sectionLayout) {
+    if (this.sectionLayout != null) {
+      throw new IllegalStateException("SectionLayout is already set for " + this);
+    }
+    if (sectionLayout == null) {
+      throw new IllegalArgumentException("SectionLayout cannot be null");
+    }
+    this.sectionLayout = sectionLayout;
   }
 
   public long getSize() {
