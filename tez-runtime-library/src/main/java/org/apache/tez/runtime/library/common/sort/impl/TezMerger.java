@@ -132,11 +132,11 @@ public class TezMerger {
 
   public static class Segment {
     static final byte[] EMPTY_BYTES = new byte[0];
-    Reader reader = null;
+    IFile.ReaderRead reader = null;
     final KeyValueBuffer key = new KeyValueBuffer(EMPTY_BYTES, 0, 0);
     TezCounter mapOutputsCounter = null;
 
-    public Segment(Reader reader, TezCounter mapOutputsCounter) {
+    public Segment(IFile.ReaderRead reader, TezCounter mapOutputsCounter) {
       this.reader = reader;
       this.mapOutputsCounter = mapOutputsCounter;
     }
@@ -199,7 +199,7 @@ public class TezMerger {
       return reader.getPosition();
     }
 
-    Reader getReader() {
+    IFile.ReaderRead getReader() {
       return reader;
     }
 
