@@ -641,9 +641,7 @@ public class ShuffleUtils {
   }
 
   public static boolean isTezShuffleHandler(Configuration config) {
-    return config.get(
-        TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
-        TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT).contains("tez");
+    return true;
   }
 
   public static String getTezShuffleHandlerServiceId(Configuration conf) {
