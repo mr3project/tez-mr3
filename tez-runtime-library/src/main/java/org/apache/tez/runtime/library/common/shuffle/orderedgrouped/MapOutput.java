@@ -61,11 +61,13 @@ public abstract class MapOutput implements ShuffleInput {
   }
 
   public static MapOutput createDiskMapOutput(InputAttemptIdentifier attemptIdentifier,
-                                              FetchedInputAllocatorOrderedGrouped callback, long size, Configuration conf,
-                                              int fetcher, boolean primaryMapOutput,
+                                              FetchedInputAllocatorOrderedGrouped callback,
                                               IFile.SectionLayout sectionLayout,
-                                              TezTaskOutputFiles mapOutputFile) throws
-      IOException {
+                                              long size,
+                                              Configuration conf,
+                                              int fetcher,
+                                              boolean primaryMapOutput,
+                                              TezTaskOutputFiles mapOutputFile) throws IOException {
     FileSystem fs = FileSystem.getLocal(conf).getRaw();
     Path outputPath = mapOutputFile.getInputFileForWrite(
         attemptIdentifier.getInputIdentifier(), attemptIdentifier.getSpillEventId(), size);
@@ -76,32 +78,35 @@ public abstract class MapOutput implements ShuffleInput {
     Path tmpOutputPath = outputPath.suffix(String.valueOf(fetcher));
     long offset = 0;
 
-    DiskMapOutput mapOutput = new DiskMapOutput(attemptIdentifier, callback, size, outputPath, offset,
-        primaryMapOutput, sectionLayout, tmpOutputPath);
+    DiskMapOutput mapOutput = new DiskMapOutput(attemptIdentifier, callback, sectionLayout, size,
+        outputPath, offset, primaryMapOutput, tmpOutputPath);
     mapOutput.disk = fs.create(tmpOutputPath);
 
     return mapOutput;
   }
 
   public static MapOutput createLocalDiskMapOutput(InputAttemptIdentifier attemptIdentifier,
-                                                   FetchedInputAllocatorOrderedGrouped callback, Path path,  long offset,
-                                                   long size, boolean primaryMapOutput,
-                                                   IFile.SectionLayout sectionLayout)  {
+                                                   FetchedInputAllocatorOrderedGrouped callback,
+                                                   IFile.SectionLayout sectionLayout,
+                                                   Path path,
+                                                   long offset,
+                                                   long size,
+                                                   boolean primaryMapOutput)  {
     DiskDirectMapOutput mapOutput =
-        new DiskDirectMapOutput(attemptIdentifier, callback, size, path, offset, primaryMapOutput,
-            sectionLayout);
+        new DiskDirectMapOutput(attemptIdentifier, callback, sectionLayout, size, path, offset,
+            primaryMapOutput);
     return mapOutput;
   }
 
   // may throw OutOfMemoryError
   public static MapOutput createMemoryMapOutput(InputAttemptIdentifier attemptIdentifier,
                                                 FetchedInputAllocatorOrderedGrouped callback,
+                                                IFile.SectionLayout sectionLayout,
                                                 long usedMemoryForMergeManger,
                                                 long size,
-                                                boolean primaryMapOutput,
-                                                IFile.SectionLayout sectionLayout)  {
-    return new InMemoryMapOutput(attemptIdentifier, callback, usedMemoryForMergeManger, size,
-        primaryMapOutput, sectionLayout);
+                                                boolean primaryMapOutput)  {
+    return new InMemoryMapOutput(attemptIdentifier, callback, sectionLayout, usedMemoryForMergeManger,
+        size, primaryMapOutput);
   }
 
   public static MapOutput createWaitMapOutput(InputAttemptIdentifier attemptIdentifier) {
@@ -188,11 +193,16 @@ public abstract class MapOutput implements ShuffleInput {
 
   private static class DiskDirectMapOutput extends MapOutput {
     private final FileChunk outputPath;
-    private DiskDirectMapOutput(InputAttemptIdentifier attemptIdentifier, FetchedInputAllocatorOrderedGrouped callback,
-                      long size, Path outputPath, long offset, boolean primaryMapOutput,
-                      IFile.SectionLayout sectionLayout) {
+    private DiskDirectMapOutput(InputAttemptIdentifier attemptIdentifier,
+                                FetchedInputAllocatorOrderedGrouped callback,
+                                IFile.SectionLayout sectionLayout,
+                                long size,
+                                Path outputPath,
+                                long offset,
+                                boolean primaryMapOutput) {
       super(attemptIdentifier, callback, primaryMapOutput, sectionLayout);
-      this.outputPath = new FileChunk(outputPath, offset, size, true, attemptIdentifier, sectionLayout);
+      this.outputPath = new FileChunk(outputPath, offset, size, true, attemptIdentifier,
+          getSectionLayout());
     }
 
     @Override
@@ -225,14 +235,20 @@ public abstract class MapOutput implements ShuffleInput {
     private final Path tmpOutputPath;
     private final FileChunk outputPath;
     private OutputStream disk;
-    private DiskMapOutput(InputAttemptIdentifier attemptIdentifier, FetchedInputAllocatorOrderedGrouped callback,
-                                long size, Path outputPath, long offset, boolean primaryMapOutput,
-                                IFile.SectionLayout sectionLayout, Path tmpOutputPath) {
+    private DiskMapOutput(InputAttemptIdentifier attemptIdentifier,
+                          FetchedInputAllocatorOrderedGrouped callback,
+                          IFile.SectionLayout sectionLayout,
+                          long size,
+                          Path outputPath,
+                          long offset,
+                          boolean primaryMapOutput,
+                          Path tmpOutputPath) {
       super(attemptIdentifier, callback, primaryMapOutput, sectionLayout);
 
       this.tmpOutputPath = tmpOutputPath;
       this.disk = null;
-      this.outputPath = new FileChunk(outputPath, offset, size, false, attemptIdentifier, sectionLayout);
+      this.outputPath = new FileChunk(outputPath, offset, size, false, attemptIdentifier,
+          getSectionLayout());
     }
 
     @Override
@@ -278,9 +294,10 @@ public abstract class MapOutput implements ShuffleInput {
     private final long usedMemoryForMergeManger;
     private InMemoryMapOutput(InputAttemptIdentifier attemptIdentifier,
                               FetchedInputAllocatorOrderedGrouped callback,
+                              IFile.SectionLayout sectionLayout,
                               long usedMemoryForMergeManger,
-                              long size, boolean primaryMapOutput,
-                              IFile.SectionLayout sectionLayout) {
+                              long size,
+                              boolean primaryMapOutput) {
       super(attemptIdentifier, callback, primaryMapOutput, sectionLayout);
       this.byteArray = new byte[(int)size];
       this.usedMemoryForMergeManger = usedMemoryForMergeManger;
