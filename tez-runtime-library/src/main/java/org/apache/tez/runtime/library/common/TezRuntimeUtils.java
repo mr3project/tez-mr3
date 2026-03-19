@@ -109,14 +109,12 @@ public class TezRuntimeUtils {
   }
 
   public static TezTaskOutput instantiateTaskOutputManager(
-      Configuration conf, OutputContext outputContext,
-      boolean isCompositeFetch) {
+      Configuration conf, OutputContext outputContext) {
     return new TezTaskOutputFiles(conf,
         outputContext.getUniqueIdentifier(),
         outputContext.getDagIdentifier(),
         outputContext.getExecutionContext().getEnvContainerId(),
-        outputContext.getTaskVertexIndex(),
-        isCompositeFetch);
+        outputContext.getTaskVertexIndex());
   }
 
   public static URL constructBaseURIForShuffleHandlerDagComplete(

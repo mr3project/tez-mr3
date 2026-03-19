@@ -19,7 +19,6 @@ public class FetcherConfigCommon {
   public final boolean localDiskFetchEnabled;
   public final boolean localDiskFetchOrderedEnabled;
   public final boolean verifyDiskChecksum;
-  public final boolean compositeFetch;
   public final boolean connectionFailAllInput;
 
   public FetcherConfigCommon(
@@ -32,7 +31,6 @@ public class FetcherConfigCommon {
       boolean localDiskFetchEnabled,
       boolean localDiskFetchOrderedEnabled,
       boolean verifyDiskChecksum,
-      boolean compositeFetch,
       boolean connectionFailAllInput) {
     this.codecConf = codecConf;
     this.jobTokenSecretMgr = jobTokenSecretMgr;
@@ -44,7 +42,6 @@ public class FetcherConfigCommon {
     this.localDiskFetchEnabled = localDiskFetchEnabled;
     this.localDiskFetchOrderedEnabled = localDiskFetchOrderedEnabled;
     this.verifyDiskChecksum = verifyDiskChecksum;
-    this.compositeFetch = compositeFetch;
     this.connectionFailAllInput = connectionFailAllInput;
   }
 
@@ -56,8 +53,6 @@ public class FetcherConfigCommon {
     sb.append(localDiskFetchEnabled);
     sb.append(", localDiskFetchOrderedEnabled=");
     sb.append(localDiskFetchOrderedEnabled);
-    sb.append(", compositeFetch=");
-    sb.append(compositeFetch);
     sb.append("]");
     return sb.toString();
   }

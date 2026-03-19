@@ -73,8 +73,7 @@ public final class CodecUtils {
         taskContext.getServiceConsumerMetaData(auxiliaryService));
     JobTokenSecretManager jobTokenSecretMgr = new JobTokenSecretManager(shuffleSecret);
 
-    boolean compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
-    HttpConnectionParams httpConnectionParams = ShuffleUtils.getHttpConnectionParams(conf, compositeFetch);
+    HttpConnectionParams httpConnectionParams = ShuffleUtils.getHttpConnectionParams(conf, true);
 
     RawLocalFileSystem localFs = (RawLocalFileSystem) FileSystem.getLocal(conf).getRaw();
     LocalDirAllocator localDirAllocator = new LocalDirAllocator(TezRuntimeFrameworkConfigs.LOCAL_DIRS);
@@ -103,7 +102,6 @@ public final class CodecUtils {
         localDiskFetchEnabled,
         localDiskFetchOrderedEnabled,
         verifyDiskChecksum,
-        compositeFetch,
         connectionFailAllInput);
   }
 

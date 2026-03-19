@@ -204,21 +204,15 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       // useFreeMemoryFetchedInput == true: recommended for performance
       // shuffleMemToMem == true: recommended for performance
       useLocalDiskFetch = false;
+    } else if (fetcherConfigCommon.localDiskFetchOrderedEnabled &&
+        host.equals(fetcherConfigCommon.localHostName)) {
+      // Inspect the first input to find the container where all inputs originate from.
+      CompositeInputAttemptIdentifier first = pendingInputsSeq.getInputs().get(0);
+      // True if inputs originate from the current ContainerWorker.
+      useLocalDiskFetch = first.getPathComponent().startsWith(
+          taskContext.getExecutionContext().getEnvContainerId());
     } else {
-      if (fetcherConfigCommon.localDiskFetchOrderedEnabled &&
-          host.equals(fetcherConfigCommon.localHostName)) {
-        if (fetcherConfigCommon.compositeFetch) {
-          // inspect 'first' to find the container where all inputs originate from
-          CompositeInputAttemptIdentifier first = pendingInputsSeq.getInputs().get(0);
-          // true if inputs originate from the current ContainerWorker
-          useLocalDiskFetch = first.getPathComponent().startsWith(
-              taskContext.getExecutionContext().getEnvContainerId());
-        } else {
-          useLocalDiskFetch = true;
-        }
-      } else {
-        useLocalDiskFetch = false;
-      }
+      useLocalDiskFetch = false;
     }
 
     List<CompositeInputAttemptIdentifier> failedFetches = null;
@@ -372,7 +366,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       String finalHost = inputHost.getConnectHost();
 
       InputHost.PartitionRange range = pendingInputsSeq.getPartitionRange();
-      String appIdInURI = fetcherConfigCommon.compositeFetch ? null : applicationId;
+      String appIdInURI = null;
       StringBuilder baseURI = ShuffleUtils.constructBaseURIForShuffleHandler(finalHost,
           port, range, appIdInURI, httpConnectionParams.isSslShuffle());
 
@@ -480,16 +474,13 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       long startTime = System.currentTimeMillis();
       int partitionCount = 1;   // single partition only when using Hadoop shuffle service
 
-      if (fetcherConfigCommon.compositeFetch) {
-        // Multiple partitions are fetched
-        partitionCount = input.readInt();
-      }
+      partitionCount = input.readInt();
       ArrayList<MapOutputStat> mapOutputStats = new ArrayList<>(partitionCount);
       for (int mapOutputIndex = 0; mapOutputIndex < partitionCount; mapOutputIndex++) {
         MapOutputStat mapOutputStat = null;
         try {
           // Read the shuffle header
-          ShuffleHeader header = new ShuffleHeader(fetcherConfigCommon.compositeFetch);
+          ShuffleHeader header = new ShuffleHeader();
           // TODO Review: Multiple header reads in case of status WAIT ?
           header.readFields(input);
           if (!header.mapId.startsWith(InputAttemptIdentifier.PATH_PREFIX_MR3) && !header.mapId.startsWith(InputAttemptIdentifier.PATH_PREFIX)) {
@@ -707,7 +698,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
           // pathComponent == srcAttemptId.getPathComponent(), so we compute spillRecord and inputFilePath only once
           if (spillRecord == null) {
             AbstractMap.SimpleEntry<TezSpillRecord, Path> pair = ShuffleUtils.getTezSpillRecordInputFilePath(
-                taskContext, pathComponent, fetcherConfigCommon.compositeFetch,
+                taskContext, pathComponent,
                 shuffleScheduler.getDagIdentifier(), conf,
                 fetcherConfigCommon.localDirAllocator, fetcherConfigCommon.localFs);
             spillRecord = pair.getKey();

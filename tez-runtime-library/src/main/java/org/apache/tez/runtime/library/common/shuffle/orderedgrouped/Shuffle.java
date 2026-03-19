@@ -29,7 +29,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.tez.runtime.api.TaskFailureType;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
-import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -139,8 +138,7 @@ public class Shuffle implements ExceptionReporter {
 
     this.shufflePhaseTime = inputContext.getCounters().findCounter(TaskCounter.SHUFFLE_PHASE_TIME);
 
-    boolean compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
-    eventHandler= new ShuffleInputEventHandlerOrderedGrouped(inputContext, shuffleScheduler, compositeFetch);
+    eventHandler= new ShuffleInputEventHandlerOrderedGrouped(inputContext, shuffleScheduler);
 
     ExecutorService rawExecutor = Executors.newFixedThreadPool(1, new ThreadFactoryBuilder()
         .setDaemon(true)

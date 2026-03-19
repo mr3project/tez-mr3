@@ -195,7 +195,7 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
     this.compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
 
     this.outputFileHandler = TezRuntimeUtils.instantiateTaskOutputManager(
-        this.conf, outputContext, this.compositeFetch);
+        this.conf, outputContext);
   }
 
   @Override
