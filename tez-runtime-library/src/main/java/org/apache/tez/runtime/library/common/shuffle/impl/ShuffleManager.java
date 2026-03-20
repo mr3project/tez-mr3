@@ -385,19 +385,17 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
       InputAttemptIdentifier inputAttemptIdentifier = srcAttemptIdentifier.expand(i);
       int inputIdentifier = inputAttemptIdentifier.getInputIdentifier();
 
-      synchronized (completedInputSet) {
-        boolean isCompleted = completedInputSet.get(inputIdentifier);
-        if (isCompleted) {
-          LOG.warn("Unordered fetch failed for {}, but input already completed: InputIdentifier={}",
-              shuffleClientId, inputAttemptIdentifier);
-          continue;
-        }
+      boolean isCompleted = isInputFinished(inputIdentifier);
+      if (isCompleted) {
+        LOG.warn("Unordered fetch failed for {}, but input already completed: InputIdentifier={}",
+            shuffleClientId, inputAttemptIdentifier);
+        continue;
       }
 
       shouldInformAM = true;
 
       if (inputAttemptIdentifier.canRetrieveInputInChunks()) {
-        synchronized (shuffleInfoEventsMap) {
+        synchronized (lockForInput(inputIdentifier)) {
           ShuffleEventInfo eventInfo = shuffleInfoEventsMap.get(inputIdentifier);
           if (eventInfo != null && inputAttemptIdentifier.getAttemptNumber() == eventInfo.attemptNum) {
             // some spills with the same attempt number have been downloaded, so this TaskAttempt cannot succeed

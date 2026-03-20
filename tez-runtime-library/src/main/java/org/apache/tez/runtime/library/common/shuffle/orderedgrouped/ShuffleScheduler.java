@@ -300,7 +300,7 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
       // Unlike in the original implementation, we do not check the number of fetch failures for srcAttemptIdentifier
       // and fail the current TaskAttempt immediately.
       if (inputAttemptIdentifier.canRetrieveInputInChunks()) {
-        synchronized (this) {
+        synchronized (lockForInput(inputIdentifier)) {
           ShuffleEventInfo eventInfo = shuffleInfoEventsMap.get(inputIdentifier);
           if (eventInfo != null && inputAttemptIdentifier.getAttemptNumber() == eventInfo.attemptNum) {
             // Some spills with the same attempt number have been downloaded, so this TaskAttempt cannot succeed.
