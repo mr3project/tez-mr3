@@ -288,19 +288,19 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
       InputAttemptIdentifier inputAttemptIdentifier = srcAttemptIdentifier.expand(i);
       int inputIdentifier = inputAttemptIdentifier.getInputIdentifier();
 
-      if (isInputFinished(inputIdentifier)) {   // e.g., if empty partition
-        LOG.warn("Ordered fetch failed for {}, but input already completed: InputIdentifier={}",
-          shuffleClientId, inputAttemptIdentifier);
-        continue;
-      }
+      synchronized (lockForInput(inputIdentifier)) {
+        if (isInputFinished(inputIdentifier)) {   // e.g., if empty partition
+          LOG.warn("Ordered fetch failed for {}, but input already completed: InputIdentifier={}",
+            shuffleClientId, inputAttemptIdentifier);
+          continue;
+        }
 
-      shouldInformAM = readFailed || connectFailed;
-      assert shouldInformAM && (readFailed ^ connectFailed);
+        shouldInformAM = readFailed || connectFailed;
+        assert shouldInformAM && (readFailed ^ connectFailed);
 
-      // Unlike in the original implementation, we do not check the number of fetch failures for srcAttemptIdentifier
-      // and fail the current TaskAttempt immediately.
-      if (inputAttemptIdentifier.canRetrieveInputInChunks()) {
-        synchronized (lockForInput(inputIdentifier)) {
+        // Unlike in the original implementation, we do not check the number of fetch failures for srcAttemptIdentifier
+        // and fail the current TaskAttempt immediately.
+        if (inputAttemptIdentifier.canRetrieveInputInChunks()) {
           ShuffleEventInfo eventInfo = shuffleInfoEventsMap.get(inputIdentifier);
           if (eventInfo != null && inputAttemptIdentifier.getAttemptNumber() == eventInfo.attemptNum) {
             // Some spills with the same attempt number have been downloaded, so this TaskAttempt cannot succeed.
@@ -309,9 +309,9 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
           } else {
             LOG.warn("Ordered fetch failed, but do not kill yet because no spill has been downloaded yet: {}", inputAttemptIdentifier);
           }
+        } else {
+          LOG.warn("Ordered fetch failed, but do not kill (non-pipelined): {}", inputAttemptIdentifier);
         }
-      } else {
-        LOG.warn("Ordered fetch failed, but do not kill (non-pipelined): {}", inputAttemptIdentifier);
       }
     }
 

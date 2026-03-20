@@ -385,17 +385,16 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
       InputAttemptIdentifier inputAttemptIdentifier = srcAttemptIdentifier.expand(i);
       int inputIdentifier = inputAttemptIdentifier.getInputIdentifier();
 
-      boolean isCompleted = isInputFinished(inputIdentifier);
-      if (isCompleted) {
-        LOG.warn("Unordered fetch failed for {}, but input already completed: InputIdentifier={}",
-            shuffleClientId, inputAttemptIdentifier);
-        continue;
-      }
+      synchronized (lockForInput(inputIdentifier)) {
+        if (isInputFinished(inputIdentifier)) {
+          LOG.warn("Unordered fetch failed for {}, but input already completed: InputIdentifier={}",
+              shuffleClientId, inputAttemptIdentifier);
+          continue;
+        }
 
-      shouldInformAM = true;
+        shouldInformAM = true;
 
-      if (inputAttemptIdentifier.canRetrieveInputInChunks()) {
-        synchronized (lockForInput(inputIdentifier)) {
+        if (inputAttemptIdentifier.canRetrieveInputInChunks()) {
           ShuffleEventInfo eventInfo = shuffleInfoEventsMap.get(inputIdentifier);
           if (eventInfo != null && inputAttemptIdentifier.getAttemptNumber() == eventInfo.attemptNum) {
             // some spills with the same attempt number have been downloaded, so this TaskAttempt cannot succeed
@@ -404,9 +403,9 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
           } else {
             LOG.warn("Unordered fetch failed, but do not kill yet because no spill has been downloaded yet: {}", inputAttemptIdentifier);
           }
+        } else {
+          LOG.warn("Unordered fetch failed, but do not kill (not pipelined): {}", inputAttemptIdentifier);
         }
-      } else {
-        LOG.warn("Unordered fetch failed, but do not kill (not pipelined): {}", inputAttemptIdentifier);
       }
     }
 
