@@ -261,6 +261,8 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
       assert cin.getInputIdentifierCount() == partitionCount;
 
       for (int k = 0; k < partitionCount; k++) {
+        // cin.expand(k) may have succeeded already if its payload is empty:
+        //   ShuffleInputEventHandlerImpl/OrderedGrouped.processCompositeRoutedDataMovementEvent()
         ShuffleServer.PathPartition pp = new ShuffleServer.PathPartition(pathComponent, partitionId + k);
         assert !pathToAttemptMap.containsKey(pp);
         pathToAttemptMap.put(pp, cin.expand(k));

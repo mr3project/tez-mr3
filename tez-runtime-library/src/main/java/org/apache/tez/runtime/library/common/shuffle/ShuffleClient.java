@@ -319,20 +319,6 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
     return false;
   }
 
-  protected boolean isObsoleteInputAttemptIdentifier(InputAttemptIdentifier input) {
-    if (input == null || obsoletedInputs.isEmpty()) {
-      return false;
-    }
-    Iterator<InputAttemptIdentifier> obsoleteInputsIter = obsoletedInputs.iterator();
-    while (obsoleteInputsIter.hasNext()) {
-      InputAttemptIdentifier obsoleteInput = obsoleteInputsIter.next();
-      if (input.include(obsoleteInput.getInputIdentifier(), obsoleteInput.getAttemptNumber())) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   public Long getShuffleClientId() {
     return shuffleClientId;
   }

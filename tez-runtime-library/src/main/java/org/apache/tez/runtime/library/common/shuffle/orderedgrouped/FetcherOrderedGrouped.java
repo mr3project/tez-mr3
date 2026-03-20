@@ -395,8 +395,8 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       }
       shuffleErrorCounterGroup.ioErrs.increment(1);
       shuffleErrorCounterGroup.connectionErrs.increment(1);
-      LOG.warn("{}: Failed to connect from {} to {} with index = {}: {}", logIdentifier, fetcherConfigCommon.localHostName,
-          host, currentIndex, ie.getMessage());
+      LOG.warn("{}: Failed to connect from {} to {} with index={}: {}",
+          logIdentifier, fetcherConfigCommon.localHostName, host, currentIndex, ie.getMessage());
 
       if (fetcherConfigCommon.connectionFailAllInput) {
         // no pending inputs && only failed inputs

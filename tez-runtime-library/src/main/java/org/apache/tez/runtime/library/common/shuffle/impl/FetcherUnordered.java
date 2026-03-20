@@ -253,8 +253,8 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         shuffleErrorCounterGroup.ioErrs.increment(1);
         shuffleErrorCounterGroup.connectionErrs.increment(1);
       }
-      LOG.warn("{}: Failed to connect from {} to {} with index = {}: {}", logIdentifier, fetcherConfigCommon.localHostName,
-          host, currentIndex, ie.getMessage());
+      LOG.warn("{}: Failed to connect from {} to {} with index={}: {}",
+          logIdentifier, fetcherConfigCommon.localHostName, host, currentIndex, ie.getMessage());
       return new HostFetchResult(
           new FetchResult(shuffleClientId, inputHost.getHostPort(), pendingInputs),
           failedFetches, true);

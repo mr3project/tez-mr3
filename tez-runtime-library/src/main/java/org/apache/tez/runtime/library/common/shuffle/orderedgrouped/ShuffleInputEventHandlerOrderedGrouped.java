@@ -139,7 +139,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
       }
     } else if (event instanceof InputFailedEvent) {
       numObsoletionEvents.incrementAndGet();
-      processTaskFailedEvent((InputFailedEvent) event);
+      processInputFailedEvent((InputFailedEvent) event);
     }
 
     if (numDmeEvents.get() == shuffleScheduler.getNumInputs() ||
@@ -230,7 +230,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
     return numPorts > 0 ? shufflePayload.getPorts((portIndex + targetIndex) % numPorts) : 0;
   }
 
-  private void processTaskFailedEvent(InputFailedEvent ifEvent) {
+  private void processInputFailedEvent(InputFailedEvent ifEvent) {
     InputAttemptIdentifier taIdentifier = new InputAttemptIdentifier(ifEvent.getTargetIndex(), ifEvent.getVersion());
     shuffleScheduler.obsoleteKnownInput(taIdentifier);
   }

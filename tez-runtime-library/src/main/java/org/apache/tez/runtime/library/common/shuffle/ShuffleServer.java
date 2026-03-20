@@ -157,7 +157,12 @@ public class ShuffleServer implements FetcherCallback {
 
   private final AtomicLong shuffleClientCount = new AtomicLong(0L);
   protected final ConcurrentMap<Long, ShuffleClient<?>> shuffleClients;
+
+  // String = envContainerId
+  // Set<Integer> = set of dagIdId values that were still 'in scheduling' when the container-finished event was processed.
+  //   - Idea: Keep this finished container ID until every DAG that was active when it finished has left
   private final Map<String, Set<Integer>> envContainerIdFinishedMap = new HashMap<String, Set<Integer>>();
+
   private final Object registerLock = new Object();
   private volatile boolean hasContainerIdFinished = false;  // true iff !envContainerIdFinishedMap.isEmpty()
 
