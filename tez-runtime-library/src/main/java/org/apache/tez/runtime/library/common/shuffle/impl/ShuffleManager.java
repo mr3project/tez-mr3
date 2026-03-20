@@ -365,54 +365,47 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
   public void fetchFailed(
       CompositeInputAttemptIdentifier srcAttemptIdentifier, boolean readFailed, boolean connectFailed) {
     assert !readFailed;   // ignore in ShuffleManager
-    final int inputIdentifier = srcAttemptIdentifier.getInputIdentifier();
     shuffleNumFailedInputsCounter.increment(1);
-
-    synchronized (completedInputSet) {
-      boolean isCompleted = completedInputSet.get(inputIdentifier);
-      if (isCompleted) {
-        LOG.warn("Unordered fetch failed for {}, but input already completed: InputIdentifier={}",
-          shuffleClientId, srcAttemptIdentifier);
-        return;
-      }
-    }
 
     if (isObsoleteInputAttemptIdentifier(srcAttemptIdentifier)) {
       LOG.info("Do not report obsolete unordered input: {}", srcAttemptIdentifier);
       return;
     }
 
-    LOG.warn("ShuffleManager {}: Reporting fetch failure for InputIdentifier: {}, taskAttemptIdentifier: {}",
-        shuffleClientId, srcAttemptIdentifier,
-        TezRuntimeUtils.getTaskAttemptIdentifier(
-            inputContext.getSourceVertexName(), srcAttemptIdentifier.getInputIdentifier(), srcAttemptIdentifier.getAttemptNumber()));
+    boolean shouldInformAM = false;
+    for (int i = 0; i < srcAttemptIdentifier.getInputIdentifierCount(); i++) {
+      InputAttemptIdentifier inputAttemptIdentifier = srcAttemptIdentifier.expand(i);
+      int inputIdentifier = inputAttemptIdentifier.getInputIdentifier();
 
-    // we send InputReadError regardless of connectFailed (Cf. gla2019.6.10.pptx, page 21)
-    InputReadErrorEvent readError = InputReadErrorEvent.create(
-        "Unordered: Fetch failure while fetching from "
-            + TezRuntimeUtils.getTaskAttemptIdentifier(
-            inputContext.getSourceVertexName(),
-            inputIdentifier,
-            srcAttemptIdentifier.getAttemptNumber()),
-        srcAttemptIdentifier.getInputIdentifier(),
-        srcAttemptIdentifier.getAttemptNumber());
-    List<Event> failedEvents = Lists.newArrayListWithCapacity(1);
-    failedEvents.add(readError);
-    inputContext.sendEvents(failedEvents);
-
-    if (srcAttemptIdentifier.canRetrieveInputInChunks()) {
-      synchronized (shuffleInfoEventsMap) {
-        ShuffleEventInfo eventInfo = shuffleInfoEventsMap.get(inputIdentifier);
-        if (eventInfo != null && srcAttemptIdentifier.getAttemptNumber() == eventInfo.attemptNum) {
-          // some spills with the same attempt number have been downloaded, so this TaskAttempt cannot succeed
-          // ShuffleServer.fetchFailed already verified !existsConcurrentNotFailedFetcher, so we should kill here.
-          reportNonFatalError("Failed to fetch input " + srcAttemptIdentifier);
-        } else {
-          LOG.warn("Unordered fetch failed, but do not kill yet because no spill has been downloaded yet: {}", srcAttemptIdentifier);
+      synchronized (completedInputSet) {
+        boolean isCompleted = completedInputSet.get(inputIdentifier);
+        if (isCompleted) {
+          LOG.warn("Unordered fetch failed for {}, but input already completed: InputIdentifier={}",
+              shuffleClientId, inputAttemptIdentifier);
+          continue;
         }
       }
-    } else {
-      LOG.warn("Unordered fetch failed, but do not kill (not pipelined): {}", srcAttemptIdentifier);
+
+      shouldInformAM = true;
+
+      if (inputAttemptIdentifier.canRetrieveInputInChunks()) {
+        synchronized (shuffleInfoEventsMap) {
+          ShuffleEventInfo eventInfo = shuffleInfoEventsMap.get(inputIdentifier);
+          if (eventInfo != null && inputAttemptIdentifier.getAttemptNumber() == eventInfo.attemptNum) {
+            // some spills with the same attempt number have been downloaded, so this TaskAttempt cannot succeed
+            // ShuffleServer.fetchFailed already verified !existsConcurrentNotFailedFetcher, so we should kill here.
+            reportNonFatalError("Failed to fetch input " + inputAttemptIdentifier);
+          } else {
+            LOG.warn("Unordered fetch failed, but do not kill yet because no spill has been downloaded yet: {}", inputAttemptIdentifier);
+          }
+        }
+      } else {
+        LOG.warn("Unordered fetch failed, but do not kill (not pipelined): {}", inputAttemptIdentifier);
+      }
+    }
+
+    if (shouldInformAM) {
+      informAM("Unordered", srcAttemptIdentifier);   // send InputReadErrorEvent only, without killing TaskAttempt
     }
   }
 

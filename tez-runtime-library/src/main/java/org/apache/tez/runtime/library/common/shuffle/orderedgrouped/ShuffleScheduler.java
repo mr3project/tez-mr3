@@ -265,57 +265,53 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
 
   public void fetchFailed(CompositeInputAttemptIdentifier srcAttemptIdentifier,
                           boolean readFailed, boolean connectFailed) {
-    int inputIdentifier = srcAttemptIdentifier.getInputIdentifier();
     shuffleNumFailedInputsCounter.increment(1);
 
-    if (isInputFinished(inputIdentifier)) {
-      LOG.warn("Ordered fetch failed for {}, but input already completed: InputIdentifier={}",
-        shuffleClientId, srcAttemptIdentifier);
-      return;
-    }
-
+    // It suffices to call isObsoleteInputAttemptIdentifier() with srcAttemptIdentifier only once
+    // because the presence of any obsolete input in srcAttemptIdentifier's InputAttemptIdentifiers implies that
+    // the source task will re-generate the entire output.
     if (isObsoleteInputAttemptIdentifier(srcAttemptIdentifier)) {
       LOG.info("Do not report obsolete ordered input: {}", srcAttemptIdentifier);
       return;
     }
 
-    boolean shouldInformAM = readFailed || connectFailed;
-    assert shouldInformAM && (readFailed ^ connectFailed);
-    if (shouldInformAM) {
-      informAM(srcAttemptIdentifier);   // send InputReadErrorEvent only, without killing TaskAttempt
-    }
+    boolean shouldInformAM = false;
+    for (int i = 0; i < srcAttemptIdentifier.getInputIdentifierCount(); i++) {
+      InputAttemptIdentifier inputAttemptIdentifier = srcAttemptIdentifier.expand(i);
+      int inputIdentifier = inputAttemptIdentifier.getInputIdentifier();
 
-    // Unlike in the original implementation, we do not check the number of fetch failures for srcAttemptIdentifier
-    // and fail the current TaskAttempt immediately.
-    if (srcAttemptIdentifier.canRetrieveInputInChunks()) {
-      synchronized (this) {
-        ShuffleEventInfo eventInfo = shuffleInfoEventsMap.get(inputIdentifier);
-        if (eventInfo != null && srcAttemptIdentifier.getAttemptNumber() == eventInfo.attemptNum) {
-          // Some spills with the same attempt number have been downloaded, so this TaskAttempt cannot succeed.
-          // ShuffleServer.fetchFailed already verified !existsConcurrentNotFailedFetcher, so we should kill here.
-          exceptionReporter.reportException(new TezUncheckedException("Failed to fetch input " + srcAttemptIdentifier));
-        } else {
-          LOG.warn("Ordered fetch failed, but do not kill yet because no spill has been downloaded yet: {}", srcAttemptIdentifier);
-        }
+      if (isInputFinished(inputIdentifier)) {   // e.g., if empty partition
+        LOG.warn("Ordered fetch failed for {}, but input already completed: InputIdentifier={}",
+          shuffleClientId, inputAttemptIdentifier);
+        continue;
       }
-    } else {
-      LOG.warn("Ordered fetch failed, but do not kill (non-pipelined): {}", srcAttemptIdentifier);
-    }
-  }
 
-  // Notify AM
-  public void informAM(CompositeInputAttemptIdentifier srcAttempt) {
-    LOG.warn("ShuffleScheduler {}: Reporting fetch failure for InputIdentifier: {}, taskAttemptIdentifier: {}",
-        shuffleClientId, srcAttempt,
-        TezRuntimeUtils.getTaskAttemptIdentifier(
-            inputContext.getSourceVertexName(), srcAttempt.getInputIdentifier(), srcAttempt.getAttemptNumber()));
-    InputReadErrorEvent readError = InputReadErrorEvent.create(
-        "Ordered: Fetch failure while fetching from " + inputContext.getUniqueIdentifier(),
-        srcAttempt.getInputIdentifier(),
-        srcAttempt.getAttemptNumber());
-    List<Event> failedEvents = Lists.newArrayListWithCapacity(1);
-    failedEvents.add(readError);
-    inputContext.sendEvents(failedEvents);
+      shouldInformAM = readFailed || connectFailed;
+      assert shouldInformAM && (readFailed ^ connectFailed);
+
+      // Unlike in the original implementation, we do not check the number of fetch failures for srcAttemptIdentifier
+      // and fail the current TaskAttempt immediately.
+      if (inputAttemptIdentifier.canRetrieveInputInChunks()) {
+        synchronized (this) {
+          ShuffleEventInfo eventInfo = shuffleInfoEventsMap.get(inputIdentifier);
+          if (eventInfo != null && inputAttemptIdentifier.getAttemptNumber() == eventInfo.attemptNum) {
+            // Some spills with the same attempt number have been downloaded, so this TaskAttempt cannot succeed.
+            // ShuffleServer.fetchFailed already verified !existsConcurrentNotFailedFetcher, so we should kill here.
+            exceptionReporter.reportException(new TezUncheckedException("Failed to fetch input " + inputAttemptIdentifier));
+          } else {
+            LOG.warn("Ordered fetch failed, but do not kill yet because no spill has been downloaded yet: {}", inputAttemptIdentifier);
+          }
+        }
+      } else {
+        LOG.warn("Ordered fetch failed, but do not kill (non-pipelined): {}", inputAttemptIdentifier);
+      }
+    }
+
+    // It suffices to call informAM() with srcAttemptIdentifier only once
+    // because the source task will re-generate the entire output.
+    if (shouldInformAM) {
+      informAM("Ordered", srcAttemptIdentifier);   // send InputReadErrorEvent only, without killing TaskAttempt
+    }
   }
 
   public void waitForMergeManager() throws InterruptedException {

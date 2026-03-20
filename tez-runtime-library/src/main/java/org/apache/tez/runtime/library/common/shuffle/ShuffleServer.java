@@ -843,7 +843,7 @@ public class ShuffleServer implements FetcherCallback {
       LOG.warn("ShuffleScheduler {} already unregistered, ignoring informAM(): {}",
         shuffleSchedulerId, srcAttempt);
     } else {
-      shuffleScheduler.informAM(srcAttempt);
+      shuffleScheduler.informAM("Fetcher Ordered", srcAttempt);
     }
   }
 

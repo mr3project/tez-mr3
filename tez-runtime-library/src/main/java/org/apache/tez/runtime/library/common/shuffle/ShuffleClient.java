@@ -18,16 +18,20 @@
 
 package org.apache.tez.runtime.library.common.shuffle;
 
+import com.google.common.collect.Lists;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.tez.common.Preconditions;
 import org.apache.tez.common.counters.TaskCounter;
 import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.common.counters.TezCounters;
+import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.InputContext;
+import org.apache.tez.runtime.api.events.InputReadErrorEvent;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
+import org.apache.tez.runtime.library.common.TezRuntimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,6 +40,7 @@ import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -304,15 +309,32 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
     obsoletedInputs.add(srcAttempt);
   }
 
+  public void informAM(String header, CompositeInputAttemptIdentifier srcAttemptIdentifier) {
+    LOG.warn("{} {}: Reporting fetch failure for InputIdentifier: {}, {}", header,
+        shuffleClientId, srcAttemptIdentifier,
+        TezRuntimeUtils.getTaskAttemptIdentifier(inputContext.getSourceVertexName(),
+            srcAttemptIdentifier.getInputIdentifier(), srcAttemptIdentifier.getAttemptNumber()));
+
+    // we send InputReadError regardless of connectFailed (Cf. gla2019.6.10.pptx, page 21)
+    InputReadErrorEvent readError = InputReadErrorEvent.create(
+        "Fetch failure while fetching from " + header + ": "
+          + inputContext.getUniqueIdentifier() + "/" + inputContext.getSourceVertexName(),
+        srcAttemptIdentifier.getInputIdentifier(), srcAttemptIdentifier.getAttemptNumber());
+
+    List<Event> failedEvents = Lists.newArrayListWithCapacity(1);
+    failedEvents.add(readError);
+    inputContext.sendEvents(failedEvents);
+  }
+
   // thread-safe because InputAttemptIdentifier is immutable
-  protected boolean isObsoleteInputAttemptIdentifier(CompositeInputAttemptIdentifier input) {
-    if (input == null || obsoletedInputs.isEmpty()) {
+  protected boolean isObsoleteInputAttemptIdentifier(CompositeInputAttemptIdentifier srcAttemptIdentifier) {
+    if (srcAttemptIdentifier == null || obsoletedInputs.isEmpty()) {
       return false;
     }
     Iterator<InputAttemptIdentifier> obsoleteInputsIter = obsoletedInputs.iterator();
     while (obsoleteInputsIter.hasNext()) {
       InputAttemptIdentifier obsoleteInput = obsoleteInputsIter.next();
-      if (input.include(obsoleteInput.getInputIdentifier(), obsoleteInput.getAttemptNumber())) {
+      if (srcAttemptIdentifier.include(obsoleteInput.getInputIdentifier(), obsoleteInput.getAttemptNumber())) {
         return true;
       }
     }
