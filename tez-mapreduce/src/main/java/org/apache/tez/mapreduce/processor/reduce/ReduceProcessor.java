@@ -26,7 +26,6 @@ import java.util.Map;
 import org.apache.tez.common.ProgressHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.RawComparator;
 import org.apache.hadoop.mapred.Counters.Counter;
 import org.apache.hadoop.mapred.JobConf;
@@ -34,7 +33,6 @@ import org.apache.hadoop.mapred.JobContext;
 import org.apache.hadoop.mapred.OutputCollector;
 import org.apache.hadoop.mapred.Reducer;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
-import org.apache.hadoop.util.Progress;
 import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.tez.common.counters.TaskCounter;
@@ -282,39 +280,7 @@ public class ReduceProcessor extends MRTask {
         (org.apache.hadoop.mapreduce.Reducer)
         ReflectionUtils.newInstance(taskContext.getReducerClass(), job);
 
-    // wrap value iterator to report progress.
     final TezRawKeyValueIterator rawIter = input.getIterator();
-    TezRawKeyValueIterator rIter = new TezRawKeyValueIterator() {
-      public void close() throws IOException {
-        rawIter.close();
-      }
-      public DataInputBuffer getKey() throws IOException {
-        return rawIter.getKey();
-      }
-      public Progress getProgress() {
-        return rawIter.getProgress();
-      }
-
-      @Override
-      public boolean isSameKey() throws IOException {
-        return rawIter.isSameKey();
-      }
-
-      public DataInputBuffer getValue() throws IOException {
-        return rawIter.getValue();
-      }
-
-      @Override
-      public boolean hasNext() throws IOException {
-        return rawIter.hasNext();
-      }
-
-      public boolean next() throws IOException {
-        boolean ret = rawIter.next();
-        reporter.setProgress(rawIter.getProgress().getProgress());
-        return ret;
-      }
-    };
 
     org.apache.hadoop.mapreduce.RecordWriter trackedRW =
         new org.apache.hadoop.mapreduce.RecordWriter() {
@@ -334,7 +300,7 @@ public class ReduceProcessor extends MRTask {
     org.apache.hadoop.mapreduce.Reducer.Context reducerContext =
         createReduceContext(
             reducer, job, taskAttemptId,
-            rIter, reduceInputKeyCounter,
+            rawIter, reduceInputKeyCounter,
             reduceInputValueCounter,
             trackedRW,
             committer,

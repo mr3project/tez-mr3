@@ -253,13 +253,11 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput {
 
   @Override
   public float getProgress() throws ProgressFailedException, InterruptedException {
-    int totalInputs = getNumPhysicalInputs();
-    if (totalInputs != 0) {
-      synchronized (this) {
-        return (rawIter != null) ? rawIter.getProgress().getProgress() : 0.0f;
-      }
-    } else {
-      return 0.0f;
+    if (getNumPhysicalInputs() == 0) {
+      return 1.0f;
+    }
+    synchronized (this) {
+      return (rawIter != null) ? 1.0f : 0.0f;
     }
   }
 

@@ -463,10 +463,6 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
     return numInputs;
   }
 
-  public float getNumCompletedInputsFloat() {
-    return numCompletedInputs.floatValue();
-  }
-
   public long getTotalSizeOfMemoryCompletedInputs() {
     return totalSizeOfMemoryCompletedInputs.get();
   }
