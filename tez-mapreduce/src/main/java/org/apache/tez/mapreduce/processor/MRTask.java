@@ -444,10 +444,14 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
   ) throws IOException, InterruptedException {
     RawKeyValueIterator r =
         new RawKeyValueIterator() {
+          private final Progress progress = new Progress();
+          private boolean done = false;
 
           @Override
           public boolean next() throws IOException {
-            return rIter.next();
+            boolean hasMore = rIter.next();
+            done = !hasMore;
+            return hasMore;
           }
 
           @Override
@@ -457,7 +461,8 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
 
           @Override
           public Progress getProgress() {
-            return rIter.getProgress();
+            progress.set(done ? 1.0f : 0.0f);
+            return progress;
           }
 
           @Override

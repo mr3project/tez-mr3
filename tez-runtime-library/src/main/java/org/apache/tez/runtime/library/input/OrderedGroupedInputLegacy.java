@@ -21,14 +21,11 @@ package org.apache.tez.runtime.library.input;
 import java.io.IOException;
 
 import org.apache.hadoop.io.DataInputBuffer;
-import org.apache.hadoop.util.Progress;
 import org.apache.tez.dag.api.TezException;
 import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.library.common.sort.impl.TezRawKeyValueIterator;
 
 public class OrderedGroupedInputLegacy extends OrderedGroupedKVInput {
-
-  private final Progress progress = new Progress();
 
   public OrderedGroupedInputLegacy(InputContext inputContext, int numPhysicalInputs) {
     super(inputContext, numPhysicalInputs);
@@ -61,12 +58,6 @@ public class OrderedGroupedInputLegacy extends OrderedGroupedKVInput {
 
         @Override
         public void close() throws IOException {
-        }
-
-        @Override
-        public Progress getProgress() {
-          progress.complete();
-          return progress;
         }
 
         @Override
