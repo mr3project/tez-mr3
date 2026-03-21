@@ -20,7 +20,6 @@ package org.apache.tez.runtime.library.common.sort.impl;
 import java.io.IOException;
 
 import org.apache.hadoop.io.DataInputBuffer;
-import org.apache.hadoop.util.Progress;
 
 /**
  * <code>TezRawKeyValueIterator</code> is an iterator used to iterate over
@@ -68,11 +67,6 @@ public interface TezRawKeyValueIterator {
    */
   void close() throws IOException;
   
-  /** Gets the Progress object; this has a float (0.0 - 1.0) 
-   * indicating the bytes processed by the iterator so far
-   */
-  Progress getProgress();
-
   /**
    * Whether the current key is same as the previous key
    *

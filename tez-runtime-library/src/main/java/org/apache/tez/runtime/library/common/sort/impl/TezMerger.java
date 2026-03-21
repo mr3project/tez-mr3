@@ -19,7 +19,6 @@ package org.apache.tez.runtime.library.common.sort.impl;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -39,7 +38,6 @@ import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.RawComparator;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.util.PriorityQueue;
-import org.apache.hadoop.util.Progress;
 import org.apache.hadoop.util.Progressable;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.counters.TezCounter;
@@ -49,7 +47,6 @@ import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader.KeyState;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Writer;
 import org.apache.tez.runtime.library.utils.BufferUtils;
-import org.apache.tez.runtime.library.utils.LocalProgress;
 
 /**
  * Merger is an utility class used by the Map and Reduce tasks for merging
@@ -73,12 +70,12 @@ public class TezMerger {
                             TezCounter readsCounter,
                             TezCounter writesCounter,
                             TezCounter bytesReadCounter,
-                            Progress mergePhase, DecompressorPool inputContext)
+                            DecompressorPool inputContext)
       throws IOException, InterruptedException {
     // Get rid of this ?
     return merge(conf, fs, serializationContext, segments, mergeFactor, tmpDir,
                  comparator, reporter, false, readsCounter, writesCounter, bytesReadCounter,
-                 mergePhase, inputContext);
+                 inputContext);
   }
 
   public static <K extends Object, V extends Object>
@@ -91,11 +88,11 @@ public class TezMerger {
                             TezCounter readsCounter,
                             TezCounter writesCounter,
                             TezCounter bytesReadCounter,
-                            Progress mergePhase, DecompressorPool inputContext)
+                            DecompressorPool inputContext)
       throws IOException, InterruptedException {
     return merge(conf, fs, serializationContext, null, segments, mergeFactor, tmpDir,
-        comparator, reporter, sortSegments, false, readsCounter, writesCounter,
-        bytesReadCounter, mergePhase, true, inputContext);
+        comparator, reporter, sortSegments, readsCounter, writesCounter,
+        bytesReadCounter, true, inputContext);
   }
 
   public static TezRawKeyValueIterator merge(Configuration conf, FileSystem fs,
@@ -107,10 +104,10 @@ public class TezMerger {
       TezCounter readsCounter,
       TezCounter writesCounter,
       TezCounter bytesReadCounter,
-      Progress mergePhase, DecompressorPool inputContext) throws IOException, InterruptedException {
+      DecompressorPool inputContext) throws IOException, InterruptedException {
     return merge(conf, fs, serializationContext, codec, segments, mergeFactor, tmpDir,
-        comparator, reporter, false, false, readsCounter, writesCounter,
-        bytesReadCounter, mergePhase, false, inputContext);
+        comparator, reporter, false, readsCounter, writesCounter,
+        bytesReadCounter, false, inputContext);
   }
 
   public static <K extends Object, V extends Object>
@@ -121,16 +118,14 @@ public class TezMerger {
       int mergeFactor, Path tmpDir,
       RawComparator comparator, Progressable reporter,
       boolean sortSegments,
-      boolean considerFinalMergeForProgress,
       TezCounter readsCounter,
       TezCounter writesCounter,
       TezCounter bytesReadCounter,
-      Progress mergePhase, boolean checkForSameKeys, DecompressorPool inputContext)
+      boolean checkForSameKeys, DecompressorPool inputContext)
       throws IOException, InterruptedException {
     return merge(conf, fs, serializationContext, codec, segments, mergeFactor, 0,
         tmpDir, comparator, reporter, sortSegments,
-        considerFinalMergeForProgress, readsCounter, writesCounter,
-        bytesReadCounter, mergePhase, checkForSameKeys, inputContext);
+        readsCounter, writesCounter, bytesReadCounter, checkForSameKeys, inputContext);
   }
 
   public static <K extends Object, V extends Object>
@@ -141,15 +136,13 @@ public class TezMerger {
                             int mergeFactor, Path tmpDir,
                             RawComparator comparator, Progressable reporter,
                             boolean sortSegments,
-                            boolean considerFinalMergeForProgress,
                             TezCounter readsCounter,
                             TezCounter writesCounter,
                             TezCounter bytesReadCounter,
-                            Progress mergePhase, DecompressorPool inputContext)
+                            DecompressorPool inputContext)
       throws IOException, InterruptedException {
     return merge(conf, fs, serializationContext, codec, segments, mergeFactor, tmpDir,
-        comparator, reporter, sortSegments, considerFinalMergeForProgress,
-        readsCounter, writesCounter, bytesReadCounter, mergePhase, true,
+        comparator, reporter, sortSegments, readsCounter, writesCounter, bytesReadCounter, true,
         inputContext);
   }
 
@@ -164,11 +157,11 @@ public class TezMerger {
                           TezCounter readsCounter,
                           TezCounter writesCounter,
                           TezCounter bytesReadCounter,
-                          Progress mergePhase, InputContext inputContext)
+                          InputContext inputContext)
       throws IOException, InterruptedException {
     return merge(conf, fs, serializationContext, codec, segments, mergeFactor,
-        inMemSegments, tmpDir, comparator, reporter, sortSegments, false,
-        readsCounter, writesCounter, bytesReadCounter, mergePhase, true,
+        inMemSegments, tmpDir, comparator, reporter, sortSegments,
+        readsCounter, writesCounter, bytesReadCounter, true,
         inputContext);
   }
 
@@ -180,18 +173,16 @@ public class TezMerger {
       int mergeFactor, int inMemSegments, Path tmpDir,
       RawComparator comparator, Progressable reporter,
       boolean sortSegments,
-      boolean considerFinalMergeForProgress,
       TezCounter readsCounter,
       TezCounter writesCounter,
       TezCounter bytesReadCounter,
-      Progress mergePhase, boolean checkForSameKeys,
+      boolean checkForSameKeys,
       DecompressorPool inputContext)
       throws IOException, InterruptedException {
     return new MergeQueue(conf, fs, segments, comparator, reporter,
-        sortSegments, codec, considerFinalMergeForProgress, checkForSameKeys)
+        sortSegments, codec, checkForSameKeys)
         .merge(serializationContext, mergeFactor, inMemSegments, tmpDir,
-            readsCounter, writesCounter, bytesReadCounter, mergePhase,
-            inputContext);
+            readsCounter, writesCounter, bytesReadCounter, inputContext);
   }
 
   public static void writeFile(TezRawKeyValueIterator records, IFile.WriterAppend writer,
@@ -451,14 +442,6 @@ public class TezMerger {
     
     final RawComparator comparator;
 
-    private long totalBytesProcessed;
-    private float progPerByte;
-    private Progress mergeProgress = new LocalProgress();
-    // Boolean variable for including/considering final merge as part of sort
-    // phase or not. This is true in map task, false in reduce task. It is
-    // used in calculating mergeProgress.
-    private final boolean considerFinalMergeForProgress;
-
     final Progressable reporter;
     
     final DataInputBuffer key = new DataInputBuffer();
@@ -483,29 +466,25 @@ public class TezMerger {
 
     public MergeQueue(Configuration conf, FileSystem fs,
         List<Segment> segments, RawComparator comparator,
-        Progressable reporter, boolean sortSegments, boolean considerFinalMergeForProgress) {
-      this(conf, fs, segments, comparator, reporter, sortSegments, null,
-          considerFinalMergeForProgress, true);
+        Progressable reporter, boolean sortSegments) {
+      this(conf, fs, segments, comparator, reporter, sortSegments, null, true);
+    }
+
+    public MergeQueue(Configuration conf, FileSystem fs,
+        List<Segment> segments, RawComparator comparator,
+        Progressable reporter, boolean sortSegments, CompressionCodec codec) {
+      this(conf, fs, segments, comparator, reporter, sortSegments, codec, true);
     }
 
     public MergeQueue(Configuration conf, FileSystem fs,
         List<Segment> segments, RawComparator comparator,
         Progressable reporter, boolean sortSegments, CompressionCodec codec,
-        boolean considerFinalMergeForProgress) {
-      this(conf, fs, segments, comparator, reporter, sortSegments, codec,
-          considerFinalMergeForProgress, true);
-    }
-
-    public MergeQueue(Configuration conf, FileSystem fs,
-        List<Segment> segments, RawComparator comparator,
-        Progressable reporter, boolean sortSegments, CompressionCodec codec,
-        boolean considerFinalMergeForProgress, boolean checkForSameKeys) {
+        boolean checkForSameKeys) {
       this.conf = conf;
       this.fs = fs;
       this.comparator = comparator;
       this.segments = segments;
       this.reporter = reporter;
-      this.considerFinalMergeForProgress = considerFinalMergeForProgress;
       if (sortSegments) {
         Collections.sort(segments, segmentComparator);
       }
@@ -534,7 +513,6 @@ public class TezMerger {
     }
 
     private void adjustPriorityQueue(Segment reader) throws IOException{
-      long startPos = reader.getPosition();
       if (checkForSameKeys) {
         if (hasNext == null) {
           /**
@@ -558,9 +536,6 @@ public class TezMerger {
         }
       }
       hasNext = reader.readRawKey(nextKey);
-      long endPos = reader.getPosition();
-      totalBytesProcessed += endPos - startPos;
-      mergeProgress.set(totalBytesProcessed * progPerByte);
       if (hasNext == KeyState.NEW_KEY) {
         adjustTop();
         compareKeyWithNextTopKey(reader);
@@ -599,7 +574,6 @@ public class TezMerger {
       }
 
       minSegment = top();
-      long startPos = minSegment.getPosition();
       KeyValueBuffer nextKey = minSegment.getKey();
       key.reset(nextKey.getData(), nextKey.getPosition(), nextKey.getLength());
       if (!minSegment.inMemory()) {
@@ -617,9 +591,6 @@ public class TezMerger {
       } else {
         minSegment.getValue(value);
       }
-      long endPos = minSegment.getPosition();
-      totalBytesProcessed += endPos - startPos;
-      mergeProgress.set(totalBytesProcessed * progPerByte);
 
       return true;
     }
@@ -650,10 +621,10 @@ public class TezMerger {
                                         TezCounter readsCounter,
                                         TezCounter writesCounter,
                                         TezCounter bytesReadCounter,
-                                        Progress mergePhase, DecompressorPool inputContext)
+                                        DecompressorPool inputContext)
         throws IOException, InterruptedException {
       return merge(serializationContext, factor, 0, tmpDir,
-                   readsCounter, writesCounter, bytesReadCounter, mergePhase, inputContext);
+                   readsCounter, writesCounter, bytesReadCounter, inputContext);
     }
 
     TezRawKeyValueIterator merge(SerializationContext serializationContext,
@@ -661,7 +632,7 @@ public class TezMerger {
                                      TezCounter readsCounter,
                                      TezCounter writesCounter,
                                      TezCounter bytesReadCounter,
-                                     Progress mergePhase, DecompressorPool inputContext)
+                                     DecompressorPool inputContext)
         throws IOException, InterruptedException {
       if (segments.size() == 0) {
         LOG.info("Nothing to merge. Returning an empty iterator");
@@ -680,14 +651,6 @@ public class TezMerger {
       int numSegments = segments.size();
       int origFactor = factor;
       int passNo = 1;
-      if (mergePhase != null) {
-        mergeProgress = mergePhase;
-      }
-
-      long totalBytes = computeBytesInMerges(segments, factor, inMem, considerFinalMergeForProgress);
-      if (totalBytes != 0) {
-        progPerByte = 1.0f / (float)totalBytes;
-      }
       
       //create the MergeStreams from the sorted map created in the constructor
       //and dump the final output to a file
@@ -704,7 +667,6 @@ public class TezMerger {
           new ArrayList<Segment>();
         int segmentsConsidered = 0;
         int numSegmentsToConsider = factor;
-        long startBytes = 0; // starting bytes of segments of this merge
         while (true) {
           //extract the smallest 'factor' number of segments  
           //Call cleanup on the empty segments (no key/value data)
@@ -715,12 +677,9 @@ public class TezMerger {
             // this helps in ensuring we don't use buffers until we need them
 
             segment.init(readsCounter, bytesReadCounter);
-            long startPos = segment.getPosition();
             boolean hasNext = segment.nextRawKey(nextKey);
-            long endPos = segment.getPosition();
             
             if (hasNext) {
-              startBytes += endPos - startPos;
               segmentsToMerge.add(segment);
               segmentsConsidered++;
             }
@@ -750,31 +709,9 @@ public class TezMerger {
         //if we have lesser number of segments remaining, then just return the
         //iterator, else do another single level merge
         if (numSegments <= factor) { // Will always kick in if only in-mem segments are provided.
-          if (!considerFinalMergeForProgress) { // for reduce task
-
-            // Reset totalBytesProcessed and recalculate totalBytes from the
-            // remaining segments to track the progress of the final merge.
-            // Final merge is considered as the progress of the reducePhase,
-            // the 3rd phase of reduce task.
-            totalBytesProcessed = 0;
-            totalBytes = 0;
-            for (int i = 0; i < segmentsToMerge.size(); i++) {
-              totalBytes += segmentsToMerge.get(i).getLength();
-            }
-          }
-          if (totalBytes != 0) //being paranoid
-            progPerByte = 1.0f / (float)totalBytes;
-          
-          totalBytesProcessed += startBytes;
-          if (totalBytes != 0)
-            mergeProgress.set(totalBytesProcessed * progPerByte);
-          else
-            mergeProgress.set(1.0f); // Last pass and no segments left - we're done
-
           if (LOG.isDebugEnabled()) {
             LOG.debug("Down to the last merge-pass, with " + numSegments +
-                " segments left of total size: " +
-                (totalBytes - totalBytesProcessed) + " bytes");
+                " segments left");
           }
           // At this point, Factor Segments have not been physically
           // materialized. The merge will be done dynamically. Some of them may
@@ -788,9 +725,6 @@ public class TezMerger {
                 (segments.size() + segmentsToMerge.size()));
           }
           
-          long bytesProcessedInPrevMerges = totalBytesProcessed;
-          totalBytesProcessed += startBytes;
-
           //we want to spread the creation of temp files on multiple disks if 
           //available under the space constraints
           long approxOutputSize = 0; 
@@ -833,18 +767,7 @@ public class TezMerger {
           }
           segments.add(pos, tempSegment);
           numSegments = segments.size();
-          
-          // Subtract the difference between expected size of new segment and 
-          // actual size of new segment(Expected size of new segment is
-          // inputBytesOfThisMerge) from totalBytes. Expected size and actual
-          // size will match(almost) if combiner is not called in merge.
-          long inputBytesOfThisMerge = totalBytesProcessed -
-                                       bytesProcessedInPrevMerges;
-          totalBytes -= inputBytesOfThisMerge - tempSegment.getLength();
-          if (totalBytes != 0) {
-            progPerByte = 1.0f / (float)totalBytes;
-          }
-          
+
           passNo++;
         }
         //we are worried about only the first pass merge factor. So reset the 
@@ -886,99 +809,6 @@ public class TezMerger {
       return subListCopy;
     }
     
-    /**
-     * Compute expected size of input bytes to merges, will be used in
-     * calculating mergeProgress. This simulates the above merge() method and
-     * tries to obtain the number of bytes that are going to be merged in all
-     * merges(assuming that there is no combiner called while merging).
-     * @param segments segments to compute merge bytes
-     * @param factor mapreduce.task.io.sort.factor
-     * @param inMem  number of segments in memory to be merged
-     * @param considerFinalMergeForProgress whether to consider for final merge
-     */
-    static long computeBytesInMerges(List<Segment> segments, int factor, int inMem, boolean considerFinalMergeForProgress) {
-      int numSegments = segments.size();
-      long[] segmentSizes = new long[numSegments];
-      long totalBytes = 0;
-      int n = numSegments - inMem;
-      // factor for 1st pass
-      int f = getPassFactor(factor, 1, n) + inMem;
-      n = numSegments;
- 
-      for (int i = 0; i < numSegments; i++) {
-        // Not handling empty segments here assuming that it would not affect
-        // much in calculation of mergeProgress.
-        segmentSizes[i] = segments.get(i).getLength();
-      }
-      
-      // If includeFinalMerge is true, allow the following while loop iterate
-      // for 1 more iteration. This is to include final merge as part of the
-      // computation of expected input bytes of merges
-      boolean considerFinalMerge = considerFinalMergeForProgress;
-
-      int offset = 0;
-      while (n > f || considerFinalMerge) {
-        if (n <= f) {
-          considerFinalMerge = false;
-        }
-        long mergedSize = 0;
-        f = Math.min(f, n);
-        for (int j = 0; j < f; j++) {
-          mergedSize += segmentSizes[offset + j];
-        }
-        totalBytes += mergedSize;
-        
-        // insert new size into the sorted list
-        int pos = Arrays.binarySearch(segmentSizes, offset, offset + n, mergedSize);
-        if (pos < 0) {
-          pos = -pos-1;
-        }
-        if (pos < offset + f) {
-          // Insert at the beginning
-          offset += f - 1;
-          segmentSizes[offset] = mergedSize;
-        } else if (pos < offset + n) {
-          // Insert in the middle
-          if (offset + n < segmentSizes.length) {
-            // Shift right after insertion point into unused capacity
-            System.arraycopy(segmentSizes, pos, segmentSizes, pos + 1, offset + n - pos);
-            // Insert into insertion point
-            segmentSizes[pos] = mergedSize;
-            offset += f;
-          } else {
-            // Full left shift before insertion point
-            System.arraycopy(segmentSizes, offset + f, segmentSizes, 0, pos - (offset + f));
-            // Insert in the middle
-            segmentSizes[pos - (offset + f)] = mergedSize;
-            // Full left shift after insertion point
-            System.arraycopy(segmentSizes, pos, segmentSizes, pos - (offset + f) + 1, offset + n - pos);
-            offset = 0;
-          }
-        } else {
-          // Insert at the end
-          if (pos < segmentSizes.length) {
-            // Append into unused capacity
-            segmentSizes[pos] = mergedSize;
-            offset += f;
-          } else {
-            // Full left shift
-            // Append at the end
-            System.arraycopy(segmentSizes, offset + f, segmentSizes, 0, n - f);
-            segmentSizes[n - f] = mergedSize;
-            offset = 0;
-          }
-        }
-        n -=  f - 1;
-        f = factor;
-      }
-
-      return totalBytes;
-    }
-
-    public Progress getProgress() {
-      return mergeProgress;
-    }
-
     @Override
     public boolean isSameKey() throws IOException {
       return (hasNext != null) && (hasNext == KeyState.SAME_KEY);
@@ -1005,12 +835,6 @@ public class TezMerger {
   }
 
   private static class EmptyIterator implements TezRawKeyValueIterator {
-    final Progress progress = new Progress();
-
-    EmptyIterator() {
-      progress.set(1.0f);
-    }
-
     @Override
     public DataInputBuffer getKey() throws IOException {
       throw new RuntimeException("No keys on an empty iterator");
@@ -1033,11 +857,6 @@ public class TezMerger {
 
     @Override
     public void close() throws IOException {
-    }
-
-    @Override
-    public Progress getProgress() {
-      return progress;
     }
 
     @Override

@@ -49,7 +49,6 @@ import org.apache.tez.runtime.library.common.comparator.ProxyComparator;
 import org.apache.hadoop.io.RawComparator;
 import org.apache.hadoop.util.IndexedSortable;
 import org.apache.hadoop.util.IndexedSorter;
-import org.apache.hadoop.util.Progress;
 import org.apache.tez.common.TezCommonUtils;
 import org.apache.tez.runtime.api.OutputContext;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
@@ -58,7 +57,6 @@ import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Writer;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger.DiskSegment;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger.Segment;
-import org.apache.tez.runtime.library.utils.LocalProgress;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
@@ -876,9 +874,9 @@ public class PipelinedSorter extends ExternalSorter {
             segmentList, mergeFactor,
             new Path(uniqueIdentifier),
             (RawComparator) ConfigUtils.getIntermediateOutputKeyComparator(conf),
-            progressable, sortSegments, true,
+            progressable, sortSegments,
             null, spilledRecordsCounter, additionalSpillBytesReadCounter,
-            null, merger.needsRLE(), outputContext); // Not using any Progress in TezMerger. Should just work.
+            merger.needsRLE(), outputContext);
         //write merged output to disk
         long segmentStart = finalOut.getPos();
         long rawLength = 0;
@@ -1210,7 +1208,6 @@ public class PipelinedSorter extends ExternalSorter {
     private final SortSpan span;
     private final InputByteBuffer key = new InputByteBuffer();
     private final InputByteBuffer value = new InputByteBuffer();
-    private final Progress progress = new LocalProgress();
 
     private static final int minrun = (1 << 4);
 
@@ -1243,9 +1240,6 @@ public class PipelinedSorter extends ExternalSorter {
       // caveat: since we use this as a comparable in the merger 
       if(kvindex == maxindex) return false;
       kvindex += 1;
-      if(kvindex % 100 == 0) {
-        progress.set(1 - ((maxindex - kvindex) / (float) maxindex));
-      }
       return true;
     }
 
@@ -1255,10 +1249,6 @@ public class PipelinedSorter extends ExternalSorter {
     }
 
     public void close() {
-    }
-
-    public Progress getProgress() { 
-      return progress;
     }
 
     @Override
@@ -1374,9 +1364,6 @@ public class PipelinedSorter extends ExternalSorter {
     public DataInputBuffer getKey() throws IOException { return iter.getKey(); }
     public DataInputBuffer getValue() throws IOException { return iter.getValue(); }
     public void close() throws IOException { }
-    public Progress getProgress() {
-      return new Progress();
-    }
 
     @Override
     public boolean isSameKey() throws IOException {
@@ -1574,11 +1561,6 @@ public class PipelinedSorter extends ExternalSorter {
     public int getPartition() { return partition; }
 
     public void close() throws IOException {
-    }
-
-    public Progress getProgress() {
-      // TODO
-      return new Progress();
     }
 
     @Override
