@@ -52,6 +52,8 @@ import org.apache.tez.runtime.library.common.sort.impl.TezRawKeyValueIterator;
 import org.apache.tez.runtime.library.input.OrderedGroupedInputLegacy;
 import org.apache.tez.runtime.library.output.OrderedPartitionedKVOutput;
 
+// ReduceProcessor is used only in MR3 test code.
+
 @SuppressWarnings({ "unchecked", "rawtypes" })
 public class ReduceProcessor extends MRTask {
 

@@ -53,6 +53,8 @@ import org.apache.tez.runtime.library.api.KeyValueReader;
 import org.apache.tez.runtime.library.api.KeyValueWriter;
 import org.apache.tez.runtime.library.output.OrderedPartitionedKVOutput;
 
+// MapProcessor is used in Hive-MR3 MRMapProcessor as well as in MR3 test code.
+
 @SuppressWarnings({ "unchecked", "rawtypes" })
 public class MapProcessor extends MRTask{
 

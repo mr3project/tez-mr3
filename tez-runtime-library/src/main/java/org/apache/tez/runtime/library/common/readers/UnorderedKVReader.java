@@ -92,8 +92,6 @@ public class UnorderedKVReader<K, V> extends KeyValueReader {
     this.valDeserializer.open(valIn);
   }
 
-  // TODO NEWTEZ Maybe add an interface to check whether next will block.
-  
   /**
    * Moves to the next key/values(s) pair
    * 
@@ -138,6 +136,7 @@ public class UnorderedKVReader<K, V> extends KeyValueReader {
   public float getProgress() throws IOException, InterruptedException {
     return completedProcessing ? 1.0f : 0.0f;
   }
+
   /**
    * Tries reading the next key and value from the current reader.
    * @return true if the current reader has more records
