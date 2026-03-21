@@ -870,13 +870,11 @@ public class PipelinedSorter extends ExternalSorter {
         boolean sortSegments = segmentList.size() > mergeFactor;
         //merge
         TezRawKeyValueIterator kvIter = TezMerger.merge(conf, localFs,
-            serializationContext, codec,
-            segmentList, mergeFactor,
+            serializationContext, codec, segmentList, mergeFactor, 0,
             new Path(uniqueIdentifier),
             (RawComparator) ConfigUtils.getIntermediateOutputKeyComparator(conf),
-            progressable, sortSegments,
-            null, spilledRecordsCounter, additionalSpillBytesReadCounter,
-            merger.needsRLE(), outputContext);
+            progressable, sortSegments, null, spilledRecordsCounter,
+            additionalSpillBytesReadCounter, merger.needsRLE(), outputContext);
         //write merged output to disk
         long segmentStart = finalOut.getPos();
         long rawLength = 0;
