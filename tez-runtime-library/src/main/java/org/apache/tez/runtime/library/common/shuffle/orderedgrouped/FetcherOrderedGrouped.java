@@ -594,10 +594,13 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         }
 
         if (mapOutput.getType() == Type.MEMORY) {
-          ShuffleUtils.shuffleToMemory(mapOutput.getMemory(), input, mapOutputStat.layout, (int) decompressedLength,
+          IFile.SectionLayout updatedLayout = ShuffleUtils.shuffleToMemory(mapOutput.getMemory(), input, mapOutputStat.layout, (int) decompressedLength,
               (int) compressedLength, codec, fetcherConfig.ifileReadAhead,
               fetcherConfig.ifileReadAheadLength, LOG,
               mapOutput.getAttemptIdentifier(), taskContext, true);
+          if (updatedLayout != null) {
+            mapOutput.setSectionLayout(updatedLayout);
+          }
         } else if (mapOutput.getType() == Type.DISK) {
           ShuffleUtils.shuffleToDisk(mapOutput.getDisk(), host,
               input, mapOutputStat.layout, compressedLength, decompressedLength, LOG,

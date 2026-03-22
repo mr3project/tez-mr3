@@ -215,11 +215,14 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
       break;
     case MEMORY:
       // set useThreadLocalDecompressor = false because we are inside an EventHandler thread, not a Fetcher thread
-      ShuffleUtils.shuffleToMemory(((MemoryFetchedInput) fetchedInput).getBytes(),
+      IFile.SectionLayout updatedLayout = ShuffleUtils.shuffleToMemory(((MemoryFetchedInput) fetchedInput).getBytes(),
           dataProto.getData().newInput(), layout, dataProto.getRawLength(),
           dataProto.getCompressedLength(),
           codec, ifileReadAhead, ifileReadAheadLength, LOG,
           fetchedInput.getInputAttemptIdentifier(), inputContext, false);
+      if (updatedLayout != null) {
+        fetchedInput.setSectionLayout(updatedLayout);
+      }
       break;
     case WAIT:
     default:

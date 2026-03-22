@@ -812,7 +812,7 @@ public class IFile {
      * Read the entire IFile contents to memory (byte[] array).
      * If the IFile header indicates compression, decompress all the three sections.
      */
-    public static void readToMemory(byte[] buffer, InputStream in, SectionLayout layout,
+    public static SectionLayout readToMemory(byte[] buffer, InputStream in, SectionLayout layout,
         CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLength,
         TaskContext taskContext, boolean useThreadLocalDecompressor)
         throws IOException {
@@ -841,7 +841,7 @@ public class IFile {
             ifileReadAhead, ifileReadAheadLength);
         readStoredSectionToBuffer(buffer, offset, in, lengthsLength + checksumSize,
             ifileReadAhead, ifileReadAheadLength);
-        return;
+        return null;
       }
 
       if (codec == null) {
@@ -884,6 +884,15 @@ public class IFile {
       } finally {
         returnDecompressor(codec, taskContext, useThreadLocalDecompressor, decompressor);
       }
+
+      SectionLayout decompressedLayout = new SectionLayout(
+          HEADER.length,
+          HEADER.length + valuesRawLength + checksumSize,
+          HEADER.length + valuesRawLength + checksumSize + keysRawLength + checksumSize,
+          layout.totalRawLength,
+          layout.totalNumRecordsWritten,
+          valuesRawLength, keysRawLength, lengthsRawLength);
+      return decompressedLayout;
     }
 
     private static void readSectionToMemory(byte[] buffer, int offset,

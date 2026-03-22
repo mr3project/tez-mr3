@@ -719,10 +719,13 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         }
 
         if (fetchedInput.getType() == Type.MEMORY) {
-          ShuffleUtils.shuffleToMemory(((MemoryFetchedInput) fetchedInput).getBytes(),
+          IFile.SectionLayout updatedLayout = ShuffleUtils.shuffleToMemory(((MemoryFetchedInput) fetchedInput).getBytes(),
               input, mapOutputStat.layout, (int) decompressedLength, (int) compressedLength, codec,
               fetcherConfig.ifileReadAhead, fetcherConfig.ifileReadAheadLength, LOG,
               fetchedInput.getInputAttemptIdentifier(), taskContext, true);
+          if (updatedLayout != null) {
+            fetchedInput.setSectionLayout(updatedLayout);
+          }
         } else if (fetchedInput.getType() == Type.DISK) {
           ShuffleUtils.shuffleToDisk(((DiskFetchedInput) fetchedInput).getOutputStream(),
               (host + ":" + port), input, mapOutputStat.layout, compressedLength, decompressedLength, LOG,

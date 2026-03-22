@@ -153,7 +153,7 @@ public abstract class MapOutput implements ShuffleInput {
   }
 
   public void setSectionLayout(IFile.SectionLayout sectionLayout) {
-    assert this.sectionLayout == null && sectionLayout != null;
+    assert sectionLayout != null;
     this.sectionLayout = sectionLayout;
   }
 

@@ -117,13 +117,13 @@ public class ShuffleUtils {
     return false;
   }
 
-  public static void shuffleToMemory(byte[] shuffleData,
+  public static IFile.SectionLayout shuffleToMemory(byte[] shuffleData,
       InputStream input, IFile.SectionLayout layout, int decompressedLength, int compressedLength,
       CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLength,
       Logger LOG, InputAttemptIdentifier identifier,
       TaskContext taskContext, boolean useThreadLocalDecompressor) throws IOException {
     try {
-      IFile.Reader.readToMemory(shuffleData, input, layout, codec,
+      return IFile.Reader.readToMemory(shuffleData, input, layout, codec,
           ifileReadAhead, ifileReadAheadLength, taskContext, useThreadLocalDecompressor);
       // metrics.inputBytes(shuffleData.length);
       // finished reading shuffleData.length bytes from identifier
