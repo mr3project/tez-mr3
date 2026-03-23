@@ -23,7 +23,6 @@ import java.util.Iterator;
 import java.util.List;
 
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.io.serializer.Serialization;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.sort.impl.TezSpillRecord;
@@ -33,7 +32,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.hadoop.io.serializer.SerializationFactory;
 import org.apache.hadoop.io.serializer.Serializer;
 import org.apache.tez.common.counters.TaskCounter;
 import org.apache.tez.common.counters.TezCounter;
@@ -42,8 +40,8 @@ import org.apache.tez.runtime.api.OutputContext;
 import org.apache.tez.runtime.library.api.KeyValuesWriter;
 import org.apache.tez.runtime.library.api.Partitioner;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
-import org.apache.tez.runtime.library.common.ConfigUtils;
 import org.apache.tez.runtime.library.common.TezRuntimeUtils;
+import org.apache.tez.runtime.library.common.serializer.SerializationContext;
 import org.apache.tez.runtime.api.TezTaskOutput;
 import org.apache.tez.runtime.library.utils.CodecUtils;
 
@@ -65,9 +63,6 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
   protected final Class valClass;
   protected final Serializer keySerializer;
   protected final Serializer valSerializer;
-  protected final SerializationFactory serializationFactory;
-  protected final Serialization keySerialization;
-  protected final Serialization valSerialization;
   protected final CompressionCodec codec;
 
   protected final String auxiliaryService;
@@ -140,13 +135,10 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
     this.numPartitions = numOutputs;
     
     // k/v serialization
-    keyClass = ConfigUtils.getIntermediateOutputKeyClass(this.conf);
-    valClass = ConfigUtils.getIntermediateOutputValueClass(this.conf);
-    serializationFactory = new SerializationFactory(this.conf);
-    keySerialization = serializationFactory.getSerialization(keyClass);
-    valSerialization = serializationFactory.getSerialization(valClass);
-    keySerializer = keySerialization.getSerializer(keyClass);
-    valSerializer = valSerialization.getSerializer(valClass);
+    keyClass = SerializationContext.getKeyClass();
+    valClass = SerializationContext.getValueClass();
+    keySerializer = SerializationContext.getKeySerializer();
+    valSerializer = SerializationContext.getValueSerializer();
     
     outputRecordsCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_RECORDS);
     outputLargeRecordsCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_LARGE_RECORDS);

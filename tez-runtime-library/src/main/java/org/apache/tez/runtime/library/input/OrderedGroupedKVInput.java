@@ -42,7 +42,7 @@ import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.library.api.KeyValuesReader;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
-import org.apache.tez.runtime.library.common.ConfigUtils;
+import org.apache.tez.runtime.library.common.serializer.SerializationContext;
 import org.apache.tez.runtime.library.common.MemoryUpdateCallbackHandler;
 import org.apache.tez.runtime.library.common.ValuesIterator;
 import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.Shuffle;
@@ -284,9 +284,9 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput {
   protected synchronized void createValuesIterator()
       throws IOException {
     // Not used by ReduceProcessor
-    RawComparator rawComparator = ConfigUtils.getIntermediateInputKeyComparator(conf);
-    Class<?> keyClass = ConfigUtils.getIntermediateInputKeyClass(conf);
-    Class<?> valClass = ConfigUtils.getIntermediateInputValueClass(conf);
+    RawComparator rawComparator = SerializationContext.getKeyComparator();
+    Class<?> keyClass = SerializationContext.getKeyClass();
+    Class<?> valClass = SerializationContext.getValueClass();
     LOG.info("{}: creating ValuesIterator with comparator={}, keyClass={}, valClass={}",
         getContext().getSourceVertexName(), rawComparator.getClass().getName(),
         keyClass.getName(), valClass.getName());
@@ -297,7 +297,7 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput {
 
   @SuppressWarnings("rawtypes")
   public RawComparator getInputKeyComparator() {
-    return (RawComparator) ConfigUtils.getIntermediateInputKeyComparator(conf);
+    return (RawComparator) SerializationContext.getKeyComparator();
   }
 
   @SuppressWarnings("rawtypes")

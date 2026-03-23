@@ -248,13 +248,13 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       skipBuffers = true;
       byte[] writeBuffer = IFile.allocateWriteBuffer();
       if (this.useCachedStream) {   // i.e., if dataViaEventsEnabled == true
-        writer = new IFile.FileBackedInMemIFileWriter(keySerialization, valSerialization, rfs,
-            outputFileHandler, keyClass, valClass, codec, outputRecordsCounter,
+        writer = new IFile.FileBackedInMemIFileWriter(rfs,
+            outputFileHandler, codec, outputRecordsCounter,
             outputRecordBytesCounter, dataViaEventsMaxSize,
             writeBuffer);
       } else {
         finalOutPath = outputFileHandler.getOutputFileForWrite();
-        writer = new IFile.Writer(keySerialization, valSerialization, rfs, finalOutPath, keyClass, valClass,
+        writer = new IFile.Writer(rfs, finalOutPath,
             codec, outputRecordsCounter, outputRecordBytesCounter,
             writeBuffer);
         ensureSpillFilePermissions(finalOutPath, rfs, rfsSpillFilePerms);
@@ -668,8 +668,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
                 }
                 // all Writer instances share the same FSDataOutputStream out
                 writer = new Writer(
-                    keySerialization, valSerialization, fsOutput,
-                    keyClass, valClass, codec, null, null, false,
+                    fsOutput, codec, null, null, false,
                     writeBuffer, compressorExternal);
               }
               numRecords += writePartition(buffer.partitionHeads[i], buffer, writer, key, val);
@@ -1168,8 +1167,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         }
         // inside close()
         writer = new Writer(
-            keySerialization, valSerialization, out, keyClass, valClass,
-            codec, null, null, false,
+            out, codec, null, null, false,
             writeBuffer, null);
         try {
           if (currentBuffer.nextPosition != 0
@@ -1295,8 +1293,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           spilledRecordsCounter.increment(1);
           Writer writer = null;
           try {
-            writer = new IFile.Writer(keySerialization, valSerialization, out, keyClass, valClass,
-                codec, null, null, false,
+            writer = new IFile.Writer(out, codec, null, null, false,
                 IFile.allocateWriteBufferSingle(), null);
             writer.append(key, value);
             outputLargeRecordsCounter.increment(1);

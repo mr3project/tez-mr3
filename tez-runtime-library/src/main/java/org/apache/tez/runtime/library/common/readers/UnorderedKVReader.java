@@ -27,10 +27,9 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.io.serializer.Deserializer;
-import org.apache.hadoop.io.serializer.SerializationFactory;
 import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.runtime.library.api.KeyValueReader;
-import org.apache.tez.runtime.library.common.ConfigUtils;
+import org.apache.tez.runtime.library.common.serializer.SerializationContext;
 import org.apache.tez.runtime.library.common.shuffle.impl.ShuffleManager;
 import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.InMemoryReader;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
@@ -78,17 +77,15 @@ public class UnorderedKVReader<K, V> extends KeyValueReader {
     this.ifileReadAheadLength = ifileReadAheadLength;
     this.inputRecordCounter = inputRecordCounter;
 
-    this.keyClass = ConfigUtils.getIntermediateInputKeyClass(conf);
-    this.valClass = ConfigUtils.getIntermediateInputValueClass(conf);
+    this.keyClass = (Class<K>) SerializationContext.getKeyClass();
+    this.valClass = (Class<V>) SerializationContext.getValueClass();
 
     this.keyIn = new DataInputBuffer();
     this.valIn = new DataInputBuffer();
 
-    SerializationFactory serializationFactory = new SerializationFactory(conf);
-
-    this.keyDeserializer = serializationFactory.getDeserializer(keyClass);
+    this.keyDeserializer = (Deserializer<K>) SerializationContext.getKeyDeserializer();
     this.keyDeserializer.open(keyIn);
-    this.valDeserializer = serializationFactory.getDeserializer(valClass);
+    this.valDeserializer = (Deserializer<V>) SerializationContext.getValueDeserializer();
     this.valDeserializer.open(valIn);
   }
 

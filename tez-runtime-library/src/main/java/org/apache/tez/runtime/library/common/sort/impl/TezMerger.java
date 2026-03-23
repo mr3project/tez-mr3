@@ -41,7 +41,6 @@ import org.apache.hadoop.util.Progressable;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
-import org.apache.tez.runtime.library.common.serializer.SerializationContext;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader.KeyState;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Writer;
@@ -61,7 +60,6 @@ public class TezMerger {
 
   public static <K extends Object, V extends Object>
   TezRawKeyValueIterator merge(Configuration conf, FileSystem fs,
-      SerializationContext serializationContext,
       CompressionCodec codec,
       List<Segment> segments,
       int mergeFactor, int inMemSegments, Path tmpDir,
@@ -74,9 +72,8 @@ public class TezMerger {
       DecompressorPool inputContext)
       throws IOException, InterruptedException {
     return new MergeQueue(conf, fs, segments, comparator, reporter,
-        sortSegments, codec, checkForSameKeys).merge(serializationContext,
-        mergeFactor, inMemSegments, tmpDir, readsCounter, writesCounter,
-        bytesReadCounter, inputContext);
+        sortSegments, codec, checkForSameKeys).merge(mergeFactor, inMemSegments, tmpDir,
+        readsCounter, writesCounter, bytesReadCounter, inputContext);
   }
 
   public static void writeFile(TezRawKeyValueIterator records, IFile.WriterAppend writer,
@@ -510,8 +507,7 @@ public class TezMerger {
       return comparator.compare(key1.getData(), s1, l1, key2.getData(), s2, l2) < 0;
     }
     
-    TezRawKeyValueIterator merge(SerializationContext serializationContext,
-                                     int factor, int inMem, Path tmpDir,
+    TezRawKeyValueIterator merge(int factor, int inMem, Path tmpDir,
                                      TezCounter readsCounter,
                                      TezCounter writesCounter,
                                      TezCounter bytesReadCounter,
@@ -624,9 +620,7 @@ public class TezMerger {
 
           // TODO Would it ever make sense to make this an in-memory writer ?
           // Merging because of too many disk segments - might fit in memory.
-          Writer writer = new Writer(serializationContext.getKeySerialization(),
-              serializationContext.getValSerialization(), fs, outputFile,
-              serializationContext.getKeyClass(), serializationContext.getValueClass(), codec,
+          Writer writer = new Writer(fs, outputFile, codec,
               writesCounter, null, writeBuffer);
 
           writeFile(this, writer, reporter, recordsBeforeProgress);

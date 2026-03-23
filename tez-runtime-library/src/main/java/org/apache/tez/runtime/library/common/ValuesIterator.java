@@ -26,8 +26,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.RawComparator;
 import org.apache.hadoop.io.serializer.Deserializer;
-import org.apache.hadoop.io.serializer.SerializationFactory;
 import org.apache.tez.common.counters.TezCounter;
+import org.apache.tez.runtime.library.common.serializer.SerializationContext;
 import org.apache.tez.runtime.library.common.sort.impl.TezRawKeyValueIterator;
 
 import org.apache.tez.common.Preconditions;
@@ -72,10 +72,9 @@ public class ValuesIterator<KEY,VALUE> {
     this.comparator = comparator;
     this.inputKeyCounter = inputKeyCounter;
     this.inputValueCounter = inputValueCounter;
-    SerializationFactory serializationFactory = new SerializationFactory(conf);
-    this.keyDeserializer = serializationFactory.getDeserializer(keyClass);
+    this.keyDeserializer = (Deserializer<KEY>) SerializationContext.getKeyDeserializer();
     this.keyDeserializer.open(keyIn);
-    this.valDeserializer = serializationFactory.getDeserializer(valClass);
+    this.valDeserializer = (Deserializer<VALUE>) SerializationContext.getValueDeserializer();
     this.valDeserializer.open(this.valueIn);
   }
 
