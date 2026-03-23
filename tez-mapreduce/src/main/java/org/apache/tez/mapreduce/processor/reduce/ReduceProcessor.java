@@ -72,14 +72,12 @@ public class ReduceProcessor extends MRTask {
 
   @Override
   public void handleEvents(List<Event> processorEvents) {
-    // TODO Auto-generated method stub
   }
 
   public void close() throws IOException {
     if (progressHelper != null) {
       progressHelper.shutDownProgressTaskService();
     }
-
   }
 
   @Override
@@ -90,12 +88,12 @@ public class ReduceProcessor extends MRTask {
     progressHelper = new ProgressHelper(this.inputs, processorContext, this.getClass().getSimpleName());
     LOG.info("Running reduce: " + processorContext.getUniqueIdentifier());
 
-    if (_outputs.size() <= 0 || _outputs.size() > 1) {
+    if (_outputs.size() != 1) {
       throw new IOException("Invalid number of _outputs"
           + ", outputCount=" + _outputs.size());
     }
 
-    if (_inputs.size() <= 0 || _inputs.size() > 1) {
+    if (_inputs.size() != 1) {
       throw new IOException("Invalid number of _inputs"
           + ", inputCount=" + _inputs.size());
     }
@@ -183,9 +181,8 @@ public class ReduceProcessor extends MRTask {
 
     // apply reduce function
     try {
-      ReduceValuesIterator values =
-          new ReduceValuesIterator(
-              input, reporter, reduceInputValueCounter);
+      ReduceValuesIterator values = new ReduceValuesIterator(
+          input, reporter, reduceInputValueCounter);
 
       values.informReduceProgress();
       while (values.more()) {

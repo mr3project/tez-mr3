@@ -56,7 +56,7 @@ import org.apache.tez.runtime.library.output.OrderedPartitionedKVOutput;
 // MapProcessor is used in Hive-MR3 MRMapProcessor as well as in MR3 test code.
 
 @SuppressWarnings({ "unchecked", "rawtypes" })
-public class MapProcessor extends MRTask{
+public class MapProcessor extends MRTask {
 
   private static final Logger LOG = LoggerFactory.getLogger(MapProcessor.class);
 
@@ -70,8 +70,6 @@ public class MapProcessor extends MRTask{
 
   @Override
   public void handleEvents(List<Event> processorEvents) {
-    // TODO Auto-generated method stub
-
   }
 
   public void close() throws IOException {
@@ -88,8 +86,7 @@ public class MapProcessor extends MRTask{
     progressHelper = new ProgressHelper(this.inputs, getContext(), this.getClass().getSimpleName());
     LOG.info("Running map: " + processorContext.getUniqueIdentifier());
 
-    if (_inputs.size() != 1
-            || _outputs.size() != 1) {
+    if (_inputs.size() != 1 || _outputs.size() != 1) {
       throw new IOException("Cannot handle multiple _inputs or _outputs"
               + ", inputCount=" + _inputs.size()
               + ", outputCount=" + _outputs.size());
@@ -127,8 +124,7 @@ public class MapProcessor extends MRTask{
     } else if ((out instanceof OrderedPartitionedKVOutput)){
       kvWriter = ((OrderedPartitionedKVOutput)out).getWriter();
     } else {
-      throw new IOException("Illegal output to map, outputClass="
-          + out.getClass());
+      throw new IOException("Illegal output to map, outputClass=" + out.getClass());
     }
 
     if (useNewApi) {

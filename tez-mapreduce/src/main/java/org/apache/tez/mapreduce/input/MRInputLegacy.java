@@ -68,7 +68,7 @@ public class MRInputLegacy extends MRInput {
     super(inputContext, numPhysicalInputs);
   }
 
-  protected void initializeInternal() throws IOException {
+  protected void initializeInternal() {
     if (LOG.isDebugEnabled()) {
       LOG.debug(getContext().getSourceVertexName() + " MRInputLegacy deferring initialization");
     }

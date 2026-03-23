@@ -226,7 +226,6 @@ public class TezRuntimeConfiguration {
   public static final String TEZ_RUNTIME_VALUE_CLASS =
       TEZ_RUNTIME_PREFIX + "value.class";
 
-  // TODO Move this key to MapReduce
   @ConfigurationProperty
   public static final String TEZ_RUNTIME_KEY_SECONDARY_COMPARATOR_CLASS =
       TEZ_RUNTIME_PREFIX + "key.secondary.comparator.class";

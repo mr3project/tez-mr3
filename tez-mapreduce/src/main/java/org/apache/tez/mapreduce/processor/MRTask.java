@@ -90,10 +90,8 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
   transient TezCounters counters;
   protected ProcessorContext processorContext;
   protected TaskAttemptID taskAttemptId;
-  protected Progress progress = new Progress();
   protected SecretKey jobTokenSecret;
   
-  LogicalInput input;
   LogicalOutput output;
 
   boolean isMap;
@@ -167,13 +165,10 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
   private void configureMRTask()
       throws IOException, InterruptedException {
 
-    Credentials credentials = UserGroupInformation.getCurrentUser()
-        .getCredentials();
+    Credentials credentials = UserGroupInformation.getCurrentUser().getCredentials();
     jobConf.setCredentials(credentials);
-    // TODO Can this be avoided all together. Have the MRTezOutputCommitter use
-    // the Tez parameter.
-    // TODO This could be fetched from the env if YARN is setting it for all
-    // Containers.
+    // TODO Can this be avoided all together. Have the MRTezOutputCommitter use the Tez parameter.
+    // TODO This could be fetched from the env if YARN is setting it for all Containers.
     // Set it in conf, so as to be able to be used the the OutputCommitter.
 
     // Not needed. This is probably being set via the source/consumer meta
@@ -302,9 +297,7 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
     this.mrReporter = new MRTaskReporter(processorContext);
     this.useNewApi = jobConf.getUseNewMapper();
     TezDAGID dagId = IDConverter.fromMRTaskAttemptId(taskAttemptId).getDAGID();
-
-    this.taskAttemptContext =
-        new TaskAttemptContextImpl(jobConf, taskAttemptId, mrReporter);
+    this.taskAttemptContext = new TaskAttemptContextImpl(jobConf, taskAttemptId, mrReporter);
 
     localizeConfiguration(jobConf);
   }
@@ -327,14 +320,12 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
     return "part-" + NUMBER_FORMAT.format(taskAttemptId.getTaskID().getId());
   }
 
-  public void waitBeforeCompletion(MRTaskReporter reporter) throws IOException,
-      InterruptedException {
+  public void waitBeforeCompletion(MRTaskReporter reporter) throws IOException, InterruptedException {
   }
 
   public void done() throws IOException, InterruptedException {
-    LOG.info("Task: {} is done. And is in the process of committing", taskAttemptId );
+    LOG.info("Task: {} is done. And is in the process of committing", taskAttemptId);
     // TODO change this to use the new context
-    // TODO TEZ Interaciton between Commit and OutputReady. Merge ?
     if (output instanceof MROutputLegacy) {
       MROutputLegacy sOut = (MROutputLegacy)output;
       if (sOut.isCommitRequired()) {
@@ -367,9 +358,8 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
   private void commit(MROutputLegacy output) throws IOException {
     int retries = 3;
     while (true) {
-      // This will loop till the AM asks for the task to be killed. As
-      // against, the AM sending a signal to the task to kill itself
-      // gracefully.
+      // This will loop till the AM asks for the task to be killed.
+      // As against, the AM sending a signal to the task to kill itself gracefully.
       try {
         if (processorContext.canCommit()) {
           break;
