@@ -62,4 +62,8 @@ public final class ExampleEdgeSerde {
   public static boolean isNullSentinel(BytesWritable value) {
     return value.getLength() == 0;
   }
+
+  public static BytesWritable copy(BytesWritable value) {
+    return new BytesWritable(value.copyBytes());
+  }
 }

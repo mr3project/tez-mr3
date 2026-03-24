@@ -92,8 +92,7 @@ public class OrderedWordCount extends TezExampleBase {
           sum += ExampleEdgeSerde.decodeInt(value);
         }
         // write the sum as the key and the word as the value
-        kvWriter.write(ExampleEdgeSerde.encodeInt(sum), ExampleEdgeSerde.encodeString(
-            ExampleEdgeSerde.decodeString(word)));
+        kvWriter.write(ExampleEdgeSerde.encodeInt(sum), ExampleEdgeSerde.copy(word));
       }
     }
   }
