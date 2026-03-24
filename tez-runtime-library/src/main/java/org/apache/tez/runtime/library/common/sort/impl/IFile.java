@@ -46,8 +46,8 @@ import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.io.compress.CompressionOutputStream;
 import org.apache.hadoop.io.compress.Compressor;
 import org.apache.hadoop.io.compress.Decompressor;
-import org.apache.hadoop.io.serializer.Serialization;
 import org.apache.hadoop.io.serializer.Serializer;
+import org.apache.tez.runtime.library.common.serializer.SerializationContext;
 import org.apache.tez.common.counters.TezCounter;
 
 import javax.annotation.Nullable;
@@ -137,25 +137,18 @@ public class IFile {
      * Note that we do not allow compression in in-mem stream.
      * When spilled over to file, compression gets enabled.
      *
-     * @param keySerialization
-     * @param valSerialization
      * @param fs
      * @param taskOutput
-     * @param keyClass
-     * @param valueClass
      * @param codec
      * @param writesCounter
      * @param serializedBytesCounter
      * @param cacheSize
      * @throws IOException
      */
-    public FileBackedInMemIFileWriter(Serialization<?> keySerialization,
-        Serialization<?> valSerialization, FileSystem fs, TezTaskOutput taskOutput,
-        Class<?> keyClass, Class<?> valueClass, CompressionCodec codec, TezCounter writesCounter,
+    public FileBackedInMemIFileWriter(FileSystem fs, TezTaskOutput taskOutput,
+        CompressionCodec codec, TezCounter writesCounter,
         TezCounter serializedBytesCounter, int cacheSize, byte[] writeBuffer) throws IOException {
-      super(keySerialization, valSerialization,
-          new FSDataOutputStream(createBoundedBuffer(cacheSize), null),
-          keyClass, valueClass, null,
+      super(new FSDataOutputStream(createBoundedBuffer(cacheSize), null), null,
           writesCounter, serializedBytesCounter, false, writeBuffer, null);
       this.fs = fs;
       this.cacheStream = (BoundedByteArrayOutputStream) this.rawOut.getWrappedStream();
@@ -337,21 +330,17 @@ public class IFile {
 
     private final Compressor compressorExternal;  // not to be shared with concurrent threads
 
-    public Writer(Serialization keySerialization, Serialization valSerialization,
-                  FileSystem fs, Path file,
-                  Class keyClass, Class valueClass,
+    public Writer(FileSystem fs, Path file,
                   CompressionCodec codec,
                   TezCounter writesCounter,
                   TezCounter serializedBytesCounter,
                   byte[] writeBuffer) throws IOException {
-      this(keySerialization, valSerialization, fs.create(file), keyClass, valueClass, codec,
+      this(fs.create(file), codec,
            writesCounter, serializedBytesCounter, false, writeBuffer, null);
       ownOutputStream = true;   // because of fs.create(file)
     }
 
-    public Writer(Serialization keySerialization, Serialization valSerialization,
-                  FSDataOutputStream outputStream,
-                  Class keyClass, Class valueClass,
+    public Writer(FSDataOutputStream outputStream,
                   CompressionCodec codec, TezCounter writesCounter, TezCounter serializedBytesCounter,
                   boolean rle,
                   byte[] writeBuffer,
@@ -372,15 +361,11 @@ public class IFile {
       setupOutputStream(codec);
       writeHeader(outputStream);
 
-      if (keyClass != null) {
-        this.closeSerializers = true;
-        this.keySerializer = keySerialization.getSerializer(keyClass);
-        this.keySerializer.open(buffer);
-        this.valueSerializer = valSerialization.getSerializer(valueClass);
-        this.valueSerializer.open(buffer);
-      } else {
-        this.closeSerializers = false;
-      }
+      this.closeSerializers = true;
+      this.keySerializer = SerializationContext.getKeySerializer();
+      this.keySerializer.open(buffer);
+      this.valueSerializer = SerializationContext.getValueSerializer();
+      this.valueSerializer.open(buffer);
     }
 
     void setupOutputStream(CompressionCodec codec) throws IOException {

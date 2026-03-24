@@ -19,6 +19,8 @@
 package org.apache.tez.runtime.library.common.readers;
 
 import java.io.IOException;
+
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
 import org.slf4j.Logger;
@@ -27,10 +29,9 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.io.serializer.Deserializer;
-import org.apache.hadoop.io.serializer.SerializationFactory;
 import org.apache.tez.common.counters.TezCounter;
-import org.apache.tez.runtime.library.api.KeyValueReader;
-import org.apache.tez.runtime.library.common.ConfigUtils;
+import org.apache.tez.runtime.library.api.KeyValueReaderEdge;
+import org.apache.tez.runtime.library.common.serializer.SerializationContext;
 import org.apache.tez.runtime.library.common.shuffle.impl.ShuffleManager;
 import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.InMemoryReader;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
@@ -38,17 +39,15 @@ import org.apache.tez.runtime.library.common.shuffle.FetchedInput;
 import org.apache.tez.runtime.library.common.shuffle.FetchedInput.Type;
 import org.apache.tez.runtime.library.common.shuffle.MemoryFetchedInput;
 
-public class UnorderedKVReader<K, V> extends KeyValueReader {
+public class UnorderedKVReader extends KeyValueReaderEdge {
 
   private static final Logger LOG = LoggerFactory.getLogger(UnorderedKVReader.class);
   
   private final ShuffleManager shuffleManager;
   private final CompressionCodec codec;
   
-  private final Class<K> keyClass;
-  private final Class<V> valClass;
-  private final Deserializer<K> keyDeserializer;
-  private final Deserializer<V> valDeserializer;
+  private final Deserializer<BytesWritable> keyDeserializer;
+  private final Deserializer<BytesWritable> valDeserializer;
   private final DataInputBuffer keyIn;
   private final DataInputBuffer valIn;
 
@@ -58,8 +57,8 @@ public class UnorderedKVReader<K, V> extends KeyValueReader {
   private final TezCounter inputRecordCounter;
   private final InputContext context;
   
-  private K key;
-  private V value;
+  private BytesWritable key;
+  private BytesWritable value;
   
   private FetchedInput currentFetchedInput;
   private IFile.Reader currentReader;
@@ -78,17 +77,12 @@ public class UnorderedKVReader<K, V> extends KeyValueReader {
     this.ifileReadAheadLength = ifileReadAheadLength;
     this.inputRecordCounter = inputRecordCounter;
 
-    this.keyClass = ConfigUtils.getIntermediateInputKeyClass(conf);
-    this.valClass = ConfigUtils.getIntermediateInputValueClass(conf);
-
     this.keyIn = new DataInputBuffer();
     this.valIn = new DataInputBuffer();
 
-    SerializationFactory serializationFactory = new SerializationFactory(conf);
-
-    this.keyDeserializer = serializationFactory.getDeserializer(keyClass);
+    this.keyDeserializer = SerializationContext.getKeyDeserializer();
     this.keyDeserializer.open(keyIn);
-    this.valDeserializer = serializationFactory.getDeserializer(valClass);
+    this.valDeserializer = SerializationContext.getValueDeserializer();
     this.valDeserializer.open(valIn);
   }
 
@@ -122,14 +116,13 @@ public class UnorderedKVReader<K, V> extends KeyValueReader {
     }
   }
 
-
   @Override
-  public Object getCurrentKey() throws IOException {
-    return (Object) key;
+  public BytesWritable getCurrentKey() throws IOException {
+    return key;
   }
 
   @Override
-  public Object getCurrentValue() throws IOException {
+  public BytesWritable getCurrentValue() throws IOException {
     return value;
   }
 
@@ -143,7 +136,6 @@ public class UnorderedKVReader<K, V> extends KeyValueReader {
    * @throws IOException
    */
   private boolean readNextFromCurrentReader() throws IOException {
-    // Initial reader.
     if (this.currentReader == null) {
       return false;
     } else {

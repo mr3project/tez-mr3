@@ -29,7 +29,7 @@ import java.util.zip.Deflater;
 
 import com.google.common.collect.Lists;
 
-import org.apache.tez.runtime.library.conf.OrderedPartitionedKVOutputConfig.SorterImpl;
+import org.apache.hadoop.io.BytesWritable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -40,7 +40,7 @@ import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.runtime.api.AbstractLogicalOutput;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.OutputContext;
-import org.apache.tez.runtime.library.api.KeyValuesWriter;
+import org.apache.tez.runtime.library.api.KeyValuesWriterEdge;
 import org.apache.tez.runtime.library.api.Partitioner;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.MemoryUpdateCallbackHandler;
@@ -121,16 +121,16 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
   }
 
   @Override
-  public synchronized KeyValuesWriter getWriter() throws IOException {
+  public synchronized KeyValuesWriterEdge getWriter() throws IOException {
     Preconditions.checkState(isStarted.get(), "Cannot get writer before starting the Output");
-    return new KeyValuesWriter() {
+    return new KeyValuesWriterEdge() {
       @Override
-      public void write(Object key, Object value) throws IOException {
+      public void write(BytesWritable key, BytesWritable value) throws IOException {
         sorter.write(key, value);
       }
 
       @Override
-      public void write(Object key, Iterable<Object> values) throws IOException {
+      public void write(BytesWritable key, Iterable<BytesWritable> values) throws IOException {
         sorter.write(key, values);
       }
     };

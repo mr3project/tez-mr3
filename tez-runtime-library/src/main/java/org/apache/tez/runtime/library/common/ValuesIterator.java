@@ -22,12 +22,12 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.RawComparator;
 import org.apache.hadoop.io.serializer.Deserializer;
-import org.apache.hadoop.io.serializer.SerializationFactory;
 import org.apache.tez.common.counters.TezCounter;
+import org.apache.tez.runtime.library.common.serializer.SerializationContext;
 import org.apache.tez.runtime.library.common.sort.impl.TezRawKeyValueIterator;
 
 import org.apache.tez.common.Preconditions;
@@ -39,21 +39,19 @@ import org.apache.tez.common.Preconditions;
  * lead to corrupt data.
  * 
  */
-
-public class ValuesIterator<KEY,VALUE> {
-  protected TezRawKeyValueIterator in; //input iterator
-  private KEY key;               // current key
-  private KEY nextKey;
-  private VALUE value;             // current value
-  //private boolean hasNext;                      // more w/ this key
-  private boolean more;                         // more in file
-  private RawComparator<KEY> comparator;
-  private Deserializer<KEY> keyDeserializer;
-  private Deserializer<VALUE> valDeserializer;
-  private DataInputBuffer keyIn = new DataInputBuffer();
-  private DataInputBuffer valueIn = new DataInputBuffer();
-  private TezCounter inputKeyCounter;
-  private TezCounter inputValueCounter;
+public class ValuesIterator {
+  protected TezRawKeyValueIterator in;  //input iterator
+  private BytesWritable key;            // current key
+  private BytesWritable nextKey;
+  private BytesWritable value;          // current value
+  private boolean more;                 // more in file
+  private final RawComparator<BytesWritable> comparator;
+  private final Deserializer<BytesWritable> keyDeserializer;
+  private final Deserializer<BytesWritable> valDeserializer;
+  private final DataInputBuffer keyIn = new DataInputBuffer();
+  private final DataInputBuffer valueIn = new DataInputBuffer();
+  private final TezCounter inputKeyCounter;
+  private final TezCounter inputValueCounter;
   
   private int keyCtr = 0;
   private boolean hasMoreValues; // For the current key.
@@ -62,9 +60,7 @@ public class ValuesIterator<KEY,VALUE> {
   private boolean completedProcessing;
   
   public ValuesIterator (TezRawKeyValueIterator in, 
-                         RawComparator<KEY> comparator, 
-                         Class<KEY> keyClass,
-                         Class<VALUE> valClass, Configuration conf,
+                         RawComparator<BytesWritable> comparator,
                          TezCounter inputKeyCounter,
                          TezCounter inputValueCounter)
     throws IOException {
@@ -72,10 +68,9 @@ public class ValuesIterator<KEY,VALUE> {
     this.comparator = comparator;
     this.inputKeyCounter = inputKeyCounter;
     this.inputValueCounter = inputValueCounter;
-    SerializationFactory serializationFactory = new SerializationFactory(conf);
-    this.keyDeserializer = serializationFactory.getDeserializer(keyClass);
+    this.keyDeserializer = SerializationContext.getKeyDeserializer();
     this.keyDeserializer.open(keyIn);
-    this.valDeserializer = serializationFactory.getDeserializer(valClass);
+    this.valDeserializer = SerializationContext.getValueDeserializer();
     this.valDeserializer.open(this.valueIn);
   }
 
@@ -103,19 +98,17 @@ public class ValuesIterator<KEY,VALUE> {
   }
 
   /** The current key. */
-  public KEY getKey() { 
+  public BytesWritable getKey() {
     return key; 
   }
   
-  // TODO NEWTEZ Maybe add another method which returns an iterator instead of iterable
-  
-  public Iterable<VALUE> getValues() {
-    return new Iterable<VALUE>() {
+  public Iterable<BytesWritable> getValues() {
+    return new Iterable<BytesWritable>() {
 
       @Override
-      public Iterator<VALUE> iterator() {
+      public Iterator<BytesWritable> iterator() {
         
-        return new Iterator<VALUE>() {
+        return new Iterator<BytesWritable>() {
 
           private final int keyNumber = keyCtr;
           
@@ -125,7 +118,7 @@ public class ValuesIterator<KEY,VALUE> {
           }
 
           @Override
-          public VALUE next() {
+          public BytesWritable next() {
             if (!hasMoreValues) {
               throw new NoSuchElementException("iterate past last value");
             }
@@ -152,8 +145,6 @@ public class ValuesIterator<KEY,VALUE> {
       }
     };
   }
-  
-  
 
   /** Start processing next unique key. */
   private void nextKey() throws IOException {
@@ -163,7 +154,7 @@ public class ValuesIterator<KEY,VALUE> {
     }
 
     // move the next key to the current one
-    KEY tmpKey = key;
+    BytesWritable tmpKey = key;
     key = nextKey;
     nextKey = tmpKey;
     hasMoreValues = more;

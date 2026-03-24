@@ -23,7 +23,7 @@ import java.util.Iterator;
 import java.util.List;
 
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.io.serializer.Serialization;
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.sort.impl.TezSpillRecord;
@@ -33,22 +33,21 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.hadoop.io.serializer.SerializationFactory;
 import org.apache.hadoop.io.serializer.Serializer;
 import org.apache.tez.common.counters.TaskCounter;
 import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.OutputContext;
-import org.apache.tez.runtime.library.api.KeyValuesWriter;
+import org.apache.tez.runtime.library.api.KeyValuesWriterEdge;
 import org.apache.tez.runtime.library.api.Partitioner;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
-import org.apache.tez.runtime.library.common.ConfigUtils;
 import org.apache.tez.runtime.library.common.TezRuntimeUtils;
+import org.apache.tez.runtime.library.common.serializer.SerializationContext;
 import org.apache.tez.runtime.api.TezTaskOutput;
 import org.apache.tez.runtime.library.utils.CodecUtils;
 
 @SuppressWarnings("rawtypes")
-public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
+public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
 
   private static final Logger LOG = LoggerFactory.getLogger(BaseUnorderedPartitionedKVWriter.class);
   
@@ -61,13 +60,8 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
   protected final int numPartitions;
 
   protected final Partitioner partitioner;
-  protected final Class keyClass;
-  protected final Class valClass;
   protected final Serializer keySerializer;
   protected final Serializer valSerializer;
-  protected final SerializationFactory serializationFactory;
-  protected final Serialization keySerialization;
-  protected final Serialization valSerialization;
   protected final CompressionCodec codec;
 
   protected final String auxiliaryService;
@@ -140,13 +134,8 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
     this.numPartitions = numOutputs;
     
     // k/v serialization
-    keyClass = ConfigUtils.getIntermediateOutputKeyClass(this.conf);
-    valClass = ConfigUtils.getIntermediateOutputValueClass(this.conf);
-    serializationFactory = new SerializationFactory(this.conf);
-    keySerialization = serializationFactory.getSerialization(keyClass);
-    valSerialization = serializationFactory.getSerialization(valClass);
-    keySerializer = keySerialization.getSerializer(keyClass);
-    valSerializer = valSerialization.getSerializer(valClass);
+    keySerializer = SerializationContext.getKeySerializer();
+    valSerializer = SerializationContext.getValueSerializer();
     
     outputRecordsCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_RECORDS);
     outputLargeRecordsCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_LARGE_RECORDS);
@@ -199,12 +188,11 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriter {
   }
 
   @Override
-  public abstract void write(Object key, Object value) throws IOException;
+  public abstract void write(BytesWritable key, BytesWritable value) throws IOException;
 
   @Override
-  public void write(Object key, Iterable<Object> values) throws IOException {
-    // TODO: UnorderedPartitionedKVWriter should override this method later.
-    Iterator<Object> it = values.iterator();
+  public void write(BytesWritable key, Iterable<BytesWritable> values) throws IOException {
+    Iterator<BytesWritable> it = values.iterator();
     while (it.hasNext()) {
       write(key, it.next());
     }

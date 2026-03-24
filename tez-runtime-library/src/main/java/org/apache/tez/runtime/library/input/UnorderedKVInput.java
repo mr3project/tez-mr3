@@ -24,8 +24,10 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.common.TezUtilsInternal;
 import org.apache.tez.runtime.api.ProgressFailedException;
+import org.apache.tez.runtime.library.api.KeyValueReaderEdge;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
@@ -38,7 +40,6 @@ import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.runtime.api.AbstractLogicalInput;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.InputContext;
-import org.apache.tez.runtime.library.api.KeyValueReader;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.MemoryUpdateCallbackHandler;
 import org.apache.tez.runtime.library.common.readers.UnorderedKVReader;
@@ -159,10 +160,10 @@ public class UnorderedKVInput extends AbstractLogicalInput {
   }
 
   @Override
-  public synchronized KeyValueReader getReader() throws Exception {
+  public synchronized KeyValueReaderEdge getReader() throws Exception {
     Preconditions.checkState(isStarted.get(), "Must start input before invoking this method");
     if (getNumPhysicalInputs() == 0) {
-      return new KeyValueReader() {
+      return new KeyValueReaderEdge() {
         @Override
         public boolean next() throws IOException {
           hasCompletedProcessing();
@@ -171,12 +172,12 @@ public class UnorderedKVInput extends AbstractLogicalInput {
         }
 
         @Override
-        public Object getCurrentKey() throws IOException {
+        public BytesWritable getCurrentKey() throws IOException {
           throw new RuntimeException("No data available in Input");
         }
 
         @Override
-        public Object getCurrentValue() throws IOException {
+        public BytesWritable getCurrentValue() throws IOException {
           throw new RuntimeException("No data available in Input");
         }
       };

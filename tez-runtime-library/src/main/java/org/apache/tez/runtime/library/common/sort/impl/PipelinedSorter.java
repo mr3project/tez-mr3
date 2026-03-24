@@ -52,7 +52,7 @@ import org.apache.hadoop.util.IndexedSorter;
 import org.apache.tez.common.TezCommonUtils;
 import org.apache.tez.runtime.api.OutputContext;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
-import org.apache.tez.runtime.library.common.ConfigUtils;
+import org.apache.tez.runtime.library.common.serializer.SerializationContext;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Writer;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger.DiskSegment;
@@ -364,7 +364,7 @@ public class PipelinedSorter extends ExternalSorter {
       Preconditions.checkArgument(buffers.get(bufferIndex) != null, "block should not be empty");
       //TODO: fix per item being passed.
       span = new SortSpan((ByteBuffer)buffers.get(bufferIndex).clear(), (1024*1024),
-          perItem, ConfigUtils.getIntermediateOutputKeyComparator(this.conf));
+          perItem, SerializationContext.getKeyComparator());
     } else {
       // queue up the sort
       SortTask task = new SortTask(span, sorter);
@@ -405,14 +405,14 @@ public class PipelinedSorter extends ExternalSorter {
    * storage to store one METADATA.
    */
   synchronized void collect(Object key, Object value, final int partition) throws IOException {
-    if (key.getClass() != serializationContext.getKeyClass()) {
+    if (key.getClass() != SerializationContext.getKeyClass()) {
       throw new IOException("Type mismatch in key from map: expected "
-                            + serializationContext.getKeyClass().getName() + ", received "
+                            + SerializationContext.getKeyClass().getName() + ", received "
                             + key.getClass().getName());
     }
-    if (value.getClass() != serializationContext.getValueClass()) {
+    if (value.getClass() != SerializationContext.getValueClass()) {
       throw new IOException("Type mismatch in value from map: expected "
-                            + serializationContext.getValueClass().getName() + ", received "
+                            + SerializationContext.getValueClass().getName() + ", received "
                             + value.getClass().getName());
     }
     if (partition < 0 || partition >= partitions) {
@@ -510,9 +510,7 @@ public class PipelinedSorter extends ExternalSorter {
           long segmentStart = out.getPos();
           if (!sendEmptyPartitionDetails || (i == partition)) {
             writer = new Writer(
-                serializationContext.getKeySerialization(), serializationContext.getValSerialization(),
                 out,
-                serializationContext.getKeyClass(), serializationContext.getValueClass(),
                 codec, spilledRecordsCounter, null, false,
                 writeBuffer, null);
           }
@@ -627,9 +625,7 @@ public class PipelinedSorter extends ExternalSorter {
             compressorExternal = CodecUtils.getCompressor(codec);
           }
           writer = new Writer(
-              serializationContext.getKeySerialization(), serializationContext.getValSerialization(),
               fsOutput,
-              serializationContext.getKeyClass(), serializationContext.getValueClass(),
               codec, spilledRecordsCounter, null, merger.needsRLE(),
               writeBuffer, compressorExternal);
         }
@@ -870,9 +866,9 @@ public class PipelinedSorter extends ExternalSorter {
         boolean sortSegments = segmentList.size() > mergeFactor;
         //merge
         TezRawKeyValueIterator kvIter = TezMerger.merge(conf, localFs,
-            serializationContext, codec, segmentList, mergeFactor, 0,
+            codec, segmentList, mergeFactor, 0,
             new Path(uniqueIdentifier),
-            (RawComparator) ConfigUtils.getIntermediateOutputKeyComparator(conf),
+            (RawComparator) SerializationContext.getKeyComparator(),
             progressable, sortSegments, null, spilledRecordsCounter,
             additionalSpillBytesReadCounter, merger.needsRLE(), outputContext);
         //write merged output to disk
@@ -881,9 +877,7 @@ public class PipelinedSorter extends ExternalSorter {
         long partLength = 0;
         if (shouldWrite) {
           Writer writer = new Writer(
-              serializationContext.getKeySerialization(), serializationContext.getValSerialization(),
               finalOut,
-              serializationContext.getKeyClass(), serializationContext.getValueClass(),
               codec, spilledRecordsCounter, null, merger.needsRLE(),
               writeBuffer, null);
           TezMerger.writeFile(kvIter, writer, progressable,
@@ -1114,7 +1108,7 @@ public class PipelinedSorter extends ExternalSorter {
           items = 1024*1024;
           perItem = 16;
         }
-        final RawComparator newComparator = ConfigUtils.getIntermediateOutputKeyComparator(conf);
+        final RawComparator newComparator = SerializationContext.getKeyComparator();
         if (this.comparator == newComparator) {
           LOG.warn("Same comparator used. comparator={}, newComparator={},"
                   + " hashCode: comparator={}, newComparator={}",

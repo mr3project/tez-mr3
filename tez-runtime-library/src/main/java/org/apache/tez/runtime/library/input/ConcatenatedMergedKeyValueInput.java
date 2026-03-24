@@ -21,13 +21,14 @@ package org.apache.tez.runtime.library.input;
 import java.io.IOException;
 import java.util.List;
 
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.dag.api.GroupInputEdge;
 import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.runtime.api.Input;
 import org.apache.tez.runtime.api.MergedLogicalInput;
 import org.apache.tez.runtime.api.Reader;
 import org.apache.tez.runtime.api.MergedInputContext;
-import org.apache.tez.runtime.library.api.KeyValueReader;
+import org.apache.tez.runtime.library.api.KeyValueReaderEdge;
 
 /**
  * Implements a {@link MergedLogicalInput} that merges the incoming inputs
@@ -35,16 +36,15 @@ import org.apache.tez.runtime.library.api.KeyValueReader;
  * input. It concatenates all the inputs to provide a unified view
  */
 public class ConcatenatedMergedKeyValueInput extends MergedLogicalInput {
-  private ConcatenatedMergedKeyValueReader concatenatedMergedKeyValueReader;
 
   public ConcatenatedMergedKeyValueInput(MergedInputContext context,
                                          List<Input> inputs) {
     super(context, inputs);
   }
 
-  public class ConcatenatedMergedKeyValueReader extends KeyValueReader {
+  public class ConcatenatedMergedKeyValueReader extends KeyValueReaderEdge {
     private int currentReaderIndex = 0;
-    private KeyValueReader currentReader;
+    private KeyValueReaderEdge currentReader;
 
     @Override
     public boolean next() throws IOException {
@@ -56,11 +56,11 @@ public class ConcatenatedMergedKeyValueInput extends MergedLogicalInput {
         }
         try {
           Reader reader = getInputs().get(currentReaderIndex).getReader();
-          if (!(reader instanceof KeyValueReader)) {
-            throw new TezUncheckedException("Expected KeyValueReader. "
+          if (!(reader instanceof KeyValueReaderEdge)) {
+            throw new TezUncheckedException("Expected KeyValueReaderEdge. "
                 + "Got: " + reader.getClass().getName());
           }
-          currentReader = (KeyValueReader) reader;
+          currentReader = (KeyValueReaderEdge) reader;
           currentReaderIndex++;
         } catch (Exception e) {
           // An InterruptedException is not expected here since this works off of
@@ -76,12 +76,12 @@ public class ConcatenatedMergedKeyValueInput extends MergedLogicalInput {
     }
 
     @Override
-    public Object getCurrentKey() throws IOException {
+    public BytesWritable getCurrentKey() throws IOException {
       return currentReader.getCurrentKey();
     }
 
     @Override
-    public Object getCurrentValue() throws IOException {
+    public BytesWritable getCurrentValue() throws IOException {
       return currentReader.getCurrentValue();
     }
 
@@ -91,13 +91,12 @@ public class ConcatenatedMergedKeyValueInput extends MergedLogicalInput {
   }
 
   /**
-   * Provides a {@link KeyValueReader} that iterates over the 
+   * Provides a {@link KeyValueReaderEdge} that iterates over the
    * concatenated input data
    */
   @Override
-  public KeyValueReader getReader() throws Exception {
-    concatenatedMergedKeyValueReader = new ConcatenatedMergedKeyValueReader();
-    return concatenatedMergedKeyValueReader;
+  public KeyValueReaderEdge getReader() throws Exception {
+    return new ConcatenatedMergedKeyValueReader();
   }
 
   @Override

@@ -50,6 +50,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.compress.CodecPool;
@@ -248,13 +249,13 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       skipBuffers = true;
       byte[] writeBuffer = IFile.allocateWriteBuffer();
       if (this.useCachedStream) {   // i.e., if dataViaEventsEnabled == true
-        writer = new IFile.FileBackedInMemIFileWriter(keySerialization, valSerialization, rfs,
-            outputFileHandler, keyClass, valClass, codec, outputRecordsCounter,
+        writer = new IFile.FileBackedInMemIFileWriter(rfs,
+            outputFileHandler, codec, outputRecordsCounter,
             outputRecordBytesCounter, dataViaEventsMaxSize,
             writeBuffer);
       } else {
         finalOutPath = outputFileHandler.getOutputFileForWrite();
-        writer = new IFile.Writer(keySerialization, valSerialization, rfs, finalOutPath, keyClass, valClass,
+        writer = new IFile.Writer(rfs, finalOutPath,
             codec, outputRecordsCounter, outputRecordBytesCounter,
             writeBuffer);
         ensureSpillFilePermissions(finalOutPath, rfs, rfsSpillFilePerms);
@@ -369,7 +370,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   }
 
   @Override
-  public void write(Object key, Object value) throws IOException {
+  public void write(BytesWritable key, BytesWritable value) throws IOException {
     // Skipping checks for key-value types. IFile takes care of these, but should be removed from
     // there as well.
 
@@ -395,7 +396,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   }
 
   @SuppressWarnings("unchecked")
-  private void write(Object key, Object value, int partition) throws IOException {
+  private void write(BytesWritable key, BytesWritable value, int partition) throws IOException {
     // Wrap to 4 byte (Int) boundary for metaData
     int mod = currentBuffer.nextPosition % INT_SIZE;
     int metaSkip = mod == 0 ? 0 : (INT_SIZE - mod);
@@ -668,8 +669,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
                 }
                 // all Writer instances share the same FSDataOutputStream out
                 writer = new Writer(
-                    keySerialization, valSerialization, fsOutput,
-                    keyClass, valClass, codec, null, null, false,
+                    fsOutput, codec, null, null, false,
                     writeBuffer, compressorExternal);
               }
               numRecords += writePartition(buffer.partitionHeads[i], buffer, writer, key, val);
@@ -1168,8 +1168,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         }
         // inside close()
         writer = new Writer(
-            keySerialization, valSerialization, out, keyClass, valClass,
-            codec, null, null, false,
+            out, codec, null, null, false,
             writeBuffer, null);
         try {
           if (currentBuffer.nextPosition != 0
@@ -1295,8 +1294,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           spilledRecordsCounter.increment(1);
           Writer writer = null;
           try {
-            writer = new IFile.Writer(keySerialization, valSerialization, out, keyClass, valClass,
-                codec, null, null, false,
+            writer = new IFile.Writer(out, codec, null, null, false,
                 IFile.allocateWriteBufferSingle(), null);
             writer.append(key, value);
             outputLargeRecordsCounter.increment(1);

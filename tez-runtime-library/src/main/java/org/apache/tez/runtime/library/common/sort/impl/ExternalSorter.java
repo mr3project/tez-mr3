@@ -33,7 +33,6 @@ import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
@@ -52,7 +51,6 @@ import org.apache.tez.runtime.api.OutputContext;
 import org.apache.tez.runtime.library.api.Partitioner;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration.ReportPartitionStats;
-import org.apache.tez.runtime.library.common.ConfigUtils;
 import org.apache.tez.runtime.library.common.TezRuntimeUtils;
 import org.apache.tez.runtime.library.common.serializer.SerializationContext;
 import org.apache.tez.runtime.api.TezTaskOutput;
@@ -94,7 +92,6 @@ public abstract class ExternalSorter {
 
   protected final Partitioner partitioner;
 
-  protected final SerializationContext serializationContext;
   protected final Serializer keySerializer;
   protected final Serializer valSerializer;
 
@@ -179,22 +176,20 @@ public abstract class ExternalSorter {
     this.sorter = ReflectionUtils.newInstance(this.conf.getClass(
         TezRuntimeConfiguration.TEZ_RUNTIME_INTERNAL_SORTER_CLASS, QuickSort.class,
         IndexedSorter.class), this.conf);
-    this.comparator = ConfigUtils.getIntermediateOutputKeyComparator(this.conf);
+    this.comparator = SerializationContext.getKeyComparator();
 
     this.conf.setInt(TezRuntimeFrameworkConfigs.TEZ_RUNTIME_NUM_EXPECTED_PARTITIONS, this.partitions);
     this.partitioner = TezRuntimeUtils.instantiatePartitioner(this.conf);
 
     // k/v serialization
-    this.serializationContext = new SerializationContext(this.conf);
-    this.keySerializer = serializationContext.getKeySerializer();
-    this.valSerializer = serializationContext.getValueSerializer();
+    this.keySerializer = SerializationContext.getKeySerializer();
+    this.valSerializer = SerializationContext.getValueSerializer();
     LOG.info("{}, memoryMb={}", outputContext.getDestinationVertexName(), assignedMb);
     if (LOG.isDebugEnabled()) {
-      LOG.debug("keySerializerClass=" + serializationContext.getKeyClass()
-          + ", valueSerializerClass=" + valSerializer
-          + ", comparator=" + (RawComparator) ConfigUtils.getIntermediateOutputKeyComparator(conf)
+      LOG.debug("keySerializerClass=" + SerializationContext.getKeyClass()
+          + ", valueSerializerClass=" + SerializationContext.getValueClass()
+          + ", comparator=" + SerializationContext.getKeyComparator()
           + ", partitioner=" + conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_PARTITIONER_CLASS)
-          + ", serialization=" + conf.get(CommonConfigurationKeys.IO_SERIALIZATIONS_KEY)
           + ", reportPartitionStats=" + reportPartitionStats);
     }
 

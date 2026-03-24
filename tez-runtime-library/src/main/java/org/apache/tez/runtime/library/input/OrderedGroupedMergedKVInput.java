@@ -27,14 +27,14 @@ import java.util.List;
 import java.util.PriorityQueue;
 import java.util.Set;
 
-import org.apache.tez.runtime.api.ProgressFailedException;
+import org.apache.hadoop.io.BytesWritable;
+import org.apache.tez.runtime.library.api.KeyValuesReaderEdge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.io.RawComparator;
 import org.apache.tez.runtime.api.Input;
 import org.apache.tez.runtime.api.MergedLogicalInput;
 import org.apache.tez.runtime.api.MergedInputContext;
-import org.apache.tez.runtime.library.api.KeyValuesReader;
 
 /**
  * A {@link MergedLogicalInput} which merges multiple
@@ -55,10 +55,10 @@ public class OrderedGroupedMergedKVInput extends MergedLogicalInput {
   }
 
   /**
-   * Provides an ordered {@link KeyValuesReader}
+   * Provides an ordered {@link KeyValuesReaderEdge}
    */
   @Override
-  public KeyValuesReader getReader() throws Exception {
+  public KeyValuesReaderEdge getReader() throws Exception {
     return new OrderedGroupedMergedKeyValuesReader(getInputs(), getContext());
   }
 
@@ -72,25 +72,25 @@ public class OrderedGroupedMergedKVInput extends MergedLogicalInput {
     }
   }
 
-  private static class OrderedGroupedMergedKeyValuesReader extends KeyValuesReader {
-    private final PriorityQueue<KeyValuesReader> pQueue;
+  private static class OrderedGroupedMergedKeyValuesReader extends KeyValuesReaderEdge {
+    private final PriorityQueue<KeyValuesReaderEdge> pQueue;
     @SuppressWarnings("rawtypes")
     private final RawComparator keyComparator;
-    private final List<KeyValuesReader> finishedReaders;
+    private final List<KeyValuesReaderEdge> finishedReaders;
     private final ValuesIterable currentValues;
-    private KeyValuesReader nextKVReader;
-    private Object currentKey;
+    private KeyValuesReaderEdge nextKVReader;
+    private BytesWritable currentKey;
     private final MergedInputContext context;
 
     public OrderedGroupedMergedKeyValuesReader(List<Input> inputs, MergedInputContext context) 
         throws Exception {
       keyComparator = ((OrderedGroupedKVInput) inputs.get(0))
           .getInputKeyComparator();
-      pQueue = new PriorityQueue<KeyValuesReader>(inputs.size(),
+      pQueue = new PriorityQueue<KeyValuesReaderEdge>(inputs.size(),
           new KVReaderComparator(keyComparator));
-      finishedReaders = new ArrayList<KeyValuesReader>(inputs.size());
+      finishedReaders = new ArrayList<KeyValuesReaderEdge>(inputs.size());
       for (Input input : inputs) {
-        KeyValuesReader reader = (KeyValuesReader) input.getReader();
+        KeyValuesReaderEdge reader = (KeyValuesReaderEdge) input.getReader();
         if (reader.next()) {
           pQueue.add(reader);
         }
@@ -99,14 +99,14 @@ public class OrderedGroupedMergedKVInput extends MergedLogicalInput {
       this.context = context;
     }
 
-    private void advanceAndAddToQueue(KeyValuesReader kvsReadr)
+    private void advanceAndAddToQueue(KeyValuesReaderEdge kvsReadr)
         throws IOException {
       if (kvsReadr.next()) {
         pQueue.add(kvsReadr);
       }
     }
 
-    private void addToQueue(KeyValuesReader kvsReadr) throws IOException {
+    private void addToQueue(KeyValuesReaderEdge kvsReadr) throws IOException {
       if (kvsReadr != null) {
         pQueue.add(kvsReadr);
       }
@@ -117,7 +117,7 @@ public class OrderedGroupedMergedKVInput extends MergedLogicalInput {
       // Skip values of current key if not consumed by the user
       currentValues.discardCurrent();
 
-      for (KeyValuesReader reader : finishedReaders) {
+      for (KeyValuesReaderEdge reader : finishedReaders) {
         // add them back to queue
         advanceAndAddToQueue(reader);
       }
@@ -136,20 +136,20 @@ public class OrderedGroupedMergedKVInput extends MergedLogicalInput {
     }
 
     @Override
-    public Object getCurrentKey() throws IOException {
+    public BytesWritable getCurrentKey() throws IOException {
       return currentKey;
     }
 
     @Override
-    public Iterable<Object> getCurrentValues() throws IOException {
+    public Iterable<BytesWritable> getCurrentValues() throws IOException {
       return currentValues;
     }
 
-    private class ValuesIterable implements Iterable<Object> {
+    private class ValuesIterable implements Iterable<BytesWritable> {
       private ValuesIterator iterator = new ValuesIterator();
 
       @Override
-      public Iterator<Object> iterator() {
+      public Iterator<BytesWritable> iterator() {
         return iterator;
       }
 
@@ -164,9 +164,9 @@ public class OrderedGroupedMergedKVInput extends MergedLogicalInput {
     }
 
     @SuppressWarnings("unchecked")
-    private class ValuesIterator implements Iterator<Object> {
+    private class ValuesIterator implements Iterator<BytesWritable> {
 
-      private Iterator<Object> currentValuesIter;
+      private Iterator<BytesWritable> currentValuesIter;
 
       public void moveToNext() throws IOException {
         currentValuesIter = nextKVReader.getCurrentValues().iterator();
@@ -213,7 +213,7 @@ public class OrderedGroupedMergedKVInput extends MergedLogicalInput {
       }
 
       @Override
-      public Object next() {
+      public BytesWritable next() {
         return currentValuesIter.next();
       }
 
@@ -225,20 +225,19 @@ public class OrderedGroupedMergedKVInput extends MergedLogicalInput {
     }
 
     /**
-     * Comparator that compares KeyValuesReader on their current key
+     * Comparator that compares KeyValuesReaderEdge on their current key
      */
     @SuppressWarnings({ "rawtypes", "unchecked" })
-    private static class KVReaderComparator implements
-        Comparator<KeyValuesReader> {
+    private static class KVReaderComparator implements Comparator<KeyValuesReaderEdge> {
 
-      private RawComparator keyComparator;
+      private final RawComparator keyComparator;
 
       public KVReaderComparator(RawComparator keyComparator) {
         this.keyComparator = keyComparator;
       }
 
       @Override
-      public int compare(KeyValuesReader o1, KeyValuesReader o2) {
+      public int compare(KeyValuesReaderEdge o1, KeyValuesReaderEdge o2) {
         try {
           return keyComparator.compare(o1.getCurrentKey(), o2.getCurrentKey());
         } catch (IOException e) {

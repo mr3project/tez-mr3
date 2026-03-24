@@ -22,8 +22,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.common.ProgressHelper;
 import org.apache.tez.runtime.api.ProgressFailedException;
+import org.apache.tez.runtime.library.api.KeyValueWriterEdge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -122,7 +124,12 @@ public class MapProcessor extends MRTask {
     if ((out instanceof MROutputLegacy)) {
       kvWriter = ((MROutputLegacy)out).getWriter();
     } else if ((out instanceof OrderedPartitionedKVOutput)){
-      kvWriter = ((OrderedPartitionedKVOutput)out).getWriter();
+      KeyValueWriterEdge kvWriterEdge = ((OrderedPartitionedKVOutput)out).getWriter();
+      kvWriter = new KeyValueWriter() {
+        public void write(Object key, Object value) throws IOException {
+          kvWriterEdge.write((BytesWritable)key, (BytesWritable)value);
+        }
+      };
     } else {
       throw new IOException("Illegal output to map, outputClass=" + out.getClass());
     }

@@ -27,8 +27,10 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.api.ProgressFailedException;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
+import org.apache.tez.runtime.library.api.KeyValuesReaderEdge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -40,9 +42,8 @@ import org.apache.tez.dag.api.TezException;
 import org.apache.tez.runtime.api.AbstractLogicalInput;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.InputContext;
-import org.apache.tez.runtime.library.api.KeyValuesReader;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
-import org.apache.tez.runtime.library.common.ConfigUtils;
+import org.apache.tez.runtime.library.common.serializer.SerializationContext;
 import org.apache.tez.runtime.library.common.MemoryUpdateCallbackHandler;
 import org.apache.tez.runtime.library.common.ValuesIterator;
 import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.Shuffle;
@@ -209,13 +210,13 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput {
    * @throws {@link IOInterruptedException} if IO was performing a blocking operation and was interrupted
    */
   @Override
-  public KeyValuesReader getReader() throws IOException, TezException {
+  public KeyValuesReaderEdge getReader() throws IOException, TezException {
     // Cannot synchronize entire method since this is called form user code and can block.
     TezRawKeyValueIterator rawIterLocal;
     synchronized (this) {
       rawIterLocal = rawIter;
       if (getNumPhysicalInputs() == 0) {
-        return new KeyValuesReader() {
+        return new KeyValuesReaderEdge() {
           @Override
           public boolean next() throws IOException {
             hasCompletedProcessing();
@@ -224,12 +225,12 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput {
           }
 
           @Override
-          public Object getCurrentKey() throws IOException {
+          public BytesWritable getCurrentKey() throws IOException {
             throw new RuntimeException("No data available in Input");
           }
 
           @Override
-          public Iterable<Object> getCurrentValues() throws IOException {
+          public Iterable<BytesWritable> getCurrentValues() throws IOException {
             throw new RuntimeException("No data available in Input");
           }
         };
@@ -284,24 +285,23 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput {
   protected synchronized void createValuesIterator()
       throws IOException {
     // Not used by ReduceProcessor
-    RawComparator rawComparator = ConfigUtils.getIntermediateInputKeyComparator(conf);
-    Class<?> keyClass = ConfigUtils.getIntermediateInputKeyClass(conf);
-    Class<?> valClass = ConfigUtils.getIntermediateInputValueClass(conf);
+    RawComparator rawComparator = SerializationContext.getKeyComparator();
+    Class<?> keyClass = SerializationContext.getKeyClass();
+    Class<?> valClass = SerializationContext.getValueClass();
     LOG.info("{}: creating ValuesIterator with comparator={}, keyClass={}, valClass={}",
         getContext().getSourceVertexName(), rawComparator.getClass().getName(),
         keyClass.getName(), valClass.getName());
 
-    vIter = new ValuesIterator(rawIter, rawComparator, keyClass, valClass,
-        conf, inputKeyCounter, inputValueCounter);
+    vIter = new ValuesIterator(rawIter, rawComparator, inputKeyCounter, inputValueCounter);
   }
 
   @SuppressWarnings("rawtypes")
   public RawComparator getInputKeyComparator() {
-    return (RawComparator) ConfigUtils.getIntermediateInputKeyComparator(conf);
+    return (RawComparator) SerializationContext.getKeyComparator();
   }
 
   @SuppressWarnings("rawtypes")
-  private static class OrderedGroupedKeyValuesReader extends KeyValuesReader {
+  private static class OrderedGroupedKeyValuesReader extends KeyValuesReaderEdge {
 
     private final ValuesIterator valuesIter;
 
@@ -315,17 +315,16 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput {
     }
 
     @Override
-    public Object getCurrentKey() throws IOException {
+    public BytesWritable getCurrentKey() throws IOException {
       return valuesIter.getKey();
     }
 
     @Override
     @SuppressWarnings("unchecked")
-    public Iterable<Object> getCurrentValues() throws IOException {
+    public Iterable<BytesWritable> getCurrentValues() throws IOException {
       return valuesIter.getValues();
     }
   };
-
 
   private static final Set<String> confKeys = new HashSet<String>();
 

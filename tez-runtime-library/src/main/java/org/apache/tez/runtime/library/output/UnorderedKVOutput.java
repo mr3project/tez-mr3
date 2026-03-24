@@ -36,7 +36,7 @@ import org.apache.tez.runtime.api.AbstractLogicalOutput;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.LogicalOutput;
 import org.apache.tez.runtime.api.OutputContext;
-import org.apache.tez.runtime.library.api.KeyValuesWriter;
+import org.apache.tez.runtime.library.api.KeyValuesWriterEdge;
 import org.apache.tez.runtime.library.api.Partitioner;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.MemoryUpdateCallbackHandler;
@@ -99,8 +99,7 @@ public class UnorderedKVOutput extends AbstractLogicalOutput {
   }
 
   @Override
-  public synchronized KeyValuesWriter getWriter() throws Exception {
-    // Eventually, disallow multiple invocations.
+  public synchronized KeyValuesWriterEdge getWriter() throws Exception {
     return kvWriter;
   }
 

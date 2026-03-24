@@ -23,7 +23,10 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.common.ProgressHelper;
+import org.apache.tez.runtime.library.api.KeyValueWriterEdge;
+import org.apache.tez.runtime.library.api.KeyValuesReaderEdge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.io.RawComparator;
@@ -126,13 +129,33 @@ public class ReduceProcessor extends MRTask {
       throw new IOException("Illegal input to reduce: " + in.getClass());
     }
     OrderedGroupedInputLegacy shuffleInput = (OrderedGroupedInputLegacy)in;
-    KeyValuesReader kvReader = shuffleInput.getReader();
+    KeyValuesReaderEdge kvReaderEdge = shuffleInput.getReader();
+    KeyValuesReader kvReader = new KeyValuesReader() {
+      @Override
+      public boolean next() throws IOException {
+        return kvReaderEdge.next();
+      }
+      @Override
+      public Object getCurrentKey() throws IOException {
+        return kvReaderEdge.getCurrentKey();
+      }
+      @Override
+      @SuppressWarnings("unchecked")
+      public Iterable<Object> getCurrentValues() throws IOException {
+        return (Iterable<Object>) (Iterable<?>) kvReaderEdge.getCurrentValues();
+      }
+    };
 
     KeyValueWriter kvWriter = null;
     if((out instanceof MROutputLegacy)) {
       kvWriter = ((MROutputLegacy) out).getWriter();
     } else if ((out instanceof OrderedPartitionedKVOutput)) {
-      kvWriter = ((OrderedPartitionedKVOutput) out).getWriter();
+      KeyValueWriterEdge kvWriterEdge = ((OrderedPartitionedKVOutput)out).getWriter();
+      kvWriter = new KeyValueWriter() {
+        public void write(Object key, Object value) throws IOException {
+          kvWriterEdge.write((BytesWritable)key, (BytesWritable)value);
+        }
+      };
     } else {
       throw new IOException("Illegal output to reduce: " + in.getClass());
     }

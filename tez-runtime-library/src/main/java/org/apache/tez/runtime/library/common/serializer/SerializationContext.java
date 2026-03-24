@@ -17,66 +17,44 @@
  */
 package org.apache.tez.runtime.library.common.serializer;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.io.serializer.Serialization;
-import org.apache.hadoop.io.serializer.SerializationFactory;
-import org.apache.hadoop.io.serializer.Serializer;
-import org.apache.tez.runtime.library.common.ConfigUtils;
+import org.apache.hadoop.io.BytesWritable;
+import org.apache.tez.runtime.library.common.comparator.TezBytesComparator;
+import org.apache.tez.runtime.library.common.serializer.TezBytesWritableSerialization.TezBytesWritableDeserializer;
+import org.apache.tez.runtime.library.common.serializer.TezBytesWritableSerialization.TezBytesWritableSerializer;
 
 /**
- * SerializationContext is a wrapper class for serialization related fields.
+ * Specialized serialization context for key = HiveKey (extending BytesWritable) / value = BytesWritable payloads.
  */
-public class SerializationContext {
+public final class SerializationContext {
 
-  private Class<?> keyClass;
-  private Class<?> valueClass;
-  private Serialization<?> keySerialization;
-  private Serialization<?> valSerialization;
-
-  public SerializationContext(Configuration conf) {
-    this.keyClass = ConfigUtils.getIntermediateInputKeyClass(conf);
-    this.valueClass = ConfigUtils.getIntermediateInputValueClass(conf);
-    SerializationFactory serializationFactory = new SerializationFactory(conf);
-    if (keyClass != null) {
-      this.keySerialization = serializationFactory.getSerialization(keyClass);
-    }
-    if (valueClass != null) {
-      this.valSerialization = serializationFactory.getSerialization(valueClass);
-    }
+  private SerializationContext() {
   }
 
-  public SerializationContext(Class<?> keyClass, Class<?> valueClass,
-      Serialization<?> keySerialization, Serialization<?> valSerialization) {
-    this.keyClass = keyClass;
-    this.valueClass = valueClass;
-    this.keySerialization = keySerialization;
-    this.valSerialization = valSerialization;
+  public static Class<BytesWritable> getKeyClass() {
+    return BytesWritable.class;
   }
 
-  public Class<?> getKeyClass() {
-    return keyClass;
+  public static Class<BytesWritable> getValueClass() {
+    return BytesWritable.class;
   }
 
-  public Class<?> getValueClass() {
-    return valueClass;
+  public static TezBytesWritableSerializer getKeySerializer() {
+    return new TezBytesWritableSerializer();
   }
 
-  public Serialization<?> getKeySerialization() {
-    return keySerialization;
+  public static TezBytesWritableDeserializer getKeyDeserializer() {
+    return new TezBytesWritableDeserializer();
   }
 
-  public Serialization<?> getValSerialization() {
-    return valSerialization;
+  public static TezBytesWritableSerializer getValueSerializer() {
+    return new TezBytesWritableSerializer();
   }
 
-  @SuppressWarnings({ "rawtypes", "unchecked" })
-  public Serializer<?> getKeySerializer() {
-    return keySerialization.getSerializer((Class) keyClass);
+  public static TezBytesWritableDeserializer getValueDeserializer() {
+    return new TezBytesWritableDeserializer();
   }
 
-  @SuppressWarnings({ "rawtypes", "unchecked" })
-  public Serializer<?> getValueSerializer() {
-    return valSerialization.getSerializer((Class) valueClass);
+  public static TezBytesComparator getKeyComparator() {
+    return new TezBytesComparator();
   }
-
 }

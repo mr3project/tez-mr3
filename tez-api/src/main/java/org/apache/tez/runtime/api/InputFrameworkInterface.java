@@ -62,8 +62,6 @@ public interface InputFrameworkInterface {
    */
   public void handleEvents(List<Event> inputEvents) throws Exception;
 
-
-
   /**
    * Closes the <code>Input</code>
    *
