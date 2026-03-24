@@ -23,6 +23,7 @@ import java.util.StringTokenizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
@@ -42,7 +43,8 @@ import org.apache.tez.mapreduce.processor.SimpleMRProcessor;
 import org.apache.tez.runtime.api.ProcessorContext;
 import org.apache.tez.runtime.library.api.KeyValueReader;
 import org.apache.tez.runtime.library.api.KeyValueWriter;
-import org.apache.tez.runtime.library.api.KeyValuesReader;
+import org.apache.tez.runtime.library.api.KeyValueWriterEdge;
+import org.apache.tez.runtime.library.api.KeyValuesReaderEdge;
 import org.apache.tez.runtime.library.conf.OrderedPartitionedKVEdgeConfig;
 import org.apache.tez.runtime.library.partitioner.HashPartitioner;
 import org.apache.tez.runtime.library.processor.SimpleProcessor;
@@ -71,9 +73,6 @@ public class WordCount extends TezExampleBase {
    * since it does not need to handle any advanced constructs for Processors.
    */
   public static class TokenProcessor extends SimpleProcessor {
-    IntWritable one = new IntWritable(1);
-    Text word = new Text();
-
     public TokenProcessor(ProcessorContext context) {
       super(context);
     }
@@ -88,13 +87,14 @@ public class WordCount extends TezExampleBase {
       // the reader and writer.
       // The inputs/outputs are referenced via the names assigned in the DAG.
       KeyValueReader kvReader = (KeyValueReader) getInputs().get(INPUT).getReader();
-      KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().get(SUMMATION).getWriter();
+      KeyValueWriterEdge kvWriter = (KeyValueWriterEdge) getOutputs().get(SUMMATION).getWriter();
       while (kvReader.next()) {
         StringTokenizer itr = new StringTokenizer(kvReader.getCurrentValue().toString());
         while (itr.hasMoreTokens()) {
-          word.set(itr.nextToken());
           // Count 1 every time a word is observed. Word is the key a 1 is the value
-          kvWriter.write(word, one);
+          kvWriter.write(
+              ExampleEdgeSerde.encodeString(itr.nextToken()),
+              ExampleEdgeSerde.encodeInt(1));
         }
       }
     }
@@ -123,14 +123,14 @@ public class WordCount extends TezExampleBase {
       // The KeyValues reader provides all values for a given key. The aggregation of values per key
       // is done by the LogicalInput. Since the key is the word and the values are its counts in 
       // the different TokenProcessors, summing all values per key provides the sum for that word.
-      KeyValuesReader kvReader = (KeyValuesReader) getInputs().get(TOKENIZER).getReader();
+      KeyValuesReaderEdge kvReader = (KeyValuesReaderEdge) getInputs().get(TOKENIZER).getReader();
       while (kvReader.next()) {
-        Text word = (Text) kvReader.getCurrentKey();
+        BytesWritable word = kvReader.getCurrentKey();
         int sum = 0;
-        for (Object value : kvReader.getCurrentValues()) {
-          sum += ((IntWritable) value).get();
+        for (BytesWritable value : kvReader.getCurrentValues()) {
+          sum += ExampleEdgeSerde.decodeInt(value);
         }
-        kvWriter.write(word, new IntWritable(sum));
+        kvWriter.write(new Text(ExampleEdgeSerde.decodeString(word)), new IntWritable(sum));
       }
       // deriving from SimpleMRProcessor takes care of committing the output
       // It automatically invokes the commit logic for the OutputFormat if necessary.
@@ -164,13 +164,14 @@ public class WordCount extends TezExampleBase {
     // we can use an edge that contains an input/output pair that handles partitioning and grouping 
     // of key value data. We use the helper OrderedPartitionedKVEdgeConfig to create such an
     // edge. Internally, it sets up matching Tez inputs and outputs that can perform this logic.
-    // We specify the key, value and partitioner type. Here the key type is Text (for word), the 
-    // value type is IntWritable (for count) and we using a hash based partitioner. This is a helper
+    // We specify the key, value and partitioner type. Intermediate edge payloads are encoded as
+    // BytesWritable (word + count bytes) and partitioned with a hash based partitioner. This is
+    // a helper
     // object. The edge can be configured by configuring the input, output etc individually without
     // using this helper. The setFromConfiguration call is optional and allows overriding the config
     // options with command line parameters.
     OrderedPartitionedKVEdgeConfig edgeConf = OrderedPartitionedKVEdgeConfig
-        .newBuilder(Text.class.getName(), IntWritable.class.getName(),
+        .newBuilder(BytesWritable.class.getName(), BytesWritable.class.getName(),
             HashPartitioner.class.getName())
         .setFromConfiguration(tezConf)
         .build();

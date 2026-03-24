@@ -19,7 +19,7 @@ package org.apache.tez.examples;
 
 import org.apache.tez.common.Preconditions;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
@@ -40,6 +40,8 @@ import org.apache.tez.mapreduce.processor.SimpleMRProcessor;
 import org.apache.tez.runtime.api.ProcessorContext;
 import org.apache.tez.runtime.library.api.KeyValueReader;
 import org.apache.tez.runtime.library.api.KeyValueWriter;
+import org.apache.tez.runtime.library.api.KeyValueReaderEdge;
+import org.apache.tez.runtime.library.api.KeyValueWriterEdge;
 import org.apache.tez.runtime.library.api.Partitioner;
 import org.apache.tez.runtime.library.cartesianproduct.CartesianProductConfig;
 import org.apache.tez.runtime.library.cartesianproduct.CartesianProductEdgeManager;
@@ -97,11 +99,13 @@ public class CartesianProduct extends TezExampleBase {
       Preconditions.checkArgument(getInputs().size() == 1);
       Preconditions.checkArgument(getOutputs().size() == 1);
       KeyValueReader kvReader = (KeyValueReader) getInputs().get(INPUT).getReader();
-      KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().get(VERTEX4).getWriter();
+      KeyValueWriterEdge kvWriter = (KeyValueWriterEdge) getOutputs().get(VERTEX4).getWriter();
       while (kvReader.next()) {
         StringTokenizer itr = new StringTokenizer(kvReader.getCurrentValue().toString());
         while (itr.hasMoreTokens()) {
-          kvWriter.write(new Text(itr.nextToken()), new IntWritable(1));
+          kvWriter.write(
+              ExampleEdgeSerde.encodeString(itr.nextToken()),
+              ExampleEdgeSerde.encodeInt(1));
         }
       }
     }
@@ -115,24 +119,24 @@ public class CartesianProduct extends TezExampleBase {
     @Override
     public void run() throws Exception {
       KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().get(OUTPUT).getWriter();
-      KeyValueReader kvReader1 = (KeyValueReader) getInputs().get(VERTEX1).getReader();
-      KeyValueReader kvReader2 = (KeyValueReader) getInputs().get(VERTEX2).getReader();
-      KeyValueReader kvReader3 = (KeyValueReader) getInputs().get(VERTEX3).getReader();
+      KeyValueReaderEdge kvReader1 = (KeyValueReaderEdge) getInputs().get(VERTEX1).getReader();
+      KeyValueReaderEdge kvReader2 = (KeyValueReaderEdge) getInputs().get(VERTEX2).getReader();
+      KeyValueReaderEdge kvReader3 = (KeyValueReaderEdge) getInputs().get(VERTEX3).getReader();
       Set<String> v2TokenSet = new HashSet<>();
       Set<String> v3TokenSet = new HashSet<>();
 
       while (kvReader2.next()) {
-        v2TokenSet.add(kvReader2.getCurrentKey().toString());
+        v2TokenSet.add(ExampleEdgeSerde.decodeString(kvReader2.getCurrentKey()));
       }
       while (kvReader3.next()) {
-        v3TokenSet.add(kvReader3.getCurrentKey().toString());
+        v3TokenSet.add(ExampleEdgeSerde.decodeString(kvReader3.getCurrentKey()));
       }
 
       while (kvReader1.next()) {
-        String left = kvReader1.getCurrentKey().toString();
+        String left = ExampleEdgeSerde.decodeString(kvReader1.getCurrentKey());
         if (v3TokenSet.contains(left)) {
           for (String right : v2TokenSet) {
-            kvWriter.write(left, right);
+            kvWriter.write(new Text(left), new Text(right));
           }
         }
       }
@@ -187,18 +191,18 @@ public class CartesianProduct extends TezExampleBase {
     EdgeProperty cpEdgeProperty;
     if (isPartitioned) {
       UnorderedPartitionedKVEdgeConfig cpEdgeConf =
-        UnorderedPartitionedKVEdgeConfig.newBuilder(Text.class.getName(),
-          IntWritable.class.getName(), CustomPartitioner.class.getName()).build();
+        UnorderedPartitionedKVEdgeConfig.newBuilder(BytesWritable.class.getName(),
+          BytesWritable.class.getName(), CustomPartitioner.class.getName()).build();
       cpEdgeProperty = cpEdgeConf.createDefaultCustomEdgeProperty(cpEdgeManager);
     } else {
       UnorderedKVEdgeConfig edgeConf =
-        UnorderedKVEdgeConfig.newBuilder(Text.class.getName(), IntWritable.class.getName()).build();
+        UnorderedKVEdgeConfig.newBuilder(BytesWritable.class.getName(), BytesWritable.class.getName()).build();
       cpEdgeProperty = edgeConf.createDefaultCustomEdgeProperty(cpEdgeManager);
     }
 
     EdgeProperty broadcastEdgeProperty;
     UnorderedKVEdgeConfig broadcastEdgeConf =
-      UnorderedKVEdgeConfig.newBuilder(Text.class.getName(), IntWritable.class.getName()).build();
+      UnorderedKVEdgeConfig.newBuilder(BytesWritable.class.getName(), BytesWritable.class.getName()).build();
     broadcastEdgeProperty = broadcastEdgeConf.createDefaultBroadcastEdgeProperty();
 
     return DAG.create("CartesianProduct")
@@ -233,4 +237,3 @@ public class CartesianProduct extends TezExampleBase {
     System.exit(res);
   }
 }
-
