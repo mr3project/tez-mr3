@@ -8,7 +8,7 @@ package com.datamonad.mr3
 import com.google.protobuf.ByteString
 import org.apache.hadoop.examples.terasort.{TeraGen, TeraInputFormat, TeraOutputFormat, TeraSortConfigKeys}
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.hadoop.io.{IntWritable, LongWritable, NullWritable, Text}
+import org.apache.hadoop.io.{BytesWritable, IntWritable, LongWritable, NullWritable, Text}
 import org.apache.hadoop.mapred.JobConf
 import org.apache.hadoop.mapreduce.lib.input.{FileInputFormat, TextInputFormat}
 import org.apache.hadoop.mapreduce.lib.output.{FileOutputFormat, TextOutputFormat}
@@ -391,7 +391,7 @@ trait TezDAGSuite
     val entityDescriptorMapMergedInputEdge = mutable.Map.empty[String, (String, Option[UserPayloadProto])]
 
     val edgePayload = getEdgePayload(
-      mr3Conf, classOf[Text].getName, classOf[IntWritable].getName)
+      mr3Conf, classOf[BytesWritable].getName, classOf[BytesWritable].getName)
     (0 until numMapVerticesInGroup).foreach{ idx =>
       SetupEntityDescriptorMap.baseVertex(entityDescriptorMapVertex, mr3Conf, hPos = idx)
       SetupEntityDescriptorMap.baseEdge(entityDescriptorMapEdge, mr3Conf,
@@ -592,7 +592,7 @@ trait TezDAGSuite
     val entityDescriptorMapMergedInputEdge = mutable.Map.empty[String, (String, Option[UserPayloadProto])]
 
     val tokenToSumEdgePayload = getEdgePayload(
-        mr3Conf, classOf[Text].getName, classOf[IntWritable].getName)
+        mr3Conf, classOf[BytesWritable].getName, classOf[BytesWritable].getName)
     inputs.zipWithIndex.foreach{ case (input, idx) =>
       setupEntityDescriptorMapForTokenVertex(
           entityDescriptorMapVertex,
@@ -660,7 +660,7 @@ trait TezDAGSuite
       entityDescriptorMapVertex: mutable.Map[String, (String, Option[UserPayloadProto])],
       mr3Conf: MR3Conf, processorClassName: String): Unit = {
     val tokenToSumEdgePayload = getEdgePayload(
-        mr3Conf, classOf[Text].getName, classOf[IntWritable].getName)
+        mr3Conf, classOf[BytesWritable].getName, classOf[BytesWritable].getName)
     SetupEntityDescriptorMap.baseEdge(
         entityDescriptorMapEdge, mr3Conf,
         srcVertexLogicalOutputClassName = classOf[OrderedPartitionedKVOutput].getName,
@@ -680,7 +680,7 @@ trait TezDAGSuite
       entityDescriptorMapVertex: mutable.Map[String, (String, Option[UserPayloadProto])],
       mr3Conf: MR3Conf): Unit = {
     val sumToSorterEdgePayload = getEdgePayload(
-        mr3Conf, classOf[IntWritable].getName, classOf[Text].getName)
+        mr3Conf, classOf[BytesWritable].getName, classOf[BytesWritable].getName)
     SetupEntityDescriptorMap.baseEdge(
         entityDescriptorMapEdge, mr3Conf,
         srcVertexLogicalOutputClassName = classOf[OrderedPartitionedKVOutput].getName,
@@ -791,7 +791,7 @@ trait TezDAGSuite
         logicalInputRootPayload = Some(streamInputPayload),
         inputInitializerClassName = classOf[MRInputAMSplitGenerator].getName)
     val streamEdgePayload = getEdgePayload(
-        mr3Conf, classOf[Text].getName, classOf[NullWritable].getName)
+        mr3Conf, classOf[BytesWritable].getName, classOf[BytesWritable].getName)
     SetupEntityDescriptorMap.baseEdge(
         entityDescriptorMapEdge, mr3Conf,
         srcVertexLogicalOutputClassName = classOf[UnorderedPartitionedKVOutput].getName,
@@ -810,7 +810,7 @@ trait TezDAGSuite
         logicalInputRootPayload = Some(hashInputPayload),
         inputInitializerClassName = classOf[MRInputAMSplitGenerator].getName, hPos = 1)
     val hashEdgePayload = getEdgePayload(
-        mr3Conf, classOf[Text].getName, classOf[NullWritable].getName)
+        mr3Conf, classOf[BytesWritable].getName, classOf[BytesWritable].getName)
     val srcVertexLogicalOutputClassName =
       if (doBroadcast) classOf[UnorderedKVOutput].getName
       else classOf[UnorderedPartitionedKVOutput].getName
@@ -863,7 +863,7 @@ trait TezDAGSuite
         logicalInputRootPayload = Some(streamInputPayload),
         inputInitializerClassName = classOf[MRInputAMSplitGenerator].getName)
     val streamEdgePayload = getEdgePayload(
-        mr3Conf, classOf[Text].getName, classOf[NullWritable].getName)
+        mr3Conf, classOf[BytesWritable].getName, classOf[BytesWritable].getName)
     SetupEntityDescriptorMap.baseEdge(
         entityDescriptorMapEdge, mr3Conf,
         srcVertexLogicalOutputClassName = classOf[OrderedPartitionedKVOutput].getName,
@@ -882,7 +882,7 @@ trait TezDAGSuite
         logicalInputRootPayload = Some(hashInputPayload),
         inputInitializerClassName = classOf[MRInputAMSplitGenerator].getName, hPos = 1)
     val hashEdgePayload = getEdgePayload(
-        mr3Conf, classOf[Text].getName, classOf[NullWritable].getName)
+        mr3Conf, classOf[BytesWritable].getName, classOf[BytesWritable].getName)
     SetupEntityDescriptorMap.baseEdge(
         entityDescriptorMapEdge, mr3Conf,
         srcVertexLogicalOutputClassName = classOf[OrderedPartitionedKVOutput].getName,
@@ -931,7 +931,7 @@ trait TezDAGSuite
         logicalInputRootPayload = Some(streamInputPayload),
         inputInitializerClassName = classOf[MRInputAMSplitGenerator].getName)
     val streamEdgePayload = getEdgePayload(
-        mr3Conf, classOf[Text].getName, classOf[NullWritable].getName)
+        mr3Conf, classOf[BytesWritable].getName, classOf[BytesWritable].getName)
     SetupEntityDescriptorMap.baseEdge(
         entityDescriptorMapEdge, mr3Conf,
         srcVertexLogicalOutputClassName = classOf[OrderedPartitionedKVOutput].getName,
@@ -950,7 +950,7 @@ trait TezDAGSuite
         logicalInputRootPayload = Some(hashInputPayload),
         inputInitializerClassName = classOf[MRInputAMSplitGenerator].getName, hPos = 1)
     val hashEdgePayload = getEdgePayload(
-        mr3Conf, classOf[Text].getName, classOf[NullWritable].getName)
+        mr3Conf, classOf[BytesWritable].getName, classOf[BytesWritable].getName)
     SetupEntityDescriptorMap.baseEdge(
         entityDescriptorMapEdge, mr3Conf,
         srcVertexLogicalOutputClassName = classOf[OrderedPartitionedKVOutput].getName,
@@ -1016,7 +1016,7 @@ trait TezDAGSuite
         outputCommitterClassName = classOf[MROutputCommitter].getName)
 
     val edgePayload = getEdgePayload(
-        mr3Conf, classOf[Text].getName, classOf[Text].getName, classOf[MRPartitioner].getName)
+        mr3Conf, classOf[BytesWritable].getName, classOf[BytesWritable].getName, classOf[MRPartitioner].getName)
     SetupEntityDescriptorMap.baseEdge(
         entityDescriptorMapEdge, mr3Conf,
         srcVertexLogicalOutputClassName = classOf[OrderedPartitionedKVOutput].getName,
@@ -1444,7 +1444,7 @@ trait TezDAGSuite
         outputCommitterClassName = classOf[MROutputCommitter].getName)
 
     val tokenToSumEdgePayload = getEdgePayload(
-        mr3Conf, classOf[Text].getName, classOf[IntWritable].getName)
+        mr3Conf, classOf[BytesWritable].getName, classOf[BytesWritable].getName)
     SetupEntityDescriptorMap.baseEdge(
         entityDescriptorMapEdge, mr3Conf,
         srcVertexLogicalOutputClassName = classOf[OrderedPartitionedKVOutput].getName,
