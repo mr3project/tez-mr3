@@ -138,7 +138,7 @@ public class OrderedWordCount extends TezExampleBase {
         TokenProcessor.class.getName()));
     tokenizerVertex.addDataSource(INPUT, dataSource);
 
-    // Use Text key and IntWritable value to bring counts for each word in the same partition
+    // Use BytesWritable key/value payloads to bring counts for each word in the same partition.
     // The setFromConfiguration call is optional and allows overriding the config options with
     // command line parameters.
     OrderedPartitionedKVEdgeConfig summationEdgeConf = OrderedPartitionedKVEdgeConfig
@@ -152,8 +152,8 @@ public class OrderedWordCount extends TezExampleBase {
     Vertex summationVertex = Vertex.create(SUMMATION, ProcessorDescriptor.create(
         SumProcessor.class.getName()), numPartitions);
     
-    // Use IntWritable key and Text value to bring all words with the same count in the same 
-    // partition. The data will be ordered by count and words grouped by count. The
+    // Use BytesWritable key/value payloads for the second edge. The data will be ordered by the
+    // encoded count key and words grouped by that key. The
     // setFromConfiguration call is optional and allows overriding the config options with
     // command line parameters.
     OrderedPartitionedKVEdgeConfig sorterEdgeConf = OrderedPartitionedKVEdgeConfig

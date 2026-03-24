@@ -164,8 +164,9 @@ public class WordCount extends TezExampleBase {
     // we can use an edge that contains an input/output pair that handles partitioning and grouping 
     // of key value data. We use the helper OrderedPartitionedKVEdgeConfig to create such an
     // edge. Internally, it sets up matching Tez inputs and outputs that can perform this logic.
-    // We specify the key, value and partitioner type. Here the key type is Text (for word), the 
-    // value type is IntWritable (for count) and we using a hash based partitioner. This is a helper
+    // We specify the key, value and partitioner type. Intermediate edge payloads are encoded as
+    // BytesWritable (word + count bytes) and partitioned with a hash based partitioner. This is
+    // a helper
     // object. The edge can be configured by configuring the input, output etc individually without
     // using this helper. The setFromConfiguration call is optional and allows overriding the config
     // options with command line parameters.

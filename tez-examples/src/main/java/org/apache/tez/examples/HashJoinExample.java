@@ -198,7 +198,7 @@ public class HashJoinExample extends TezExampleBase {
     /**
      * The streamed side will be partitioned into fragments with the same keys
      * going to the same fragments using hash partitioning. The data to be
-     * joined is the key itself and so the value is null. The number of
+     * joined is the key itself and so the value uses an empty BytesWritable sentinel. The number of
      * fragments is initially inferred from the number of tasks running in the
      * join vertex because each task will be handling one fragment. The
      * setFromConfiguration call is optional and allows overriding the config
@@ -230,7 +230,7 @@ public class HashJoinExample extends TezExampleBase {
        * of its fragment of keys with all the keys of the hash side. Using an
        * unpartitioned edge to transfer the complete output of the hash side to
        * be broadcasted to all fragments of the streamed side. Again, since the
-       * data is the key, the value is null. The setFromConfiguration call is
+       * data is the key and the value uses an empty BytesWritable sentinel. The setFromConfiguration call is
        * optional and allows overriding the config options with command line
        * parameters.
        */

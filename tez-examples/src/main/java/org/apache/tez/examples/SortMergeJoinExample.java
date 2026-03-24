@@ -199,8 +199,8 @@ public class SortMergeJoinExample extends TezExampleBase {
     /**
      * The output of inputVertex1 and inputVertex2 will be partitioned into
      * fragments with the same keys going to the same fragments using hash
-     * partitioning. The data to be joined is the key itself and so the value is
-     * null. And these outputs will be sorted before feeding them to
+     * partitioning. The data to be joined is the key itself and the edge value
+     * uses an empty BytesWritable sentinel. And these outputs will be sorted before feeding them to
      * JoinProcessor. The number of fragments is initially inferred from the
      * number of tasks running in the join vertex because each task will be
      * handling one fragment.
