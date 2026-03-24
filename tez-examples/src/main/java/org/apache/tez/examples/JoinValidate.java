@@ -45,7 +45,7 @@ import org.apache.tez.mapreduce.input.MRInput;
 import org.apache.tez.runtime.api.LogicalInput;
 import org.apache.tez.runtime.api.ProcessorContext;
 import org.apache.tez.runtime.api.Reader;
-import org.apache.tez.runtime.library.api.KeyValuesReader;
+import org.apache.tez.runtime.library.api.KeyValuesReaderEdge;
 import org.apache.tez.runtime.library.conf.OrderedPartitionedKVEdgeConfig;
 import org.apache.tez.runtime.library.partitioner.HashPartitioner;
 import org.apache.tez.runtime.library.processor.SimpleProcessor;
@@ -229,10 +229,10 @@ public class JoinValidate extends TezExampleBase {
       LogicalInput rhsInput = getInputs().get(RHS_INPUT_NAME);
       Reader lhsReaderRaw = lhsInput.getReader();
       Reader rhsReaderRaw = rhsInput.getReader();
-      Preconditions.checkState(lhsReaderRaw instanceof KeyValuesReader);
-      Preconditions.checkState(rhsReaderRaw instanceof KeyValuesReader);
-      KeyValuesReader lhsReader = (KeyValuesReader) lhsReaderRaw;
-      KeyValuesReader rhsReader = (KeyValuesReader) rhsReaderRaw;
+      Preconditions.checkState(lhsReaderRaw instanceof KeyValuesReaderEdge);
+      Preconditions.checkState(rhsReaderRaw instanceof KeyValuesReaderEdge);
+      KeyValuesReaderEdge lhsReader = (KeyValuesReaderEdge) lhsReaderRaw;
+      KeyValuesReaderEdge rhsReader = (KeyValuesReaderEdge) rhsReaderRaw;
       boolean rhsReaderEnd = false;
 
       TezCounter lhsMissingKeyCounter = getContext().getCounters().findCounter(COUNTER_GROUP_NAME,
@@ -240,8 +240,10 @@ public class JoinValidate extends TezExampleBase {
 
       while (lhsReader.next()) {
         if (rhsReader.next()) {
-          if (!lhsReader.getCurrentKey().equals(rhsReader.getCurrentKey())) {
-            LOG.info("MismatchedKeys: " + "lhs=" + lhsReader.getCurrentKey() + ", rhs=" + rhsReader.getCurrentKey());
+          String lhsKey = ExampleEdgeSerde.decodeString(lhsReader.getCurrentKey());
+          String rhsKey = ExampleEdgeSerde.decodeString(rhsReader.getCurrentKey());
+          if (!lhsKey.equals(rhsKey)) {
+            LOG.info("MismatchedKeys: " + "lhs=" + lhsKey + ", rhs=" + rhsKey);
             lhsMissingKeyCounter.increment(1);
           }
         } else {

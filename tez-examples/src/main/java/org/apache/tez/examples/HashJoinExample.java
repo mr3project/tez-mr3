@@ -48,6 +48,8 @@ import org.apache.tez.runtime.api.ProcessorContext;
 import org.apache.tez.runtime.api.Reader;
 import org.apache.tez.runtime.library.api.KeyValueReader;
 import org.apache.tez.runtime.library.api.KeyValueWriter;
+import org.apache.tez.runtime.library.api.KeyValueReaderEdge;
+import org.apache.tez.runtime.library.api.KeyValueWriterEdge;
 import org.apache.tez.runtime.library.conf.UnorderedKVEdgeConfig;
 import org.apache.tez.runtime.library.conf.UnorderedPartitionedKVEdgeConfig;
 import org.apache.tez.runtime.library.partitioner.HashPartitioner;
@@ -284,14 +286,14 @@ public class HashJoinExample extends TezExampleBase {
       LogicalOutput output = getOutputs().values().iterator().next();
 
       KeyValueReader reader = (KeyValueReader) rawReader;
-      KeyValueWriter writer = (KeyValueWriter) output.getWriter();
+      KeyValueWriterEdge writer = (KeyValueWriterEdge) output.getWriter();
 
       while (reader.next()) {
         Object val = reader.getCurrentValue();
         // The data value itself is the join key. Simply write it out as the
         // key.
         // The output value is null.
-        writer.write(val, NullWritable.get());
+        writer.write(ExampleEdgeSerde.encodeString(val.toString()), ExampleEdgeSerde.nullSentinel());
       }
     }
   }
@@ -319,25 +321,25 @@ public class HashJoinExample extends TezExampleBase {
       LogicalInput hashInput = getInputs().get(hashSide);
       Reader rawStreamReader = streamInput.getReader();
       Reader rawHashReader = hashInput.getReader();
-      Preconditions.checkState(rawStreamReader instanceof KeyValueReader);
-      Preconditions.checkState(rawHashReader instanceof KeyValueReader);
+      Preconditions.checkState(rawStreamReader instanceof KeyValueReaderEdge);
+      Preconditions.checkState(rawHashReader instanceof KeyValueReaderEdge);
       LogicalOutput lo = getOutputs().get(joinOutput);
       Preconditions.checkState(lo.getWriter() instanceof KeyValueWriter);
       KeyValueWriter writer = (KeyValueWriter) lo.getWriter();
 
       // create a hash table for the hash side
-      KeyValueReader hashKvReader = (KeyValueReader) rawHashReader;
-      Set<Text> keySet = new HashSet<Text>();
+      KeyValueReaderEdge hashKvReader = (KeyValueReaderEdge) rawHashReader;
+      Set<String> keySet = new HashSet<String>();
       while (hashKvReader.next()) {
-        keySet.add(new Text((Text) hashKvReader.getCurrentKey()));
+        keySet.add(ExampleEdgeSerde.decodeString(hashKvReader.getCurrentKey()));
       }
 
       // read the stream side and join it using the hash table
-      KeyValueReader streamKvReader = (KeyValueReader) rawStreamReader;
+      KeyValueReaderEdge streamKvReader = (KeyValueReaderEdge) rawStreamReader;
       while (streamKvReader.next()) {
-        Text key = (Text) streamKvReader.getCurrentKey();
+        String key = ExampleEdgeSerde.decodeString(streamKvReader.getCurrentKey());
         if (keySet.contains(key)) {
-          writer.write(key, NullWritable.get());
+          writer.write(new Text(key), NullWritable.get());
         }
       }
     }

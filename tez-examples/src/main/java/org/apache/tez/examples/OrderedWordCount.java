@@ -23,6 +23,7 @@ import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
@@ -42,7 +43,8 @@ import org.apache.tez.mapreduce.output.MROutput;
 import org.apache.tez.mapreduce.processor.SimpleMRProcessor;
 import org.apache.tez.runtime.api.ProcessorContext;
 import org.apache.tez.runtime.library.api.KeyValueWriter;
-import org.apache.tez.runtime.library.api.KeyValuesReader;
+import org.apache.tez.runtime.library.api.KeyValueWriterEdge;
+import org.apache.tez.runtime.library.api.KeyValuesReaderEdge;
 import org.apache.tez.runtime.library.conf.OrderedPartitionedKVEdgeConfig;
 import org.apache.tez.runtime.library.partitioner.HashPartitioner;
 import org.apache.tez.runtime.library.processor.SimpleProcessor;
@@ -81,16 +83,17 @@ public class OrderedWordCount extends TezExampleBase {
       // without affecting the semantic guarantees of the data type that are represented by
       // the reader and writer.
       // The inputs/outputs are referenced via the names assigned in the DAG.
-      KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().get(SORTER).getWriter();
-      KeyValuesReader kvReader = (KeyValuesReader) getInputs().get(TOKENIZER).getReader();
+      KeyValueWriterEdge kvWriter = (KeyValueWriterEdge) getOutputs().get(SORTER).getWriter();
+      KeyValuesReaderEdge kvReader = (KeyValuesReaderEdge) getInputs().get(TOKENIZER).getReader();
       while (kvReader.next()) {
-        Text word = (Text) kvReader.getCurrentKey();
+        BytesWritable word = kvReader.getCurrentKey();
         int sum = 0;
-        for (Object value : kvReader.getCurrentValues()) {
-          sum += ((IntWritable) value).get();
+        for (BytesWritable value : kvReader.getCurrentValues()) {
+          sum += ExampleEdgeSerde.decodeInt(value);
         }
         // write the sum as the key and the word as the value
-        kvWriter.write(new IntWritable(sum), word);
+        kvWriter.write(ExampleEdgeSerde.encodeInt(sum), ExampleEdgeSerde.encodeString(
+            ExampleEdgeSerde.decodeString(word)));
       }
     }
   }
@@ -110,11 +113,11 @@ public class OrderedWordCount extends TezExampleBase {
       Preconditions.checkArgument(getInputs().size() == 1);
       Preconditions.checkArgument(getOutputs().size() == 1);
       KeyValueWriter kvWriter = (KeyValueWriter) getOutputs().get(OUTPUT).getWriter();
-      KeyValuesReader kvReader = (KeyValuesReader) getInputs().get(SUMMATION).getReader();
+      KeyValuesReaderEdge kvReader = (KeyValuesReaderEdge) getInputs().get(SUMMATION).getReader();
       while (kvReader.next()) {
-        Object sum = kvReader.getCurrentKey();
-        for (Object word : kvReader.getCurrentValues()) {
-          kvWriter.write(word, sum);
+        int sum = ExampleEdgeSerde.decodeInt(kvReader.getCurrentKey());
+        for (BytesWritable word : kvReader.getCurrentValues()) {
+          kvWriter.write(new Text(ExampleEdgeSerde.decodeString(word)), new IntWritable(sum));
         }
       }
       // deriving from SimpleMRProcessor takes care of committing the output

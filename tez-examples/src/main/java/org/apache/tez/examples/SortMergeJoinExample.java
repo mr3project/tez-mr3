@@ -46,7 +46,7 @@ import org.apache.tez.runtime.api.LogicalOutput;
 import org.apache.tez.runtime.api.ProcessorContext;
 import org.apache.tez.runtime.api.Reader;
 import org.apache.tez.runtime.library.api.KeyValueWriter;
-import org.apache.tez.runtime.library.api.KeyValuesReader;
+import org.apache.tez.runtime.library.api.KeyValuesReaderEdge;
 import org.apache.tez.runtime.library.conf.OrderedPartitionedKVEdgeConfig;
 import org.apache.tez.runtime.library.partitioner.HashPartitioner;
 
@@ -256,18 +256,18 @@ public class SortMergeJoinExample extends TezExampleBase {
       LogicalInput logicalInput2 = getInputs().get(input2);
       Reader inputReader1 = logicalInput1.getReader();
       Reader inputReader2 = logicalInput2.getReader();
-      Preconditions.checkState(inputReader1 instanceof KeyValuesReader);
-      Preconditions.checkState(inputReader2 instanceof KeyValuesReader);
+      Preconditions.checkState(inputReader1 instanceof KeyValuesReaderEdge);
+      Preconditions.checkState(inputReader2 instanceof KeyValuesReaderEdge);
       LogicalOutput lo = getOutputs().get(joinOutput);
       Preconditions.checkState(lo.getWriter() instanceof KeyValueWriter);
       KeyValueWriter writer = (KeyValueWriter) lo.getWriter();
 
-      join((KeyValuesReader) inputReader1, (KeyValuesReader) inputReader2,
+      join((KeyValuesReaderEdge) inputReader1, (KeyValuesReaderEdge) inputReader2,
           writer);
     }
 
     /**
-     * Join 2 sorted inputs both from {@link KeyValuesReader} and write output
+     * Join 2 sorted inputs both from {@link KeyValuesReaderEdge} and write output
      * using {@link KeyValueWriter}
      * 
      * @param inputReader1
@@ -275,26 +275,26 @@ public class SortMergeJoinExample extends TezExampleBase {
      * @param writer
      * @throws IOException
      */
-    private void join(KeyValuesReader inputReader1,
-        KeyValuesReader inputReader2, KeyValueWriter writer) throws IOException {
+    private void join(KeyValuesReaderEdge inputReader1,
+        KeyValuesReaderEdge inputReader2, KeyValueWriter writer) throws IOException {
 
       while (inputReader1.next() && inputReader2.next()) {
-        Text value1 = (Text) inputReader1.getCurrentKey();
-        Text value2 = (Text) inputReader2.getCurrentKey();
+        String value1 = ExampleEdgeSerde.decodeString(inputReader1.getCurrentKey());
+        String value2 = ExampleEdgeSerde.decodeString(inputReader2.getCurrentKey());
         boolean reachEnd = false;
         // move the cursor of 2 inputs forward until find the same values or one
         // of them reach the end.
-        while (value1.compareTo(value2) != 0) {
+        while (!value1.equals(value2)) {
           if (value1.compareTo(value2) > 0) {
             if (inputReader2.next()) {
-              value2 = (Text) inputReader2.getCurrentKey();
+              value2 = ExampleEdgeSerde.decodeString(inputReader2.getCurrentKey());
             } else {
               reachEnd = true;
               break;
             }
           } else {
             if (inputReader1.next()) {
-              value1 = (Text) inputReader1.getCurrentKey();
+              value1 = ExampleEdgeSerde.decodeString(inputReader1.getCurrentKey());
             } else {
               reachEnd = true;
               break;
@@ -305,7 +305,7 @@ public class SortMergeJoinExample extends TezExampleBase {
         if (reachEnd) {
           break;
         } else {
-          writer.write(value1, NullWritable.get());
+          writer.write(new Text(value1), NullWritable.get());
         }
       }
     }
