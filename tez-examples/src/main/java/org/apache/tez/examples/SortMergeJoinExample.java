@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
@@ -208,7 +209,7 @@ public class SortMergeJoinExample extends TezExampleBase {
      */
     OrderedPartitionedKVEdgeConfig edgeConf =
         OrderedPartitionedKVEdgeConfig
-            .newBuilder(Text.class.getName(), NullWritable.class.getName(),
+            .newBuilder(BytesWritable.class.getName(), BytesWritable.class.getName(),
                 HashPartitioner.class.getName()).setFromConfiguration(tezConf)
             .build();
 

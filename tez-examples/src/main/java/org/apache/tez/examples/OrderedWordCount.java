@@ -142,7 +142,7 @@ public class OrderedWordCount extends TezExampleBase {
     // The setFromConfiguration call is optional and allows overriding the config options with
     // command line parameters.
     OrderedPartitionedKVEdgeConfig summationEdgeConf = OrderedPartitionedKVEdgeConfig
-        .newBuilder(Text.class.getName(), IntWritable.class.getName(),
+        .newBuilder(BytesWritable.class.getName(), BytesWritable.class.getName(),
             HashPartitioner.class.getName())
         .setFromConfiguration(tezConf)
         .build();
@@ -157,7 +157,7 @@ public class OrderedWordCount extends TezExampleBase {
     // setFromConfiguration call is optional and allows overriding the config options with
     // command line parameters.
     OrderedPartitionedKVEdgeConfig sorterEdgeConf = OrderedPartitionedKVEdgeConfig
-        .newBuilder(IntWritable.class.getName(), Text.class.getName(),
+        .newBuilder(BytesWritable.class.getName(), BytesWritable.class.getName(),
             HashPartitioner.class.getName())
         .setFromConfiguration(tezConf)
         .build();

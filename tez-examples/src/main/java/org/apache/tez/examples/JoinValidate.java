@@ -26,8 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.NullWritable;
-import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.tez.client.TezClient;
@@ -146,7 +145,7 @@ public class JoinValidate extends TezExampleBase {
     // better mechanism to configure the IOs. The setFromConfiguration call is optional and allows
     // overriding the config options with command line parameters.
     OrderedPartitionedKVEdgeConfig edgeConf = OrderedPartitionedKVEdgeConfig
-        .newBuilder(Text.class.getName(), NullWritable.class.getName(),
+        .newBuilder(BytesWritable.class.getName(), BytesWritable.class.getName(),
             HashPartitioner.class.getName())
         .setFromConfiguration(tezConf)
         .build();

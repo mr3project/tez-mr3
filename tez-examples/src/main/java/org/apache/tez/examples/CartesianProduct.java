@@ -19,7 +19,7 @@ package org.apache.tez.examples;
 
 import org.apache.tez.common.Preconditions;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
@@ -191,18 +191,18 @@ public class CartesianProduct extends TezExampleBase {
     EdgeProperty cpEdgeProperty;
     if (isPartitioned) {
       UnorderedPartitionedKVEdgeConfig cpEdgeConf =
-        UnorderedPartitionedKVEdgeConfig.newBuilder(Text.class.getName(),
-          IntWritable.class.getName(), CustomPartitioner.class.getName()).build();
+        UnorderedPartitionedKVEdgeConfig.newBuilder(BytesWritable.class.getName(),
+          BytesWritable.class.getName(), CustomPartitioner.class.getName()).build();
       cpEdgeProperty = cpEdgeConf.createDefaultCustomEdgeProperty(cpEdgeManager);
     } else {
       UnorderedKVEdgeConfig edgeConf =
-        UnorderedKVEdgeConfig.newBuilder(Text.class.getName(), IntWritable.class.getName()).build();
+        UnorderedKVEdgeConfig.newBuilder(BytesWritable.class.getName(), BytesWritable.class.getName()).build();
       cpEdgeProperty = edgeConf.createDefaultCustomEdgeProperty(cpEdgeManager);
     }
 
     EdgeProperty broadcastEdgeProperty;
     UnorderedKVEdgeConfig broadcastEdgeConf =
-      UnorderedKVEdgeConfig.newBuilder(Text.class.getName(), IntWritable.class.getName()).build();
+      UnorderedKVEdgeConfig.newBuilder(BytesWritable.class.getName(), BytesWritable.class.getName()).build();
     broadcastEdgeProperty = broadcastEdgeConf.createDefaultBroadcastEdgeProperty();
 
     return DAG.create("CartesianProduct")
