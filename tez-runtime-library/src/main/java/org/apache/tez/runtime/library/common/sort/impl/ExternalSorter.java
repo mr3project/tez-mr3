@@ -26,6 +26,7 @@ import java.util.Map;
 
 import com.google.common.collect.Maps;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
@@ -245,11 +246,10 @@ public abstract class ExternalSorter {
 
   public abstract void flush() throws IOException;
 
-  public abstract void write(Object key, Object value) throws IOException;
+  public abstract void write(BytesWritable key, BytesWritable value) throws IOException;
 
-  public void write(Object key, Iterable<Object> values) throws IOException {
-    //TODO: Sorter classes should override this method later.
-    Iterator<Object> it = values.iterator();
+  public void write(BytesWritable key, Iterable<BytesWritable> values) throws IOException {
+    Iterator<BytesWritable> it = values.iterator();
     while (it.hasNext()) {
       write(key, it.next());
     }

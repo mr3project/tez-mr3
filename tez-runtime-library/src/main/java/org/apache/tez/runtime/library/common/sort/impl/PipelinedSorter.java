@@ -29,6 +29,7 @@ import java.util.PriorityQueue;
 import java.util.concurrent.*;
 import java.util.zip.Deflater;
 
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.compress.CodecPool;
 import org.apache.hadoop.io.compress.Compressor;
 import org.apache.tez.common.Preconditions;
@@ -394,7 +395,7 @@ public class PipelinedSorter extends ExternalSorter {
   }
 
   @Override
-  public void write(Object key, Object value)
+  public void write(BytesWritable key, BytesWritable value)
       throws IOException {
     collect(key, value, partitioner.getPartition(key, value, partitions));
   }
@@ -404,17 +405,7 @@ public class PipelinedSorter extends ExternalSorter {
    * When this method returns, kvindex must refer to sufficient unused
    * storage to store one METADATA.
    */
-  synchronized void collect(Object key, Object value, final int partition) throws IOException {
-    if (key.getClass() != SerializationContext.getKeyClass()) {
-      throw new IOException("Type mismatch in key from map: expected "
-                            + SerializationContext.getKeyClass().getName() + ", received "
-                            + key.getClass().getName());
-    }
-    if (value.getClass() != SerializationContext.getValueClass()) {
-      throw new IOException("Type mismatch in value from map: expected "
-                            + SerializationContext.getValueClass().getName() + ", received "
-                            + value.getClass().getName());
-    }
+  synchronized void collect(BytesWritable key, BytesWritable value, final int partition) throws IOException {
     if (partition < 0 || partition >= partitions) {
       throw new IOException("Illegal partition for " + key + " (" +
           partition + ")");
