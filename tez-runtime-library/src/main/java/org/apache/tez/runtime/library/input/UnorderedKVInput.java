@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.common.TezUtilsInternal;
+import org.apache.tez.runtime.api.LogicalInputEdge;
 import org.apache.tez.runtime.api.ProgressFailedException;
 import org.apache.tez.runtime.library.api.KeyValueReaderEdge;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
@@ -56,7 +57,7 @@ import org.apache.tez.common.Preconditions;
  * unified view to that data. There are no ordering constraints applied by
  * this input.
  */
-public class UnorderedKVInput extends AbstractLogicalInput {
+public class UnorderedKVInput extends AbstractLogicalInput implements LogicalInputEdge {
 
   private static final Logger LOG = LoggerFactory.getLogger(UnorderedKVInput.class);
 

@@ -35,10 +35,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * take care of initializing and closing the Input after a {@link Processor} completes. </p>
  * <p/>
  */
-public abstract class MergedLogicalInput implements LogicalInput {
+public abstract class MergedLogicalInput implements LogicalInput, LogicalInputEdge {
 
-  private AtomicBoolean notifiedInputReady = new AtomicBoolean(false);
-  private List<Input> inputs;
+  private final AtomicBoolean notifiedInputReady = new AtomicBoolean(false);
+  private final List<Input> inputs;
   private final AtomicBoolean isStarted = new AtomicBoolean(false);
   private final MergedInputContext context;
 

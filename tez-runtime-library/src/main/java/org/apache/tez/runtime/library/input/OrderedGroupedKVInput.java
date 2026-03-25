@@ -28,6 +28,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.io.BytesWritable;
+import org.apache.tez.runtime.api.LogicalInputEdge;
 import org.apache.tez.runtime.api.ProgressFailedException;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
 import org.apache.tez.runtime.library.api.KeyValuesReaderEdge;
@@ -65,7 +66,7 @@ import org.apache.tez.common.Preconditions;
  * completion. Attempting to get a reader on a non-complete input will block.
  *
  */
-public class OrderedGroupedKVInput extends AbstractLogicalInput {
+public class OrderedGroupedKVInput extends AbstractLogicalInput implements LogicalInputEdge {
 
   static final Logger LOG = LoggerFactory.getLogger(OrderedGroupedKVInput.class);
 

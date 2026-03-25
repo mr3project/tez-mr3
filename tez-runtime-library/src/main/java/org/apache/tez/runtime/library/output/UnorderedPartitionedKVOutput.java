@@ -27,6 +27,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.tez.common.Preconditions;
 
+import org.apache.tez.runtime.api.LogicalOutputEdge;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,7 +48,7 @@ import org.apache.tez.runtime.library.common.writers.UnorderedPartitionedKVWrite
  * write Key-Value pairs. The key-value pairs are written to the correct partition based on the
  * configured Partitioner.
  */
-public class UnorderedPartitionedKVOutput extends AbstractLogicalOutput {
+public class UnorderedPartitionedKVOutput extends AbstractLogicalOutput implements LogicalOutputEdge {
 
   private static final Logger LOG = LoggerFactory.getLogger(UnorderedPartitionedKVOutput.class);
 

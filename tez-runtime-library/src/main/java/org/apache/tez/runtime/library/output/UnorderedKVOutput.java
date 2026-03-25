@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.tez.runtime.api.LogicalOutputEdge;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,7 +48,7 @@ import org.apache.tez.runtime.library.common.writers.UnorderedPartitionedKVWrite
  * value data without applying any ordering or grouping constraints. This can be
  * used to write raw key value data as is.
  */
-public class UnorderedKVOutput extends AbstractLogicalOutput {
+public class UnorderedKVOutput extends AbstractLogicalOutput implements LogicalOutputEdge {
 
   private static final Logger LOG = LoggerFactory.getLogger(UnorderedKVOutput.class);
 

@@ -30,6 +30,7 @@ import java.util.zip.Deflater;
 import com.google.common.collect.Lists;
 
 import org.apache.hadoop.io.BytesWritable;
+import org.apache.tez.runtime.api.LogicalOutputEdge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -56,7 +57,7 @@ import org.apache.tez.common.Preconditions;
  * key/value pairs written to it. It also partitions the output based on a
  * {@link Partitioner}
  */
-public class OrderedPartitionedKVOutput extends AbstractLogicalOutput {
+public class OrderedPartitionedKVOutput extends AbstractLogicalOutput implements LogicalOutputEdge {
 
   private static final Logger LOG = LoggerFactory.getLogger(OrderedPartitionedKVOutput.class);
 
