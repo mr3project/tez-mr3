@@ -30,6 +30,8 @@ import java.util.Set;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.library.api.KeyValuesReaderEdge;
 import org.apache.tez.runtime.library.api.LogicalInputEdge;
+import org.apache.tez.runtime.library.common.comparator.TezBytesComparator;
+import org.apache.tez.runtime.library.common.serializer.SerializationContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.io.RawComparator;
@@ -41,9 +43,6 @@ import org.apache.tez.runtime.api.MergedInputContext;
  * A {@link MergedLogicalInput} which merges multiple
  * {@link OrderedGroupedKVInput}s and returns a single view of these by merging
  * values which belong to the same key.
- * 
- * Combiners and Secondary Sort are not implemented, so there is no guarantee on
- * the order of values.
  */
 public class OrderedGroupedMergedKVInput extends MergedLogicalInput implements LogicalInputEdge {
 
@@ -74,19 +73,17 @@ public class OrderedGroupedMergedKVInput extends MergedLogicalInput implements L
   }
 
   private static class OrderedGroupedMergedKeyValuesReader extends KeyValuesReaderEdge {
+
     private final PriorityQueue<KeyValuesReaderEdge> pQueue;
-    @SuppressWarnings("rawtypes")
-    private final RawComparator keyComparator;
+    private final TezBytesComparator keyComparator;
     private final List<KeyValuesReaderEdge> finishedReaders;
     private final ValuesIterable currentValues;
     private KeyValuesReaderEdge nextKVReader;
     private BytesWritable currentKey;
-    private final MergedInputContext context;
 
     public OrderedGroupedMergedKeyValuesReader(List<Input> inputs, MergedInputContext context) 
         throws Exception {
-      keyComparator = ((OrderedGroupedKVInput) inputs.get(0))
-          .getInputKeyComparator();
+      keyComparator = SerializationContext.getKeyComparator();
       pQueue = new PriorityQueue<KeyValuesReaderEdge>(inputs.size(),
           new KVReaderComparator(keyComparator));
       finishedReaders = new ArrayList<KeyValuesReaderEdge>(inputs.size());
@@ -97,7 +94,6 @@ public class OrderedGroupedMergedKVInput extends MergedLogicalInput implements L
         }
       }
       currentValues = new ValuesIterable();
-      this.context = context;
     }
 
     private void advanceAndAddToQueue(KeyValuesReaderEdge kvsReadr)
@@ -147,7 +143,7 @@ public class OrderedGroupedMergedKVInput extends MergedLogicalInput implements L
     }
 
     private class ValuesIterable implements Iterable<BytesWritable> {
-      private ValuesIterator iterator = new ValuesIterator();
+      private final ValuesIterator iterator = new ValuesIterator();
 
       @Override
       public Iterator<BytesWritable> iterator() {
@@ -161,10 +157,8 @@ public class OrderedGroupedMergedKVInput extends MergedLogicalInput implements L
       public void moveToNext() throws IOException {
         iterator.moveToNext();
       }
-
     }
 
-    @SuppressWarnings("unchecked")
     private class ValuesIterator implements Iterator<BytesWritable> {
 
       private Iterator<BytesWritable> currentValuesIter;

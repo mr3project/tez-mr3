@@ -18,9 +18,8 @@
 
 package org.apache.tez.runtime.library.api;
 
-import org.apache.tez.runtime.api.WriterEdge;
-
 // LogicalOutput via an Edge
 public interface LogicalOutputEdge {
-  WriterEdge getWriter() throws Exception;
+  // we can use KeyValueWriterEdge because KeyValuesWriterEdge extends it
+  KeyValueWriterEdge getWriter() throws Exception;
 }
