@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.tez.common.Preconditions;
 
-import org.apache.tez.runtime.api.LogicalOutputEdge;
+import org.apache.tez.runtime.library.api.LogicalOutputEdge;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -85,7 +85,7 @@ public class UnorderedPartitionedKVOutput extends AbstractLogicalOutput implemen
   }
 
   @Override
-  public synchronized Writer getWriter() throws Exception {
+  public synchronized UnorderedPartitionedKVWriter getWriter() throws Exception {
     Preconditions.checkState(isStarted.get(), "Cannot get writer before starting the Output");
     return kvWriter;
   }

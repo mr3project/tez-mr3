@@ -16,25 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.tez.runtime.library.api;
+package org.apache.tez.runtime.api;
 
-import java.io.IOException;
-
-import org.apache.hadoop.io.BytesWritable;
-import org.apache.tez.runtime.api.WriterEdge;
-
-public abstract class KeyValueWriterEdge implements WriterEdge {
-  /**
-   * Writes a key/value pair.
-   * 
-   * @param key
-   *          the key to write
-   * @param value
-   *          the value to write
-   * @throws IOException
-   *           if an error occurs
-   * @throws {@link IOInterruptedException} if IO was interrupted
-   * @throws {@link IOInterruptedException} if IO was performing a blocking operation and was interrupted
-   */
-  public abstract void write(BytesWritable key, BytesWritable value) throws IOException;
+public interface WriterEdge extends Writer {
 }

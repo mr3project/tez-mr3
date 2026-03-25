@@ -26,7 +26,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.common.TezUtilsInternal;
-import org.apache.tez.runtime.api.LogicalInputEdge;
+import org.apache.tez.runtime.library.api.LogicalInputEdge;
 import org.apache.tez.runtime.api.ProgressFailedException;
 import org.apache.tez.runtime.library.api.KeyValueReaderEdge;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;

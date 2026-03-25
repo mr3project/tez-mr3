@@ -22,7 +22,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-
 /**
  * A LogicalInput that is used to merge the data from multiple inputs and provide a
  * single <code>Reader</code> to read that data.
@@ -35,7 +34,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * take care of initializing and closing the Input after a {@link Processor} completes. </p>
  * <p/>
  */
-public abstract class MergedLogicalInput implements LogicalInput, LogicalInputEdge {
+public abstract class MergedLogicalInput implements LogicalInput {
 
   private final AtomicBoolean notifiedInputReady = new AtomicBoolean(false);
   private final List<Input> inputs;

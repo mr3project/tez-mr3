@@ -21,32 +21,23 @@ package org.apache.tez.runtime.library.api;
 import java.io.IOException;
 
 import org.apache.hadoop.io.BytesWritable;
+import org.apache.tez.runtime.api.ReaderEdge;
 
-public abstract class KeyValueReaderEdge extends KeyValueReader {
+public abstract class KeyValueReaderEdge extends KeyValueReader implements ReaderEdge {
 
-  /**
-   * Moves to the next key/values(s) pair
-   * 
-   * @return true if another key/value(s) pair exists, false if there are no more.
-   * @throws IOException
-   *           if an error occurs
-   * @throws {@link IOInterruptedException} if IO was performing a blocking operation and was interrupted
-   */
-  public abstract boolean next() throws IOException;
-
-  
   /**
    * Returns the current key
    * @return the current key
    */
+  @Override
   public abstract BytesWritable getCurrentKey() throws IOException;
-  
-  
+
   /**
    * Returns the current value
    * @return the current value
    *
    * @throws IOException
    */
+  @Override
   public abstract BytesWritable getCurrentValue() throws IOException;
 }

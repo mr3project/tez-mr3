@@ -18,7 +18,6 @@
 
 package org.apache.tez.runtime.api;
 
-
 /**
  * Represents an input through which a {@link Processor} receives data on an edge.
  * </p>

@@ -18,7 +18,5 @@
 
 package org.apache.tez.runtime.api;
 
-
-public interface LogicalOutputEdge {
-
+public interface ReaderEdge extends Reader {
 }

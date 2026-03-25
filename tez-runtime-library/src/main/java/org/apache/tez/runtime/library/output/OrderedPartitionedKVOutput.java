@@ -18,11 +18,9 @@
 package org.apache.tez.runtime.library.output;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.Deflater;
@@ -30,7 +28,7 @@ import java.util.zip.Deflater;
 import com.google.common.collect.Lists;
 
 import org.apache.hadoop.io.BytesWritable;
-import org.apache.tez.runtime.api.LogicalOutputEdge;
+import org.apache.tez.runtime.library.api.LogicalOutputEdge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;

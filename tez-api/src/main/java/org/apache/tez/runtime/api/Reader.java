@@ -23,5 +23,5 @@ package org.apache.tez.runtime.api;
  * It encapsulates the data type etc of the data being provided by the {@link Input}
  * E.g. There can be Key-Value readers, byte readers etc.
  */
-public abstract class Reader {
+public interface Reader {
 }

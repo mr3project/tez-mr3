@@ -29,6 +29,7 @@ import java.util.Set;
 
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.library.api.KeyValuesReaderEdge;
+import org.apache.tez.runtime.library.api.LogicalInputEdge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.io.RawComparator;
@@ -44,7 +45,7 @@ import org.apache.tez.runtime.api.MergedInputContext;
  * Combiners and Secondary Sort are not implemented, so there is no guarantee on
  * the order of values.
  */
-public class OrderedGroupedMergedKVInput extends MergedLogicalInput {
+public class OrderedGroupedMergedKVInput extends MergedLogicalInput implements LogicalInputEdge {
 
   private static final Logger LOG = LoggerFactory.getLogger(OrderedGroupedMergedKVInput.class);
   private final Set<Input> completedInputs = Collections

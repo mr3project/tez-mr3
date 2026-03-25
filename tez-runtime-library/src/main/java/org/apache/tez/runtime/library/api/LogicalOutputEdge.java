@@ -16,8 +16,11 @@
  * limitations under the License.
  */
 
-package org.apache.tez.runtime.api;
+package org.apache.tez.runtime.library.api;
 
-// LogicalInput via an Edge
-public interface LogicalInputEdge {
+import org.apache.tez.runtime.api.WriterEdge;
+
+// LogicalOutput via an Edge
+public interface LogicalOutputEdge {
+  WriterEdge getWriter() throws Exception;
 }

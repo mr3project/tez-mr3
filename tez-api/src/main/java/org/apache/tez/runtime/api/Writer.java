@@ -23,6 +23,5 @@ package org.apache.tez.runtime.api;
  * A <code>Writer</code> represents the data being written by an {@link Output}
  * It encapsulates the data type etc of the data being provided by the {@link Output}
  * E.g. There can be Key-Value writers, byte writers etc. */
-public abstract class Writer {
-
+public interface Writer {
 }

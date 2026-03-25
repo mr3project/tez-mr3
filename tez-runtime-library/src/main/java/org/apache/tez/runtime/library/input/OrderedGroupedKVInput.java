@@ -28,7 +28,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.io.BytesWritable;
-import org.apache.tez.runtime.api.LogicalInputEdge;
+import org.apache.tez.runtime.library.api.LogicalInputEdge;
 import org.apache.tez.runtime.api.ProgressFailedException;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
 import org.apache.tez.runtime.library.api.KeyValuesReaderEdge;

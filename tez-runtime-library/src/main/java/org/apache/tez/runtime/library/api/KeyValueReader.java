@@ -35,7 +35,7 @@ import org.apache.tez.runtime.api.Reader;
  * if next() is called after processing everything,
  * IOException would be thrown
  */
-public abstract class KeyValueReader extends Reader {
+public abstract class KeyValueReader implements Reader {
 
   protected boolean completedProcessing;
 

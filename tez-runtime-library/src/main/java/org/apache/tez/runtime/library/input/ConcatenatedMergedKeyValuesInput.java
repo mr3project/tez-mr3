@@ -30,6 +30,7 @@ import org.apache.tez.runtime.api.Reader;
 import org.apache.tez.runtime.api.MergedInputContext;
 import org.apache.tez.runtime.library.api.KeyValuesReader;
 import org.apache.tez.runtime.library.api.KeyValuesReaderEdge;
+import org.apache.tez.runtime.library.api.LogicalInputEdge;
 
 /**
  * Implements a {@link MergedLogicalInput} that merges the incoming inputs
@@ -37,7 +38,7 @@ import org.apache.tez.runtime.library.api.KeyValuesReaderEdge;
  * input. It concatenates all the inputs to provide a unified view
  */
 
-public class ConcatenatedMergedKeyValuesInput extends MergedLogicalInput {
+public class ConcatenatedMergedKeyValuesInput extends MergedLogicalInput implements LogicalInputEdge {
 
   public ConcatenatedMergedKeyValuesInput(MergedInputContext context,
                                           List<Input> inputs) {
@@ -97,7 +98,7 @@ public class ConcatenatedMergedKeyValuesInput extends MergedLogicalInput {
    * concatenated input data
    */
   @Override
-  public KeyValuesReader getReader() throws Exception {
+  public KeyValuesReaderEdge getReader() throws Exception {
     return new ConcatenatedMergedKeyValuesReader();
   }
 

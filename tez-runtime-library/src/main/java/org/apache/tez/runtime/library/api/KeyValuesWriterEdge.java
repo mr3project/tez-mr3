@@ -24,16 +24,5 @@ import java.io.IOException;
 
 public abstract class KeyValuesWriterEdge extends KeyValueWriterEdge {
 
-  /**
-   * Writes a key and its associated values
-   *
-   * @param key
-   *          the key to write
-   * @param values
-   *          values to write
-   * @throws java.io.IOException
-   * @throws {@link IOInterruptedException} if IO was interrupted
-   * @throws {@link IOInterruptedException} if IO was performing a blocking operation and was interrupted
-   */
   public abstract void write(BytesWritable key, Iterable<BytesWritable> values) throws IOException;
 }

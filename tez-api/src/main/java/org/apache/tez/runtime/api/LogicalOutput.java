@@ -18,7 +18,6 @@
 
 package org.apache.tez.runtime.api;
 
-
 /**
  * An @link {@link Output} which handles all outgoing physical connections on an
  * edge. A {@link LogicalIOProcessor} sees a single Logical Output per outgoing
@@ -27,5 +26,4 @@ package org.apache.tez.runtime.api;
  * Users are expected to derive from {@link AbstractLogicalOutput}
  */
 public interface LogicalOutput extends Output {
-
 }

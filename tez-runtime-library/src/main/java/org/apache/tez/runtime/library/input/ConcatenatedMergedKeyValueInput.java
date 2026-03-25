@@ -29,13 +29,14 @@ import org.apache.tez.runtime.api.MergedLogicalInput;
 import org.apache.tez.runtime.api.Reader;
 import org.apache.tez.runtime.api.MergedInputContext;
 import org.apache.tez.runtime.library.api.KeyValueReaderEdge;
+import org.apache.tez.runtime.library.api.LogicalInputEdge;
 
 /**
  * Implements a {@link MergedLogicalInput} that merges the incoming inputs
  * (e.g. from a {@link GroupInputEdge} and provide a unified view of the 
  * input. It concatenates all the inputs to provide a unified view
  */
-public class ConcatenatedMergedKeyValueInput extends MergedLogicalInput {
+public class ConcatenatedMergedKeyValueInput extends MergedLogicalInput implements LogicalInputEdge {
 
   public ConcatenatedMergedKeyValueInput(MergedInputContext context,
                                          List<Input> inputs) {

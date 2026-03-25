@@ -25,6 +25,7 @@ import java.util.Map;
 
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.common.ProgressHelper;
+import org.apache.tez.runtime.api.LogicalInput;
 import org.apache.tez.runtime.library.api.KeyValueWriterEdge;
 import org.apache.tez.runtime.library.api.KeyValuesReaderEdge;
 import org.slf4j.Logger;
@@ -45,7 +46,6 @@ import org.apache.tez.mapreduce.processor.MRTask;
 import org.apache.tez.mapreduce.processor.MRTaskReporter;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.Input;
-import org.apache.tez.runtime.api.LogicalInput;
 import org.apache.tez.runtime.api.LogicalOutput;
 import org.apache.tez.runtime.api.ProcessorContext;
 import org.apache.tez.runtime.library.api.KeyValueWriter;
@@ -129,23 +129,7 @@ public class ReduceProcessor extends MRTask {
       throw new IOException("Illegal input to reduce: " + in.getClass());
     }
     OrderedGroupedInputLegacy shuffleInput = (OrderedGroupedInputLegacy)in;
-    KeyValuesReaderEdge kvReaderEdge = shuffleInput.getReader();
-    KeyValuesReader kvReader = new KeyValuesReader() {
-      @Override
-      public boolean next() throws IOException {
-        return kvReaderEdge.next();
-      }
-      @Override
-      public Object getCurrentKey() throws IOException {
-        return kvReaderEdge.getCurrentKey();
-      }
-      @Override
-      @SuppressWarnings("unchecked")
-      public Iterable<Object> getCurrentValues() throws IOException {
-        return (Iterable<Object>) (Iterable<?>) kvReaderEdge.getCurrentValues();
-      }
-    };
-
+    KeyValuesReaderEdge kvReader = shuffleInput.getReader();
     KeyValueWriter kvWriter = null;
     if((out instanceof MROutputLegacy)) {
       kvWriter = ((MROutputLegacy) out).getWriter();
@@ -183,7 +167,7 @@ public class ReduceProcessor extends MRTask {
 
   void runOldReducer(JobConf job,
       final MRTaskReporter reporter,
-      KeyValuesReader input,
+      KeyValuesReaderEdge input,
       RawComparator comparator,
       Class keyClass,
       Class valueClass,
@@ -204,7 +188,7 @@ public class ReduceProcessor extends MRTask {
 
     // apply reduce function
     try {
-      ReduceValuesIterator values = new ReduceValuesIterator(
+      ReduceValuesIterator values = new ReduceValuesIterator<BytesWritable, BytesWritable>(
           input, reporter, reduceInputValueCounter);
 
       values.informReduceProgress();
@@ -233,12 +217,12 @@ public class ReduceProcessor extends MRTask {
   private static class ReduceValuesIterator<KEY,VALUE>
   implements Iterator<VALUE> {
     private Counter reduceInputValueCounter;
-    private KeyValuesReader in;
+    private KeyValuesReaderEdge in;
     private Progressable reporter;
     private Object currentKey;
-    private Iterator<Object> currentValues;
+    private Iterator<BytesWritable> currentValues;
 
-    public ReduceValuesIterator (KeyValuesReader in,
+    public ReduceValuesIterator (KeyValuesReaderEdge in,
         Progressable reporter,
         Counter reduceInputValueCounter)
             throws IOException {
@@ -282,7 +266,6 @@ public class ReduceProcessor extends MRTask {
     public void remove() {
       throw new UnsupportedOperationException();
     }
-
   }
 
   void runNewReducer(JobConf job,

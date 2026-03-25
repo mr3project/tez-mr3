@@ -31,8 +31,6 @@ package org.apache.tez.runtime.api;
  */
 public interface Output {
 
-
-
   /**
    * Start any processing that the Output may need to perform. It is the
    * responsibility of the Processor to start Outputs.
