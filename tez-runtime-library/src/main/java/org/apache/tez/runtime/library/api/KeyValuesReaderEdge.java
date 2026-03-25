@@ -21,11 +21,8 @@ package org.apache.tez.runtime.library.api;
 import java.io.IOException;
 
 import org.apache.hadoop.io.BytesWritable;
-import org.apache.tez.runtime.api.Reader;
 
-public abstract class KeyValuesReaderEdge extends Reader {
-
-  protected boolean completedProcessing;
+public abstract class KeyValuesReaderEdge extends KeyValuesReader {
 
   /**
    * Moves to the next key/values(s) pair
@@ -49,17 +46,4 @@ public abstract class KeyValuesReaderEdge extends Reader {
    * @return an Iterable view of the values associated with the current key
    */
   public abstract Iterable<BytesWritable> getCurrentValues() throws IOException;
-
-  /**
-   * Check whether processing has been completed.
-   *
-   * @throws IOException
-   */
-  protected void hasCompletedProcessing() throws IOException {
-    if (completedProcessing) {
-      throw new IOException("Please check if you are"
-          + " invoking next() even after it returned false. For usage, please refer to "
-          + "KeyValuesReader javadocs");
-    }
-  }
 }

@@ -60,7 +60,7 @@ public abstract class KeyValuesReader extends Reader {
    * Returns an Iterable view of the values associated with the current key
    * @return an Iterable view of the values associated with the current key
    */
-  public abstract Iterable<Object> getCurrentValues() throws IOException;
+  public abstract Iterable<? extends Object> getCurrentValues() throws IOException;
 
   /**
    * Check whether processing has been completed.
