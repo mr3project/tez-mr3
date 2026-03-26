@@ -772,7 +772,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         TezMerger.merge(conf, rfs, null, inMemorySegments,
             inMemorySegments.size(), 0,
             new Path(inputContext.getUniqueIdentifier()),
-            (RawComparator) SerializationContext.getKeyComparator(),
+            SerializationContext.getKeyComparator(),
             progressable, false, null, null, null, true, inputContext);
       TezMerger.writeFile(rIter, writer, progressable, TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
       writer.close();
@@ -855,7 +855,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         // Nothing actually materialized to disk - controlled by setting sort-factor to #segments.
         rIter = TezMerger.merge(conf, rfs, null,
             inMemorySegments, inMemorySegments.size(), 0, tmpDir,
-            (RawComparator) SerializationContext.getKeyComparator(),
+            SerializationContext.getKeyComparator(),
             progressable, false, spilledRecordsCounter, null,
             additionalSpillBytesRead, true, inputContext);
         // spilledRecordsCounter is tracking the number of keys that will be
@@ -978,7 +978,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       try {
         TezRawKeyValueIterator iter = TezMerger.merge(conf, rfs,
             null, inputSegments, ioSortFactor, 0, tmpDir,
-            (RawComparator) SerializationContext.getKeyComparator(),
+            SerializationContext.getKeyComparator(),
             progressable, true, spilledRecordsCounter, null,
             mergedMapOutputsCounter, true, inputContext);
 
@@ -1097,8 +1097,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
     // merge config params
     final Path tmpDir = new Path(inputContext.getUniqueIdentifier());
-    final RawComparator comparator =
-      (RawComparator) SerializationContext.getKeyComparator();
+    final RawComparator comparator = SerializationContext.getKeyComparator();
 
     // segments required to vacate memory
     List<Segment> memDiskSegments = new ArrayList<Segment>();

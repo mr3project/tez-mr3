@@ -297,11 +297,6 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
   }
 
   @SuppressWarnings("rawtypes")
-  public RawComparator getInputKeyComparator() {
-    return (RawComparator) SerializationContext.getKeyComparator();
-  }
-
-  @SuppressWarnings("rawtypes")
   private static class OrderedGroupedKeyValuesReader extends KeyValuesReaderEdge {
 
     private final ValuesIterator valuesIter;

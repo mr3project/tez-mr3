@@ -371,8 +371,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
   @Override
   public void write(BytesWritable key, BytesWritable value) throws IOException {
-    // Skipping checks for key-value types. IFile takes care of these, but should be removed from
-    // there as well.
+    // Skipping checks for key-value types.
+    // IFile takes care of these, but should be removed from there as well.
 
     // How expensive are checks like these ?
     if (isShutdown.get()) {
@@ -1269,7 +1269,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     });
   }
 
-  private void writeLargeRecord(final Object key, final Object value, final int partition)
+  private void writeLargeRecord(final BytesWritable key, final BytesWritable value, final int partition)
       throws IOException {
     numAdditionalSpillsCounter.increment(1);
     long size = sizePerBuffer - (currentBuffer.numRecords * META_SIZE) - currentBuffer.skipSize
