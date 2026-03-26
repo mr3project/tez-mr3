@@ -73,7 +73,8 @@ import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.apache.tez.runtime.library.common.sort.impl.TezIndexRecord;
-import org.apache.tez.runtime.library.common.sort.impl.IFile.Writer;
+import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterBytesWritable;
+import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterInputBuffer;
 import org.apache.tez.runtime.library.common.sort.impl.TezSpillRecord;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.shuffle.impl.ShuffleUserPayloads;
@@ -134,7 +135,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   private final boolean rfsSpillFilePerms;
 
   // for single partition cases
-  private final IFile.Writer writer;
+  private final IFile.WriterBytesWritable writer;
   private final boolean skipBuffers;
 
   private int numBuffers;
@@ -255,7 +256,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
             writeBuffer);
       } else {
         finalOutPath = outputFileHandler.getOutputFileForWrite();
-        writer = new IFile.Writer(rfs, finalOutPath,
+        writer = new IFile.WriterBytesWritable(rfs, finalOutPath,
             codec, outputRecordsCounter, outputRecordBytesCounter,
             writeBuffer);
         ensureSpillFilePermissions(finalOutPath, rfs, rfsSpillFilePerms);
@@ -653,7 +654,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         byte[] writeBuffer = IFile.allocateWriteBuffer();
 
         for (int i = 0; i < numPartitions; i++) {
-          IFile.Writer writer = null;
+          WriterInputBuffer writer = null;
           try {
             long segmentStart = fsOutput.getPos();
             long numRecords = 0;
@@ -667,7 +668,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
                   compressorExternal = CodecUtils.getCompressor(codec);
                 }
                 // all Writer instances share the same FSDataOutputStream out
-                writer = new Writer(
+                writer = new WriterInputBuffer(
                     fsOutput, codec, null, null, false,
                     writeBuffer, compressorExternal);
               }
@@ -717,7 +718,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     }
   }
 
-  private long writePartition(int pos, WrappedBuffer wrappedBuffer, Writer writer,
+  private long writePartition(int pos, WrappedBuffer wrappedBuffer, WriterInputBuffer writer,
       DataInputBuffer keyBuffer, DataInputBuffer valBuffer) throws IOException {
     long numRecords = 0;
     while (pos != WrappedBuffer.PARTITION_ABSENT_POSITION) {
@@ -1154,7 +1155,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     try {
       out = rfs.create(finalOutPath);
       ensureSpillFilePermissions(finalOutPath, rfs, rfsSpillFilePerms);
-      Writer writer = null;
+      WriterInputBuffer writer = null;
 
       byte[] writeBuffer = IFile.allocateWriteBuffer();
       for (int i = 0; i < numPartitions; i++) {
@@ -1166,7 +1167,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           continue;
         }
         // inside close()
-        writer = new Writer(
+        writer = new WriterInputBuffer(
             out, codec, null, null, false,
             writeBuffer, null);
         try {
@@ -1291,9 +1292,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         final long recordStart = out.getPos();
         if (i == partition) {
           spilledRecordsCounter.increment(1);
-          Writer writer = null;
+          WriterBytesWritable writer = null;
           try {
-            writer = new IFile.Writer(out, codec, null, null, false,
+            writer = new IFile.WriterBytesWritable(out, codec, null, null,
                 IFile.allocateWriteBufferSingle(), null);
             writer.append(key, value);
             outputLargeRecordsCounter.increment(1);

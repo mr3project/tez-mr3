@@ -55,7 +55,8 @@ import org.apache.tez.runtime.api.OutputContext;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.serializer.SerializationContext;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
-import org.apache.tez.runtime.library.common.sort.impl.IFile.Writer;
+import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterBytesWritable;
+import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterInputBuffer;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger.DiskSegment;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger.Segment;
 
@@ -496,12 +497,12 @@ public class PipelinedSorter extends ExternalSorter {
         if (isThreadInterrupted()) {
           return;
         }
-        Writer writer = null;
+        WriterBytesWritable writer = null;
         try {
           long segmentStart = out.getPos();
           if (!sendEmptyPartitionDetails || (i == partition)) {
-            writer = new Writer(out,
-                codec, spilledRecordsCounter, null, false,
+            writer = new WriterBytesWritable(out,
+                codec, spilledRecordsCounter, null,
                 writeBuffer, null);
           }
           // we need not check for combiner since its a single record
@@ -608,13 +609,13 @@ public class PipelinedSorter extends ExternalSorter {
         TezRawKeyValueIterator kvIter = merger.filter(i);
         // write merged output to disk
         long segmentStart = fsOutput.getPos();
-        Writer writer = null;
+        WriterInputBuffer writer = null;
         boolean hasNext = kvIter.hasNext();
         if (hasNext || !sendEmptyPartitionDetails) {
           if (codec != null && compressorExternal == null) {
             compressorExternal = CodecUtils.getCompressor(codec);
           }
-          writer = new Writer(
+          writer = new WriterInputBuffer(
               fsOutput,
               codec, spilledRecordsCounter, null, merger.needsRLE(),
               writeBuffer, compressorExternal);
@@ -866,7 +867,7 @@ public class PipelinedSorter extends ExternalSorter {
         long rawLength = 0;
         long partLength = 0;
         if (shouldWrite) {
-          Writer writer = new Writer(
+          IFile.WriterInputBuffer writer = new WriterInputBuffer(
               finalOut,
               codec, spilledRecordsCounter, null, merger.needsRLE(),
               writeBuffer, null);
