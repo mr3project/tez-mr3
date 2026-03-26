@@ -20,6 +20,7 @@ package org.apache.tez.runtime.library.partitioner;
 import org.apache.tez.runtime.library.api.Partitioner;
 
 public class RoundRobinPartitioner implements Partitioner {
+
     private int x = 0;
 
     @Override

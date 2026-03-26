@@ -28,6 +28,7 @@ import java.nio.ByteOrder;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.io.BoundedByteArrayOutputStream;
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.api.DecompressorPool;
 import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.api.TezTaskOutput;
@@ -67,9 +68,9 @@ public class IFile {
   public static final int RLE_MARKER = -2; // Repeat same key marker
   public static final int V_END_MARKER = -3; // End of values marker
 
+  // REPEAT_KEY is primarily an ordered-path optimization, and never used for unordered output.
   public static final DataInputBuffer REPEAT_KEY = new DataInputBuffer();
-  static final byte[] HEADER = new byte[] { (byte) 'T', (byte) 'I',
-    (byte) 'F' , (byte) 0};
+  static final byte[] HEADER = new byte[] { (byte) 'T', (byte) 'I', (byte) 'F', (byte) 0};
 
   private static final String INCOMPLETE_READ = "Requested to read %d got %d";
   private static final String REQ_BUFFER_SIZE_TOO_LARGE = "Size of data %d is greater than the max allowed of %d";
@@ -301,18 +302,17 @@ public class IFile {
 
     // Count records written to disk
     private long numRecordsWritten = 0;
-    private long rleWritten = 0; //number of RLE markers written
-    private long totalKeySaving = 0; //number of keys saved due to multi KV writes + RLE
+    private long rleWritten = 0;      //number of RLE markers written
+    private long totalKeySaving = 0;  //number of keys saved due to multi KV writes + RLE
     private final TezCounter writtenRecordsCounter;
     private final TezCounter serializedUncompressedBytes;
 
-    private boolean closeSerializers = false;
-    private Serializer keySerializer = null;
-    private Serializer valueSerializer = null;
+    private final Serializer keySerializer;
+    private final Serializer valueSerializer;
 
     private final DataOutputBuffer buffer = new DataOutputBuffer();
     private final DataOutputBuffer previous = new DataOutputBuffer();
-    protected Object prevKey = null;
+    protected DataInputBuffer prevKey = null;
     protected boolean headerWritten = false;
 
     final int RLE_MARKER_SIZE = INT_SIZE;
@@ -361,7 +361,6 @@ public class IFile {
       setupOutputStream(codec);
       writeHeader(outputStream);
 
-      this.closeSerializers = true;
       this.keySerializer = SerializationContext.getKeySerializer();
       this.keySerializer.open(buffer);
       this.valueSerializer = SerializationContext.getValueSerializer();
@@ -403,13 +402,8 @@ public class IFile {
         throw new IOException("Writer was already closed earlier");
       }
 
-      // When IFile writer is created by BackupStore, we do not have
-      // Key and Value classes set. So, check before closing the
-      // serializers
-      if (closeSerializers) {
-        keySerializer.close();
-        valueSerializer.close();
-      }
+      keySerializer.close();
+      valueSerializer.close();
 
       // write V_END_MARKER as needed
       writeValueMarker();
@@ -463,45 +457,24 @@ public class IFile {
       }
     }
 
-    /**
-     * Send key/value to be appended to IFile. To represent same key as previous
-     * one, send IFile.REPEAT_KEY as key parameter.  Should not call this method with
-     * IFile.REPEAT_KEY as the first key. It is caller's responsibility to ensure that correct
-     * key/value type checks and key/value length (non-negative) checks are done properly.
-     *
-     * @param key
-     * @param value
-     * @throws IOException
-     */
-    public void append(Object key, Object value) throws IOException {
+    // Called only from sites that pass BytesWritable and construct writer with rle=false
+    // (unordered writer paths, plus ordered single-record spill path).
+    public void append(BytesWritable key, BytesWritable value) throws IOException {
+      assert !this.rle;
       int keyLength = 0;
-      boolean sameKey = (key == REPEAT_KEY);
-      if (!sameKey) {
-        keySerializer.serialize(key);
-        keyLength = buffer.getLength();
-        assert(keyLength >= 0);
-        if (rle && (keyLength == previous.getLength())) {
-          sameKey = BufferUtils.compareEqual(previous, buffer);
-        }
-      }
+
+      keySerializer.serialize(key);
+      keyLength = buffer.getLength();
+      assert (keyLength >= 0);
 
       // Append the 'value'
       valueSerializer.serialize(value);
       int valueLength = buffer.getLength() - keyLength;
-      assert(valueLength >= 0);
-      if (!sameKey) {
-        //dump entire key value pair
-        writeKVPair(buffer.getData(), 0, keyLength, buffer.getData(),
-            keyLength, buffer.getLength() - keyLength);
-        if (rle) {
-          previous.reset();
-          previous.write(buffer.getData(), 0, keyLength); //store the key
-        }
-      } else {
-        writeValue(buffer.getData(), keyLength, valueLength);
-      }
+      assert (valueLength >= 0);
+      // dump entire key value pair
+      writeKVPair(buffer.getData(), 0, keyLength, buffer.getData(),
+          keyLength, buffer.getLength() - keyLength);
 
-      prevKey = sameKey ? REPEAT_KEY : key;
       // Reset
       buffer.reset();
       ++numRecordsWritten;
@@ -520,10 +493,10 @@ public class IFile {
      */
     public void append(DataInputBuffer key, DataInputBuffer value) throws IOException {
       int keyLength = key.getLength() - key.getPosition();
-      assert(key == REPEAT_KEY || keyLength >=0);
+      assert (key == REPEAT_KEY || keyLength >=0);
 
       int valueLength = value.getLength() - value.getPosition();
-      assert(valueLength >= 0);
+      assert (valueLength >= 0);
 
       boolean sameKey = (key == REPEAT_KEY);
       if (!sameKey && rle) {

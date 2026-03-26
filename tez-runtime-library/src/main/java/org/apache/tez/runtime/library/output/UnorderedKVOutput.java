@@ -70,8 +70,8 @@ public class UnorderedKVOutput extends AbstractLogicalOutput implements LogicalO
     this.conf = getContext().getConfigurationFromUserPayload(true);
     this.conf.setStrings(TezRuntimeFrameworkConfigs.LOCAL_DIRS, getContext().getWorkDirs());
 
-    this.conf.set(TezRuntimeConfiguration.TEZ_RUNTIME_PARTITIONER_CLASS, CustomPartitioner.class
-        .getName());
+    this.conf.set(TezRuntimeConfiguration.TEZ_RUNTIME_PARTITIONER_CLASS,
+        CustomPartitioner.class.getName());
 
     this.memoryUpdateCallbackHandler = new MemoryUpdateCallbackHandler();
 
@@ -159,7 +159,6 @@ public class UnorderedKVOutput extends AbstractLogicalOutput implements LogicalO
   }
 
   public static class CustomPartitioner implements Partitioner {
-
     @Override
     public int getPartition(Object key, Object value, int numPartitions) {
       return 0;

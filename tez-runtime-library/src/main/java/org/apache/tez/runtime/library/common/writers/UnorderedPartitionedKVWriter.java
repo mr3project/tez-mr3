@@ -385,9 +385,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     if (skipBuffers) {
       // special case, where we have only one partition and pipelining is disabled.
       // The reason outputRecordsCounter isn't updated here:
-      // For skipBuffers case, IFile writer has the reference to
-      // outputRecordsCounter and during its close method call,
-      // it will update the outputRecordsCounter.
+      // For skipBuffers case, IFile writer has the reference to outputRecordsCounter and
+      // during its close method call, it will update the outputRecordsCounter.
       writer.append(key, value);
     } else {
       int partition = partitioner.getPartition(key, value, numPartitions);

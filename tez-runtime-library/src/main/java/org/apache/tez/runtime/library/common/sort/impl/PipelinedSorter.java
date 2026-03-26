@@ -481,7 +481,7 @@ public class PipelinedSorter extends ExternalSorter {
   // it is guaranteed that when spillSingleRecord is called, there is
   // no merger spans queued in executor.
   // inside collect() synchronized
-  private void spillSingleRecord(final Object key, final Object value,
+  private void spillSingleRecord(final BytesWritable key, final BytesWritable value,
           int partition) throws IOException {
     final TezSpillRecord spillRec = new TezSpillRecord(partitions);
     // getSpillFileForWrite with size -1 as the serialized size of KV pair is still unknown
@@ -500,8 +500,7 @@ public class PipelinedSorter extends ExternalSorter {
         try {
           long segmentStart = out.getPos();
           if (!sendEmptyPartitionDetails || (i == partition)) {
-            writer = new Writer(
-                out,
+            writer = new Writer(out,
                 codec, spilledRecordsCounter, null, false,
                 writeBuffer, null);
           }

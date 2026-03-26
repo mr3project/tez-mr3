@@ -37,7 +37,7 @@ public class InMemoryWriter implements IFile.WriterAppend {
 
   private DataOutputStream out;
 
-  private Object prevKey = null;
+  private DataInputBuffer prevKey = null;
 
   // InMemoryWriter does not use another byte[] buffer, unlike IFile.Writer
   public InMemoryWriter(byte[] array) {
