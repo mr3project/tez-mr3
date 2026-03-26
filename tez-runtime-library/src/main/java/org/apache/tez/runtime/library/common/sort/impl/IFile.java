@@ -61,6 +61,7 @@ import javax.annotation.Nullable;
  * a <code>Reader</code> to read files of this format.
  */
 public class IFile {
+
   private static final Logger LOG = LoggerFactory.getLogger(IFile.class);
   private static final boolean isDebugEnabled = LOG.isDebugEnabled();
 
@@ -1066,8 +1067,6 @@ public class IFile {
     }
 
     public void reset(int offset) {
-      return;
     }
   }
-
 }

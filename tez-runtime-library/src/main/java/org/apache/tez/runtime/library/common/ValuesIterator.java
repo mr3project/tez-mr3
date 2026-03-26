@@ -40,7 +40,8 @@ import org.apache.tez.common.Preconditions;
  * 
  */
 public class ValuesIterator {
-  protected TezRawKeyValueIterator in;  //input iterator
+
+  protected TezRawKeyValueIterator in;  // input iterator
   private BytesWritable key;            // current key
   private BytesWritable nextKey;
   private BytesWritable value;          // current value
@@ -59,17 +60,17 @@ public class ValuesIterator {
 
   private boolean completedProcessing;
   
-  public ValuesIterator (TezRawKeyValueIterator in, 
-                         RawComparator<BytesWritable> comparator,
-                         TezCounter inputKeyCounter,
-                         TezCounter inputValueCounter)
+  public ValuesIterator(TezRawKeyValueIterator in,
+                        RawComparator<BytesWritable> comparator,
+                        TezCounter inputKeyCounter,
+                        TezCounter inputValueCounter)
     throws IOException {
     this.in = in;
     this.comparator = comparator;
     this.inputKeyCounter = inputKeyCounter;
     this.inputValueCounter = inputValueCounter;
     this.keyDeserializer = SerializationContext.getKeyDeserializer();
-    this.keyDeserializer.open(keyIn);
+    this.keyDeserializer.open(this.keyIn);
     this.valDeserializer = SerializationContext.getValueDeserializer();
     this.valDeserializer.open(this.valueIn);
   }

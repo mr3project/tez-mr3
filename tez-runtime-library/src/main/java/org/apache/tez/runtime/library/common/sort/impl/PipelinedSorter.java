@@ -427,7 +427,7 @@ public class PipelinedSorter extends ExternalSorter {
       valstart = span.kvbuffer.position();      
       valSerializer.serialize(value);
       valend = span.kvbuffer.position();
-    } catch(BufferOverflowException overflow) {
+    } catch (BufferOverflowException overflow) {
       // restore limit
       span.kvbuffer.position(keystart);
       this.sort();

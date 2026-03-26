@@ -194,15 +194,11 @@ public class UnorderedKVEdgeConfig extends HadoopKeyValuesBasedBaseEdgeConfig {
      * the corresponding comparator class to be used as key comparator.
      *
      * @param serializationClassName
-     * @param serializerConf         the serializer configuration. This can be null, and is a
-     *                               {@link java.util.Map} of key-value pairs. The keys should be limited
-     *                               to the ones required by the comparator.
      * @return this object for further chained method calls
      */
-    public Builder setKeySerializationClass(String serializationClassName,
-                                            @Nullable Map<String, String> serializerConf) {
-      outputBuilder.setKeySerializationClass(serializationClassName, serializerConf);
-      inputBuilder.setKeySerializationClass(serializationClassName, serializerConf);
+    public Builder setKeySerializationClass(String serializationClassName) {
+      outputBuilder.setKeySerializationClass(serializationClassName);
+      inputBuilder.setKeySerializationClass(serializationClassName);
       return this;
     }
 
@@ -210,15 +206,11 @@ public class UnorderedKVEdgeConfig extends HadoopKeyValuesBasedBaseEdgeConfig {
      * Set serialization class responsible for providing serializer/deserializer for values.
      *
      * @param serializationClassName
-     * @param serializerConf         the serializer configuration. This can be null, and is a
-     *                               {@link java.util.Map} of key-value pairs. The keys should be limited
-     *                               to the ones required by the comparator.
      * @return this object for further chained method calls
      */
-    public Builder setValueSerializationClass(String serializationClassName,
-                                              @Nullable Map<String, String> serializerConf) {
-      outputBuilder.setValueSerializationClass(serializationClassName, serializerConf);
-      inputBuilder.setValueSerializationClass(serializationClassName, serializerConf);
+    public Builder setValueSerializationClass(String serializationClassName) {
+      outputBuilder.setValueSerializationClass(serializationClassName);
+      inputBuilder.setValueSerializationClass(serializationClassName);
       return this;
     }
 

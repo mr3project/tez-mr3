@@ -89,10 +89,8 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
   /**
    * Moves to the next key/values(s) pair
    * 
-   * @return true if another key/value(s) pair exists, false if there are no
-   *         more.
-   * @throws IOException
-   *           if an error occurs
+   * @return true if another key/value(s) pair exists, false if there are no more.
+   * @throws IOException if an error occurs
    */
   @Override  
   public boolean next() throws IOException {
@@ -158,7 +156,7 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
    * @throws IOException
    */
   private boolean moveToNextInput() throws IOException {
-    if (currentReader != null) { // Close the current reader.
+    if (currentReader != null) {  // Close the current reader.
       currentReader.close();
       /**
        * clear reader explicitly. Otherwise this could point to stale reference when next() is
@@ -187,7 +185,6 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
       throws IOException {
     if (fetchedInput.getType() == Type.MEMORY) {
       MemoryFetchedInput mfi = (MemoryFetchedInput) fetchedInput;
-
       return new InMemoryReader(null, mfi.getInputAttemptIdentifier(),
           mfi.getBytes(), 0, (int) mfi.getSize(), 0);
     } else {

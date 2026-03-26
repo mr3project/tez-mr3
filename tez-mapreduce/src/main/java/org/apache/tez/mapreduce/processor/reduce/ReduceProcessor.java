@@ -147,10 +147,8 @@ public class ReduceProcessor extends MRTask {
     if (useNewApi) {
       try {
         runNewReducer(
-            jobConf,
-            mrReporter,
-            shuffleInput, comparator,  keyClass, valueClass,
-            kvWriter);
+            jobConf, mrReporter,
+            shuffleInput, comparator,  keyClass, valueClass, kvWriter);
       } catch (ClassNotFoundException cnfe) {
         throw new IOException(cnfe);
       }
@@ -302,17 +300,14 @@ public class ReduceProcessor extends MRTask {
       }
     };
 
-    org.apache.hadoop.mapreduce.Reducer.Context reducerContext =
-        createReduceContext(
-            reducer, job, taskAttemptId,
-            rawIter, reduceInputKeyCounter,
-            reduceInputValueCounter,
-            trackedRW,
-            committer,
-            reporter, comparator, keyClass,
-            valueClass);
-
-
+    org.apache.hadoop.mapreduce.Reducer.Context reducerContext = createReduceContext(
+        reducer, job, taskAttemptId,
+        rawIter, reduceInputKeyCounter,
+        reduceInputValueCounter,
+        trackedRW,
+        committer,
+        reporter, comparator, keyClass,
+        valueClass);
 
     reducer.run(reducerContext);
 

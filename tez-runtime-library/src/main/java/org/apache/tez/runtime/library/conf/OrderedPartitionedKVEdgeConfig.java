@@ -191,15 +191,12 @@ public class OrderedPartitionedKVEdgeConfig
      *
      * @param serializationClassName
      * @param comparatorClassName
-     * @param serializerConf         the serializer configuration. This can be null, and is a
-     *                               {@link java.util.Map} of key-value pairs. The keys should be limited
-     *                               to the ones required by the comparator.
      * @return this object for further chained method calls
      */
     public Builder setKeySerializationClass(String serializationClassName,
-        String comparatorClassName, @Nullable Map<String, String> serializerConf) {
-      outputBuilder.setKeySerializationClass(serializationClassName, comparatorClassName, serializerConf);
-      inputBuilder.setKeySerializationClass(serializationClassName, comparatorClassName, serializerConf);
+        String comparatorClassName) {
+      outputBuilder.setKeySerializationClass(serializationClassName, comparatorClassName);
+      inputBuilder.setKeySerializationClass(serializationClassName, comparatorClassName);
       return this;
     }
 
@@ -207,15 +204,11 @@ public class OrderedPartitionedKVEdgeConfig
      * Set serialization class responsible for providing serializer/deserializer for values.
      *
      * @param serializationClassName
-     * @param serializerConf         the serializer configuration. This can be null, and is a
-     *                               {@link java.util.Map} of key-value pairs. The keys should be limited
-     *                               to the ones required by the comparator.
      * @return this object for further chained method calls
      */
-    public Builder setValueSerializationClass(String serializationClassName,
-                                              @Nullable Map<String, String> serializerConf) {
-      outputBuilder.setValueSerializationClass(serializationClassName, serializerConf);
-      inputBuilder.setValueSerializationClass(serializationClassName, serializerConf);
+    public Builder setValueSerializationClass(String serializationClassName) {
+      outputBuilder.setValueSerializationClass(serializationClassName);
+      inputBuilder.setValueSerializationClass(serializationClassName);
       return this;
     }
 

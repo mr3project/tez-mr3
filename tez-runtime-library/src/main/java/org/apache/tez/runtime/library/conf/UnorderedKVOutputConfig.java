@@ -74,10 +74,6 @@ public class UnorderedKVOutputConfig {
     }
   }
 
-  String toHistoryText() {
-    return null;
-  }
-
   public static Builder newBuilder(String keyClass, String valClass) {
     return new Builder(keyClass, valClass);
   }
@@ -94,8 +90,6 @@ public class UnorderedKVOutputConfig {
      */
     Builder(String keyClassName, String valueClassName) {
       this();
-      Objects.requireNonNull(keyClassName, "Key class name cannot be null");
-      Objects.requireNonNull(valueClassName, "Value class name cannot be null");
       setKeyClassName(keyClassName);
       setValueClassName(valueClassName);
     }
@@ -166,17 +160,9 @@ public class UnorderedKVOutputConfig {
      *                               to the ones required by the comparator.
      * @return this object for further chained method calls
      */
-    public Builder setKeySerializationClass(String serializationClassName,
-                                            @Nullable Map<String, String> serializerConf) {
+    public Builder setKeySerializationClass(String serializationClassName) {
       Preconditions.checkArgument(serializationClassName != null,
           "serializationClassName cannot be null");
-      this.conf.set(CommonConfigurationKeys.IO_SERIALIZATIONS_KEY, serializationClassName + ","
-          + conf.get(CommonConfigurationKeys.IO_SERIALIZATIONS_KEY));
-      if (serializerConf != null) {
-        // Merging the confs for now. Change to be specific in the future.
-        ConfigUtils.mergeConfsWithExclusions(this.conf, serializerConf,
-            TezRuntimeConfiguration.getRuntimeConfigKeySet());
-      }
       return this;
     }
 
@@ -184,22 +170,11 @@ public class UnorderedKVOutputConfig {
      * Set serialization class responsible for providing serializer/deserializer for values.
      *
      * @param serializationClassName
-     * @param serializerConf         the serializer configuration. This can be null, and is a
-     *                               {@link java.util.Map} of key-value pairs. The keys should be limited
-     *                               to the ones required by the comparator.
      * @return this object for further chained method calls
      */
-    public Builder setValueSerializationClass(String serializationClassName,
-                                              @Nullable Map<String, String> serializerConf) {
+    public Builder setValueSerializationClass(String serializationClassName) {
       Preconditions.checkArgument(serializationClassName != null,
           "serializationClassName cannot be null");
-      this.conf.set(CommonConfigurationKeys.IO_SERIALIZATIONS_KEY, serializationClassName + ","
-          + conf.get(CommonConfigurationKeys.IO_SERIALIZATIONS_KEY));
-      if (serializerConf != null) {
-        // Merging the confs for now. Change to be specific in the future.
-        ConfigUtils.mergeConfsWithExclusions(this.conf, serializerConf,
-            TezRuntimeConfiguration.getRuntimeConfigKeySet());
-      }
       return this;
     }
 
