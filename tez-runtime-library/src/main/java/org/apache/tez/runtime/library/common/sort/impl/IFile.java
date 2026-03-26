@@ -121,7 +121,7 @@ public class IFile {
    * done intentionally, as it is not possible to know compressed data length
    * upfront.
    */
-  public static class FileBackedInMemIFileWriter extends Writer {
+  public static class FileBackedInMemIFileWriter extends WriterBytesWritable {
 
     private final FileSystem fs;
     private boolean bufferFull;
@@ -150,7 +150,7 @@ public class IFile {
         CompressionCodec codec, TezCounter writesCounter,
         TezCounter serializedBytesCounter, int cacheSize, byte[] writeBuffer) throws IOException {
       super(new FSDataOutputStream(createBoundedBuffer(cacheSize), null), null,
-          writesCounter, serializedBytesCounter, false, writeBuffer, null);
+          writesCounter, serializedBytesCounter, writeBuffer, null);
       this.fs = fs;
       this.cacheStream = (BoundedByteArrayOutputStream) this.rawOut.getWrappedStream();
       this.taskOutput = taskOutput;
@@ -277,8 +277,7 @@ public class IFile {
   /**
    * <code>IFile.Writer</code> to write out intermediate map-outputs.
    */
-  @SuppressWarnings({"unchecked", "rawtypes"})
-  public static class Writer implements WriterAppend {
+  public abstract static class Writer {
     // DataOutput: rawOut <-- checksumOut <-- compressedOut <-- out <-- [writeBuffer]
 
     protected DataOutputStream out;
@@ -307,19 +306,11 @@ public class IFile {
     private final TezCounter writtenRecordsCounter;
     private final TezCounter serializedUncompressedBytes;
 
-    private final Serializer keySerializer;
-    private final Serializer valueSerializer;
-
-    private final DataOutputBuffer buffer = new DataOutputBuffer();
-    private final DataOutputBuffer previous = new DataOutputBuffer();
     protected DataInputBuffer prevKey = null;
     protected boolean headerWritten = false;
 
     final int RLE_MARKER_SIZE = INT_SIZE;
     final int V_END_MARKER_SIZE = INT_SIZE;
-
-    // de-dup keys or not
-    protected final boolean rle;
 
     // We use writeBuffer[] to reduce the number of writes to 'out' and thus
     // to reduce the number of writes to 'compressedOut'.
@@ -330,26 +321,25 @@ public class IFile {
 
     private final Compressor compressorExternal;  // not to be shared with concurrent threads
 
-    public Writer(FileSystem fs, Path file,
-                  CompressionCodec codec,
-                  TezCounter writesCounter,
-                  TezCounter serializedBytesCounter,
-                  byte[] writeBuffer) throws IOException {
+    protected Writer(FileSystem fs, Path file,
+                     CompressionCodec codec,
+                     TezCounter writesCounter,
+                     TezCounter serializedBytesCounter,
+                     byte[] writeBuffer) throws IOException {
       this(fs.create(file), codec,
-           writesCounter, serializedBytesCounter, false, writeBuffer, null);
+          writesCounter, serializedBytesCounter, writeBuffer, null);
       ownOutputStream = true;   // because of fs.create(file)
     }
 
-    public Writer(FSDataOutputStream outputStream,
-                  CompressionCodec codec, TezCounter writesCounter, TezCounter serializedBytesCounter,
-                  boolean rle,
-                  byte[] writeBuffer,
-                  @Nullable Compressor compressorExternal) throws IOException {
+    protected Writer(FSDataOutputStream outputStream,
+                     CompressionCodec codec, TezCounter writesCounter,
+                     TezCounter serializedBytesCounter,
+                     byte[] writeBuffer,
+                     @Nullable Compressor compressorExternal) throws IOException {
       this.rawOut = outputStream;
       this.writtenRecordsCounter = writesCounter;
       this.serializedUncompressedBytes = serializedBytesCounter;
       this.start = this.rawOut.getPos();
-      this.rle = rle;
 
       this.writeBuffer = writeBuffer;
       this.writeBufferLength = writeBuffer.length;
@@ -360,11 +350,6 @@ public class IFile {
 
       setupOutputStream(codec);
       writeHeader(outputStream);
-
-      this.keySerializer = SerializationContext.getKeySerializer();
-      this.keySerializer.open(buffer);
-      this.valueSerializer = SerializationContext.getValueSerializer();
-      this.valueSerializer.open(buffer);
     }
 
     void setupOutputStream(CompressionCodec codec) throws IOException {
@@ -402,15 +387,9 @@ public class IFile {
         throw new IOException("Writer was already closed earlier");
       }
 
-      keySerializer.close();
-      valueSerializer.close();
-
-      // write V_END_MARKER as needed
-      writeValueMarker();
+      onClose();
 
       // Write EOF_MARKER for key/value length
-      // bufferWriteInt(EOF_MARKER);
-      // bufferWriteInt(EOF_MARKER);
       long combined = ((long) EOF_MARKER << 32) | (EOF_MARKER & 0xFFFFFFFFL);
       bufferWriteLong(combined);
 
@@ -450,69 +429,14 @@ public class IFile {
         writtenRecordsCounter.increment(numRecordsWritten);
       }
       if (isDebugEnabled) {
-        LOG.debug("Total keys written=" + numRecordsWritten + "; rleEnabled=" + rle + "; Savings" +
+        LOG.debug("Total keys written=" + numRecordsWritten + "; rleEnabled=" + hasRle() + "; Savings" +
             "(due to multi-kv/rle)=" + totalKeySaving + "; number of RLEs written=" +
             rleWritten + "; compressedLen=" + compressedBytesWritten + "; rawLen="
             + decompressedBytesWritten);
       }
     }
 
-    // Called only from sites that pass BytesWritable and construct writer with rle=false
-    // (unordered writer paths, plus ordered single-record spill path).
-    public void append(BytesWritable key, BytesWritable value) throws IOException {
-      assert !this.rle;
-      int keyLength = 0;
-
-      keySerializer.serialize(key);
-      keyLength = buffer.getLength();
-      assert (keyLength >= 0);
-
-      // Append the 'value'
-      valueSerializer.serialize(value);
-      int valueLength = buffer.getLength() - keyLength;
-      assert (valueLength >= 0);
-      // dump entire key value pair
-      writeKVPair(buffer.getData(), 0, keyLength, buffer.getData(),
-          keyLength, buffer.getLength() - keyLength);
-
-      // Reset
-      buffer.reset();
-      ++numRecordsWritten;
-    }
-
-    /**
-     * Send key/value to be appended to IFile. To represent same key as previous
-     * one, send IFile.REPEAT_KEY as key parameter.  Should not call this method with
-     * IFile.REPEAT_KEY as the first key. It is caller's responsibility to pass non-negative
-     * key/value lengths. Otherwise,IndexOutOfBoundsException could be thrown at runtime.
-     *
-     *
-     * @param key
-     * @param value
-     * @throws IOException
-     */
-    public void append(DataInputBuffer key, DataInputBuffer value) throws IOException {
-      int keyLength = key.getLength() - key.getPosition();
-      assert (key == REPEAT_KEY || keyLength >=0);
-
-      int valueLength = value.getLength() - value.getPosition();
-      assert (valueLength >= 0);
-
-      boolean sameKey = (key == REPEAT_KEY);
-      if (!sameKey && rle) {
-        sameKey = (keyLength != 0) && BufferUtils.compareEqual(previous, key);
-      }
-
-      if (!sameKey) {
-        writeKVPair(key.getData(), key.getPosition(), keyLength,
-            value.getData(), value.getPosition(), valueLength);
-        if (rle) {
-          BufferUtils.copy(key, previous);
-        }
-      } else {
-        writeValue(value.getData(), value.getPosition(), valueLength);
-      }
-      prevKey = sameKey ? REPEAT_KEY : key;
+    protected void incrementRecordsWritten() {
       ++numRecordsWritten;
     }
 
@@ -532,8 +456,6 @@ public class IFile {
         byte[] valueData, int valPos, int valueLength) throws IOException {
       writeValueMarker();
 
-      // bufferWriteInt(keyLength);
-      // bufferWriteLong(valueLength);
       long combined = ((long) keyLength << 32) | (valueLength & 0xFFFFFFFFL);
       bufferWriteLong(combined);
 
@@ -547,31 +469,25 @@ public class IFile {
       }
     }
 
-    private void writeRLE() throws IOException {
-      /**
-       * To strike a balance between 2 use cases (lots of unique KV in stream
-       * vs lots of identical KV in stream), we start off by writing KV pair.
-       * If subsequent KV is identical, we write RLE marker along with V_END_MARKER
-       * {KL1, VL1, K1, V1}
-       * {RLE, VL2, V2, VL3, V3, ...V_END_MARKER}
-       */
-      if (prevKey != REPEAT_KEY) {
-        bufferWriteInt(RLE_MARKER);
-        decompressedBytesWritten += RLE_MARKER_SIZE;
-        rleWritten++;
-      }
+    protected void writeRLE() throws IOException {
     }
 
     protected void writeValueMarker() throws IOException {
-      /**
-       * Write V_END_MARKER only in RLE scenario. This will
-       * save space in conditions where lots of unique KV pairs are found in the
-       * stream.
-       */
-      if (prevKey == REPEAT_KEY) {
-        bufferWriteInt(V_END_MARKER);
-        decompressedBytesWritten += V_END_MARKER_SIZE;
-      }
+    }
+
+    protected void onClose() throws IOException {
+    }
+
+    protected boolean hasRle() {
+      return false;
+    }
+
+    protected void incrementRleWritten() {
+      rleWritten++;
+    }
+
+    protected void incrementDecompressedBytesWritten(long length) {
+      decompressedBytesWritten += length;
     }
 
     protected void bufferWriteInt(int val) throws IOException {
@@ -620,6 +536,135 @@ public class IFile {
 
     public long getCompressedLength() {
       return compressedBytesWritten;
+    }
+  }
+
+  public static class WriterInputBuffer extends Writer implements WriterAppend {
+
+    private final DataOutputBuffer previous = new DataOutputBuffer();
+    // de-dup keys or not
+    protected final boolean rle;
+
+    public WriterInputBuffer(FileSystem fs, Path file,
+        CompressionCodec codec,
+        TezCounter writesCounter,
+        TezCounter serializedBytesCounter,
+        byte[] writeBuffer) throws IOException {
+      this(fs.create(file), codec, writesCounter, serializedBytesCounter, false, writeBuffer, null);
+      ownOutputStream = true;
+    }
+
+    public WriterInputBuffer(FSDataOutputStream outputStream,
+        CompressionCodec codec, TezCounter writesCounter, TezCounter serializedBytesCounter,
+        boolean rle, byte[] writeBuffer, @Nullable Compressor compressorExternal) throws IOException {
+      super(outputStream, codec, writesCounter, serializedBytesCounter, writeBuffer, compressorExternal);
+      this.rle = rle;
+    }
+
+    @Override
+    protected boolean hasRle() {
+      return rle;
+    }
+
+    /**
+     * Send key/value to be appended to IFile. To represent same key as previous
+     * one, send IFile.REPEAT_KEY as key parameter.  Should not call this method with
+     * IFile.REPEAT_KEY as the first key. It is caller's responsibility to pass non-negative
+     * key/value lengths. Otherwise,IndexOutOfBoundsException could be thrown at runtime.
+     */
+    @Override
+    public void append(DataInputBuffer key, DataInputBuffer value) throws IOException {
+      int keyLength = key.getLength() - key.getPosition();
+      assert (key == REPEAT_KEY || keyLength >=0);
+
+      int valueLength = value.getLength() - value.getPosition();
+      assert (valueLength >= 0);
+
+      boolean sameKey = (key == REPEAT_KEY);
+      if (!sameKey && rle) {
+        sameKey = (keyLength != 0) && BufferUtils.compareEqual(previous, key);
+      }
+
+      if (!sameKey) {
+        writeKVPair(key.getData(), key.getPosition(), keyLength,
+            value.getData(), value.getPosition(), valueLength);
+        if (rle) {
+          BufferUtils.copy(key, previous);
+        }
+      } else {
+        writeValue(value.getData(), value.getPosition(), valueLength);
+      }
+      prevKey = sameKey ? REPEAT_KEY : key;
+      incrementRecordsWritten();
+    }
+
+    @Override
+    protected void writeRLE() throws IOException {
+      if (prevKey != REPEAT_KEY) {
+        bufferWriteInt(RLE_MARKER);
+        incrementDecompressedBytesWritten(RLE_MARKER_SIZE);
+        incrementRleWritten();
+      }
+    }
+
+    @Override
+    protected void writeValueMarker() throws IOException {
+      if (prevKey == REPEAT_KEY) {
+        bufferWriteInt(V_END_MARKER);
+        incrementDecompressedBytesWritten(V_END_MARKER_SIZE);
+      }
+    }
+
+    @Override
+    protected void onClose() throws IOException {
+      writeValueMarker();
+    }
+  }
+
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  public static class WriterBytesWritable extends Writer {
+
+    private final Serializer keySerializer;
+    private final Serializer valueSerializer;
+    private final DataOutputBuffer buffer = new DataOutputBuffer();
+
+    public WriterBytesWritable(FileSystem fs, Path file,
+        CompressionCodec codec,
+        TezCounter writesCounter,
+        TezCounter serializedBytesCounter,
+        byte[] writeBuffer) throws IOException {
+      this(fs.create(file), codec, writesCounter, serializedBytesCounter, writeBuffer, null);
+      ownOutputStream = true;
+    }
+
+    public WriterBytesWritable(FSDataOutputStream outputStream,
+        CompressionCodec codec, TezCounter writesCounter, TezCounter serializedBytesCounter,
+        byte[] writeBuffer, @Nullable Compressor compressorExternal) throws IOException {
+      super(outputStream, codec, writesCounter, serializedBytesCounter, writeBuffer, compressorExternal);
+      this.keySerializer = SerializationContext.getKeySerializer();
+      this.keySerializer.open(buffer);
+      this.valueSerializer = SerializationContext.getValueSerializer();
+      this.valueSerializer.open(buffer);
+    }
+
+    public void append(BytesWritable key, BytesWritable value) throws IOException {
+      keySerializer.serialize(key);
+      int keyLength = buffer.getLength();
+      assert (keyLength >= 0);
+
+      valueSerializer.serialize(value);
+      int valueLength = buffer.getLength() - keyLength;
+      assert (valueLength >= 0);
+      writeKVPair(buffer.getData(), 0, keyLength, buffer.getData(), keyLength, valueLength);
+
+      buffer.reset();
+      incrementRecordsWritten();
+    }
+
+    @Override
+    protected void onClose() throws IOException {
+      keySerializer.close();
+      valueSerializer.close();
     }
   }
 

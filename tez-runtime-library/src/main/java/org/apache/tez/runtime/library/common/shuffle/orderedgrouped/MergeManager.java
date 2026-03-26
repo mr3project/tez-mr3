@@ -42,6 +42,7 @@ import org.apache.tez.runtime.library.common.serializer.SerializationContext;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Writer;
+import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterInputBuffer;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger.DiskSegment;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger.Segment;
@@ -845,7 +846,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       Writer writer = null;
       long outFileLen = 0;
       try {
-        writer = new Writer(rfs, outputPath, codec,
+        writer = new WriterInputBuffer(rfs, outputPath, codec,
             null, null, writeBuffer);
 
         TezRawKeyValueIterator rIter = null;
@@ -972,7 +973,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       outputPath = localDirAllocator.getLocalPathForWrite(outputPathString, approxOutputSize, conf);
       outputPath = outputPath.suffix(Constants.MERGED_OUTPUT_PREFIX + mergeFileSequenceId.getAndIncrement());
 
-      Writer writer = new Writer(rfs, outputPath, codec, null,
+      Writer writer = new WriterInputBuffer(rfs, outputPath, codec, null,
           null, writeBuffer);
       tmpDir = new Path(inputContext.getUniqueIdentifier());
       try {
@@ -1123,7 +1124,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
             comparator, progressable, false, spilledRecordsCounter, null,
             additionalSpillBytesRead, true, inputContext);
         final byte[] writeBuffer = IFile.allocateWriteBuffer();
-        final Writer writer = new Writer(fs, outputPath, codec, null, null, writeBuffer);
+        final Writer writer = new WriterInputBuffer(fs, outputPath, codec, null, null, writeBuffer);
         try {
           TezMerger.writeFile(rIter, writer, progressable, TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
         } catch (IOException e) {

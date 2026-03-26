@@ -44,6 +44,7 @@ import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader.KeyState;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Writer;
+import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterInputBuffer;
 import org.apache.tez.runtime.library.utils.BufferUtils;
 
 /**
@@ -620,7 +621,7 @@ public class TezMerger {
 
           // TODO Would it ever make sense to make this an in-memory writer ?
           // Merging because of too many disk segments - might fit in memory.
-          Writer writer = new Writer(fs, outputFile, codec,
+          Writer writer = new WriterInputBuffer(fs, outputFile, codec,
               writesCounter, null, writeBuffer);
 
           writeFile(this, writer, reporter, recordsBeforeProgress);
