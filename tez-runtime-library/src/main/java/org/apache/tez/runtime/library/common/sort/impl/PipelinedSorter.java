@@ -1433,27 +1433,27 @@ public class PipelinedSorter extends ExternalSorter {
       partIter = new PartitionFilter(this);
     }
 
-    public final void add(SpanIterator iter) {
+    public void add(SpanIterator iter) {
       if(iter.next()) {
         heap.add(iter);
       }
     }
 
-    public final void add(Future<SpanIterator> iter) {
+    public void add(Future<SpanIterator> iter) {
       this.futures.add(iter);
     }
 
-    public final boolean ready() throws IOException, InterruptedException {
+    public boolean ready() throws IOException, InterruptedException {
       int numSpanItr = futures.size();
       try {
         SpanIterator iter = null;
-        while(this.futures.size() > 0) {
+        while(!this.futures.isEmpty()) {
           Future<SpanIterator> futureIter = this.futures.remove(0);
           iter = futureIter.get();
           this.add(iter);
         }
 
-        if (heap.size() == 0) {
+        if (heap.isEmpty()) {
           return false;
         }
         for(SpanIterator sp: heap) {
@@ -1506,7 +1506,7 @@ public class PipelinedSorter extends ExternalSorter {
       return heap.peek();
     }
 
-    public final boolean next() {
+    public boolean next() {
       SpanIterator current = pop();
 
       if(current != null) {

@@ -224,9 +224,7 @@ public class IFile {
     protected void writeKVPair(byte[] keyData, int keyPos, int keyLength,
         byte[] valueData, int valPos, int valueLength) throws IOException {
       if (!bufferFull) {
-        // Compute actual payload size: write RLE marker, length info and then entire data.
-        totalSize += ((prevKey == REPEAT_KEY) ? V_END_MARKER_SIZE : 0)
-            + INT_SIZE + keyLength
+        totalSize += INT_SIZE + keyLength
             + INT_SIZE + valueLength;
 
         if (shouldWriteToDisk()) {
@@ -239,7 +237,7 @@ public class IFile {
     @Override
     protected void writeValue(byte[] data, int offset, int length) throws IOException {
       if (!bufferFull) {
-        totalSize += ((prevKey != REPEAT_KEY) ? RLE_MARKER_SIZE : 0) + INT_SIZE + length;
+        totalSize += INT_SIZE + length;
 
         if (shouldWriteToDisk()) {
           resetToFileBasedWriter();
@@ -301,16 +299,10 @@ public class IFile {
 
     // Count records written to disk
     private long numRecordsWritten = 0;
-    private long rleWritten = 0;      //number of RLE markers written
-    private long totalKeySaving = 0;  //number of keys saved due to multi KV writes + RLE
     private final TezCounter writtenRecordsCounter;
     private final TezCounter serializedUncompressedBytes;
 
-    protected DataInputBuffer prevKey = null;
     protected boolean headerWritten = false;
-
-    final int RLE_MARKER_SIZE = INT_SIZE;
-    final int V_END_MARKER_SIZE = INT_SIZE;
 
     // We use writeBuffer[] to reduce the number of writes to 'out' and thus
     // to reduce the number of writes to 'compressedOut'.
@@ -320,16 +312,6 @@ public class IFile {
     private int writeOffset;
 
     private final Compressor compressorExternal;  // not to be shared with concurrent threads
-
-    protected Writer(FileSystem fs, Path file,
-                     CompressionCodec codec,
-                     TezCounter writesCounter,
-                     TezCounter serializedBytesCounter,
-                     byte[] writeBuffer) throws IOException {
-      this(fs.create(file), codec,
-          writesCounter, serializedBytesCounter, writeBuffer, null);
-      ownOutputStream = true;   // because of fs.create(file)
-    }
 
     protected Writer(FSDataOutputStream outputStream,
                      CompressionCodec codec, TezCounter writesCounter,
@@ -429,10 +411,8 @@ public class IFile {
         writtenRecordsCounter.increment(numRecordsWritten);
       }
       if (isDebugEnabled) {
-        LOG.debug("Total keys written=" + numRecordsWritten + "; rleEnabled=" + hasRle() + "; Savings" +
-            "(due to multi-kv/rle)=" + totalKeySaving + "; number of RLEs written=" +
-            rleWritten + "; compressedLen=" + compressedBytesWritten + "; rawLen="
-            + decompressedBytesWritten);
+        LOG.debug("Total keys written=" + numRecordsWritten + "; compressedLen="
+            + compressedBytesWritten + "; rawLen=" + decompressedBytesWritten);
       }
     }
 
@@ -441,7 +421,6 @@ public class IFile {
     }
 
     protected void writeValue(byte[] data, int offset, int length) throws IOException {
-      writeRLE();
       bufferWriteInt(length); // value length
       bufferWriteBytes(data, offset, length);
       // Update bytes written
@@ -449,13 +428,10 @@ public class IFile {
       if (serializedUncompressedBytes != null) {
         serializedUncompressedBytes.increment(length);
       }
-      totalKeySaving++;
     }
 
     protected void writeKVPair(byte[] keyData, int keyPos, int keyLength,
         byte[] valueData, int valPos, int valueLength) throws IOException {
-      writeValueMarker();
-
       long combined = ((long) keyLength << 32) | (valueLength & 0xFFFFFFFFL);
       bufferWriteLong(combined);
 
@@ -469,21 +445,7 @@ public class IFile {
       }
     }
 
-    protected void writeRLE() throws IOException {
-    }
-
-    protected void writeValueMarker() throws IOException {
-    }
-
     protected void onClose() throws IOException {
-    }
-
-    protected boolean hasRle() {
-      return false;
-    }
-
-    protected void incrementRleWritten() {
-      rleWritten++;
     }
 
     protected void incrementDecompressedBytesWritten(long length) {
@@ -543,7 +505,12 @@ public class IFile {
 
     private final DataOutputBuffer previous = new DataOutputBuffer();
     // de-dup keys or not
-    protected final boolean rle;
+    private final boolean rle;
+    private DataInputBuffer prevKey = null;
+    private long rleWritten = 0;      //number of RLE markers written
+    private long totalKeySaving = 0;  //number of keys saved due to multi KV writes + RLE
+    private static final int RLE_MARKER_SIZE = INT_SIZE;
+    private static final int V_END_MARKER_SIZE = INT_SIZE;
 
     public WriterInputBuffer(FileSystem fs, Path file,
         CompressionCodec codec,
@@ -562,8 +529,17 @@ public class IFile {
     }
 
     @Override
-    protected boolean hasRle() {
-      return rle;
+    protected void writeValue(byte[] data, int offset, int length) throws IOException {
+      writeRLE();
+      super.writeValue(data, offset, length);
+      totalKeySaving++;
+    }
+
+    @Override
+    protected void writeKVPair(byte[] keyData, int keyPos, int keyLength,
+        byte[] valueData, int valPos, int valueLength) throws IOException {
+      writeValueMarker();
+      super.writeKVPair(keyData, keyPos, keyLength, valueData, valPos, valueLength);
     }
 
     /**
@@ -598,16 +574,14 @@ public class IFile {
       incrementRecordsWritten();
     }
 
-    @Override
     protected void writeRLE() throws IOException {
       if (prevKey != REPEAT_KEY) {
         bufferWriteInt(RLE_MARKER);
         incrementDecompressedBytesWritten(RLE_MARKER_SIZE);
-        incrementRleWritten();
+        rleWritten++;
       }
     }
 
-    @Override
     protected void writeValueMarker() throws IOException {
       if (prevKey == REPEAT_KEY) {
         bufferWriteInt(V_END_MARKER);
@@ -618,14 +592,17 @@ public class IFile {
     @Override
     protected void onClose() throws IOException {
       writeValueMarker();
+      if (isDebugEnabled) {
+        LOG.debug("WriterInputBuffer rleEnabled=" + rle + "; Savings(due to multi-kv/rle)="
+            + totalKeySaving + "; number of RLEs written=" + rleWritten);
+      }
     }
   }
 
-  @SuppressWarnings({"unchecked", "rawtypes"})
   public static class WriterBytesWritable extends Writer {
 
-    private final Serializer keySerializer;
-    private final Serializer valueSerializer;
+    private final Serializer<BytesWritable> keySerializer;
+    private final Serializer<BytesWritable> valueSerializer;
     private final DataOutputBuffer buffer = new DataOutputBuffer();
 
     public WriterBytesWritable(FileSystem fs, Path file,

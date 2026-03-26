@@ -93,8 +93,8 @@ public abstract class ExternalSorter {
 
   protected final Partitioner partitioner;
 
-  protected final Serializer keySerializer;
-  protected final Serializer valSerializer;
+  protected final Serializer<BytesWritable> keySerializer;
+  protected final Serializer<BytesWritable> valSerializer;
 
   // Compression for map-outputs
   protected final CompressionCodec codec;

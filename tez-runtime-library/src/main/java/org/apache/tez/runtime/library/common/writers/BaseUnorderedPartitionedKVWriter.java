@@ -60,8 +60,8 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriterEd
   protected final int numPartitions;
 
   protected final Partitioner partitioner;
-  protected final Serializer keySerializer;
-  protected final Serializer valSerializer;
+  protected final Serializer<BytesWritable> keySerializer;
+  protected final Serializer<BytesWritable> valSerializer;
   protected final CompressionCodec codec;
 
   protected final String auxiliaryService;
