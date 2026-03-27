@@ -35,7 +35,6 @@ import org.apache.tez.dag.api.UserPayload;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.ConfigUtils;
 import org.apache.tez.runtime.library.input.OrderedGroupedKVInput;
-import org.apache.tez.runtime.library.input.OrderedGroupedInputLegacy;
 
 /**
  * Configure {@link org.apache.tez.runtime.library.input.OrderedGroupedKVInput} </p>
@@ -49,16 +48,9 @@ public class OrderedGroupedKVInputConfig {
 
   private String inputClassName;
 
-  OrderedGroupedKVInputConfig() {
-  }
-
-  private OrderedGroupedKVInputConfig(Configuration conf, boolean useLegacyInput) {
+  private OrderedGroupedKVInputConfig(Configuration conf) {
     this.conf = conf;
-    if (useLegacyInput) {
-      inputClassName = OrderedGroupedInputLegacy.class.getName();
-    } else {
-      inputClassName = OrderedGroupedKVInput.class.getName();
-    }
+    inputClassName = OrderedGroupedKVInput.class.getName();
   }
 
   /**
@@ -84,7 +76,6 @@ public class OrderedGroupedKVInputConfig {
   public static class Builder {
 
     private final Configuration conf = new Configuration(false);
-    private boolean useLegacyInput = false;
 
     /**
      * Create a configuration builder for {@link org.apache.tez.runtime.library.input.OrderedGroupedKVInput}
@@ -104,11 +95,6 @@ public class OrderedGroupedKVInputConfig {
               OrderedGroupedKVInput.getConfigurationKeySet());
       ConfigUtils.addConfigMapToConfiguration(this.conf, tezDefaults);
       ConfigUtils.addConfigMapToConfiguration(this.conf, TezRuntimeConfiguration.getOtherConfigDefaults());
-    }
-
-    public Builder useLegacyInput() {
-      this.useLegacyInput = true;
-      return this;
     }
 
     public Builder setShuffleBufferFraction(float shuffleBufferFraction) {
@@ -238,8 +224,7 @@ public class OrderedGroupedKVInputConfig {
      * @return an instance of the Configuration
      */
     public OrderedGroupedKVInputConfig build() {
-      return new OrderedGroupedKVInputConfig(this.conf, this.useLegacyInput);
+      return new OrderedGroupedKVInputConfig(this.conf);
     }
   }
-
 }

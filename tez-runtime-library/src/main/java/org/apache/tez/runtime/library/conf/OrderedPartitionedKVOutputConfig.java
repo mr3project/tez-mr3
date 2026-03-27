@@ -54,9 +54,6 @@ public class OrderedPartitionedKVOutputConfig {
 
   Configuration conf;
 
-  OrderedPartitionedKVOutputConfig() {
-  }
-
   private OrderedPartitionedKVOutputConfig(Configuration conf) {
     this.conf = conf;
   }

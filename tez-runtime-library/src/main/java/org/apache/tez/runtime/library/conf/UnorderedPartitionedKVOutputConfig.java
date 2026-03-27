@@ -45,9 +45,6 @@ public class UnorderedPartitionedKVOutputConfig {
   @SuppressWarnings("rawtypes")
   Configuration conf;
 
-  UnorderedPartitionedKVOutputConfig() {
-  }
-
   private UnorderedPartitionedKVOutputConfig(Configuration conf) {
     this.conf = conf;
   }

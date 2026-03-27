@@ -44,9 +44,6 @@ public class UnorderedKVOutputConfig {
 
   Configuration conf;
 
-  UnorderedKVOutputConfig() {
-  }
-
   private UnorderedKVOutputConfig(Configuration conf) {
     this.conf = conf;
   }
