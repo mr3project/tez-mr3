@@ -97,34 +97,6 @@ public class OrderedGroupedKVInputConfig {
       ConfigUtils.addConfigMapToConfiguration(this.conf, TezRuntimeConfiguration.getOtherConfigDefaults());
     }
 
-    public Builder setShuffleBufferFraction(float shuffleBufferFraction) {
-      this.conf.setFloat(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT,
-          shuffleBufferFraction);
-      return this;
-    }
-
-    public Builder setPostMergeBufferFraction(float postMergeBufferFraction) {
-      this.conf.setFloat(TezRuntimeConfiguration.TEZ_RUNTIME_INPUT_POST_MERGE_BUFFER_PERCENT,
-          postMergeBufferFraction);
-      return this;
-    }
-
-    public Builder setMaxSingleMemorySegmentFraction(float maxSingleSegmentFraction) {
-      this.conf.setFloat(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MEMORY_LIMIT_PERCENT,
-          maxSingleSegmentFraction);
-      return this;
-    }
-
-    public Builder setMemToMemMerger(boolean enable) {
-      this.conf.setBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_ENABLE_MEMTOMEM, enable);
-      return this;
-    }
-
-    public Builder setMergeFraction(float mergeFraction) {
-      this.conf.setFloat(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MERGE_PERCENT, mergeFraction);
-      return this;
-    }
-
     /**
      * Set the key comparator class
      *
