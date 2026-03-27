@@ -163,13 +163,6 @@ public class UnorderedPartitionedKVEdgeConfig extends KeyValuesBasedBaseEdgeConf
     }
 
     @Override
-    public Builder setAdditionalConfiguration(Map<String, String> confMap) {
-      outputBuilder.setAdditionalConfiguration(confMap);
-      inputBuilder.setAdditionalConfiguration(confMap);
-      return this;
-    }
-
-    @Override
     /**
      * Edge config options are derived from client-side tez-site.xml (recommended).
      * Optionally invoke setFromConfiguration to override these config options via commandline arguments.

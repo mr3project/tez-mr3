@@ -477,7 +477,6 @@ public class TezRuntimeConfiguration {
       if (tezRuntimeKeys.contains(confEntry.getKey())) {
         tezRuntimeConfMap.put(confEntry.getKey(), confEntry.getValue());
       } else {
-        // TODO TEZ-1232 Filter out parameters from TezConfiguration, and Task specific confs
         otherConfMap.put(confEntry.getKey(), confEntry.getValue());
         otherKeys.add(confEntry.getKey());
       }

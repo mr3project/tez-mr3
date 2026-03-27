@@ -73,14 +73,6 @@ public class OrderedPartitionedKVOutputConfig {
     }
   }
 
-  public void fromUserPayload(UserPayload payload) {
-    try {
-      this.conf = TezUtils.createConfFromUserPayload(payload);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
   public static Builder newBuilder(String keyClass, String valueClass, String partitionerClassName) {
     return newBuilder(keyClass, valueClass, partitionerClassName, null);
   }
@@ -154,16 +146,6 @@ public class OrderedPartitionedKVOutputConfig {
           this.conf.set(key, value);
         }
       }
-      return this;
-    }
-
-    @SuppressWarnings("unchecked")
-    public Builder setAdditionalConfiguration(Map<String, String> confMap) {
-      Objects.requireNonNull(confMap, "ConfMap cannot be null");
-      Map<String, String> map = ConfigUtils.extractConfigurationMap(confMap,
-          Lists.newArrayList(OrderedPartitionedKVOutput.getConfigurationKeySet(),
-              TezRuntimeConfiguration.getRuntimeAdditionalConfigKeySet()), TezRuntimeConfiguration.getAllowedPrefixes());
-      ConfigUtils.addConfigMapToConfiguration(this.conf, map);
       return this;
     }
 

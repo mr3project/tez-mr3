@@ -96,6 +96,14 @@ public class ConfigUtils {
     return conf.getBoolean("mapred.mapper.new-api", false);
   }
 
+  public static void addConfigMapToConfiguration(Configuration conf, Map<String, String> confMap) {
+    Preconditions.checkArgument(conf != null, "Configuration cannot be null");
+    Preconditions.checkArgument(confMap != null, "Configuration map cannot be null");
+    for (Map.Entry<String, String> entry : confMap.entrySet()) {
+      conf.set(entry.getKey(), entry.getValue());
+    }
+  }
+
   public static Map<String, String> extractConfigurationMap(Map<String, String> confMap, Set<String> allowedKeys) {
     Preconditions.checkArgument(confMap != null, "ConfMap cannot be null");
     Preconditions.checkArgument(allowedKeys != null, "Valid key set cannot be empty");
@@ -106,24 +114,6 @@ public class ConfigUtils {
       }
     }
     return map;
-  }
-
-  public static void addConfigMapToConfiguration(Configuration conf, Map<String, String> confMap) {
-    Preconditions.checkArgument(conf != null, "Configuration cannot be null");
-    Preconditions.checkArgument(confMap != null, "Configuration map cannot be null");
-    for (Map.Entry<String, String> entry : confMap.entrySet()) {
-      conf.set(entry.getKey(), entry.getValue());
-    }
-  }
-
-  public static Map<String, String> extractConfigurationMap(Map<String, String> confMap,
-                                                            List<Set<String>> validKeySets,
-                                                            List<String> allowedPrefixes) {
-    Preconditions.checkArgument(confMap != null, "ConfMap cannot be null");
-    Preconditions.checkArgument(validKeySets != null, "Valid key set cannot be empty");
-    Preconditions.checkArgument(allowedPrefixes != null, "Allowed prefixes cannot be null");
-
-    return extractConfigurationMapInternal(confMap.entrySet(), validKeySets, allowedPrefixes);
   }
 
   public static Map<String, String> extractConfigurationMap(Configuration conf,
@@ -170,26 +160,5 @@ public class ConfigUtils {
         destConf.set(entry.getKey(), entry.getValue());
       }
     }
-  }
-
-  private static Map<String, String> extractConfigurationMapInternal(
-      Iterable<Map.Entry<String, String>> iterable, List<Set<String>> validKeySets, List<String> allowedPrefixes) {
-    Set<String> validKeys = new HashSet<String>();
-    for (Set<String> set : validKeySets) {
-      validKeys.addAll(set);
-    }
-    Map<String, String> localConfMap = new HashMap<String, String>();
-    for (Map.Entry<String, String> entry : iterable) {
-      if (validKeys.contains(entry.getKey())) {
-        localConfMap.put(entry.getKey(), entry.getValue());
-      } else {
-        for (String prefix : allowedPrefixes) {
-          if (entry.getKey().startsWith(prefix)) {
-            localConfMap.put(entry.getKey(), entry.getValue());
-          }
-        }
-      }
-    }
-    return localConfMap;
   }
 }

@@ -20,7 +20,6 @@
 
 package org.apache.tez.runtime.library.conf;
 
-import java.util.Map;
 import java.util.Objects;
 
 import org.apache.hadoop.conf.Configuration;
@@ -151,13 +150,6 @@ public class UnorderedKVEdgeConfig extends KeyValuesBasedBaseEdgeConfig {
     public Builder setAdditionalConfiguration(String key, String value) {
       outputBuilder.setAdditionalConfiguration(key, value);
       inputBuilder.setAdditionalConfiguration(key, value);
-      return this;
-    }
-
-    @Override
-    public Builder setAdditionalConfiguration(Map<String, String> confMap) {
-      outputBuilder.setAdditionalConfiguration(confMap);
-      inputBuilder.setAdditionalConfiguration(confMap);
       return this;
     }
 

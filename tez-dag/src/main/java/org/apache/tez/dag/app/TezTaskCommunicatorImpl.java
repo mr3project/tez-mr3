@@ -24,7 +24,6 @@ import java.util.Objects;
 
 import com.google.common.collect.Maps;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.ipc.ProtocolSignature;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.Server;
@@ -152,13 +151,6 @@ public class TezTaskCommunicatorImpl extends TaskCommunicator {
           .setPort(0)
           .setInstance(taskUmbilical)
           .setSecretManager(jobTokenSecretManager).build();
-
-      // Enable service authorization?
-      if (conf.getBoolean(
-          CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION,
-          false)) {
-        refreshServiceAcls(conf, new TezAMPolicyProvider());
-      }
 
       server.start();
       InetSocketAddress serverBindAddress = NetUtils.getConnectAddress(server);

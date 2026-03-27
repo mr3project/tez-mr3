@@ -62,8 +62,7 @@ public class SleepProcessor extends AbstractLogicalIOProcessor {
         + ", using default timeToSleep of 1 ms");
       timeToSleepMS = 1;
     } else {
-      SleepProcessorConfig cfg =
-        new SleepProcessorConfig();
+      SleepProcessorConfig cfg = new SleepProcessorConfig();
       cfg.fromUserPayload(getContext().getUserPayload());
       timeToSleepMS = cfg.getTimeToSleepMS();
     }

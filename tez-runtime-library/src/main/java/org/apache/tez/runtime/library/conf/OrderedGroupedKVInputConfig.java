@@ -73,14 +73,6 @@ public class OrderedGroupedKVInputConfig {
     }
   }
 
-  public void fromUserPayload(UserPayload payload) {
-    try {
-      this.conf = TezUtils.createConfFromUserPayload(payload);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
   public String getInputClassName() {
     return inputClassName;
   }
@@ -195,16 +187,6 @@ public class OrderedGroupedKVInputConfig {
           this.conf.set(key, value);
         }
       }
-      return this;
-    }
-
-    @SuppressWarnings("unchecked")
-    public Builder setAdditionalConfiguration(Map<String, String> confMap) {
-      Objects.requireNonNull(confMap, "ConfMap cannot be null");
-      Map<String, String> map = ConfigUtils.extractConfigurationMap(confMap,
-          Lists.newArrayList(OrderedGroupedKVInput.getConfigurationKeySet(),
-              TezRuntimeConfiguration.getRuntimeAdditionalConfigKeySet()), TezRuntimeConfiguration.getAllowedPrefixes());
-      ConfigUtils.addConfigMapToConfiguration(this.conf, map);
       return this;
     }
 

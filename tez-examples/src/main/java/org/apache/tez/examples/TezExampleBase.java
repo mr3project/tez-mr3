@@ -29,7 +29,6 @@ import com.google.common.collect.Sets;
 import org.apache.commons.cli.Options;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.tez.client.CallerContext;
-import org.apache.tez.common.TezUtilsInternal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -58,7 +57,6 @@ public abstract class TezExampleBase extends Configured implements Tool {
   protected static final String GENERATE_SPLIT_IN_CLIENT = "generateSplitInClient";
   protected static final String LEAVE_AM_RUNNING = "leaveAmRunning";
   protected static final String RECONNECT_APP_ID = "reconnectAppId";
-
 
   private boolean disableSplitGrouping = false;
   private boolean isLocalMode = false;

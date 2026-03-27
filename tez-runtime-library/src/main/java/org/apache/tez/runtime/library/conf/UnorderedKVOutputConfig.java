@@ -20,8 +20,6 @@
 
 package org.apache.tez.runtime.library.conf;
 
-import javax.annotation.Nullable;
-
 import java.io.IOException;
 import java.util.Map;
 import java.util.Objects;
@@ -30,7 +28,6 @@ import org.apache.tez.common.Preconditions;
 import com.google.common.collect.Lists;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.tez.common.TezUtils;
 import org.apache.tez.dag.api.UserPayload;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
@@ -61,14 +58,6 @@ public class UnorderedKVOutputConfig {
   public UserPayload toUserPayload() {
     try {
       return TezUtils.createUserPayloadFromConf(conf);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  public void fromUserPayload(UserPayload payload) {
-    try {
-      this.conf = TezUtils.createConfFromUserPayload(payload);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
@@ -115,16 +104,6 @@ public class UnorderedKVOutputConfig {
           this.conf.set(key, value);
         }
       }
-      return this;
-    }
-
-    @SuppressWarnings("unchecked")
-    public Builder setAdditionalConfiguration(Map<String, String> confMap) {
-      Objects.requireNonNull(confMap, "ConfMap cannot be null");
-      Map<String, String> map = ConfigUtils.extractConfigurationMap(confMap,
-          Lists.newArrayList(UnorderedKVOutput.getConfigurationKeySet(),
-              TezRuntimeConfiguration.getRuntimeAdditionalConfigKeySet()), TezRuntimeConfiguration.getAllowedPrefixes());
-      ConfigUtils.addConfigMapToConfiguration(this.conf, map);
       return this;
     }
 

@@ -20,8 +20,6 @@
 
 package org.apache.tez.runtime.library.conf;
 
-import java.util.Map;
-
 import org.apache.hadoop.conf.Configuration;
 
 interface BaseConfigBuilder<T> {
@@ -35,17 +33,6 @@ interface BaseConfigBuilder<T> {
    * @return this object for further chained method calls
    */
   public T setAdditionalConfiguration(String key, String value);
-
-  /**
-   * Used to set additional configuration parameters which are not set via API methods. This is
-   * primarily meant for rarely used configuration options such as IFile read-ahead, configuring
-   * the number of parallel files to merge etc. </p> Additionally keys set via this method are
-   * made available to the combiner.
-   *
-   * @param confMap map of configuration key-value pairs
-   * @return this object for further chained method calls
-   */
-  public T setAdditionalConfiguration(Map<String, String> confMap);
 
   /**
    * Used to build out a configuration from an existing Hadoop {@link
