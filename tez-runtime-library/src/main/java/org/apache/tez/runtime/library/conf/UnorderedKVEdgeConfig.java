@@ -140,25 +140,12 @@ public class UnorderedKVEdgeConfig extends HadoopKeyValuesBasedBaseEdgeConfig {
 
   public static class Builder extends HadoopKeyValuesBasedBaseEdgeConfig.Builder<Builder> {
 
-    private final UnorderedKVOutputConfig.Builder outputBuilder =
-        new UnorderedKVOutputConfig.Builder();
-
-    private final UnorderedKVInputConfig.Builder inputBuilder =
-        new UnorderedKVInputConfig.Builder();
+    private final UnorderedKVOutputConfig.Builder outputBuilder;
+    private final UnorderedKVInputConfig.Builder inputBuilder;
 
     Builder(String keyClassName, String valueClassName) {
-      outputBuilder.setKeyClassName(keyClassName);
-      outputBuilder.setValueClassName(valueClassName);
-      inputBuilder.setKeyClassName(keyClassName);
-      inputBuilder.setValueClassName(valueClassName);
-    }
-
-    @Override
-    public Builder setCompression(boolean enabled, @Nullable String compressionCodec,
-                                  @Nullable Map<String, String> codecConf) {
-      outputBuilder.setCompression(enabled, compressionCodec, codecConf);
-      inputBuilder.setCompression(enabled, compressionCodec, codecConf);
-      return this;
+      outputBuilder = new UnorderedKVOutputConfig.Builder(keyClassName, valueClassName);
+      inputBuilder = new UnorderedKVInputConfig.Builder(keyClassName, valueClassName);
     }
 
     @Override

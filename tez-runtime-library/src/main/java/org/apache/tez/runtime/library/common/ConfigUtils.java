@@ -44,8 +44,7 @@ public class ConfigUtils {
     String name = conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS_CODEC);
     if (name != null) {
       try {
-        codecClass = conf.getClassByName(name).asSubclass(
-            CompressionCodec.class);
+        codecClass = conf.getClassByName(name).asSubclass(CompressionCodec.class);
       } catch (ClassNotFoundException e) {
         throw new IllegalArgumentException("Compression codec " + name
             + " was not found.", e);
@@ -54,73 +53,45 @@ public class ConfigUtils {
     return codecClass;
   }
 
-  // TODO Move defaults over to a constants file.
-  
   public static boolean shouldCompressIntermediateOutput(Configuration conf) {
     return conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS, false);
   }
 
-  public static <V> Class<V> getIntermediateOutputValueClass(Configuration conf) {
-    Class<V> retv = (Class<V>) conf.getClass(
-        TezRuntimeConfiguration.TEZ_RUNTIME_VALUE_CLASS, null,
-        Object.class);
-    return retv;
-  }
-  
-  public static <V> Class<V> getIntermediateInputValueClass(Configuration conf) {
-    Class<V> retv = (Class<V>) conf.getClass(
-        TezRuntimeConfiguration.TEZ_RUNTIME_VALUE_CLASS, null,
-        Object.class);
-    return retv;
-  }
-
-  public static <K> Class<K> getIntermediateOutputKeyClass(Configuration conf) {
-    Class<K> retv = (Class<K>) conf.getClass(
-        TezRuntimeConfiguration.TEZ_RUNTIME_KEY_CLASS, null,
-        Object.class);
-    return retv;
-  }
-
   public static <K> Class<K> getIntermediateInputKeyClass(Configuration conf) {
     Class<K> retv = (Class<K>) conf.getClass(
-        TezRuntimeConfiguration.TEZ_RUNTIME_KEY_CLASS, null,
-        Object.class);
+        TezRuntimeConfiguration.TEZ_RUNTIME_KEY_CLASS,
+        null, Object.class);
     return retv;
   }
 
-  public static <K> RawComparator<K> getIntermediateOutputKeyComparator(Configuration conf) {
-    Class<? extends RawComparator> theClass = conf.getClass(
-        TezRuntimeConfiguration.TEZ_RUNTIME_KEY_COMPARATOR_CLASS, null,
-        RawComparator.class);
-    if (theClass != null)
-      return ReflectionUtils.newInstance(theClass, conf);
-    return WritableComparator.get(getIntermediateOutputKeyClass(conf).asSubclass(
-        WritableComparable.class), conf);
-  }
-
-  public static <K> RawComparator<K> getIntermediateInputKeyComparator(Configuration conf) {
-    Class<? extends RawComparator> theClass = conf.getClass(
-        TezRuntimeConfiguration.TEZ_RUNTIME_KEY_COMPARATOR_CLASS, null,
-        RawComparator.class);
-    if (theClass != null)
-      return ReflectionUtils.newInstance(theClass, conf);
-    return WritableComparator.get(getIntermediateInputKeyClass(conf).asSubclass(
-        WritableComparable.class), conf);
+  public static <V> Class<V> getIntermediateInputValueClass(Configuration conf) {
+    Class<V> retv = (Class<V>) conf.getClass(
+        TezRuntimeConfiguration.TEZ_RUNTIME_VALUE_CLASS,
+        null, Object.class);
+    return retv;
   }
 
   public static <V> RawComparator<V> getInputKeySecondaryGroupingComparator(
       Configuration conf) {
-    Class<? extends RawComparator> theClass = conf
-        .getClass(
-            TezRuntimeConfiguration.TEZ_RUNTIME_KEY_SECONDARY_COMPARATOR_CLASS,
-            null, RawComparator.class);
-    if (theClass == null) {
-      return getIntermediateInputKeyComparator(conf);
+    Class<? extends RawComparator> theClass = conf.getClass(
+        TezRuntimeConfiguration.TEZ_RUNTIME_KEY_SECONDARY_COMPARATOR_CLASS,
+        null, RawComparator.class);
+    if (theClass != null) {
+      return ReflectionUtils.newInstance(theClass, conf);
     }
-
-    return ReflectionUtils.newInstance(theClass, conf);
+    return getIntermediateInputKeyComparator(conf);
   }
-  
+
+  public static <K> RawComparator<K> getIntermediateInputKeyComparator(Configuration conf) {
+    Class<? extends RawComparator> theClass = conf.getClass(
+        TezRuntimeConfiguration.TEZ_RUNTIME_KEY_COMPARATOR_CLASS,
+        null, RawComparator.class);
+    if (theClass != null)
+      return ReflectionUtils.newInstance(theClass, conf);
+    return WritableComparator.get(getIntermediateInputKeyClass(conf).asSubclass(
+      WritableComparable.class), conf);
+  }
+
   public static boolean useNewApi(Configuration conf) {
     return conf.getBoolean("mapred.mapper.new-api", false);
   }
@@ -153,15 +124,6 @@ public class ConfigUtils {
     Preconditions.checkArgument(allowedPrefixes != null, "Allowed prefixes cannot be null");
 
     return extractConfigurationMapInternal(confMap.entrySet(), validKeySets, allowedPrefixes);
-  }
-
-  public static Map<String, String> extractConfigurationMap(Configuration conf,
-                                                            List<Set<String>> validKeySets,
-                                                            List<String> allowedPrefixes) {
-    Preconditions.checkArgument(conf != null, "conf cannot be null");
-    Preconditions.checkArgument(validKeySets != null, "Valid key set cannot be empty");
-    Preconditions.checkArgument(allowedPrefixes != null, "Allowed prefixes cannot be null");
-    return extractConfigurationMapInternal(conf, validKeySets, allowedPrefixes);
   }
 
   public static Map<String, String> extractConfigurationMap(Configuration conf,
@@ -207,16 +169,6 @@ public class ConfigUtils {
       if (!excludedKeySet.contains(entry.getKey())) {
         destConf.set(entry.getKey(), entry.getValue());
       }
-    }
-  }
-
-  public static void mergeConfs(Configuration destConf, Configuration srcConf) {
-    Preconditions.checkState(destConf != null, "Destination conf cannot be null");
-    Preconditions.checkState(srcConf != null, "Source conf cannot be null");
-    for (Map.Entry<String, String> entry : srcConf) {
-      // Explicit get to have parameter replacement work.
-      String val = srcConf.get(entry.getKey());
-      destConf.set(entry.getKey(), val);
     }
   }
 

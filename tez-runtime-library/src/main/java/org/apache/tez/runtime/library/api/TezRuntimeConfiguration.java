@@ -218,13 +218,13 @@ public class TezRuntimeConfiguration {
   public static final String TEZ_RUNTIME_KEY_COMPARATOR_CLASS =
       TEZ_RUNTIME_PREFIX + "key.comparator.class";
 
+  // fixed as BytesWritable, but keep for compatibility
   @ConfigurationProperty
-  public static final String TEZ_RUNTIME_KEY_CLASS =
-      TEZ_RUNTIME_PREFIX + "key.class";
+  public static final String TEZ_RUNTIME_KEY_CLASS = TEZ_RUNTIME_PREFIX + "key.class";
 
+  // fixed as BytesWritable, but keep for compatibility
   @ConfigurationProperty
-  public static final String TEZ_RUNTIME_VALUE_CLASS =
-      TEZ_RUNTIME_PREFIX + "value.class";
+  public static final String TEZ_RUNTIME_VALUE_CLASS = TEZ_RUNTIME_PREFIX + "value.class";
 
   @ConfigurationProperty
   public static final String TEZ_RUNTIME_KEY_SECONDARY_COMPARATOR_CLASS =

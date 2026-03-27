@@ -140,19 +140,14 @@ public class OrderedPartitionedKVEdgeConfig
 
   public static class Builder extends HadoopKeyValuesBasedBaseEdgeConfig.Builder<Builder> {
 
-    private final OrderedPartitionedKVOutputConfig.Builder outputBuilder =
-        new OrderedPartitionedKVOutputConfig.Builder();
-
-    private final OrderedGroupedKVInputConfig.Builder inputBuilder =
-        new OrderedGroupedKVInputConfig.Builder();
+    private final OrderedPartitionedKVOutputConfig.Builder outputBuilder;
+    private final OrderedGroupedKVInputConfig.Builder inputBuilder;
 
     Builder(String keyClassName, String valueClassName, String partitionerClassName,
             Map<String, String> partitionerConf) {
-      outputBuilder.setKeyClassName(keyClassName);
-      outputBuilder.setValueClassName(valueClassName);
-      outputBuilder.setPartitioner(partitionerClassName, partitionerConf);
-      inputBuilder.setKeyClassName(keyClassName);
-      inputBuilder.setValueClassName(valueClassName);
+      outputBuilder = new OrderedPartitionedKVOutputConfig.Builder(
+          keyClassName, valueClassName, partitionerClassName, partitionerConf);
+      inputBuilder = new OrderedGroupedKVInputConfig.Builder(keyClassName, valueClassName);
     }
 
     /**
@@ -212,14 +207,6 @@ public class OrderedPartitionedKVEdgeConfig
       return this;
     }
 
-
-    @Override
-    public Builder setCompression(boolean enabled, @Nullable String compressionCodec,
-                                  @Nullable Map<String, String> codecConf) {
-      outputBuilder.setCompression(enabled, compressionCodec, codecConf);
-      inputBuilder.setCompression(enabled, compressionCodec, codecConf);
-      return this;
-    }
 
     @Override
     public Builder setAdditionalConfiguration(String key, String value) {

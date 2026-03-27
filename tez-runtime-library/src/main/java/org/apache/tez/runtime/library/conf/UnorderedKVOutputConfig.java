@@ -90,8 +90,8 @@ public class UnorderedKVOutputConfig {
      */
     Builder(String keyClassName, String valueClassName) {
       this();
-      setKeyClassName(keyClassName);
-      setValueClassName(valueClassName);
+      Objects.requireNonNull(keyClassName, "Key class name cannot be null");
+      Objects.requireNonNull(valueClassName, "Value class name cannot be null");
     }
 
     Builder() {
@@ -100,18 +100,6 @@ public class UnorderedKVOutputConfig {
               UnorderedKVOutput.getConfigurationKeySet());
       ConfigUtils.addConfigMapToConfiguration(this.conf, tezDefaults);
       ConfigUtils.addConfigMapToConfiguration(this.conf, TezRuntimeConfiguration.getOtherConfigDefaults());
-    }
-
-    Builder setKeyClassName(String keyClassName) {
-      Objects.requireNonNull(keyClassName, "Key class name cannot be null");
-      this.conf.set(TezRuntimeConfiguration.TEZ_RUNTIME_KEY_CLASS, keyClassName);
-      return this;
-    }
-
-    Builder setValueClassName(String valueClassName) {
-      Objects.requireNonNull(valueClassName, "Value class name cannot be null");
-      this.conf.set(TezRuntimeConfiguration.TEZ_RUNTIME_VALUE_CLASS, valueClassName);
-      return this;
     }
 
     @SuppressWarnings("unchecked")
@@ -175,21 +163,6 @@ public class UnorderedKVOutputConfig {
     public Builder setValueSerializationClass(String serializationClassName) {
       Preconditions.checkArgument(serializationClassName != null,
           "serializationClassName cannot be null");
-      return this;
-    }
-
-    public Builder setCompression(boolean enabled, @Nullable String compressionCodec,
-                                  @Nullable Map<String, String> codecConf) {
-      this.conf.setBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS, enabled);
-      if (enabled && compressionCodec != null) {
-        this.conf
-            .set(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS_CODEC, compressionCodec);
-      }
-      if (codecConf != null) {
-        // Merging the confs for now. Change to be specific in the future.
-        ConfigUtils.mergeConfsWithExclusions(this.conf, codecConf,
-            TezRuntimeConfiguration.getRuntimeConfigKeySet());
-      }
       return this;
     }
 

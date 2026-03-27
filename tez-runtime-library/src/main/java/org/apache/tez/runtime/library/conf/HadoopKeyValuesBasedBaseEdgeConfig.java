@@ -51,21 +51,5 @@ abstract class HadoopKeyValuesBasedBaseEdgeConfig {
   public abstract String getInputClassName();
 
   public abstract static class Builder<T extends Builder<T>> implements BaseConfigBuilder<T> {
-
-    /**
-     * Enable compression for the specific Input / Output / Edge
-     *
-     * @param enabled          whether to enable compression or not
-     * @param compressionCodec the codec to be used if compression is enabled. null implies using
-     *                         the default
-     * @param codecConf        the codec configuration. This can be null, and is a {@link
-     *                         java.util.Map} of key-value pairs. The keys should be limited to
-     *                         the ones required by the comparator.
-     * @return instance of the current builder
-     */
-    public abstract T setCompression(boolean enabled, @Nullable String compressionCodec,
-                            @Nullable Map<String, String> codecConf);
-
   }
-
 }
