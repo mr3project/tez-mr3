@@ -40,8 +40,7 @@ import org.apache.tez.runtime.library.output.UnorderedPartitionedKVOutput;
  * Values will be picked up from tez-site if not specified, otherwise defaults from
  * {@link org.apache.tez.runtime.library.api.TezRuntimeConfiguration} will be used.
  */
-public class UnorderedPartitionedKVEdgeConfig
-    extends HadoopKeyValuesBasedBaseEdgeConfig {
+public class UnorderedPartitionedKVEdgeConfig extends KeyValuesBasedBaseEdgeConfig {
 
   private final UnorderedPartitionedKVOutputConfig outputConf;
   private final UnorderedKVInputConfig inputConf;
@@ -143,7 +142,7 @@ public class UnorderedPartitionedKVEdgeConfig
     return edgeProperty;
   }
 
-  public static class Builder extends HadoopKeyValuesBasedBaseEdgeConfig.Builder<Builder> {
+  public static class Builder implements BaseConfigBuilder<Builder> {
 
     private final UnorderedPartitionedKVOutputConfig.Builder outputBuilder;
     private final UnorderedKVInputConfig.Builder inputBuilder;
@@ -215,6 +214,5 @@ public class UnorderedPartitionedKVEdgeConfig
     public UnorderedPartitionedKVEdgeConfig build() {
       return new UnorderedPartitionedKVEdgeConfig(outputBuilder.build(), inputBuilder.build());
     }
-
   }
 }

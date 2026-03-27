@@ -37,8 +37,7 @@ import org.apache.tez.runtime.library.output.OrderedPartitionedKVOutput;
  * Values will be picked up from tez-site if not specified, otherwise defaults from
  * {@link org.apache.tez.runtime.library.api.TezRuntimeConfiguration} will be used.
  */
-public class OrderedPartitionedKVEdgeConfig
-    extends HadoopKeyValuesBasedBaseEdgeConfig {
+public class OrderedPartitionedKVEdgeConfig extends KeyValuesBasedBaseEdgeConfig {
 
   private final OrderedPartitionedKVOutputConfig outputConf;
   private final OrderedGroupedKVInputConfig inputConf;
@@ -138,7 +137,7 @@ public class OrderedPartitionedKVEdgeConfig
     return edgeProperty;
   }
 
-  public static class Builder extends HadoopKeyValuesBasedBaseEdgeConfig.Builder<Builder> {
+  public static class Builder implements BaseConfigBuilder<Builder> {
 
     private final OrderedPartitionedKVOutputConfig.Builder outputBuilder;
     private final OrderedGroupedKVInputConfig.Builder inputBuilder;
@@ -151,35 +150,6 @@ public class OrderedPartitionedKVEdgeConfig
     }
 
     /**
-     * Set the key comparator class
-     *
-     * @param comparatorClassName the key comparator class name
-     * @return instance of the current builder
-     */
-    public Builder setKeyComparatorClass(String comparatorClassName) {
-      return setKeyComparatorClass(comparatorClassName, null);
-    }
-
-    /**
-     * Set the key comparator class and it's associated configuration. This method should only be
-     * used if the comparator requires some specific configuration, which is typically not the
-     * case. {@link #setKeyComparatorClass(String)} is the preferred method for setting a
-     * comparator.
-     *
-     * @param comparatorClassName the key comparator class name
-     * @param comparatorConf      the comparator configuration. This can be null, and is a {@link
-     *                            java.util.Map} of key-value pairs. The keys should be limited to
-     *                            the ones required by the comparator.
-     * @return instance of the current builder
-     */
-    public Builder setKeyComparatorClass(String comparatorClassName,
-                                         @Nullable Map<String, String> comparatorConf) {
-      outputBuilder.setKeyComparatorClass(comparatorClassName, comparatorConf);
-      inputBuilder.setKeyComparatorClass(comparatorClassName, comparatorConf);
-      return this;
-    }
-
-    /**
      * Set serialization class and the relevant comparator to be used for sorting.
      * Providing custom serialization class could change the way, keys needs to be compared in
      * sorting. Providing invalid comparator here could create invalid results.
@@ -188,8 +158,7 @@ public class OrderedPartitionedKVEdgeConfig
      * @param comparatorClassName
      * @return this object for further chained method calls
      */
-    public Builder setKeySerializationClass(String serializationClassName,
-        String comparatorClassName) {
+    public Builder setKeySerializationClass(String serializationClassName, String comparatorClassName) {
       outputBuilder.setKeySerializationClass(serializationClassName, comparatorClassName);
       inputBuilder.setKeySerializationClass(serializationClassName, comparatorClassName);
       return this;
@@ -243,6 +212,5 @@ public class OrderedPartitionedKVEdgeConfig
     public OrderedPartitionedKVEdgeConfig build() {
       return new OrderedPartitionedKVEdgeConfig(outputBuilder.build(), inputBuilder.build());
     }
-
   }
 }

@@ -18,13 +18,9 @@
 
 package org.apache.tez.runtime.library.conf;
 
-import javax.annotation.Nullable;
-
-import java.util.Map;
-
 import org.apache.tez.dag.api.UserPayload;
 
-abstract class HadoopKeyValuesBasedBaseEdgeConfig {
+abstract class KeyValuesBasedBaseEdgeConfig {
 
   /**
    * Get the payload for the configured Output
@@ -49,7 +45,4 @@ abstract class HadoopKeyValuesBasedBaseEdgeConfig {
    * @return the input class name
    */
   public abstract String getInputClassName();
-
-  public abstract static class Builder<T extends Builder<T>> implements BaseConfigBuilder<T> {
-  }
 }

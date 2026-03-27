@@ -20,8 +20,6 @@
 
 package org.apache.tez.runtime.library.conf;
 
-import javax.annotation.Nullable;
-
 import java.util.Map;
 import java.util.Objects;
 
@@ -40,7 +38,8 @@ import org.apache.tez.runtime.library.output.UnorderedKVOutput;
  * Values will be picked up from tez-site if not specified, otherwise defaults from
  * {@link org.apache.tez.runtime.library.api.TezRuntimeConfiguration} will be used.
  */
-public class UnorderedKVEdgeConfig extends HadoopKeyValuesBasedBaseEdgeConfig {
+public class UnorderedKVEdgeConfig extends KeyValuesBasedBaseEdgeConfig {
+
   private final UnorderedKVOutputConfig outputConf;
   private final UnorderedKVInputConfig inputConf;
 
@@ -138,7 +137,7 @@ public class UnorderedKVEdgeConfig extends HadoopKeyValuesBasedBaseEdgeConfig {
     return edgeProperty;
   }
 
-  public static class Builder extends HadoopKeyValuesBasedBaseEdgeConfig.Builder<Builder> {
+  public static class Builder implements BaseConfigBuilder<Builder> {
 
     private final UnorderedKVOutputConfig.Builder outputBuilder;
     private final UnorderedKVInputConfig.Builder inputBuilder;
@@ -208,6 +207,5 @@ public class UnorderedKVEdgeConfig extends HadoopKeyValuesBasedBaseEdgeConfig {
     public UnorderedKVEdgeConfig build() {
       return new UnorderedKVEdgeConfig(outputBuilder.build(), inputBuilder.build());
     }
-
   }
 }

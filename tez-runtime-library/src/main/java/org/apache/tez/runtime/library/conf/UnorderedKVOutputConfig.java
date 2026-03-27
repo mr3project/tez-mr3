@@ -143,9 +143,6 @@ public class UnorderedKVOutputConfig {
      * Set serialization class responsible for providing serializer/deserializer for keys.
      *
      * @param serializationClassName
-     * @param serializerConf         the serializer configuration. This can be null, and is a
-     *                               {@link java.util.Map} of key-value pairs. The keys should be limited
-     *                               to the ones required by the comparator.
      * @return this object for further chained method calls
      */
     public Builder setKeySerializationClass(String serializationClassName) {
