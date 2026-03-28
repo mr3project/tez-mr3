@@ -21,8 +21,7 @@ import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.WritableComparator;
 import org.apache.tez.runtime.library.utils.FastByteComparisons;
 
-public final class TezBytesComparator extends WritableComparator implements
-    ProxyComparator<BytesWritable> {
+public final class TezBytesComparator extends WritableComparator implements ProxyComparator<BytesWritable> {
 
   public TezBytesComparator() {
     super(BytesWritable.class);
@@ -38,22 +37,20 @@ public final class TezBytesComparator extends WritableComparator implements
 
   @Override
   public int getProxy(BytesWritable key) {
-    int prefix = 0;
     final int len = key.getLength();
     final byte[] content = key.getBytes();
     int b1 = 0, b2 = 0, b3 = 0;
     switch (len) {
-    default:
-    case 3:
-      b3 = content[2] & 0xff;
-    case 2:
-      b2 = content[1] & 0xff;
-    case 1:
-      b1 = content[0] & 0xff;
-    case 0:
+      default:
+      case 3:
+        b3 = content[2] & 0xff;
+      case 2:
+        b2 = content[1] & 0xff;
+      case 1:
+        b1 = content[0] & 0xff;
+      case 0:
     }
-    prefix = (b1 << 16) | (b2 << 8) | (b3);
+    int prefix = (b1 << 16) | (b2 << 8) | (b3);
     return prefix;
   }
-
 }

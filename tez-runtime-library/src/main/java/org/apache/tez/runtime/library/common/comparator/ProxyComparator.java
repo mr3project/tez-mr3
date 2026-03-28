@@ -20,6 +20,7 @@ package org.apache.tez.runtime.library.common.comparator;
 import org.apache.hadoop.io.RawComparator;
 
 public interface ProxyComparator<KEY> extends RawComparator {
+
   /**
    * This comparator interface provides a fast-path for comparisons between keys.
    *
@@ -32,11 +33,10 @@ public interface ProxyComparator<KEY> extends RawComparator {
    *
    * getProxy(k1) == getProxy(k2) does not imply ordering, but requires actual key comparisons.
    *
-   * This serves as a way to short-circuit  the RawComparator speeds.
+   * This serves as a way to short-circuit the RawComparator speeds.
    *
    * @param key
    * @return proxy
    */
   int getProxy(KEY key);
-
 }

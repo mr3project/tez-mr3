@@ -102,9 +102,9 @@ public class OrderedPartitionedKVOutputConfig {
     }
 
     Builder() {
-      Map<String, String> tezDefaults = ConfigUtils
-          .extractConfigurationMap(TezRuntimeConfiguration.getTezRuntimeConfigDefaults(),
-              OrderedPartitionedKVOutput.getConfigurationKeySet());
+      Map<String, String> tezDefaults = ConfigUtils.extractConfigurationMap(
+          TezRuntimeConfiguration.getTezRuntimeConfigDefaults(),
+          OrderedPartitionedKVOutput.getConfigurationKeySet());
       ConfigUtils.addConfigMapToConfiguration(this.conf, tezDefaults);
       ConfigUtils.addConfigMapToConfiguration(this.conf, TezRuntimeConfiguration.getOtherConfigDefaults());
     }
@@ -117,16 +117,6 @@ public class OrderedPartitionedKVOutputConfig {
         ConfigUtils.mergeConfsWithExclusions(this.conf, partitionerConf,
             TezRuntimeConfiguration.getRuntimeConfigKeySet());
       }
-      return this;
-    }
-
-    public Builder setSortBufferSize(int sortBufferSize) {
-      this.conf.setInt(TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB, sortBufferSize);
-      return this;
-    }
-
-    public Builder setSorterNumThreads(int numThreads) {
-      this.conf.setInt(TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_SORT_THREADS, numThreads);
       return this;
     }
 
@@ -154,72 +144,6 @@ public class OrderedPartitionedKVOutputConfig {
           OrderedPartitionedKVOutput.getConfigurationKeySet(),
           TezRuntimeConfiguration.getRuntimeAdditionalConfigKeySet(), TezRuntimeConfiguration.getAllowedPrefixes());
       ConfigUtils.addConfigMapToConfiguration(this.conf, map);
-      return this;
-    }
-
-    /**
-     * Set the key comparator class
-     *
-     * @param comparatorClassName the key comparator class name
-     * @return instance of the current builder
-     */
-    public Builder setKeyComparatorClass(String comparatorClassName) {
-      return this.setKeyComparatorClass(comparatorClassName, null);
-    }
-
-    /**
-     * Set the key comparator class and it's associated configuration. This method should only be
-     * used if the comparator requires some specific configuration, which is typically not the
-     * case. {@link #setKeyComparatorClass(String)} is the preferred method for setting a
-     * comparator.
-     *
-     * @param comparatorClassName the key comparator class name
-     * @param comparatorConf      the comparator configuration. This can be null, and is a {@link
-     *                            java.util.Map} of key-value pairs. The keys should be limited to
-     *                            the ones required by the comparator.
-     * @return instance of the current builder
-     */
-    public Builder setKeyComparatorClass(String comparatorClassName,
-                                         @Nullable Map<String, String> comparatorConf) {
-      Objects.requireNonNull(comparatorClassName, "Comparator class name cannot be null");
-      this.conf.set(TezRuntimeConfiguration.TEZ_RUNTIME_KEY_COMPARATOR_CLASS,
-          comparatorClassName);
-      if (comparatorConf != null) {
-        // Merging the confs for now. Change to be specific in the future.
-        ConfigUtils.mergeConfsWithExclusions(this.conf, comparatorConf,
-            TezRuntimeConfiguration.getRuntimeConfigKeySet());
-      }
-      return this;
-    }
-
-    /**
-     * Set serialization class and the relevant comparator to be used for sorting.
-     * Providing custom serialization class could change the way, keys needs to be compared in
-     * sorting. Providing invalid comparator here could create invalid results.
-     *
-     * @param serializationClassName
-     * @param comparatorClassName
-     * @return this object for further chained method calls
-     */
-    public Builder setKeySerializationClass(String serializationClassName,
-        String comparatorClassName) {
-      Preconditions.checkArgument(serializationClassName != null,
-          "serializationClassName cannot be null");
-      Preconditions.checkArgument(comparatorClassName != null,
-          "comparator cannot be null");
-      setKeyComparatorClass(comparatorClassName, null);
-      return this;
-    }
-
-    /**
-     * Set serialization class responsible for providing serializer/deserializer for values.
-     *
-     * @param serializationClassName
-     * @return this object for further chained method calls
-     */
-    public Builder setValueSerializationClass(String serializationClassName) {
-      Preconditions.checkArgument(serializationClassName != null,
-          "serializationClassName cannot be null");
       return this;
     }
 

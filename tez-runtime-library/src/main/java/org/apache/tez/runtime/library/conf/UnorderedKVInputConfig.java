@@ -81,9 +81,9 @@ public class UnorderedKVInputConfig {
     }
 
     Builder() {
-      Map<String, String> tezDefaults = ConfigUtils
-          .extractConfigurationMap(TezRuntimeConfiguration.getTezRuntimeConfigDefaults(),
-              UnorderedKVInput.getConfigurationKeySet());
+      Map<String, String> tezDefaults = ConfigUtils.extractConfigurationMap(
+          TezRuntimeConfiguration.getTezRuntimeConfigDefaults(),
+          UnorderedKVInput.getConfigurationKeySet());
       ConfigUtils.addConfigMapToConfiguration(this.conf, tezDefaults);
       ConfigUtils.addConfigMapToConfiguration(this.conf, TezRuntimeConfiguration.getOtherConfigDefaults());
     }
@@ -112,31 +112,6 @@ public class UnorderedKVInputConfig {
           UnorderedKVInput.getConfigurationKeySet(),
           TezRuntimeConfiguration.getRuntimeAdditionalConfigKeySet(), TezRuntimeConfiguration.getAllowedPrefixes());
       ConfigUtils.addConfigMapToConfiguration(this.conf, map);
-      return this;
-    }
-
-    /**
-     * Set serialization class responsible for providing serializer/deserializer for key/value and
-     * the corresponding comparator class to be used as key comparator.
-     *
-     * @param serializationClassName
-     * @return this object for further chained method calls
-     */
-    public Builder setKeySerializationClass(String serializationClassName) {
-      Preconditions.checkArgument(serializationClassName != null,
-          "serializationClassName cannot be null");
-      return this;
-    }
-
-    /**
-     * Set serialization class responsible for providing serializer/deserializer for values.
-     *
-     * @param serializationClassName
-     * @return this object for further chained method calls
-     */
-    public Builder setValueSerializationClass(String serializationClassName) {
-      Preconditions.checkArgument(serializationClassName != null,
-          "serializationClassName cannot be null");
       return this;
     }
 

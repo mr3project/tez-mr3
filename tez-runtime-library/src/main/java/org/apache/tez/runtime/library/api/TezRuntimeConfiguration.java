@@ -214,6 +214,7 @@ public class TezRuntimeConfiguration {
   public static final String TEZ_RUNTIME_INTERNAL_SORTER_CLASS =
       TEZ_RUNTIME_PREFIX + "internal.sorter.class";
 
+  // fixed as TezBytesComparator, but keep for compatibility
   @ConfigurationProperty
   public static final String TEZ_RUNTIME_KEY_COMPARATOR_CLASS =
       TEZ_RUNTIME_PREFIX + "key.comparator.class";

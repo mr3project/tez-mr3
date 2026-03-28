@@ -18,9 +18,14 @@
 package org.apache.tez.runtime.library.common.serializer;
 
 import org.apache.hadoop.io.BytesWritable;
+import org.apache.hadoop.io.DataInputBuffer;
+import org.apache.hadoop.io.serializer.Deserializer;
+import org.apache.hadoop.io.serializer.Serializer;
 import org.apache.tez.runtime.library.common.comparator.TezBytesComparator;
-import org.apache.tez.runtime.library.common.serializer.TezBytesWritableSerialization.TezBytesWritableDeserializer;
-import org.apache.tez.runtime.library.common.serializer.TezBytesWritableSerialization.TezBytesWritableSerializer;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 
 /**
  * Specialized serialization context for key = HiveKey (extending BytesWritable) / value = BytesWritable payloads.
@@ -56,5 +61,53 @@ public final class SerializationContext {
 
   public static TezBytesComparator getKeyComparator() {
     return new TezBytesComparator();
+  }
+
+  public static class TezBytesWritableDeserializer implements Deserializer<BytesWritable> {
+
+    private DataInputBuffer dataIn;
+
+    public TezBytesWritableDeserializer() {
+    }
+
+    @Override
+    public void open(InputStream in) {
+      dataIn = (DataInputBuffer) in;
+    }
+
+    @Override
+    public BytesWritable deserialize(BytesWritable writable) throws IOException {
+      BytesWritable value = writable;
+      if (value == null) {
+        value = new BytesWritable();
+      }
+      value.set(dataIn.getData(), dataIn.getPosition(), dataIn.getLength() - dataIn.getPosition());
+      return value;
+    }
+
+    @Override
+    public void close() throws IOException {
+      dataIn.close();
+    }
+  }
+
+  public static class TezBytesWritableSerializer implements Serializer<BytesWritable> {
+
+    private OutputStream dataOut;
+
+    @Override
+    public void open(OutputStream out) {
+      this.dataOut = out;
+    }
+
+    @Override
+    public void serialize(BytesWritable writable) throws IOException {
+      dataOut.write(writable.getBytes(), 0, writable.getLength());
+    }
+
+    @Override
+    public void close() throws IOException {
+      dataOut.close();
+    }
   }
 }

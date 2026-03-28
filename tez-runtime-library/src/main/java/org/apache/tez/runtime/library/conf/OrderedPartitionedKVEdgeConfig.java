@@ -149,33 +149,6 @@ public class OrderedPartitionedKVEdgeConfig extends KeyValuesBasedBaseEdgeConfig
       inputBuilder = new OrderedGroupedKVInputConfig.Builder(keyClassName, valueClassName);
     }
 
-    /**
-     * Set serialization class and the relevant comparator to be used for sorting.
-     * Providing custom serialization class could change the way, keys needs to be compared in
-     * sorting. Providing invalid comparator here could create invalid results.
-     *
-     * @param serializationClassName
-     * @param comparatorClassName
-     * @return this object for further chained method calls
-     */
-    public Builder setKeySerializationClass(String serializationClassName, String comparatorClassName) {
-      outputBuilder.setKeySerializationClass(serializationClassName, comparatorClassName);
-      inputBuilder.setKeySerializationClass(serializationClassName, comparatorClassName);
-      return this;
-    }
-
-    /**
-     * Set serialization class responsible for providing serializer/deserializer for values.
-     *
-     * @param serializationClassName
-     * @return this object for further chained method calls
-     */
-    public Builder setValueSerializationClass(String serializationClassName) {
-      outputBuilder.setValueSerializationClass(serializationClassName);
-      inputBuilder.setValueSerializationClass(serializationClassName);
-      return this;
-    }
-
     @Override
     public Builder setAdditionalConfiguration(String key, String value) {
       outputBuilder.setAdditionalConfiguration(key, value);

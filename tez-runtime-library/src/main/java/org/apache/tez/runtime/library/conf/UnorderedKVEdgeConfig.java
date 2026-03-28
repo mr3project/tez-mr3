@@ -168,31 +168,6 @@ public class UnorderedKVEdgeConfig extends KeyValuesBasedBaseEdgeConfig {
     }
 
     /**
-     * Set serialization class responsible for providing serializer/deserializer for key/value and
-     * the corresponding comparator class to be used as key comparator.
-     *
-     * @param serializationClassName
-     * @return this object for further chained method calls
-     */
-    public Builder setKeySerializationClass(String serializationClassName) {
-      outputBuilder.setKeySerializationClass(serializationClassName);
-      inputBuilder.setKeySerializationClass(serializationClassName);
-      return this;
-    }
-
-    /**
-     * Set serialization class responsible for providing serializer/deserializer for values.
-     *
-     * @param serializationClassName
-     * @return this object for further chained method calls
-     */
-    public Builder setValueSerializationClass(String serializationClassName) {
-      outputBuilder.setValueSerializationClass(serializationClassName);
-      inputBuilder.setValueSerializationClass(serializationClassName);
-      return this;
-    }
-
-    /**
      * Build and return an instance of the configuration
      * @return an instance of the acatual configuration
      */
