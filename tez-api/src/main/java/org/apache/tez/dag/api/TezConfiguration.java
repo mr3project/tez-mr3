@@ -214,7 +214,7 @@ process as
   public static final String TEZ_AM_MODIFY_ACLS = TEZ_AM_PREFIX + "modify-acls";
 
   //
-  // Tez configurations used by MR3
+  // Tez configurations used by MR3 - fixed at startup and cannot be updated at runtime
   //
 
   /**

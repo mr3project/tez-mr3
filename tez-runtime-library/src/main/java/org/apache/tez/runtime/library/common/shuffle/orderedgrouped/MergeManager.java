@@ -41,7 +41,6 @@ import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.serializer.SerializationContext;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
-import org.apache.tez.runtime.library.common.sort.impl.IFile.Writer;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterInputBuffer;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger.DiskSegment;
@@ -925,12 +924,9 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       }
       numDiskToDiskMerges.increment(1);
 
-      long approxOutputSize = 0;
-      int bytesPerSum = 
-        conf.getInt("io.bytes.per.checksum", 512);
-      
       LOG.info("OnDiskMerger: We have {} map outputs on disk. Triggering merge...", inputs.size());
 
+      long approxOutputSize = 0;
       List<Segment> inputSegments = new ArrayList<Segment>(inputs.size());
 
       // 1. Prepare the list of files to be merged.
@@ -951,8 +947,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       }
 
       // add the checksum length
-      approxOutputSize += 
-        ChecksumFileSystem.getChecksumLength(approxOutputSize, bytesPerSum);
+      approxOutputSize += (long)ChecksumFileSystem.getApproxChkSumLength(approxOutputSize);
 
       // 2. Start the on-disk merge process
       FileChunk file0 = inputs.get(0);

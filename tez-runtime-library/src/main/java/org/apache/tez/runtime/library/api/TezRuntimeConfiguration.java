@@ -27,6 +27,7 @@ import java.util.Set;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.tez.common.annotation.ConfigurationProperty;
+import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.runtime.library.conf.OrderedPartitionedKVOutputConfig.SorterImpl;
 
 /**
@@ -472,7 +473,7 @@ public class TezRuntimeConfiguration {
 
     defaultConf.addResource("core-default.xml");
     defaultConf.addResource("core-site.xml");
-    defaultConf.addResource("tez-site.xml");
+    defaultConf.addResource(TezConfiguration.TEZ_SITE_XML);
 
     for (Map.Entry<String, String> confEntry : defaultConf) {
       if (tezRuntimeKeys.contains(confEntry.getKey())) {

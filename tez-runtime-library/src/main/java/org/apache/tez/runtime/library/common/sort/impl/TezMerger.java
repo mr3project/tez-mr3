@@ -43,7 +43,6 @@ import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader.KeyState;
-import org.apache.tez.runtime.library.common.sort.impl.IFile.Writer;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterInputBuffer;
 import org.apache.tez.runtime.library.utils.BufferUtils;
 
@@ -199,8 +198,7 @@ public class TezMerger {
       return reader.getPosition();
     }
 
-    // This method is used by BackupStore to extract the
-    // absolute position after a reset
+    // This method is used by BackupStore to extract the absolute position after a reset
     long getActualPosition() throws IOException {
       return reader.getPosition();
     }
@@ -209,8 +207,7 @@ public class TezMerger {
       return reader;
     }
 
-    // This method is used by BackupStore to reinitialize the
-    // reader to start reading from a different segment offset
+    // This method is used by BackupStore to reinitialize the reader to start reading from a different segment offset
     void reinitReader(int offset) throws IOException {
     }
   }
@@ -219,7 +216,7 @@ public class TezMerger {
 
     FileSystem fs = null;
     Path file = null;
-    boolean preserve = false; // Signifies whether the segment should be kept after a merge is complete. Checked in the close method.
+    boolean preserve = false;   // Signifies whether the segment should be kept after a merge is complete. Checked in the close method.
     CompressionCodec codec = null;
     long segmentOffset = 0;
     long segmentLength = -1;
@@ -300,15 +297,13 @@ public class TezMerger {
         fs.delete(file, false);
       }
     }
-    // This method is used by BackupStore to extract the
-    // absolute position after a reset
+    // This method is used by BackupStore to extract the absolute position after a reset
     @Override
     long getActualPosition() throws IOException {
       return segmentOffset + reader.getPosition();
     }
 
-    // This method is used by BackupStore to reinitialize the
-    // reader to start reading from a different segment offset
+    // This method is used by BackupStore to reinitialize the reader to start reading from a different segment offset
     @Override
     void reinitReader(int offset) throws IOException {
       if (!inMemory()) {
@@ -415,7 +410,7 @@ public class TezMerger {
            */
           populatePreviousKey();
         } else {
-          //indicates a key has been read already
+          // indicates a key has been read already
           if (hasNext != KeyState.SAME_KEY) {
             /**
              * Store previous key before reading next for later key comparisons.
@@ -450,11 +445,11 @@ public class TezMerger {
     void compareKeyWithNextTopKey(Segment current) throws IOException {
       Segment nextTop = top();
       if (checkForSameKeys && nextTop != current) {
-        //we have a different file. Compare it with previous key
+        // we have a different file. Compare it with previous key
         KeyValueBuffer nextKey = nextTop.getKey();
         int compare = compare(nextKey, prevKey);
         if (compare == 0) {
-          //Same key is available in the next segment.
+          // Same key is available in the next segment.
           hasNext = KeyState.SAME_KEY;
         }
       }
@@ -469,15 +464,14 @@ public class TezMerger {
       KeyValueBuffer nextKey = minSegment.getKey();
       key.reset(nextKey.getData(), nextKey.getPosition(), nextKey.getLength());
       if (!minSegment.inMemory()) {
-        //When we load the value from an inmemory segment, we reset
-        //the "value" DIB in this class to the inmem segment's byte[].
-        //When we load the value bytes from disk, we shouldn't use
-        //the same byte[] since it would corrupt the data in the inmem
-        //segment. So we maintain an explicit DIB for value bytes
-        //obtained from disk, and if the current segment is a disk
-        //segment, we reset the "value" DIB to the byte[] in that (so 
-        //we reuse the disk segment DIB whenever we consider
-        //a disk segment).
+        // When we load the value from an inmemory segment, we reset
+        // the "value" DIB in this class to the inmem segment's byte[].
+        // When we load the value bytes from disk, we shouldn't use
+        // the same byte[] since it would corrupt the data in the inmem segment.
+        // So we maintain an explicit DIB for value bytes obtained from disk,
+        // and if the current segment is a disk segment,
+        // we reset the "value" DIB to the byte[] in that (so we reuse the disk segment DIB
+        // whenever we consider a disk segment).
         minSegment.getValue(diskIFileValue);
         value.reset(diskIFileValue.getData(), diskIFileValue.getLength());
       } else {
@@ -532,13 +526,12 @@ public class TezMerger {
       int origFactor = factor;
       int passNo = 1;
       
-      //create the MergeStreams from the sorted map created in the constructor
-      //and dump the final output to a file
+      // create the MergeStreams from the sorted map created in the constructor
+      // and dump the final output to a file
       byte[] writeBuffer = IFile.allocateWriteBuffer();
       do {
-        //get the factor for this pass of merge. We assume in-memory segments
-        //are the first entries in the segment list and that the pass factor
-        //doesn't apply to them
+        // get the factor for this pass of merge. We assume in-memory segments are
+        // the first entries in the segment list and that the pass factor doesn't apply to them
         factor = getPassFactor(factor, passNo, numSegments - inMem);
         if (1 == passNo) {
           factor += inMem;
@@ -548,8 +541,8 @@ public class TezMerger {
         int segmentsConsidered = 0;
         int numSegmentsToConsider = factor;
         while (true) {
-          //extract the smallest 'factor' number of segments  
-          //Call cleanup on the empty segments (no key/value data)
+          // extract the smallest 'factor' number of segments
+          // Call cleanup on the empty segments (no key/value data)
           List<Segment> mStream = 
             getSegmentDescriptors(numSegmentsToConsider);
           for (Segment segment : mStream) {
@@ -568,8 +561,7 @@ public class TezMerger {
               numSegments--; //we ignore this segment for the merge
             }
           }
-          //if we have the desired number of segments
-          //or looked at all available segments, we break
+          // if we have the desired number of segments or looked at all available segments, we break
           if (segmentsConsidered == factor || 
               segments.size() == 0) {
             break;
@@ -579,15 +571,15 @@ public class TezMerger {
           numSegmentsToConsider = factor - segmentsConsidered;
         }
         
-        //feed the streams to the priority queue
+        // feed the streams to the priority queue
         initialize(segmentsToMerge.size());
         clear();
         for (Segment segment : segmentsToMerge) {
           put(segment);
         }
         
-        //if we have lesser number of segments remaining, then just return the
-        //iterator, else do another single level merge
+        // if we have lesser number of segments remaining, then just return the iterator,
+        // else do another single level merge
         if (numSegments <= factor) { // Will always kick in if only in-mem segments are provided.
           if (LOG.isDebugEnabled()) {
             LOG.debug("Down to the last merge-pass, with " + numSegments +
@@ -605,13 +597,10 @@ public class TezMerger {
                 (segments.size() + segmentsToMerge.size()));
           }
           
-          //we want to spread the creation of temp files on multiple disks if 
-          //available under the space constraints
+          // we want to spread the creation of temp files on multiple disks if available under the space constraints
           long approxOutputSize = 0; 
           for (Segment s : segmentsToMerge) {
-            approxOutputSize += s.getLength() + 
-                                ChecksumFileSystem.getApproxChkSumLength(
-                                s.getLength());
+            approxOutputSize += s.getLength() + (long)ChecksumFileSystem.getApproxChkSumLength(s.getLength());
           }
           Path tmpFilename = new Path(tmpDir, "intermediate").suffix("." + passNo);
 
@@ -627,8 +616,7 @@ public class TezMerger {
           writeFile(this, writer, reporter, recordsBeforeProgress);
           writer.close();
           
-          //we finished one single level merge; now clean up the priority 
-          //queue
+          // we finished one single level merge; now clean up the priority queue
           this.close();
 
           // Add the newly create segment to the list of segments to be merged
@@ -648,8 +636,7 @@ public class TezMerger {
 
           passNo++;
         }
-        //we are worried about only the first pass merge factor. So reset the 
-        //factor to what it originally was
+        // we are worried about only the first pass merge factor. So reset the factor to what it originally was
         factor = origFactor;
       } while(true);
     }
@@ -697,9 +684,9 @@ public class TezMerger {
         return false;
 
       if (minSegment != null) {
-        //minSegment is non-null for all invocations of next except the first
-        //one. For the first invocation, the priority queue is ready for use
-        //but for the subsequent invocations, first adjust the queue
+        // minSegment is non-null for all invocations of next except the first one.
+        // For the first invocation, the priority queue is ready for use
+        // but for the subsequent invocations, first adjust the queue.
         adjustPriorityQueue(minSegment);
         if (size() == 0) {
           minSegment = null;
