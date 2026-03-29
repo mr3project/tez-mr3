@@ -172,9 +172,7 @@ public class InputReadyVertexManager extends VertexManagerPlugin {
                 descriptor.setUserPayload(UserPayload.create(buffer));
 
                 EdgeProperty newEdgeProp = EdgeProperty.create(descriptor,
-                    DataMovementType.CUSTOM,
-                    edgeProp.getDataSourceType(), edgeProp.getSchedulingType(),
-                    edgeProp.getEdgeSource(), edgeProp.getEdgeDestination());
+                    DataMovementType.CUSTOM, edgeProp.getEdgeSource(), edgeProp.getEdgeDestination());
                 edgeProperties.put(srcVertex, newEdgeProp);
                 break;
               default:

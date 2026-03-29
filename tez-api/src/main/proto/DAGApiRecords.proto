@@ -42,17 +42,6 @@ enum PlanEdgeDataMovementType {
   CUSTOM = 3;
 }
 
-enum PlanEdgeDataSourceType {
-  PERSISTED = 0;
-  PERSISTED_RELIABLE = 1;
-  EPHEMERAL = 2;
-}
-
-enum PlanEdgeSchedulingType {
-  SEQUENTIAL = 0;
-  CONCURRENT = 1;
-}
-
 message PlanKeyValuePair {
   required string key = 1;
   required string value = 2;
@@ -152,11 +141,9 @@ message VertexPlan {
 
 message PlanEdgeProperty {
   required PlanEdgeDataMovementType dataMovementType = 1;
-  required PlanEdgeDataSourceType dataSourceType = 2;
-  required PlanEdgeSchedulingType schedulingType = 3;
-  optional TezEntityDescriptorProto edge_source = 4;
-  optional TezEntityDescriptorProto edge_destination = 5;
-  optional TezEntityDescriptorProto edge_manager = 6;
+  optional TezEntityDescriptorProto edge_source = 2;
+  optional TezEntityDescriptorProto edge_destination = 3;
+  optional TezEntityDescriptorProto edge_manager = 4;
 }
 
 message EdgePlan {
@@ -164,11 +151,9 @@ message EdgePlan {
   required string inputVertexName = 2;
   required string outputVertexName = 3;
   required PlanEdgeDataMovementType dataMovementType = 4;
-  required PlanEdgeDataSourceType dataSourceType = 5;
-  required PlanEdgeSchedulingType schedulingType = 6;
-  optional TezEntityDescriptorProto edge_source = 7;
-  optional TezEntityDescriptorProto edge_destination = 8;
-  optional TezEntityDescriptorProto edge_manager = 9;
+  optional TezEntityDescriptorProto edge_source = 5;
+  optional TezEntityDescriptorProto edge_destination = 6;
+  optional TezEntityDescriptorProto edge_manager = 7;
 }
 
 message TezNamedEntityDescriptorProto {

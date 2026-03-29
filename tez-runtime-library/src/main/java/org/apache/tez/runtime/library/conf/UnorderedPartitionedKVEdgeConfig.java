@@ -110,14 +110,12 @@ public class UnorderedPartitionedKVEdgeConfig extends KeyValuesBasedBaseEdgeConf
    * {@link org.apache.tez.dag.api.EdgeProperty} which is likely to be used. </p>
    * If custom edge properties are required, the methods to get the relevant payloads should be
    * used. </p>
-   * * In this case - DataMovementType.SCATTER_GATHER, EdgeProperty.DataSourceType.PERSISTED,
-   * EdgeProperty.SchedulingType.SEQUENTIAL
+   * * In this case - DataMovementType.SCATTER_GATHER
    *
    * @return an {@link org.apache.tez.dag.api.EdgeProperty} instance
    */
   public EdgeProperty createDefaultEdgeProperty() {
     EdgeProperty edgeProperty = EdgeProperty.create(EdgeProperty.DataMovementType.SCATTER_GATHER,
-        EdgeProperty.DataSourceType.PERSISTED, EdgeProperty.SchedulingType.SEQUENTIAL,
         OutputDescriptor.create(
             getOutputClassName()).setUserPayload(getOutputPayload()),
         InputDescriptor.create(
@@ -135,8 +133,7 @@ public class UnorderedPartitionedKVEdgeConfig extends KeyValuesBasedBaseEdgeConf
   public EdgeProperty createDefaultCustomEdgeProperty(EdgeManagerPluginDescriptor edgeManagerDescriptor) {
     Objects.requireNonNull(edgeManagerDescriptor, "EdgeManagerDescriptor cannot be null");
     EdgeProperty edgeProperty =
-        EdgeProperty.create(edgeManagerDescriptor, EdgeProperty.DataSourceType.PERSISTED,
-            EdgeProperty.SchedulingType.SEQUENTIAL,
+        EdgeProperty.create(edgeManagerDescriptor,
             OutputDescriptor.create(getOutputClassName()).setUserPayload(getOutputPayload()),
             InputDescriptor.create(getInputClassName()).setUserPayload(getInputPayload()));
     return edgeProperty;

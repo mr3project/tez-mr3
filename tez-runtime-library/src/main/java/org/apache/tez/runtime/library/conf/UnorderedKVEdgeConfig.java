@@ -84,14 +84,12 @@ public class UnorderedKVEdgeConfig extends KeyValuesBasedBaseEdgeConfig {
    * {@link org.apache.tez.dag.api.EdgeProperty} which is likely to be used. </p>
    * If custom edge properties are required, the methods to get the relevant payloads should be
    * used. </p>
-   * * In this case - DataMovementType.BROADCAST, EdgeProperty.DataSourceType.PERSISTED,
-   * EdgeProperty.SchedulingType.SEQUENTIAL
+   * * In this case - DataMovementType.BROADCAST
    *
    * @return an {@link org.apache.tez.dag.api.EdgeProperty} instance
    */
   public EdgeProperty createDefaultBroadcastEdgeProperty() {
     EdgeProperty edgeProperty = EdgeProperty.create(EdgeProperty.DataMovementType.BROADCAST,
-        EdgeProperty.DataSourceType.PERSISTED, EdgeProperty.SchedulingType.SEQUENTIAL,
         OutputDescriptor.create(
             getOutputClassName()).setUserPayload(getOutputPayload()),
         InputDescriptor.create(
@@ -104,14 +102,12 @@ public class UnorderedKVEdgeConfig extends KeyValuesBasedBaseEdgeConfig {
    * {@link org.apache.tez.dag.api.EdgeProperty} which is likely to be used. </p>
    * If custom edge properties are required, the methods to get the relevant payloads should be
    * used. </p>
-   * * In this case - DataMovementType.ONE_TO_ONE, EdgeProperty.DataSourceType.PERSISTED,
-   * EdgeProperty.SchedulingType.SEQUENTIAL
+   * * In this case - DataMovementType.ONE_TO_ONE
    *
    * @return an {@link org.apache.tez.dag.api.EdgeProperty} instance
    */
   public EdgeProperty createDefaultOneToOneEdgeProperty() {
     EdgeProperty edgeProperty = EdgeProperty.create(EdgeProperty.DataMovementType.ONE_TO_ONE,
-        EdgeProperty.DataSourceType.PERSISTED, EdgeProperty.SchedulingType.SEQUENTIAL,
         OutputDescriptor.create(
             getOutputClassName()).setUserPayload(getOutputPayload()),
         InputDescriptor.create(
@@ -129,8 +125,7 @@ public class UnorderedKVEdgeConfig extends KeyValuesBasedBaseEdgeConfig {
   public EdgeProperty createDefaultCustomEdgeProperty(EdgeManagerPluginDescriptor edgeManagerDescriptor) {
     Objects.requireNonNull(edgeManagerDescriptor, "EdgeManagerDescriptor cannot be null");
     EdgeProperty edgeProperty =
-        EdgeProperty.create(edgeManagerDescriptor, EdgeProperty.DataSourceType.PERSISTED,
-            EdgeProperty.SchedulingType.SEQUENTIAL,
+        EdgeProperty.create(edgeManagerDescriptor,
             OutputDescriptor.create(getOutputClassName()).setUserPayload(getOutputPayload()),
             InputDescriptor.create(getInputClassName()).setUserPayload(getInputPayload()));
     return edgeProperty;

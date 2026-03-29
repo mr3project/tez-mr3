@@ -791,9 +791,7 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
       String vertex = entry.getKey();
       EdgeProperty oldEdgeProp = entry.getValue().edgeProperty;
       EdgeProperty newEdgeProp = EdgeProperty.create(entry.getValue().newDescriptor,
-          DataMovementType.CUSTOM,
-          oldEdgeProp.getDataSourceType(), oldEdgeProp.getSchedulingType(),
-          oldEdgeProp.getEdgeSource(), oldEdgeProp.getEdgeDestination());
+          DataMovementType.CUSTOM, oldEdgeProp.getEdgeSource(), oldEdgeProp.getEdgeDestination());
       edgeProperties.put(vertex, newEdgeProp);
     }
     getContext().reconfigureVertex(finalTaskParallelism, null, edgeProperties);
