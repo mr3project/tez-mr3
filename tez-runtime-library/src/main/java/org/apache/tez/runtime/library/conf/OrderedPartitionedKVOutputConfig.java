@@ -98,7 +98,6 @@ public class OrderedPartitionedKVOutputConfig {
           TezRuntimeConfiguration.getTezRuntimeConfigDefaults(),
           OrderedPartitionedKVOutput.getConfigurationKeySet());
       ConfigUtils.addConfigMapToConfiguration(this.conf, tezDefaults);
-      ConfigUtils.addConfigMapToConfiguration(this.conf, TezRuntimeConfiguration.getTezSiteXmlOtherConfigDefaults());
     }
 
     Builder setPartitioner(String partitionerClassName, @Nullable Map<String, String> partitionerConf) {

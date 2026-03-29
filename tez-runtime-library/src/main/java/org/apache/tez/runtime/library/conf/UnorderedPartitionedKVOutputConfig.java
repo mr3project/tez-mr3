@@ -97,7 +97,6 @@ public class UnorderedPartitionedKVOutputConfig {
           TezRuntimeConfiguration.getTezRuntimeConfigDefaults(),
           UnorderedPartitionedKVOutput.getConfigurationKeySet());
       ConfigUtils.addConfigMapToConfiguration(this.conf, tezDefaults);
-      ConfigUtils.addConfigMapToConfiguration(this.conf, TezRuntimeConfiguration.getTezSiteXmlOtherConfigDefaults());
     }
 
     Builder setPartitioner(String partitionerClassName, Map<String, String> partitionerConf) {

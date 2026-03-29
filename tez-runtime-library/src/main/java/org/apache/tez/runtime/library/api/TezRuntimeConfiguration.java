@@ -42,11 +42,6 @@ public class TezRuntimeConfiguration {
   // from tez-site.xml, in tezRuntimeKeys
   private static final Map<String, String> tezSiteXmlRuntimeConfMap = new HashMap<String, String>();
 
-  // from tez-site.xml, not in tezRuntimeKeys
-  private static final Map<String, String> tezSiteXmlOtherConfMap = new HashMap<String, String>();
-  private static final Set<String> tezSiteXmlOtherKeys = new HashSet<String>();
-  private static final Set<String> unmodifiableTezSiteXmlOtherKeySet;
-
   /**
    * Configuration key to enable/disable IFile readahead.
    */
@@ -461,14 +456,9 @@ public class TezRuntimeConfiguration {
     for (Map.Entry<String, String> confEntry : defaultConf) {
       if (tezRuntimeKeys.contains(confEntry.getKey())) {
         tezSiteXmlRuntimeConfMap.put(confEntry.getKey(), confEntry.getValue());
-      } else {
-        tezSiteXmlOtherConfMap.put(confEntry.getKey(), confEntry.getValue());
-        tezSiteXmlOtherKeys.add(confEntry.getKey());
       }
     }
-
     umnodifiableTezRuntimeKeySet = Collections.unmodifiableSet(tezRuntimeKeys);
-    unmodifiableTezSiteXmlOtherKeySet = Collections.unmodifiableSet(tezSiteXmlOtherKeys);
   }
 
   public static Set<String> getTezRuntimeConfigKeySet() {
@@ -477,10 +467,6 @@ public class TezRuntimeConfiguration {
 
   public static Map<String, String> getTezRuntimeConfigDefaults() {
     return Collections.unmodifiableMap(tezSiteXmlRuntimeConfMap);
-  }
-
-  public static Map<String, String> getTezSiteXmlOtherConfigDefaults() {
-    return Collections.unmodifiableMap(tezSiteXmlOtherConfMap);
   }
 
   public enum ReportPartitionStats {

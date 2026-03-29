@@ -85,7 +85,6 @@ public class UnorderedKVOutputConfig {
           TezRuntimeConfiguration.getTezRuntimeConfigDefaults(),
           UnorderedKVOutput.getConfigurationKeySet());
       ConfigUtils.addConfigMapToConfiguration(this.conf, tezDefaults);
-      ConfigUtils.addConfigMapToConfiguration(this.conf, TezRuntimeConfiguration.getTezSiteXmlOtherConfigDefaults());
     }
 
     @SuppressWarnings("unchecked")

@@ -92,7 +92,6 @@ public class OrderedGroupedKVInputConfig {
           TezRuntimeConfiguration.getTezRuntimeConfigDefaults(),
           OrderedGroupedKVInput.getConfigurationKeySet());
       ConfigUtils.addConfigMapToConfiguration(this.conf, tezDefaults);
-      ConfigUtils.addConfigMapToConfiguration(this.conf, TezRuntimeConfiguration.getTezSiteXmlOtherConfigDefaults());
     }
 
     @SuppressWarnings("unchecked")
