@@ -214,18 +214,9 @@ process as
   public static final String TEZ_AM_MODIFY_ACLS = TEZ_AM_PREFIX + "modify-acls";
 
   //
-  // Tez configurations used by MR3 - fixed at startup and cannot be updated at runtime
+  // Tez configurations used by MR3
+  // The following keys are configurable for Vertex and MRInput/MROutput in each DAG.
   //
-
-  /**
-   * String value. Specifies the name of the shuffle auxiliary service.
-   */
-  @ConfigurationScope(Scope.AM)
-  @ConfigurationProperty
-  public static final String TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID =
-    TEZ_AM_PREFIX + "shuffle.auxiliary-service.id";
-  public static final String TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT =
-    TezConstants.TEZ_SHUFFLE_HANDLER_SERVICE_ID;
 
   /**
    * Whether to scale down memory requested by each component if the total

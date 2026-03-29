@@ -196,6 +196,7 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput implements
   private static final Set<String> confKeys = new HashSet<String>();
 
   static {
+    confKeys.add(TezRuntimeConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_BYTES);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_FACTOR);
@@ -207,14 +208,14 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput implements
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_LAZY_ALLOCATE_MEMORY);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_PARTITIONER_CLASS);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_INTERNAL_SORTER_CLASS);
-    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS);
-    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS_CODEC);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_FREE_MEMORY_WRITER_OUTPUT_THRESHOLD_MB);
+    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS);
+    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS_CODEC);
   }
 
   public static Set<String> getConfigurationKeySet() {

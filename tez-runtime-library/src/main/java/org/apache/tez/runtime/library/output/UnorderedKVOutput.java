@@ -136,11 +136,10 @@ public class UnorderedKVOutput extends AbstractLogicalOutput implements LogicalO
   private static final Set<String> confKeys = new HashSet<String>();
 
   static {
+    confKeys.add(TezRuntimeConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_BYTES);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_OUTPUT_BUFFER_SIZE_MB);
-    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS);
-    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS_CODEC);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_ENABLED);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_MAX_SIZE);
@@ -150,6 +149,8 @@ public class UnorderedKVOutput extends AbstractLogicalOutput implements LogicalO
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_REPORT_PARTITION_STATS);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_FREE_MEMORY_WRITER_OUTPUT_THRESHOLD_MB);
+    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS);
+    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS_CODEC);
   }
 
   public static Set<String> getConfigurationKeySet() {

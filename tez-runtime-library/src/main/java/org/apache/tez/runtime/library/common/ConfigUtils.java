@@ -19,8 +19,6 @@
 package org.apache.tez.runtime.library.common;
 
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -82,7 +80,7 @@ public class ConfigUtils {
     return getIntermediateInputKeyComparator(conf);
   }
 
-  public static <K> RawComparator<K> getIntermediateInputKeyComparator(Configuration conf) {
+  private static <K> RawComparator<K> getIntermediateInputKeyComparator(Configuration conf) {
     Class<? extends RawComparator> theClass = conf.getClass(
         TezRuntimeConfiguration.TEZ_RUNTIME_KEY_COMPARATOR_CLASS,
         null, RawComparator.class);

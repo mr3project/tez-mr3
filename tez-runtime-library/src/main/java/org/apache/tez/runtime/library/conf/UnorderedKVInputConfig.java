@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.Objects;
 
 import org.apache.tez.common.Preconditions;
-import com.google.common.collect.Lists;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.tez.common.TezUtils;

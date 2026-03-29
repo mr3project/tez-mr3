@@ -20,27 +20,86 @@ package org.apache.tez.runtime.library.api;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.tez.common.annotation.ConfigurationProperty;
 import org.apache.tez.dag.api.TezConfiguration;
+import org.apache.tez.dag.api.TezConstants;
 
-/**
- * Meant for user configurable job properties.
- */
+import static org.apache.tez.dag.api.TezConfiguration.TEZ_AM_PREFIX;
+
 public class TezRuntimeConfiguration {
 
   private static final String TEZ_RUNTIME_PREFIX = "tez.runtime.";
 
   // We allow only keys in tezRuntimeKeys[] to be updated at runtime by users.
+  // tezRuntimeKeys[] = sum of confKeys[] in:
+  //   OrderedGroupedKVInput, UnorderedKVInput, OrderedPartitionedKVOutput, UnorderedKVOutput, UnorderedPartitionedKVOutput
   private static final Set<String> tezRuntimeKeys = new HashSet<String>();
   private static final Set<String> umnodifiableTezRuntimeKeySet;
 
   // from tez-site.xml, in tezRuntimeKeys
   private static final Map<String, String> tezSiteXmlRuntimeConfMap = new HashMap<String, String>();
+
+  //
+  // constants
+  //
+
+  // only TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT is used
+  @ConfigurationProperty(type = "integer")
+  public static final String TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS = TEZ_RUNTIME_PREFIX +
+      "merge.progress.records";
+  public static final long TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT = 10000;
+
+  //
+  // CLASS keys
+  //
+
+  // fixed as BytesWritable, but keep for compatibility
+  @ConfigurationProperty
+  public static final String TEZ_RUNTIME_KEY_CLASS = TEZ_RUNTIME_PREFIX + "key.class";
+
+  // fixed as BytesWritable, but keep for compatibility
+  @ConfigurationProperty
+  public static final String TEZ_RUNTIME_VALUE_CLASS = TEZ_RUNTIME_PREFIX + "value.class";
+
+  // fixed as TezBytesComparator, but keep for compatibility
+  @ConfigurationProperty
+  public static final String TEZ_RUNTIME_KEY_COMPARATOR_CLASS =
+    TEZ_RUNTIME_PREFIX + "key.comparator.class";
+
+  @ConfigurationProperty
+  public static final String TEZ_RUNTIME_KEY_SECONDARY_COMPARATOR_CLASS =
+    TEZ_RUNTIME_PREFIX + "key.secondary.comparator.class";
+
+  @ConfigurationProperty
+  public static final String TEZ_RUNTIME_INTERNAL_SORTER_CLASS =
+    TEZ_RUNTIME_PREFIX + "internal.sorter.class";
+
+  /**
+   * Specifies a partitioner class
+   */
+  @ConfigurationProperty
+  public static final String TEZ_RUNTIME_PARTITIONER_CLASS =
+    TEZ_RUNTIME_PREFIX + "partitioner.class";
+
+  //
+  // The following keys are configurable for LogicalInput/Output of Edge in each DAG.
+  // Thus they are added to tezRuntimeKeys[].
+  // These keys are NOT consumed by Vertex and MRInput/Output.
+  // Note: TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID is included.
+  //
+
+  /**
+   * String value. Specifies the name of the shuffle auxiliary service.
+   */
+  @ConfigurationProperty
+  public static final String TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID =
+      TEZ_AM_PREFIX + "shuffle.auxiliary-service.id";
+  public static final String TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT =
+      TezConstants.TEZ_SHUFFLE_HANDLER_SERVICE_ID;
 
   /**
    * Configuration key to enable/disable IFile readahead.
@@ -124,31 +183,14 @@ public class TezRuntimeConfiguration {
 
   /**
    * Report partition statistics (e.g better scheduling in ShuffleVertexManager). TEZ-2496
-   * This can be enabled/disabled at vertex level.
    * {@link org.apache.tez.runtime.library.api.TezRuntimeConfiguration.ReportPartitionStats}
    * defines the list of values that can be specified.
-   * TODO TEZ-3303 Given ShuffleVertexManager doesn't consume precise stats
-   * yet. So do not set the value to "precise" yet when ShuffleVertexManager is used.
    */
   @ConfigurationProperty
   public static final String TEZ_RUNTIME_REPORT_PARTITION_STATS =
       TEZ_RUNTIME_PREFIX + "report.partition.stats";
   public static final String TEZ_RUNTIME_REPORT_PARTITION_STATS_DEFAULT =
       ReportPartitionStats.MEMORY_OPTIMIZED.getType();
-
-  /**
-   * Specifies a partitioner class
-   */
-  @ConfigurationProperty
-  public static final String TEZ_RUNTIME_PARTITIONER_CLASS =
-      TEZ_RUNTIME_PREFIX + "partitioner.class";
-
-  /**
-   * Specifies a combiner class (primarily for Shuffle)
-   */
-  @ConfigurationProperty
-  public static final String TEZ_RUNTIME_COMBINER_CLASS =
-      TEZ_RUNTIME_PREFIX + "combiner.class";
 
   @ConfigurationProperty(type = "integer")
   public static final String TEZ_RUNTIME_SHUFFLE_PARALLEL_COPIES =
@@ -187,27 +229,6 @@ public class TezRuntimeConfiguration {
   public static final String TEZ_RUNTIME_INPUT_POST_MERGE_BUFFER_PERCENT =
       TEZ_RUNTIME_PREFIX + "task.input.post-merge.buffer.percent";
   public static final float TEZ_RUNTIME_INPUT_BUFFER_PERCENT_DEFAULT = 0.9f;
-
-  @ConfigurationProperty
-  public static final String TEZ_RUNTIME_INTERNAL_SORTER_CLASS =
-      TEZ_RUNTIME_PREFIX + "internal.sorter.class";
-
-  // fixed as TezBytesComparator, but keep for compatibility
-  @ConfigurationProperty
-  public static final String TEZ_RUNTIME_KEY_COMPARATOR_CLASS =
-      TEZ_RUNTIME_PREFIX + "key.comparator.class";
-
-  // fixed as BytesWritable, but keep for compatibility
-  @ConfigurationProperty
-  public static final String TEZ_RUNTIME_KEY_CLASS = TEZ_RUNTIME_PREFIX + "key.class";
-
-  // fixed as BytesWritable, but keep for compatibility
-  @ConfigurationProperty
-  public static final String TEZ_RUNTIME_VALUE_CLASS = TEZ_RUNTIME_PREFIX + "value.class";
-
-  @ConfigurationProperty
-  public static final String TEZ_RUNTIME_KEY_SECONDARY_COMPARATOR_CLASS =
-      TEZ_RUNTIME_PREFIX + "key.secondary.comparator.class";
 
   @ConfigurationProperty(type = "boolean")
   public static final String TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED =
@@ -302,64 +323,73 @@ public class TezRuntimeConfiguration {
       TEZ_RUNTIME_PREFIX + "shuffle.max.speculative.fetch.attempts";
   public static final int TEZ_RUNTIME_SHUFFLE_MAX_SPECULATIVE_FETCH_ATTEMPTS_DEFAULT = 2;
 
-  //
-  // The following keys are not configurable for LogicalInput/Output in each DAG.
-  // They are supposed to be fixed for all DAGs, similarly to keys in TezConfiguration.
-  // Thus they are not added to tezRuntimeKeys[].
-  //
-
   @ConfigurationProperty(type = "boolean")
   public static final String TEZ_RUNTIME_COMPRESS = TEZ_RUNTIME_PREFIX + "compress";
 
   @ConfigurationProperty
   public static final String TEZ_RUNTIME_COMPRESS_CODEC = TEZ_RUNTIME_PREFIX + "compress.codec";
 
+  //
+  // The following keys are not configurable for LogicalInput/Output in each DAG.
+  // They are consumed when starting ShuffleServer and fixed for all DAGs.
+  // Thus they are not added to tezRuntimeKeys[].
+  //
+
+  // read only when constructing ShuffleServer, so not included in tezRuntimeKeys[]
   @ConfigurationProperty(type = "integer")
   public static final String TEZ_RUNTIME_SHUFFLE_TOTAL_PARALLEL_COPIES =
       TEZ_RUNTIME_PREFIX + "shuffle.total.parallel.copies";
   public static final int TEZ_RUNTIME_SHUFFLE_TOTAL_PARALLEL_COPIES_DEFAULT = 40;
 
+  // read only when constructing ShuffleServer, so not included in tezRuntimeKeys[]
   @ConfigurationProperty(type = "integer")
   public static final String TEZ_RUNTIME_SHUFFLE_FETCH_MAX_TASK_OUTPUT_AT_ONCE =
       TEZ_RUNTIME_PREFIX + "shuffle.fetch.max.task.output.at.once";
   public final static int TEZ_RUNTIME_SHUFFLE_FETCH_MAX_TASK_OUTPUT_AT_ONCE_DEFAULT = 20;
 
   // "first", "max" - used in ShuffleServer
+  // read only when constructing ShuffleServer, so not included in tezRuntimeKeys[]
   public static final String TEZ_RUNTIME_SHUFFLE_RANGES_SCHEME =
       TEZ_RUNTIME_PREFIX + "shuffle.ranges.scheme";
   public static final String TEZ_RUNTIME_SHUFFLE_RANGES_SCHEME_DEFAULT = "priority";
 
+  // read only in constructFetcherConfigCommon() from ShuffleServer, so not included in tezRuntimeKeys[]
   @ConfigurationProperty(type = "boolean")
   public static final String TEZ_RUNTIME_SHUFFLE_CONNECTION_FAIL_ALL_INPUT =
       TEZ_RUNTIME_PREFIX + "shuffle.connection.fail.all.input";
   public static final boolean TEZ_RUNTIME_SHUFFLE_CONNECTION_FAIL_ALL_INPUT_DEFAULT = false;
 
-  // TODO: move to tezRuntimeKeys[]
+  // read only in constructFetcherConfigCommon() from ShuffleServer, so not included in tezRuntimeKeys[]
   @ConfigurationProperty(type = "integer")
   public static final String TEZ_RUNTIME_SHUFFLE_CONNECT_TIMEOUT =
       TEZ_RUNTIME_PREFIX + "shuffle.connect.timeout";
   public static final int TEZ_RUNTIME_SHUFFLE_STALLED_COPY_TIMEOUT_DEFAULT = 27500;
 
+  // read only in constructFetcherConfigCommon() from ShuffleServer, so not included in tezRuntimeKeys[]
   @ConfigurationProperty(type = "boolean")
   public static final String TEZ_RUNTIME_SHUFFLE_KEEP_ALIVE_ENABLED =
       TEZ_RUNTIME_PREFIX + "shuffle.keep-alive.enabled";
   public static final boolean TEZ_RUNTIME_SHUFFLE_KEEP_ALIVE_ENABLED_DEFAULT = false;
 
+  // read only in constructFetcherConfigCommon() from ShuffleServer, so not included in tezRuntimeKeys[]
   @ConfigurationProperty(type = "integer")
   public static final String TEZ_RUNTIME_SHUFFLE_KEEP_ALIVE_MAX_CONNECTIONS =
       TEZ_RUNTIME_PREFIX + "shuffle.keep-alive.max.connections";
   public static final int TEZ_RUNTIME_SHUFFLE_KEEP_ALIVE_MAX_CONNECTIONS_DEFAULT = 20;
 
+  // read only in constructFetcherConfigCommon() from ShuffleServer, so not included in tezRuntimeKeys[]
   @ConfigurationProperty(type = "integer")
   public static final String TEZ_RUNTIME_SHUFFLE_READ_TIMEOUT =
       TEZ_RUNTIME_PREFIX + "shuffle.read.timeout";
   public final static int TEZ_RUNTIME_SHUFFLE_READ_TIMEOUT_DEFAULT = 2 * 60 * 1000;
 
+  // read only in constructFetcherConfigCommon() from ShuffleServer, so not included in tezRuntimeKeys[]
   @ConfigurationProperty(type = "integer")
   public static final String TEZ_RUNTIME_SHUFFLE_BUFFER_SIZE =
       TEZ_RUNTIME_PREFIX + "shuffle.buffersize";
   public final static int TEZ_RUNTIME_SHUFFLE_BUFFER_SIZE_DEFAULT = 8 * 1024;
 
+  // read only in constructFetcherConfigCommon() from ShuffleServer, so not included in tezRuntimeKeys[]
   @ConfigurationProperty(type = "boolean")
   public static final String TEZ_RUNTIME_SHUFFLE_ENABLE_SSL =
       TEZ_RUNTIME_PREFIX + "shuffle.ssl.enable";
@@ -371,6 +401,7 @@ public class TezRuntimeConfiguration {
    * and report the failure against the upstream task before the data reaches
    * the Processor and causes the fetching task to fail.
    */
+  // read only in constructFetcherConfigCommon() from ShuffleServer, so not included in tezRuntimeKeys[]
   @ConfigurationProperty(type = "boolean")
   public static final String TEZ_RUNTIME_SHUFFLE_FETCH_VERIFY_DISK_CHECKSUM =
       TEZ_RUNTIME_PREFIX + "shuffle.fetch.verify-disk-checksum";
@@ -382,6 +413,7 @@ public class TezRuntimeConfiguration {
    */
   // do not change the default value because local mode assumes 'true'.
   // do not change the default value because tez-site.xml does not set it.
+  // read only in constructFetcherConfigCommon() from ShuffleServer, so not included in tezRuntimeKeys[]
   @ConfigurationProperty(type = "boolean")
   public static final String TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH = TEZ_RUNTIME_PREFIX +
       "optimize.local.fetch";
@@ -391,19 +423,14 @@ public class TezRuntimeConfiguration {
   // set to false when tez.runtime.shuffle.memory-to-memory.enable=true.
   // do not change the default value because local mode assumes 'true'.
   // do not change the default value because tez-site.xml does not set it.
+  // read only in constructFetcherConfigCommon() from ShuffleServer, so not included in tezRuntimeKeys[]
   @ConfigurationProperty(type = "boolean")
   public static final String TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_ORDERED = TEZ_RUNTIME_PREFIX +
       "optimize.local.fetch.ordered";
   public static final boolean TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_ORDERED_DEFAULT = true;
 
-  @ConfigurationProperty(type = "integer")
-  public static final String TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS = TEZ_RUNTIME_PREFIX +
-      "merge.progress.records";
-  public static final long TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT = 10000;
-
   static {
-    // tezRuntimeKeys[] = sum of confKeys[] in:
-    //   OrderedGroupedKVInput, UnorderedKVInput, OrderedPartitionedKVOutput, UnorderedKVOutput, UnorderedPartitionedKVOutput
+    tezRuntimeKeys.add(TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID);
     tezRuntimeKeys.add(TEZ_RUNTIME_IFILE_READAHEAD);
     tezRuntimeKeys.add(TEZ_RUNTIME_IFILE_READAHEAD_BYTES);
     tezRuntimeKeys.add(TEZ_RUNTIME_IO_SORT_FACTOR);
@@ -416,7 +443,6 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_UNORDERED_OUTPUT_BUFFER_SIZE_MB);
     tezRuntimeKeys.add(TEZ_RUNTIME_REPORT_PARTITION_STATS);
     tezRuntimeKeys.add(TEZ_RUNTIME_PARTITIONER_CLASS);
-    tezRuntimeKeys.add(TEZ_RUNTIME_COMBINER_CLASS);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_PARALLEL_COPIES);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_MEMORY_LIMIT_PERCENT);
@@ -442,6 +468,8 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_THRESHOLD_MILLIS);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_RELEASE_MILLIS);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_MAX_SPECULATIVE_FETCH_ATTEMPTS);
+    tezRuntimeKeys.add(TEZ_RUNTIME_COMPRESS);
+    tezRuntimeKeys.add(TEZ_RUNTIME_COMPRESS_CODEC);
 
     // Do not keep defaultConf as a static member because it holds a reference to ClassLoader
     // of the Thread that is active at the time of loading this class. The active Thread usually

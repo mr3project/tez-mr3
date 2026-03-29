@@ -325,6 +325,7 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
   private static final Set<String> confKeys = new HashSet<String>();
 
   static {
+    confKeys.add(TezRuntimeConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_BYTES);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_FACTOR);
@@ -335,8 +336,7 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MEMTOMEM_SEGMENTS);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_ENABLE_MEMTOMEM);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_INPUT_POST_MERGE_BUFFER_PERCENT);
-    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS);
-    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS_CODEC);
+    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_KEY_COMPARATOR_CLASS);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_KEY_SECONDARY_COMPARATOR_CLASS);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT);
@@ -347,6 +347,8 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_THRESHOLD_MILLIS);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_RELEASE_MILLIS);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MAX_SPECULATIVE_FETCH_ATTEMPTS);
+    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS);
+    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS_CODEC);
   }
 
   public static Set<String> getConfigurationKeySet() {

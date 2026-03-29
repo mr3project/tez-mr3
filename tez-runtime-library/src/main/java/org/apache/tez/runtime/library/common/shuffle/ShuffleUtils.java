@@ -50,6 +50,7 @@ import org.apache.tez.runtime.api.ConcurrentByteCache;
 import org.apache.tez.runtime.api.IndexPathCache;
 import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.api.events.DataMovementEvent;
+import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.TezRuntimeUtils;
@@ -641,14 +642,14 @@ public class ShuffleUtils {
 
   public static boolean isTezShuffleHandler(Configuration config) {
     return config.get(
-        TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
-        TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT).contains("tez");
+        TezRuntimeConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
+        TezRuntimeConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT).contains("tez");
   }
 
   public static String getTezShuffleHandlerServiceId(Configuration conf) {
     return conf.get(
-        TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
-        TezConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT);
+        TezRuntimeConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID,
+        TezRuntimeConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT);
   }
 
   public static String adjustPathComponent(boolean compositeFetch, int dagIdentifier, String pathComponent) {

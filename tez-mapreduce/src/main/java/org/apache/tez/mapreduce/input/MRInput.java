@@ -449,8 +449,7 @@ public class MRInput extends MRInputBase {
                   .getTaskVertexIndex(), getContext().getApplicationId().getId(), getContext()
                   .getTaskIndex(), getContext().getTaskAttemptNumber(), getContext());
         } else {
-          mrReader = new MRReaderMapred(jobConf, getContext().getCounters(), inputRecordCounter, 
-              getContext());
+          mrReader = new MRReaderMapred(jobConf, getContext().getCounters(), inputRecordCounter, getContext());
         }
       } else {
         TaskSplitMetaInfo thisTaskMetaInfo = MRInputUtils.getSplits(jobConf,
