@@ -110,11 +110,6 @@ public class UnorderedPartitionedKVOutputConfig {
       return this;
     }
 
-    public Builder setAvailableBufferSize(int availableBufferSize) {
-      this.conf.setInt(TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_OUTPUT_BUFFER_SIZE_MB, availableBufferSize);
-      return this;
-    }
-
     @SuppressWarnings("unchecked")
     public Builder setAdditionalConfiguration(String key, String value) {
       Objects.requireNonNull(key, "Key cannot be null");

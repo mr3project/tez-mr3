@@ -29,7 +29,6 @@ import org.apache.tez.common.Preconditions;
  */
 public class EdgeProperty {
 
-
   /**
    * Defines the manner of data movement between source and destination tasks.
    * Determines which destination tasks have access to data produced on this
