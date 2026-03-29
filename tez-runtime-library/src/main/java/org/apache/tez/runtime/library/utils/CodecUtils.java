@@ -107,7 +107,7 @@ public final class CodecUtils {
         connectionFailAllInput);
   }
 
-  // conf is specific to each RuntimeTask
+  // conf is specific to each RuntimeTask, called from TezContainerWorkerEnv
   public static FetcherConfig constructFetcherConfig(Configuration conf) {
     boolean ifileReadAhead = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD,

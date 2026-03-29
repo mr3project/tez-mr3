@@ -17,7 +17,6 @@
  */
 package org.apache.tez.runtime.library.api;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -28,29 +27,25 @@ import java.util.Set;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.tez.common.annotation.ConfigurationProperty;
 import org.apache.tez.dag.api.TezConfiguration;
-import org.apache.tez.runtime.library.conf.OrderedPartitionedKVOutputConfig.SorterImpl;
 
 /**
  * Meant for user configurable job properties.
- * <p/>
- * Note for developers: Whenever a new key is added to this file, it must also be added to the set of
- * known tezRuntimeKeys.
  */
 public class TezRuntimeConfiguration {
 
   private static final String TEZ_RUNTIME_PREFIX = "tez.runtime.";
 
+  // We allow only keys in tezRuntimeKeys[] to be updated at runtime by users.
   private static final Set<String> tezRuntimeKeys = new HashSet<String>();
   private static final Set<String> umnodifiableTezRuntimeKeySet;
-  private static final Set<String> otherKeys = new HashSet<String>();
-  private static final Set<String> unmodifiableOtherKeySet;
-  private static final Map<String, String> tezRuntimeConfMap = new HashMap<String, String>();
-  private static final Map<String, String> otherConfMap = new HashMap<String, String>();
 
-  /**
-   * Prefixes from Hadoop configuration which are allowed.
-   */
-  private static final List<String> allowedPrefixes = new ArrayList<String>();
+  // from tez-site.xml, in tezRuntimeKeys
+  private static final Map<String, String> tezSiteXmlRuntimeConfMap = new HashMap<String, String>();
+
+  // from tez-site.xml, not in tezRuntimeKeys
+  private static final Map<String, String> tezSiteXmlOtherConfMap = new HashMap<String, String>();
+  private static final Set<String> tezSiteXmlOtherKeys = new HashSet<String>();
+  private static final Set<String> unmodifiableTezSiteXmlOtherKeySet;
 
   /**
    * Configuration key to enable/disable IFile readahead.
@@ -108,19 +103,6 @@ public class TezRuntimeConfiguration {
   public static final String TEZ_RUNTIME_PIPELINED_SORTER_LAZY_ALLOCATE_MEMORY =
       TEZ_RUNTIME_PREFIX + "pipelined.sorter.lazy-allocate.memory";
   public static final boolean TEZ_RUNTIME_PIPELINED_SORTER_LAZY_ALLOCATE_MEMORY_DEFAULT = false;
-
-  /**
-   * String value.
-   * Which sorter implementation to use.
-   * Valid values:
-   *    - LEGACY
-   *    - PIPELINED ( default )
-   *    {@link org.apache.tez.runtime.library.conf.OrderedPartitionedKVOutputConfig.SorterImpl}
-   */
-  @ConfigurationProperty
-  public static final String TEZ_RUNTIME_SORTER_CLASS =
-      TEZ_RUNTIME_PREFIX + "sorter.class";
-  public static final String TEZ_RUNTIME_SORTER_CLASS_DEFAULT = SorterImpl.PIPELINED.name();
 
   @ConfigurationProperty(type = "integer")
   public static final String TEZ_RUNTIME_PIPELINED_SORTER_SORT_THREADS =
@@ -326,7 +308,7 @@ public class TezRuntimeConfiguration {
   public static final int TEZ_RUNTIME_SHUFFLE_MAX_SPECULATIVE_FETCH_ATTEMPTS_DEFAULT = 2;
 
   //
-  // The following keys are not configurable for LogicalInput/Ouput in each DAG.
+  // The following keys are not configurable for LogicalInput/Output in each DAG.
   // They are supposed to be fixed for all DAGs, similarly to keys in TezConfiguration.
   // Thus they are not added to tezRuntimeKeys[].
   //
@@ -471,48 +453,34 @@ public class TezRuntimeConfiguration {
     // belongs to a running DAG, so keeping defaultConf gives rise to memory leak of DAGClassLoader.
     Configuration defaultConf = new Configuration(false);
 
-    defaultConf.addResource("core-default.xml");
-    defaultConf.addResource("core-site.xml");
+    // Tez runtime uses only Tez configurations.
+    //  - do not include core-site.xml.
+    //  - do not use 'allowed prefixes'
     defaultConf.addResource(TezConfiguration.TEZ_SITE_XML);
 
     for (Map.Entry<String, String> confEntry : defaultConf) {
       if (tezRuntimeKeys.contains(confEntry.getKey())) {
-        tezRuntimeConfMap.put(confEntry.getKey(), confEntry.getValue());
+        tezSiteXmlRuntimeConfMap.put(confEntry.getKey(), confEntry.getValue());
       } else {
-        otherConfMap.put(confEntry.getKey(), confEntry.getValue());
-        otherKeys.add(confEntry.getKey());
+        tezSiteXmlOtherConfMap.put(confEntry.getKey(), confEntry.getValue());
+        tezSiteXmlOtherKeys.add(confEntry.getKey());
       }
     }
 
-    // Do NOT need all prefixes from the following list. Only specific ones are allowed
-    // "hadoop.", "hadoop.security", "io.", "fs.", "ipc.", "net.", "file.", "dfs.", "ha.", "s3.", "nfs3.", "rpc.", "ssl."
-    allowedPrefixes.add("io.");
-    allowedPrefixes.add("file.");
-    allowedPrefixes.add("fs.");
-    allowedPrefixes.add("ssl.");
-
     umnodifiableTezRuntimeKeySet = Collections.unmodifiableSet(tezRuntimeKeys);
-    unmodifiableOtherKeySet = Collections.unmodifiableSet(otherKeys);
+    unmodifiableTezSiteXmlOtherKeySet = Collections.unmodifiableSet(tezSiteXmlOtherKeys);
   }
 
-  public static Set<String> getRuntimeConfigKeySet() {
+  public static Set<String> getTezRuntimeConfigKeySet() {
     return umnodifiableTezRuntimeKeySet;
   }
 
-  public static Set<String> getRuntimeAdditionalConfigKeySet() {
-    return unmodifiableOtherKeySet;
-  }
-
-  public static List<String> getAllowedPrefixes() {
-    return allowedPrefixes;
-  }
-
   public static Map<String, String> getTezRuntimeConfigDefaults() {
-    return Collections.unmodifiableMap(tezRuntimeConfMap);
+    return Collections.unmodifiableMap(tezSiteXmlRuntimeConfMap);
   }
 
-  public static Map<String, String> getOtherConfigDefaults() {
-    return Collections.unmodifiableMap(otherConfMap);
+  public static Map<String, String> getTezSiteXmlOtherConfigDefaults() {
+    return Collections.unmodifiableMap(tezSiteXmlOtherConfMap);
   }
 
   public enum ReportPartitionStats {
@@ -534,7 +502,7 @@ public class TezRuntimeConfiguration {
 
     private final String type;
 
-    private ReportPartitionStats(String type) {
+    ReportPartitionStats(String type) {
       this.type = type;
     }
 

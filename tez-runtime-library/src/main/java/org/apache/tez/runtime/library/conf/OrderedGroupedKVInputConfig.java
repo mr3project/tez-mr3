@@ -20,8 +20,6 @@
 
 package org.apache.tez.runtime.library.conf;
 
-import javax.annotation.Nullable;
-
 import java.io.IOException;
 import java.util.Map;
 import java.util.Objects;
@@ -94,16 +92,13 @@ public class OrderedGroupedKVInputConfig {
           TezRuntimeConfiguration.getTezRuntimeConfigDefaults(),
           OrderedGroupedKVInput.getConfigurationKeySet());
       ConfigUtils.addConfigMapToConfiguration(this.conf, tezDefaults);
-      ConfigUtils.addConfigMapToConfiguration(this.conf, TezRuntimeConfiguration.getOtherConfigDefaults());
+      ConfigUtils.addConfigMapToConfiguration(this.conf, TezRuntimeConfiguration.getTezSiteXmlOtherConfigDefaults());
     }
 
     @SuppressWarnings("unchecked")
     public Builder setAdditionalConfiguration(String key, String value) {
       Objects.requireNonNull(key, "Key cannot be null");
-      if (ConfigUtils.doesKeyQualify(key,
-          Lists.newArrayList(OrderedGroupedKVInput.getConfigurationKeySet(),
-              TezRuntimeConfiguration.getRuntimeAdditionalConfigKeySet()),
-          TezRuntimeConfiguration.getAllowedPrefixes())) {
+      if (ConfigUtils.doesKeyQualify(key, OrderedGroupedKVInput.getConfigurationKeySet())) {
         if (value == null) {
           this.conf.unset(key);
         } else {
@@ -118,8 +113,7 @@ public class OrderedGroupedKVInputConfig {
       // Maybe ensure this is the first call ? Otherwise this can end up overriding other parameters
       Preconditions.checkArgument(conf != null, "Configuration cannot be null");
       Map<String, String> map = ConfigUtils.extractConfigurationMap(conf,
-          OrderedGroupedKVInput.getConfigurationKeySet(),
-          TezRuntimeConfiguration.getRuntimeAdditionalConfigKeySet(), TezRuntimeConfiguration.getAllowedPrefixes());
+          OrderedGroupedKVInput.getConfigurationKeySet());
       ConfigUtils.addConfigMapToConfiguration(this.conf, map);
       return this;
     }

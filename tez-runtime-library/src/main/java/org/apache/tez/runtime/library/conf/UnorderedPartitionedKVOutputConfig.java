@@ -97,7 +97,7 @@ public class UnorderedPartitionedKVOutputConfig {
           TezRuntimeConfiguration.getTezRuntimeConfigDefaults(),
           UnorderedPartitionedKVOutput.getConfigurationKeySet());
       ConfigUtils.addConfigMapToConfiguration(this.conf, tezDefaults);
-      ConfigUtils.addConfigMapToConfiguration(this.conf, TezRuntimeConfiguration.getOtherConfigDefaults());
+      ConfigUtils.addConfigMapToConfiguration(this.conf, TezRuntimeConfiguration.getTezSiteXmlOtherConfigDefaults());
     }
 
     Builder setPartitioner(String partitionerClassName, Map<String, String> partitionerConf) {
@@ -106,24 +106,20 @@ public class UnorderedPartitionedKVOutputConfig {
       if (partitionerConf != null) {
         // Merging the confs for now. Change to be specific in the future.
         ConfigUtils.mergeConfsWithExclusions(this.conf, partitionerConf,
-            TezRuntimeConfiguration.getRuntimeConfigKeySet());
+            TezRuntimeConfiguration.getTezRuntimeConfigKeySet());
       }
       return this;
     }
 
     public Builder setAvailableBufferSize(int availableBufferSize) {
-      this.conf
-          .setInt(TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_OUTPUT_BUFFER_SIZE_MB, availableBufferSize);
+      this.conf.setInt(TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_OUTPUT_BUFFER_SIZE_MB, availableBufferSize);
       return this;
     }
 
     @SuppressWarnings("unchecked")
     public Builder setAdditionalConfiguration(String key, String value) {
       Objects.requireNonNull(key, "Key cannot be null");
-      if (ConfigUtils.doesKeyQualify(key,
-          Lists.newArrayList(UnorderedPartitionedKVOutput.getConfigurationKeySet(),
-              TezRuntimeConfiguration.getRuntimeAdditionalConfigKeySet()),
-          TezRuntimeConfiguration.getAllowedPrefixes())) {
+      if (ConfigUtils.doesKeyQualify(key, UnorderedPartitionedKVOutput.getConfigurationKeySet())) {
         if (value == null) {
           this.conf.unset(key);
         } else {
@@ -138,8 +134,7 @@ public class UnorderedPartitionedKVOutputConfig {
       // Maybe ensure this is the first call ? Otherwise this can end up overriding other parameters
       Preconditions.checkArgument(conf != null, "Configuration cannot be null");
       Map<String, String> map = ConfigUtils.extractConfigurationMap(conf,
-          UnorderedPartitionedKVOutput.getConfigurationKeySet(),
-          TezRuntimeConfiguration.getRuntimeAdditionalConfigKeySet(), TezRuntimeConfiguration.getAllowedPrefixes());
+          UnorderedPartitionedKVOutput.getConfigurationKeySet());
       ConfigUtils.addConfigMapToConfiguration(this.conf, map);
       return this;
     }

@@ -44,14 +44,6 @@ import org.apache.tez.runtime.library.output.OrderedPartitionedKVOutput;
  */
 public class OrderedPartitionedKVOutputConfig {
 
-  /**
-   * Currently supported sorter implementations
-   */
-  public enum SorterImpl {
-    /** Pipeline sorter - a more efficient sorter that supports > 2 GB sort buffers */
-    PIPELINED
-  }
-
   Configuration conf;
 
   private OrderedPartitionedKVOutputConfig(Configuration conf) {
@@ -106,7 +98,7 @@ public class OrderedPartitionedKVOutputConfig {
           TezRuntimeConfiguration.getTezRuntimeConfigDefaults(),
           OrderedPartitionedKVOutput.getConfigurationKeySet());
       ConfigUtils.addConfigMapToConfiguration(this.conf, tezDefaults);
-      ConfigUtils.addConfigMapToConfiguration(this.conf, TezRuntimeConfiguration.getOtherConfigDefaults());
+      ConfigUtils.addConfigMapToConfiguration(this.conf, TezRuntimeConfiguration.getTezSiteXmlOtherConfigDefaults());
     }
 
     Builder setPartitioner(String partitionerClassName, @Nullable Map<String, String> partitionerConf) {
@@ -115,7 +107,7 @@ public class OrderedPartitionedKVOutputConfig {
       if (partitionerConf != null) {
         // Merging the confs for now. Change to be specific in the future.
         ConfigUtils.mergeConfsWithExclusions(this.conf, partitionerConf,
-            TezRuntimeConfiguration.getRuntimeConfigKeySet());
+            TezRuntimeConfiguration.getTezRuntimeConfigKeySet());
       }
       return this;
     }
@@ -123,10 +115,7 @@ public class OrderedPartitionedKVOutputConfig {
     @SuppressWarnings("unchecked")
     public Builder setAdditionalConfiguration(String key, String value) {
       Objects.requireNonNull(key, "Key cannot be null");
-      if (ConfigUtils.doesKeyQualify(key,
-          Lists.newArrayList(OrderedPartitionedKVOutput.getConfigurationKeySet(),
-              TezRuntimeConfiguration.getRuntimeAdditionalConfigKeySet()),
-          TezRuntimeConfiguration.getAllowedPrefixes())) {
+      if (ConfigUtils.doesKeyQualify(key, OrderedPartitionedKVOutput.getConfigurationKeySet())) {
         if (value == null) {
           this.conf.unset(key);
         } else {
@@ -141,8 +130,7 @@ public class OrderedPartitionedKVOutputConfig {
       // Maybe ensure this is the first call ? Otherwise this can end up overriding other parameters
       Preconditions.checkArgument(conf != null, "Configuration cannot be null");
       Map<String, String> map = ConfigUtils.extractConfigurationMap(conf,
-          OrderedPartitionedKVOutput.getConfigurationKeySet(),
-          TezRuntimeConfiguration.getRuntimeAdditionalConfigKeySet(), TezRuntimeConfiguration.getAllowedPrefixes());
+          OrderedPartitionedKVOutput.getConfigurationKeySet());
       ConfigUtils.addConfigMapToConfiguration(this.conf, map);
       return this;
     }

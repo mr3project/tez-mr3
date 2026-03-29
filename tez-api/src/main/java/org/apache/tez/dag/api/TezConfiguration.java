@@ -291,7 +291,7 @@ process as
   @ConfigurationProperty
   public static final String TEZ_MRREADER_CONFIG_UPDATE_PROPERTIES = "tez.mrreader.config.update.properties";
 
+  // unused in MR3
   public static void validateProperty(String property, Scope usedScope) {
-    // unused in MR3
   }
 }
