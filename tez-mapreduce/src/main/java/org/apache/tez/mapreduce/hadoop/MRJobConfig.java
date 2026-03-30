@@ -19,55 +19,59 @@ package org.apache.tez.mapreduce.hadoop;
 
 public interface MRJobConfig {
 
-  static final String MR_TEZ_PREFIX = "mapreduce.tez.";
+  String MR_TEZ_PREFIX = "mapreduce.tez.";
   
   // Put all of the attribute names in here so that Job and JobContext are consistent.
-  public static final String INPUT_FORMAT_CLASS_ATTR = "mapreduce.job.inputformat.class";
+  String INPUT_FORMAT_CLASS_ATTR = "mapreduce.job.inputformat.class";
   
-  public static final String NEW_API_MAPPER_CONFIG = "mapred.mapper.new-api";
-  public static final String NEW_API_REDUCER_CONFIG = "mapred.reducer.new-api";
+  String NEW_API_MAPPER_CONFIG = "mapred.mapper.new-api";
+  String NEW_API_REDUCER_CONFIG = "mapred.reducer.new-api";
 
-  public static final String OUTPUT_FORMAT_CLASS_ATTR = "mapreduce.job.outputformat.class";
-  public static final String PARTITIONER_CLASS_ATTR = "mapreduce.job.partitioner.class";
+  String OUTPUT_FORMAT_CLASS_ATTR = "mapreduce.job.outputformat.class";
+  String PARTITIONER_CLASS_ATTR = "mapreduce.job.partitioner.class";
 
-  public static final String SPLIT_METAINFO_MAXSIZE = "mapreduce.job.split.metainfo.maxsize";
-  public static final long DEFAULT_SPLIT_METAINFO_MAXSIZE = 10000000L;
+  String SPLIT_METAINFO_MAXSIZE = "mapreduce.job.split.metainfo.maxsize";
+  long DEFAULT_SPLIT_METAINFO_MAXSIZE = 10000000L;
 
-  public static final String JOB_LOCAL_DIR = "mapreduce.job.local.dir";
+  String JOB_LOCAL_DIR = "mapreduce.job.local.dir";
 
-  public static final String CACHE_LOCALFILES = "mapreduce.job.cache.local.files";
-  public static final String CACHE_LOCALARCHIVES = "mapreduce.job.cache.local.archives";
+  String CACHE_LOCALFILES = "mapreduce.job.cache.local.files";
+  String CACHE_LOCALARCHIVES = "mapreduce.job.cache.local.archives";
 
   /**
    * Used by committers to set a job-wide UUID.
    */
-  public static final String JOB_COMMITTER_UUID = "job.committer.uuid";
+  String JOB_COMMITTER_UUID = "job.committer.uuid";
 
-  public static String LAZY_OUTPUTFORMAT_OUTPUTFORMAT =
+  String LAZY_OUTPUTFORMAT_OUTPUTFORMAT =
       "mapreduce.output.lazyoutputformat.outputformat";
 
-  public static String FILEOUTPUTFORMAT_BASE_OUTPUT_NAME =
+  String FILEOUTPUTFORMAT_BASE_OUTPUT_NAME =
       "mapreduce.output.basename";
 
   /** The staging directory for map reduce.*/
-  public static final String MR_PREFIX = "yarn.app.mapreduce.";
-  public static final String MR_AM_PREFIX = MR_PREFIX + "am.";
-  public static final String MR_AM_STAGING_DIR = MR_AM_PREFIX + "staging-dir";
+  String MR_PREFIX = "yarn.app.mapreduce.";
+  String MR_AM_PREFIX = MR_PREFIX + "am.";
+  String MR_AM_STAGING_DIR = MR_AM_PREFIX + "staging-dir";
 
-  public static final String JOB_SPLIT = "job.split";
-  public static final String JOB_SPLIT_METAINFO = "job.splitmetainfo";
+  String JOB_SPLIT = "job.split";
+  String JOB_SPLIT_METAINFO = "job.splitmetainfo";
 
-  public static final String APPLICATION_ATTEMPT_ID = "mapreduce.job.application.attempt.id";
-  public static final String VERTEX_NAME = "mapreduce.task.vertex.name";
-  public static final String VERTEX_ID = "mapreduce.task.vertex.id";
-  public static final String TASK_ATTEMPT_ID = "mapreduce.task.attempt.id";
-  public static final String TASK_ISMAP = "mapreduce.task.ismap";
+  String APPLICATION_ATTEMPT_ID = "mapreduce.job.application.attempt.id";
+  String VERTEX_NAME = "mapreduce.task.vertex.name";
+  String VERTEX_ID = "mapreduce.task.vertex.id";
+  String TASK_ATTEMPT_ID = "mapreduce.task.attempt.id";
+  String TASK_ISMAP = "mapreduce.task.ismap";
 
-  public static final String MR_TEZ_SPLITS_VIA_EVENTS = MR_TEZ_PREFIX + "splits.via.events";
-  public static final boolean MR_TEZ_SPLITS_VIA_EVENTS_DEFAULT = true;
+  String MR_TEZ_SPLITS_VIA_EVENTS = MR_TEZ_PREFIX + "splits.via.events";
+  boolean MR_TEZ_SPLITS_VIA_EVENTS_DEFAULT = true;
 
-  public static final String MR_TEZ_INPUT_INITIALIZER_SERIALIZE_EVENT_PAYLOAD = MR_TEZ_PREFIX
+  String MR_TEZ_INPUT_INITIALIZER_SERIALIZE_EVENT_PAYLOAD = MR_TEZ_PREFIX
       + "input.initializer.serialize.event.payload";
-  public static final boolean MR_TEZ_INPUT_INITIALIZER_SERIALIZE_EVENT_PAYLOAD_DEFAULT = true;
-  
+  boolean MR_TEZ_INPUT_INITIALIZER_SERIALIZE_EVENT_PAYLOAD_DEFAULT = true;
+
+  // used by MR3 test code
+  String MAP_MEMORY_MB = "mapreduce.map.memory.mb";
+  String REDUCE_MEMORY_MB = "mapreduce.reduce.memory.mb";
+  String NUM_REDUCES = "mapreduce.job.reduces";
 }
