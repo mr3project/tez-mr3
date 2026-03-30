@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.library.api.LogicalOutputEdge;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
@@ -159,7 +160,7 @@ public class UnorderedKVOutput extends AbstractLogicalOutput implements LogicalO
 
   public static class CustomPartitioner implements Partitioner {
     @Override
-    public int getPartition(Object key, Object value, int numPartitions) {
+    public int getPartition(BytesWritable key, BytesWritable value, int numPartitions) {
       return 0;
     }
   }

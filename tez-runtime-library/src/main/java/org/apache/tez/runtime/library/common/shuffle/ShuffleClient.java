@@ -326,9 +326,9 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
   }
 
   public void informAM(String header, CompositeInputAttemptIdentifier srcAttemptIdentifier) {
-    LOG.warn("{} {}: Reporting fetch failure for InputIdentifier: {}, {}", header,
-        shuffleClientId, srcAttemptIdentifier,
-        TezRuntimeUtils.getTaskAttemptIdentifier(inputContext.getSourceVertexName(),
+    LOG.warn("{} {}: Reporting fetch failure for InputIdentifier: {}, {}_{}", header,
+        shuffleClientId, srcAttemptIdentifier, inputContext.getSourceVertexName(),
+        String.format("%06d_%02d",
             srcAttemptIdentifier.getInputIdentifier(), srcAttemptIdentifier.getAttemptNumber()));
 
     // we send InputReadError regardless of connectFailed (Cf. gla2019.6.10.pptx, page 21)

@@ -17,6 +17,7 @@
  */
 package org.apache.tez.runtime.library.partitioner;
 
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.library.api.Partitioner;
 
 public class RoundRobinPartitioner implements Partitioner {
@@ -24,7 +25,7 @@ public class RoundRobinPartitioner implements Partitioner {
     private int x = 0;
 
     @Override
-    public int getPartition(Object key, Object value, int numPartitions) {
+    public int getPartition(BytesWritable key, BytesWritable value, int numPartitions) {
       x = x % numPartitions;
       return (x++) % numPartitions;
     }

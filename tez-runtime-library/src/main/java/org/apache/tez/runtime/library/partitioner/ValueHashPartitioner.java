@@ -21,13 +21,13 @@ package org.apache.tez.runtime.library.partitioner;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.library.api.Partitioner;
 
-/**
- * Implements a {@link Partitioner} that does hash based partitioning
- */
-public class HashPartitioner implements Partitioner {
+public class ValueHashPartitioner implements Partitioner {
+
+  public ValueHashPartitioner() {
+  }
 
   @Override
   public int getPartition(BytesWritable key, BytesWritable value, int numPartitions) {
-    return (key.hashCode() & Integer.MAX_VALUE) % numPartitions;
+    return (value.hashCode() & 2147483647) % numPartitions;
   }
 }

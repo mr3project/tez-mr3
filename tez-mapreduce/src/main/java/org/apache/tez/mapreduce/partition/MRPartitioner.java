@@ -18,6 +18,7 @@
 
 package org.apache.tez.mapreduce.partition;
 
+import org.apache.hadoop.io.BytesWritable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -91,7 +92,7 @@ public class MRPartitioner implements org.apache.tez.runtime.library.api.Partiti
   }
 
   @Override
-  public int getPartition(Object key, Object value, int numPartitions) {
+  public int getPartition(BytesWritable key, BytesWritable value, int numPartitions) {
     if (useNewApi) {
       return newPartitioner.getPartition(key, value, numPartitions);
     } else {

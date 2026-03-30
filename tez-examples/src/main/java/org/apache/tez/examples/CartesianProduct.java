@@ -145,7 +145,7 @@ public class CartesianProduct extends TezExampleBase {
 
   public static class CustomPartitioner implements Partitioner {
     @Override
-    public int getPartition(Object key, Object value, int numPartitions) {
+    public int getPartition(BytesWritable key, BytesWritable value, int numPartitions) {
       return key.toString().charAt(0) % numPartition;
     }
   }

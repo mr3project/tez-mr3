@@ -58,28 +58,11 @@ public class OrderedPartitionedKVEdgeConfig extends KeyValuesBasedBaseEdgeConfig
    * @param keyClassName         the key class name
    * @param valueClassName       the value class name
    * @param partitionerClassName the partitioner class name
-   * @param partitionerConf      the partitioner configuration. This can be null, and is a {@link
-   *                             java.util.Map} of key-value pairs. The keys should be limited to
-   *                             the ones required by the partitioner.
-   * @return a builder to configure the edge
-   */
-  public static Builder newBuilder(String keyClassName, String valueClassName,
-                                   String partitionerClassName,
-                                   @Nullable Map<String, String> partitionerConf) {
-    return new Builder(keyClassName, valueClassName, partitionerClassName, partitionerConf);
-  }
-
-  /**
-   * Create a builder to configure the relevant Input and Output
-   *
-   * @param keyClassName         the key class name
-   * @param valueClassName       the value class name
-   * @param partitionerClassName the partitioner class name
    * @return a builder to configure the edge
    */
   public static Builder newBuilder(String keyClassName, String valueClassName,
                                    String partitionerClassName) {
-    return newBuilder(keyClassName, valueClassName, partitionerClassName, null);
+    return new Builder(keyClassName, valueClassName, partitionerClassName);
   }
 
   @Override
@@ -139,10 +122,9 @@ public class OrderedPartitionedKVEdgeConfig extends KeyValuesBasedBaseEdgeConfig
     private final OrderedPartitionedKVOutputConfig.Builder outputBuilder;
     private final OrderedGroupedKVInputConfig.Builder inputBuilder;
 
-    Builder(String keyClassName, String valueClassName, String partitionerClassName,
-            Map<String, String> partitionerConf) {
+    Builder(String keyClassName, String valueClassName, String partitionerClassName) {
       outputBuilder = new OrderedPartitionedKVOutputConfig.Builder(
-          keyClassName, valueClassName, partitionerClassName, partitionerConf);
+          keyClassName, valueClassName, partitionerClassName);
       inputBuilder = new OrderedGroupedKVInputConfig.Builder(keyClassName, valueClassName);
     }
 

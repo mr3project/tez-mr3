@@ -21,7 +21,6 @@ package org.apache.tez.runtime.library.common;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.ByteBuffer;
 
@@ -48,28 +47,12 @@ public class TezRuntimeUtils {
   // Shared by multiple threads
   private static volatile SSLFactory sslFactory;
 
-  public static String getTaskIdentifier(String vertexName, int taskIndex) {
-    return String.format("%s_%06d", vertexName, taskIndex);
-  }
-
-  public static String getTaskAttemptIdentifier(int taskIndex,
-      int taskAttemptNumber) {
-    return String.format("%d_%d", taskIndex, taskAttemptNumber);
-  }
-
-  public static String getTaskAttemptIdentifier(String vertexName,
-      int taskIndex, int taskAttemptNumber) {
-    return String.format("%s_%06d_%02d", vertexName, taskIndex,
-        taskAttemptNumber);
-  }
-
   @SuppressWarnings("unchecked")
-  public static Partitioner instantiatePartitioner(Configuration conf)
-      throws IOException {
+  public static Partitioner instantiatePartitioner(Configuration conf) throws IOException {
     Class<? extends Partitioner> clazz;
     try {
-      clazz = (Class<? extends Partitioner>) conf.getClassByName(conf
-          .get(TezRuntimeConfiguration.TEZ_RUNTIME_PARTITIONER_CLASS));
+      clazz = (Class<? extends Partitioner>) conf.getClassByName(
+          conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_PARTITIONER_CLASS));
     } catch (ClassNotFoundException e) {
       throw new IOException("Unable to find Partitioner class specified in config : "
           + conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_PARTITIONER_CLASS), e);
@@ -80,22 +63,13 @@ public class TezRuntimeUtils {
     }
 
     Partitioner partitioner = null;
-
     try {
-      Constructor<? extends Partitioner> ctorWithConf = clazz
-          .getConstructor(Configuration.class);
-      partitioner = ctorWithConf.newInstance(conf);
+      Constructor<? extends Partitioner> ctorWithConf = clazz.getConstructor();
+      partitioner = ctorWithConf.newInstance();
     } catch (SecurityException e) {
       throw new IOException(e);
     } catch (NoSuchMethodException e) {
-      try {
-        // Try a 0 argument constructor.
-        partitioner = clazz.newInstance();
-      } catch (InstantiationException e1) {
-        throw new IOException(e1);
-      } catch (IllegalAccessException e1) {
-        throw new IOException(e1);
-      }
+      throw new IOException(e);
     } catch (IllegalArgumentException e) {
       throw new IOException(e);
     } catch (InstantiationException e) {
@@ -117,23 +91,6 @@ public class TezRuntimeUtils {
         outputContext.getExecutionContext().getEnvContainerId(),
         outputContext.getTaskVertexIndex(),
         isCompositeFetch);
-  }
-
-  public static URL constructBaseURIForShuffleHandlerDagComplete(
-      String host, int port, String appId, int dagIdentifier, boolean sslShuffle)
-      throws MalformedURLException {
-    final String http_protocol = (sslShuffle) ? "https://" : "http://";
-    StringBuilder sb = new StringBuilder(http_protocol);
-    sb.append(host);
-    sb.append(":");
-    sb.append(port);
-    sb.append("/");
-    sb.append("mapOutput?dagAction=delete");
-    sb.append("&job=");
-    sb.append(appId.replace("application", "job"));
-    sb.append("&dag=");
-    sb.append(String.valueOf(dagIdentifier));
-    return new URL(sb.toString());
   }
 
   public static HttpConnectionParams getHttpConnectionParams(

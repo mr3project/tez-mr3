@@ -20,14 +20,18 @@ package org.apache.tez.runtime.library.partitioner;
 
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.library.api.Partitioner;
+import org.apache.hadoop.mapred.lib.HashPartitioner;
 
-/**
- * Implements a {@link Partitioner} that does hash based partitioning
- */
-public class HashPartitioner implements Partitioner {
+public class MRHashPartitioner implements Partitioner {
+
+  private final HashPartitioner partitioner;
+
+  public MRHashPartitioner() {
+    partitioner = new HashPartitioner();
+  }
 
   @Override
   public int getPartition(BytesWritable key, BytesWritable value, int numPartitions) {
-    return (key.hashCode() & Integer.MAX_VALUE) % numPartitions;
+    return partitioner.getPartition(key, value, numPartitions);
   }
 }

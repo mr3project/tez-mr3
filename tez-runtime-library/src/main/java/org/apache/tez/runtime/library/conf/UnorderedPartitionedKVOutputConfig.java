@@ -62,12 +62,7 @@ public class UnorderedPartitionedKVOutputConfig {
   }
 
   public static Builder newBuilder(String keyClass, String valClass, String partitionerClassName) {
-    return newBuilder(keyClass, valClass, partitionerClassName, null);
-  }
-
-  public static Builder newBuilder(String keyClass, String valClass, String partitionerClassName,
-                                   Map<String, String> partitionerConf) {
-    return new Builder(keyClass, valClass, partitionerClassName, partitionerConf);
+    return newBuilder(keyClass, valClass, partitionerClassName);
   }
 
   public static class Builder {
@@ -80,16 +75,13 @@ public class UnorderedPartitionedKVOutputConfig {
      * @param keyClassName         the key class name
      * @param valueClassName       the value class name
      * @param partitionerClassName the partitioner class name
-     * @param partitionerConf      configuration for the partitioner specified as a map of key-value
-     *                             pairs. This can be null
      */
-    Builder(String keyClassName, String valueClassName, String partitionerClassName,
-                   Map<String, String> partitionerConf) {
+    Builder(String keyClassName, String valueClassName, String partitionerClassName) {
       this();
       Objects.requireNonNull(partitionerClassName, "Partitioner class name cannot be null");
       Objects.requireNonNull(keyClassName, "Key class name cannot be null");
       Objects.requireNonNull(valueClassName, "Value class name cannot be null");
-      setPartitioner(partitionerClassName, partitionerConf);
+      setPartitioner(partitionerClassName);
     }
 
     Builder() {
@@ -99,14 +91,9 @@ public class UnorderedPartitionedKVOutputConfig {
       ConfigUtils.addConfigMapToConfiguration(this.conf, tezDefaults);
     }
 
-    Builder setPartitioner(String partitionerClassName, Map<String, String> partitionerConf) {
+    Builder setPartitioner(String partitionerClassName) {
       Objects.requireNonNull(partitionerClassName, "Partitioner class name cannot be null");
       this.conf.set(TezRuntimeConfiguration.TEZ_RUNTIME_PARTITIONER_CLASS, partitionerClassName);
-      if (partitionerConf != null) {
-        // Merging the confs for now. Change to be specific in the future.
-        ConfigUtils.mergeConfsWithExclusions(this.conf, partitionerConf,
-            TezRuntimeConfiguration.getTezRuntimeConfigKeySet());
-      }
       return this;
     }
 

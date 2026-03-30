@@ -19,16 +19,10 @@
 package org.apache.tez.common;
 
 import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.net.URL;
-import java.net.URLClassLoader;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.tez.dag.api.TezReflectionException;
-import org.apache.tez.dag.api.TezUncheckedException;
 
 public class ReflectionUtils {
 
