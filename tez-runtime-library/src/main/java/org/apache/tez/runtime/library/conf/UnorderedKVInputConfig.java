@@ -75,8 +75,6 @@ public class UnorderedKVInputConfig {
      */
     Builder(String keyClassName, String valueClassName) {
       this();
-      Objects.requireNonNull(keyClassName, "Key class name cannot be null");
-      Objects.requireNonNull(valueClassName, "Value class name cannot be null");
     }
 
     Builder() {

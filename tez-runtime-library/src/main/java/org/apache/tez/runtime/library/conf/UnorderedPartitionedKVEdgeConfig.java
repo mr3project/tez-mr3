@@ -53,10 +53,7 @@ public class UnorderedPartitionedKVEdgeConfig extends KeyValuesBasedBaseEdgeConf
   }
 
   /**
-   * Create a builder to configure the relevant Input and Output. </p> This method should only be
-   * used when using a custom Partitioner which requires specific Configuration. {@link
-   * #newBuilder(String, String, String)} is the preferred method to crate an instance of the
-   * Builder
+   * Create a builder to configure the relevant Input and Output.
    *
    * @param keyClassName         the key class name
    * @param valueClassName       the value class name

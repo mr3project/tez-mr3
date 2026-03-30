@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.Objects;
 
 import org.apache.tez.common.Preconditions;
-import com.google.common.collect.Lists;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.tez.common.TezUtils;
@@ -76,8 +75,6 @@ public class UnorderedKVOutputConfig {
      */
     Builder(String keyClassName, String valueClassName) {
       this();
-      Objects.requireNonNull(keyClassName, "Key class name cannot be null");
-      Objects.requireNonNull(valueClassName, "Value class name cannot be null");
     }
 
     Builder() {

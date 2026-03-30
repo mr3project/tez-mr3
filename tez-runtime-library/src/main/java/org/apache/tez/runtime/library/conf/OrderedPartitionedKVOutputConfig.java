@@ -62,7 +62,7 @@ public class OrderedPartitionedKVOutputConfig {
   }
 
   public static Builder newBuilder(String keyClass, String valueClass, String partitionerClassName) {
-    return newBuilder(keyClass, valueClass, partitionerClassName);
+    return new Builder(keyClass, valueClass, partitionerClassName);
   }
 
   public static class Builder {
@@ -78,8 +78,6 @@ public class OrderedPartitionedKVOutputConfig {
      */
     Builder(String keyClassName, String valueClassName, String partitionerClassName) {
       this();
-      Objects.requireNonNull(keyClassName, "Key class name cannot be null");
-      Objects.requireNonNull(valueClassName, "Value class name cannot be null");
       setPartitioner(partitionerClassName);
     }
 
