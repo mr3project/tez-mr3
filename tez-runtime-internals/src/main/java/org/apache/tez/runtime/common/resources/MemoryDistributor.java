@@ -30,9 +30,7 @@ import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.tez.common.ReflectionUtils;
 import org.apache.tez.dag.api.TezConfiguration;
-import org.apache.tez.dag.api.EntityDescriptor;
 import org.apache.tez.dag.api.TezException;
 import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.runtime.api.MemoryUpdateCallback;
@@ -59,7 +57,6 @@ public class MemoryDistributor {
 
   private final long totalJvmMemory;
   private final boolean isEnabled;
-  private final String allocatorClassName;
   private final Set<TaskContext> dupSet = Collections
       .newSetFromMap(new ConcurrentHashMap<TaskContext, Boolean>());
   private final List<RequestorInfo> requestList;
@@ -78,19 +75,12 @@ public class MemoryDistributor {
     isEnabled = conf.getBoolean(TezConfiguration.TEZ_TASK_SCALE_MEMORY_ENABLED,
         TezConfiguration.TEZ_TASK_SCALE_MEMORY_ENABLED_DEFAULT);
 
-    if (isEnabled) {
-      allocatorClassName = conf.get(TezConfiguration.TEZ_TASK_SCALE_MEMORY_ALLOCATOR_CLASS,
-          TezConfiguration.TEZ_TASK_SCALE_MEMORY_ALLOCATOR_CLASS_DEFAULT);
-    } else {
-      allocatorClassName = null;
-    }
-
     this.numTotalInputs = numTotalInputs;
     this.numTotalOutputs = numTotalOutputs;
     this.totalJvmMemory = totalMemory;
     this.requestList = Collections.synchronizedList(new LinkedList<RequestorInfo>());
-    LOG.info("InitialMemoryDistributor (isEnabled={}): numInputs={}, numOutputs={}, JVM.maxFree={}, allocatorClassName={}",
-        isEnabled, numTotalInputs, numTotalOutputs, totalJvmMemory, allocatorClassName);
+    LOG.info("InitialMemoryDistributor (isEnabled={}): numInputs={}, numOutputs={}, JVM.maxFree={}",
+        isEnabled, numTotalInputs, numTotalOutputs, totalJvmMemory);
   }
 
   public MemoryDistributor(int numTotalInputs, int numTotalOutputs, Configuration conf) {
@@ -101,8 +91,8 @@ public class MemoryDistributor {
    * Used by the Tez framework to request memory on behalf of user requests.
    */
   public void requestMemory(long requestSize, MemoryUpdateCallback callback,
-      TaskContext taskContext, EntityDescriptor<?> descriptor) {
-    registerRequest(requestSize, callback, taskContext, descriptor);
+      TaskContext taskContext, InitialMemoryRequestContext.RequestType requestType) {
+    registerRequest(requestSize, callback, taskContext, requestType);
   }
 
   /**
@@ -133,7 +123,7 @@ public class MemoryDistributor {
         }
       });
     } else {
-      InitialMemoryAllocator allocator = ReflectionUtils.createClazzInstance(allocatorClassName);
+      WeightedScalingMemoryDistributor allocator = new WeightedScalingMemoryDistributor();
       allocator.setConf(conf);
       allocations = allocator.assignMemory(totalJvmMemory, numTotalInputs, numTotalOutputs,
           Iterables.unmodifiableIterable(requestContexts));
@@ -152,7 +142,7 @@ public class MemoryDistributor {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Informing: " + rInfo.getRequestContext().getComponentType() + ", "
             + rInfo.getRequestContext().getComponentVertexName() + ", "
-            + rInfo.getRequestContext().getComponentClassName() + ": requested="
+            + rInfo.getRequestContext().getRequestType() + ": requested="
             + rInfo.getRequestContext().getRequestedSize() + ", allocated=" + allocated);
       }
       rInfo.getCallback().memoryAssigned(allocated);
@@ -160,17 +150,17 @@ public class MemoryDistributor {
   }
 
   private long registerRequest(long requestSize, MemoryUpdateCallback callback,
-      TaskContext entityContext, EntityDescriptor<?> descriptor) {
+      TaskContext entityContext, InitialMemoryRequestContext.RequestType requestType) {
     Preconditions.checkArgument(requestSize >= 0);
     Objects.requireNonNull(callback);
     Objects.requireNonNull(entityContext);
-    Objects.requireNonNull(descriptor);
+    Objects.requireNonNull(requestType);
     if (!dupSet.add(entityContext)) {
       throw new TezUncheckedException(
           "A single entity can only make one call to request resources for now");
     }
 
-    RequestorInfo requestInfo = new RequestorInfo(entityContext, requestSize, callback, descriptor);
+    RequestorInfo requestInfo = new RequestorInfo(entityContext, requestSize, callback, requestType);
     switch (requestInfo.getRequestContext().getComponentType()) {
     case INPUT:
       numInputsSeen.incrementAndGet();
@@ -211,13 +201,11 @@ public class MemoryDistributor {
 
   private static class RequestorInfo {
 
-    private static final Logger LOG = LoggerFactory.getLogger(RequestorInfo.class);
-
     private final MemoryUpdateCallback callback;
     private final InitialMemoryRequestContext requestContext;
 
     public RequestorInfo(TaskContext taskContext, long requestSize,
-        final MemoryUpdateCallback callback, EntityDescriptor<?> descriptor) {
+        final MemoryUpdateCallback callback, InitialMemoryRequestContext.RequestType requestType) {
       InitialMemoryRequestContext.ComponentType type;
       String componentVertexName;
       if (taskContext instanceof InputContext) {
@@ -233,8 +221,7 @@ public class MemoryDistributor {
         throw new IllegalArgumentException("Unknown type of entityContext: "
             + taskContext.getClass().getName());
       }
-      this.requestContext = new InitialMemoryRequestContext(requestSize, descriptor.getClassName(),
-          type, componentVertexName);
+      this.requestContext = new InitialMemoryRequestContext(requestSize, requestType, type, componentVertexName);
       this.callback = callback;
     }
 
@@ -247,7 +234,6 @@ public class MemoryDistributor {
     }
   }
 
-
   private void logInitialRequests(List<RequestorInfo> initialRequests) {
     if (initialRequests != null && !initialRequests.isEmpty()) {
       StringBuilder sb = new StringBuilder();
@@ -256,7 +242,7 @@ public class MemoryDistributor {
         sb.append("[");
         sb.append(context.getComponentVertexName()).append(":");
         sb.append(context.getComponentType()).append(":");
-        sb.append(context.getRequestedSize()).append(":").append(context.getComponentClassName());
+        sb.append(context.getRequestedSize()).append(":").append(context.getRequestType());
         sb.append("]");
         if (i < initialRequests.size() - 1) {
           sb.append(", ");
@@ -276,7 +262,7 @@ public class MemoryDistributor {
         InitialMemoryRequestContext context = requestList.get(i).getRequestContext();
         sb.append("[");
         sb.append(context.getComponentVertexName()).append(":");
-        sb.append(context.getComponentClassName()).append(":");
+        sb.append(context.getRequestType()).append(":");
         sb.append(context.getComponentType()).append(":");
         sb.append(context.getRequestedSize()).append(":").append(allocated);
         sb.append("]");
@@ -287,5 +273,4 @@ public class MemoryDistributor {
       LOG.debug("Allocations=" + sb.toString());
     }
   }
-
 }

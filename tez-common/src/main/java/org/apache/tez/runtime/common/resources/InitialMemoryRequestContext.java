@@ -20,28 +20,34 @@ package org.apache.tez.runtime.common.resources;
 
 import java.util.Objects;
 
-
-
 public class InitialMemoryRequestContext {
 
-  public static enum ComponentType {
+  public enum RequestType {
+    PARTITIONED_UNSORTED_OUTPUT,
+    UNSORTED_OUTPUT,
+    UNSORTED_INPUT,
+    SORTED_OUTPUT,
+    SORTED_MERGED_INPUT,
+    PROCESSOR,
+    OTHER
+  };
+
+  public enum ComponentType {
     INPUT, OUTPUT, PROCESSOR
   }
 
-  private long requestedSize;
-  // TODO Replace this with the entire descriptor at some point. ComponentType
-  // automatically goes away.
-  private String componentClassName;
-  private ComponentType componentType;
-  private String componentVertexName;
+  private final long requestedSize;
+  private final RequestType requestType;
+  private final ComponentType componentType;
+  private final String componentVertexName;
 
-  public InitialMemoryRequestContext(long requestedSize, String componentClassName,
+  public InitialMemoryRequestContext(long requestedSize, RequestType requestType,
       ComponentType componentType, String componentVertexName) {
-    Objects.requireNonNull(componentClassName, "componentClassName is null");
+    Objects.requireNonNull(requestType, "requestType is null");
     Objects.requireNonNull(componentType, "componentType is null");
     Objects.requireNonNull(componentVertexName, "componentVertexName is null");
     this.requestedSize = requestedSize;
-    this.componentClassName = componentClassName;
+    this.requestType = requestType;
     this.componentType = componentType;
     this.componentVertexName = componentVertexName;
   }
@@ -50,8 +56,8 @@ public class InitialMemoryRequestContext {
     return requestedSize;
   }
 
-  public String getComponentClassName() {
-    return componentClassName;
+  public RequestType getRequestType() {
+    return requestType;
   }
 
   public ComponentType getComponentType() {
@@ -61,5 +67,4 @@ public class InitialMemoryRequestContext {
   public String getComponentVertexName() {
     return componentVertexName;
   }
-
 }

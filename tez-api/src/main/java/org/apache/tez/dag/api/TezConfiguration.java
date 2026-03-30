@@ -229,16 +229,6 @@ process as
   public static final boolean TEZ_TASK_SCALE_MEMORY_ENABLED_DEFAULT = true;
 
   /**
-   * The allocator to use for initial memory allocation
-   */
-  @ConfigurationScope(Scope.VERTEX)
-  @ConfigurationProperty
-  public static final String TEZ_TASK_SCALE_MEMORY_ALLOCATOR_CLASS =
-    TEZ_TASK_PREFIX + "scale.memory.allocator.class";
-  public static final String TEZ_TASK_SCALE_MEMORY_ALLOCATOR_CLASS_DEFAULT =
-    "org.apache.tez.runtime.library.resources.WeightedScalingMemoryDistributor";
-
-  /**
    * The fraction of the JVM memory which will not be considered for allocation.
    * No defaults, since there are pre-existing defaults based on different scenarios.
    */

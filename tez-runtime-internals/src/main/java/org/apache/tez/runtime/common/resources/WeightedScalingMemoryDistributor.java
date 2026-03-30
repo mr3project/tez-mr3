@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.tez.runtime.library.resources;
+package org.apache.tez.runtime.common.resources;
 
 import java.text.DecimalFormat;
 import java.util.EnumMap;
@@ -28,14 +28,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.tez.dag.api.TezConfiguration;
-import org.apache.tez.runtime.common.resources.InitialMemoryAllocator;
-import org.apache.tez.runtime.common.resources.InitialMemoryRequestContext;
 import org.apache.tez.runtime.common.resources.InitialMemoryRequestContext.ComponentType;
-import org.apache.tez.runtime.library.input.OrderedGroupedKVInput;
-import org.apache.tez.runtime.library.input.OrderedGroupedInputLegacy;
-import org.apache.tez.runtime.library.input.UnorderedKVInput;
-import org.apache.tez.runtime.library.output.OrderedPartitionedKVOutput;
-import org.apache.tez.runtime.library.output.UnorderedPartitionedKVOutput;
+import org.apache.tez.runtime.common.resources.InitialMemoryRequestContext.RequestType;
 
 import org.apache.tez.common.Preconditions;
 import com.google.common.collect.Lists;
@@ -63,23 +57,33 @@ public class WeightedScalingMemoryDistributor implements InitialMemoryAllocator 
   static final String[] DEFAULT_TASK_MEMORY_WEIGHTED_RATIOS =
       generateWeightStrings(1, 1, 1, 12, 12, 1, 1);
 
+  private static class Request {
+    ComponentType componentType;
+    long requestSize;
+    private final RequestType requestType;
+    private int requestWeight;
+
+    Request(ComponentType componentType, long requestSize,
+            RequestType requestType, int requestWeight) {
+      this.componentType = componentType;
+      this.requestSize = requestSize;
+      this.requestType = requestType;
+      this.requestWeight = requestWeight;
+    }
+  }
+
   private Configuration conf;
 
   public WeightedScalingMemoryDistributor() {
   }
 
-  public enum RequestType {
-    PARTITIONED_UNSORTED_OUTPUT, UNSORTED_INPUT, UNSORTED_OUTPUT, SORTED_OUTPUT,
-    SORTED_MERGED_INPUT, PROCESSOR, OTHER
-  };
-
-  private EnumMap<RequestType, Integer> typeScaleMap = Maps.newEnumMap(RequestType.class);
+  private final EnumMap<RequestType, Integer> typeScaleMap = Maps.newEnumMap(RequestType.class);
 
   private int numRequests = 0;
   private int numRequestsScaled = 0;
   private long totalRequested = 0;
 
-  private List<Request> requests = Lists.newArrayList();
+  private final List<Request> requests = Lists.newArrayList();
 
   @Override
   public Iterable<Long> assignMemory(long availableForAllocation, int numTotalInputs,
@@ -130,9 +134,9 @@ public class WeightedScalingMemoryDistributor implements InitialMemoryAllocator 
     for (Request request : requests) {
       long allocated = 0;
       if (request.requestSize == 0) {
-        allocations.add(0l);
+        allocations.add(0L);
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Scaling requested " + request.componentClassname + " of type "
+          LOG.debug("Scaling requested " + request.requestType + " of type "
               + request.requestType + " 0 to allocated: 0");
         }
       } else {
@@ -141,11 +145,10 @@ public class WeightedScalingMemoryDistributor implements InitialMemoryAllocator 
         allocated = Math.min(
             (long) ((scaledRequest / totalScaledRequest) * availableForAllocation),
             request.requestSize);
-        // TODO Later - If requestedSize is used, the difference (allocated -
-        // requestedSize) could be allocated to others.
+        // TODO: If requestedSize is used, the difference (allocated - requestedSize) could be allocated to others.
         allocations.add(allocated);
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Scaling requested " + request.componentClassname + " of type "
+          LOG.debug("Scaling requested " + request.requestType + " of type "
               + request.requestType + " " + request.requestSize + "  to allocated: " + allocated);
         }
       }
@@ -155,16 +158,14 @@ public class WeightedScalingMemoryDistributor implements InitialMemoryAllocator 
   }
 
   private void initialProcessMemoryRequestContext(InitialMemoryRequestContext context) {
-    RequestType requestType;
     numRequests++;
     totalRequested += context.getRequestedSize();
-    String className = context.getComponentClassName();
-    requestType = getRequestTypeForClass(className);
-    Integer typeScaleFactor = getScaleFactorForType(requestType);
-    ComponentType componentType = context.getComponentType();
 
-    Request request = new Request(context.getComponentClassName(), componentType,
-        context.getRequestedSize(), requestType, typeScaleFactor);
+    RequestType requestType = context.getRequestType();
+    Integer typeScaleFactor = getScaleFactorForType(requestType);
+    Request request = new Request(
+        context.getComponentType(), context.getRequestedSize(), requestType, typeScaleFactor);
+
     requests.add(request);
     numRequestsScaled += typeScaleFactor;
   }
@@ -176,26 +177,6 @@ public class WeightedScalingMemoryDistributor implements InitialMemoryAllocator 
       typeScaleFactor = 0;
     }
     return typeScaleFactor;
-  }
-
-  private RequestType getRequestTypeForClass(String className) {
-    RequestType requestType;
-    if (className.equals(OrderedPartitionedKVOutput.class.getName())) {
-      requestType = RequestType.SORTED_OUTPUT;
-    } else if (className.equals(OrderedGroupedKVInput.class.getName())
-        || className.equals(OrderedGroupedInputLegacy.class.getName())) {
-      requestType = RequestType.SORTED_MERGED_INPUT;
-    } else if (className.equals(UnorderedKVInput.class.getName())) {
-      requestType = RequestType.UNSORTED_INPUT;
-    } else if (className.equals(UnorderedPartitionedKVOutput.class.getName())) {
-      requestType = RequestType.PARTITIONED_UNSORTED_OUTPUT;
-    } else {
-      requestType = RequestType.OTHER;
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Falling back to RequestType.OTHER for class: " + className);
-      }
-    }
-    return requestType;
   }
 
   private void populateTypeScaleMap() {
@@ -232,7 +213,6 @@ public class WeightedScalingMemoryDistributor implements InitialMemoryAllocator 
 
     StringBuilder sb = new StringBuilder();
     Set<RequestType> seenTypes = new HashSet<RequestType>();
-
     for (String ratio : ratios) {
       String[] parts = ratio.split(":");
       Preconditions.checkState(parts.length == 2);
@@ -246,7 +226,7 @@ public class WeightedScalingMemoryDistributor implements InitialMemoryAllocator 
       typeScaleMap.put(requestType, ratioVal);
       sb.append("[").append(requestType).append(":").append(ratioVal).append("]");
     }
-    LOG.info("ScaleRatiosUsed=" + sb.toString());
+    LOG.info("ScaleRatiosUsed={}", sb.toString());
   }
 
   private double computeReservedFraction(int numTotalRequests) {
@@ -302,22 +282,5 @@ public class WeightedScalingMemoryDistributor implements InitialMemoryAllocator 
   @Override
   public Configuration getConf() {
     return this.conf;
-  }
-
-  private static class Request {
-    Request(String componentClassname, ComponentType componentType, long requestSize,
-        RequestType requestType, int requestWeight) {
-      this.componentClassname = componentClassname;
-      this.componentType = componentType;
-      this.requestSize = requestSize;
-      this.requestType = requestType;
-      this.requestWeight = requestWeight;
-    }
-
-    String componentClassname;
-    ComponentType componentType;
-    long requestSize;
-    private RequestType requestType;
-    private int requestWeight;
   }
 }
