@@ -187,9 +187,6 @@ public class MiniTezCluster extends MiniYARNCluster {
     conf.setClass(YarnConfiguration.NM_CONTAINER_EXECUTOR,
         DefaultContainerExecutor.class, ContainerExecutor.class);
 
-    // TestMRJobs is for testing non-uberized operation only; see TestUberAM
-    // for corresponding uberized tests.
-    conf.setBoolean(MRJobConfig.JOB_UBERTASK_ENABLE, false);
     super.serviceInit(conf);
   }
 

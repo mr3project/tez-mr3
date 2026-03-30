@@ -511,12 +511,9 @@ public class MROutput extends AbstractLogicalOutput {
   }
 
   protected String getOutputFileNamePrefix() {
-    String prefix = jobConf.get(MRJobConfig.MROUTPUT_FILE_NAME_PREFIX);
-    if (prefix == null) {
-      prefix = "part-v" + 
-          nonTaskNumberFormat.format(getContext().getTaskVertexIndex()) +  
-          "-o" + nonTaskNumberFormat.format(getContext().getOutputIndex());
-    }
+    String prefix = "part-v" +
+        nonTaskNumberFormat.format(getContext().getTaskVertexIndex()) +
+        "-o" + nonTaskNumberFormat.format(getContext().getOutputIndex());
     return prefix;
   }
 

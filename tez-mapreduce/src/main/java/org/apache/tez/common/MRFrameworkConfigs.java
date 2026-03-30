@@ -33,7 +33,4 @@ public class MRFrameworkConfigs {
    * The directory which contains the localized files for this task.
    */
   public static final String TASK_LOCAL_RESOURCE_DIR = MR_FRAMEWORK_PREFIX + "task-local-resource.dir";
-  public static final String TASK_LOCAL_RESOURCE_DIR_DEFAULT = "/tmp";
-
-  public static final String JOB_LOCAL_DIR = MR_FRAMEWORK_PREFIX + "job.local.dir";
 }

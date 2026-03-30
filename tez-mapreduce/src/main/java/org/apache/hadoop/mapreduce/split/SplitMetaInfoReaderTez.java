@@ -42,16 +42,11 @@ public class SplitMetaInfoReaderTez {
 
   public static final Logger LOG = LoggerFactory.getLogger(SplitMetaInfoReaderTez.class);
 
-  public static final int META_SPLIT_VERSION = JobSplit.META_SPLIT_VERSION;
-  public static final byte[] META_SPLIT_FILE_HEADER = JobSplit.META_SPLIT_FILE_HEADER;
-
   private static FSDataInputStream getFSDataIS(Configuration conf,
       FileSystem fs) throws IOException {
     long maxMetaInfoSize = conf.getLong(
-        MRJobConfig.SPLIT_METAINFO_MAXSIZE,
-        MRJobConfig.DEFAULT_SPLIT_METAINFO_MAXSIZE);
+        MRJobConfig.SPLIT_METAINFO_MAXSIZE, MRJobConfig.DEFAULT_SPLIT_METAINFO_MAXSIZE);
     FSDataInputStream in = null;
-    // TODO NEWTEZ Figure out how this can be improved. i.e. access from context instead of setting in conf ?
     String basePath = conf.get(MRFrameworkConfigs.TASK_LOCAL_RESOURCE_DIR, ".");
     LOG.info("Attempting to find splits in dir: " + basePath);
 

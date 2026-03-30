@@ -188,7 +188,6 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
   }
 
   private void configureLocalDirs() throws IOException {
-    // TODO NEWTEZ Is most of this functionality required ?
     jobConf.setStrings(TezRuntimeFrameworkConfigs.LOCAL_DIRS, processorContext.getWorkDirs());
     if (jobConf.get(MRFrameworkConfigs.TASK_LOCAL_RESOURCE_DIR) == null) {
       jobConf.set(MRFrameworkConfigs.TASK_LOCAL_RESOURCE_DIR, System.getenv(Environment.PWD.name()));
@@ -225,8 +224,7 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
               + workDir.toString());
       }
     }
-    // TODO NEWTEZ Is this required ?
-    jobConf.set(MRFrameworkConfigs.JOB_LOCAL_DIR, workDir.toString());
+
     jobConf.set(MRJobConfig.JOB_LOCAL_DIR, workDir.toString());
   }
 
@@ -242,7 +240,7 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
   private static void setupDistributedCacheConfig(final JobConf job)
       throws IOException {
 
-    String localWorkDir = (job.get(MRFrameworkConfigs.TASK_LOCAL_RESOURCE_DIR));
+    String localWorkDir = job.get(MRFrameworkConfigs.TASK_LOCAL_RESOURCE_DIR);
     // ^ ^ all symlinks are created in the current work-dir
 
     // Update the configuration object with localized archives.
