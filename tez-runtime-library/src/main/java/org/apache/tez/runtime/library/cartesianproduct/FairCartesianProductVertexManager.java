@@ -246,9 +246,8 @@ class FairCartesianProductVertexManager extends CartesianProductVertexManagerRea
     }
 
     for (Map.Entry<String, EdgeProperty> e : getContext().getInputVertexEdgeProperties().entrySet()) {
-      if (e.getValue().getDataMovementType() == CUSTOM
-        && e.getValue().getEdgeManagerDescriptor().getClassName()
-        .equals(CartesianProductEdgeManager.class.getName())) {
+      if (e.getValue().getDataMovementType() == CUSTOM &&
+          e.getValue().getEdgeManagerDescriptor().getClassName().equals(CartesianProductEdgeManager.class.getName())) {
         srcVerticesByName.put(e.getKey(), new SrcVertex());
         srcVerticesByName.get(e.getKey()).name = e.getKey();
         getContext().registerForVertexStateUpdates(e.getKey(), EnumSet.of(VertexState.CONFIGURED));

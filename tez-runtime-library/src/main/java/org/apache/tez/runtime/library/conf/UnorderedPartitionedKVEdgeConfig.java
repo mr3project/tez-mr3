@@ -20,9 +20,6 @@
 
 package org.apache.tez.runtime.library.conf;
 
-import javax.annotation.Nullable;
-
-import java.util.Map;
 import java.util.Objects;
 
 import org.apache.hadoop.conf.Configuration;
