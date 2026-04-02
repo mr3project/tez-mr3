@@ -383,8 +383,12 @@ public class MROutput extends AbstractLogicalOutput {
     taskNumberFormat.setGroupingUsed(false);
     nonTaskNumberFormat.setMinimumIntegerDigits(3);
     nonTaskNumberFormat.setGroupingUsed(false);
-    Configuration conf = getContext().getConfigurationFromUserPayload(false);
-    this.jobConf = new JobConf(conf);
+
+    Configuration commonJobConf = getContext().getCommonJobConf(false);
+    this.jobConf = new JobConf(commonJobConf);
+    Configuration diff = getContext().getConfigurationFromUserPayload(false);
+    jobConf.addResource(diff);
+
     // Add tokens to the jobConf - in case they are accessed within the RW / OF
     jobConf.getCredentials().mergeAll(UserGroupInformation.getCurrentUser().getCredentials());
     this.isMapperOutput = jobConf.getBoolean(MRConfig.IS_MAP_PROCESSOR,

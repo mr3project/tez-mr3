@@ -102,6 +102,8 @@ public interface TaskContext extends DecompressorPool {
 
   public Configuration getConfigurationFromUserPayload(boolean createCopy);
 
+  Configuration getCommonJobConf(boolean createCopy);
+
   /**
    * Get the work directories for the Input/Output/Processor
    * @return an array of work dirs
