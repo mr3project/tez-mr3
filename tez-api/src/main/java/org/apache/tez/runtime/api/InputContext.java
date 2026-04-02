@@ -18,6 +18,7 @@
 
 package org.apache.tez.runtime.api;
 
+import org.apache.hadoop.conf.Configuration;
 
 /**
  * Context handle for the Input to initialize itself.
@@ -46,4 +47,6 @@ public interface InputContext extends TaskContext {
   public void inputIsReady();
 
   public boolean getScheduledOnHost();
+
+  Configuration getCommonJobConf(boolean createCopy);
 }

@@ -65,8 +65,12 @@ public abstract class MRInputBase extends AbstractLogicalInput {
     boolean isGrouped = mrUserPayload.getGroupingEnabled();
     Preconditions.checkArgument(mrUserPayload.hasSplits() == false,
         "Split information not expected in {}", this.getClass().getName());
-    Configuration conf = TezUtils.createConfFromByteString(mrUserPayload.getConfigurationBytes());
-    this.jobConf = new JobConf(conf);
+
+    Configuration commonJobConf = getContext().getCommonJobConf(false);
+    this.jobConf = new JobConf(commonJobConf);
+    Configuration diff = TezUtils.createConfFromByteString(mrUserPayload.getConfigurationBytes());
+    jobConf.addResource(diff);
+
     useNewApi = this.jobConf.getUseNewMapper();
     if (isGrouped) {
       if (useNewApi) {

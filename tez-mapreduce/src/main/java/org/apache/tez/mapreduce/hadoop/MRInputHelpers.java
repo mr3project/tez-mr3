@@ -729,31 +729,26 @@ public class MRInputHelpers {
    */
   protected static UserPayload createMRInputPayload(Configuration conf,
       MRRuntimeProtos.MRSplitsProto mrSplitsProto, boolean isGrouped,
-      boolean isSorted) throws
-          IOException {
-    Preconditions
-        .checkArgument(conf != null, "Configuration must be specified");
+      boolean isSorted) throws IOException {
+    Preconditions.checkArgument(conf != null, "Configuration must be specified");
 
     return createMRInputPayload(TezUtils.createByteStringFromConf(conf),
         mrSplitsProto, isGrouped, isSorted);
   }
 
   private static UserPayload createMRInputPayload(ByteString bytes,
-    MRRuntimeProtos.MRSplitsProto mrSplitsProto,
-    boolean isGrouped, boolean isSorted) throws IOException {
+      MRRuntimeProtos.MRSplitsProto mrSplitsProto,
+      boolean isGrouped, boolean isSorted) throws IOException {
     MRRuntimeProtos.MRInputUserPayloadProto.Builder userPayloadBuilder =
-        MRRuntimeProtos.MRInputUserPayloadProto
-            .newBuilder();
+        MRRuntimeProtos.MRInputUserPayloadProto.newBuilder();
     userPayloadBuilder.setConfigurationBytes(bytes);
     if (mrSplitsProto != null) {
       userPayloadBuilder.setSplits(mrSplitsProto);
     }
     userPayloadBuilder.setGroupingEnabled(isGrouped);
     userPayloadBuilder.setSortSplitsEnabled(isSorted);
-    return UserPayload.create(userPayloadBuilder.build().
-        toByteString().asReadOnlyByteBuffer());
+    return UserPayload.create(userPayloadBuilder.build().toByteString().asReadOnlyByteBuffer());
   }
-
 
   private static String getStringProperty(Configuration conf, String propertyName) {
     Objects.requireNonNull(conf, "Configuration must be provided");

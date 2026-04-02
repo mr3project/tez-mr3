@@ -19,7 +19,6 @@
 package org.apache.tez.runtime.api;
 
 import javax.annotation.Nullable;
-import java.util.EnumSet;
 import java.util.Set;
 
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -27,7 +26,6 @@ import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.tez.common.counters.TezCounters;
 import org.apache.tez.dag.api.UserPayload;
 import org.apache.tez.dag.api.event.VertexState;
-import org.apache.tez.dag.api.event.VertexStateUpdate;
 
 /**
  * A context that provides information to the {@link InputInitializer}
@@ -122,4 +120,7 @@ public interface InputInitializerContext {
   void addCounters(TezCounters tezCounters);
 
   String getLocationHintFromHash(long hash);
+
+  // may return null
+  com.datamonad.mr3.DAGAPI.ConfigurationProto getCommonJobConf();
 }
