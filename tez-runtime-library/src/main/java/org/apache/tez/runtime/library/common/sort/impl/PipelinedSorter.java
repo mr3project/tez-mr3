@@ -227,9 +227,6 @@ public class PipelinedSorter extends ExternalSorter {
         .setNameFormat("Sorter {" + outputContext.getDestinationVertexName() + "} #%d")
         .build());
 
-    valSerializer.open(this.span.out);
-    keySerializer.open(this.span.out);
-
     this.deflater = TezCommonUtils.newBestCompressionDeflater();
 
     this.finalEvents = Lists.newLinkedList();
@@ -375,8 +372,6 @@ public class PipelinedSorter extends ExternalSorter {
       merger.add(future);
       span = newSpan;
     }
-    valSerializer.open(span.out);
-    keySerializer.open(span.out);
   }
 
   // if pipelined shuffle is enabled, this method is called to send events for every spill
@@ -423,9 +418,9 @@ public class PipelinedSorter extends ExternalSorter {
     int valstart = -1;
     int valend = -1;
     try {
-      keySerializer.serialize(key);
+      span.out.write(key.getBytes(), 0, key.getLength());
       valstart = span.kvbuffer.position();      
-      valSerializer.serialize(value);
+      span.out.write(value.getBytes(), 0, value.getLength());
       valend = span.kvbuffer.position();
     } catch (BufferOverflowException overflow) {
       // restore limit

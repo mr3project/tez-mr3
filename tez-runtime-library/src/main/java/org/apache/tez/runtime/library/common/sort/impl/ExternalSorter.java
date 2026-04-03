@@ -40,7 +40,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.io.RawComparator;
 import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.hadoop.io.serializer.Serializer;
 import org.apache.hadoop.util.IndexedSorter;
 import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.QuickSort;
@@ -92,9 +91,6 @@ public abstract class ExternalSorter {
   protected final RawComparator comparator;
 
   protected final Partitioner partitioner;
-
-  protected final Serializer<BytesWritable> keySerializer;
-  protected final Serializer<BytesWritable> valSerializer;
 
   // Compression for map-outputs
   protected final CompressionCodec codec;
@@ -182,13 +178,10 @@ public abstract class ExternalSorter {
     this.conf.setInt(TezRuntimeFrameworkConfigs.TEZ_RUNTIME_NUM_EXPECTED_PARTITIONS, this.partitions);
     this.partitioner = TezRuntimeUtils.instantiatePartitioner(this.conf);
 
-    // k/v serialization
-    this.keySerializer = SerializationContext.getKeySerializer();
-    this.valSerializer = SerializationContext.getValueSerializer();
     LOG.info("{}, memoryMb={}", outputContext.getDestinationVertexName(), assignedMb);
     if (LOG.isDebugEnabled()) {
-      LOG.debug("keySerializerClass=" + SerializationContext.getKeyClass()
-          + ", valueSerializerClass=" + SerializationContext.getValueClass()
+      LOG.debug("keyClass=" + SerializationContext.getKeyClass()
+          + ", valueClass=" + SerializationContext.getValueClass()
           + ", comparator=" + SerializationContext.getKeyComparator()
           + ", partitioner=" + conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_PARTITIONER_CLASS)
           + ", reportPartitionStats=" + reportPartitionStats);
