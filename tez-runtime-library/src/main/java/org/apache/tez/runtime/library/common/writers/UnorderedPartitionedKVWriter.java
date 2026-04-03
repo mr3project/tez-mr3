@@ -60,7 +60,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.tez.common.TezCommonUtils;
 import org.apache.tez.common.TezUtilsInternal;
 import org.apache.tez.common.counters.TezCounter;
-import org.apache.tez.common.io.NonSyncDataOutputStream;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.ExecutorServiceUserGroupInformation;
 import org.apache.tez.runtime.api.MultiByteArrayOutputStream;
@@ -144,7 +143,6 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   private int spillLimit;
 
   private final ByteArrayOutputStream baos;
-  private final NonSyncDataOutputStream dos;
 
   private BlockingQueue<WrappedBuffer> availableBuffers;
   private WrappedBuffer[] buffers;
@@ -267,10 +265,6 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     }
 
     baos = new ByteArrayOutputStream();
-    dos = new NonSyncDataOutputStream(baos);
-    keySerializer.open(dos);
-    valSerializer.open(dos);
-
     if (!skipBuffers) {
       // originally the default value of TEZ_RUNTIME_UNORDERED_OUTPUT_MAX_PER_BUFFER_SIZE_BYTES
       int maxSingleBufferSizeBytes = Integer.MAX_VALUE;
@@ -410,7 +404,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     currentBuffer.availableSize -= (META_SIZE + metaSkip);
     currentBuffer.nextPosition += META_SIZE;
 
-    keySerializer.serialize(key);
+    baos.write(key.getBytes(), 0, key.getLength());
 
     if (currentBuffer.full) {
       if (metaStart == 0) { // Started writing at the start of the buffer. Write Key to disk.
@@ -428,7 +422,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     }
 
     int valStart = currentBuffer.nextPosition;
-    valSerializer.serialize(value);
+    baos.write(value.getBytes(), 0, value.getLength());
 
     if (currentBuffer.full) {
       // Value too large for current buffer, or K-V too large for entire buffer.

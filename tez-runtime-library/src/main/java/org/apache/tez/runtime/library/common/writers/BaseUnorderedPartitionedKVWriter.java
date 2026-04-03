@@ -33,7 +33,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.hadoop.io.serializer.Serializer;
 import org.apache.tez.common.counters.TaskCounter;
 import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.runtime.api.Event;
@@ -42,7 +41,6 @@ import org.apache.tez.runtime.library.api.KeyValuesWriterEdge;
 import org.apache.tez.runtime.library.api.Partitioner;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.TezRuntimeUtils;
-import org.apache.tez.runtime.library.common.serializer.SerializationContext;
 import org.apache.tez.runtime.api.TezTaskOutput;
 import org.apache.tez.runtime.library.utils.CodecUtils;
 
@@ -60,8 +58,6 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriterEd
   protected final int numPartitions;
 
   protected final Partitioner partitioner;
-  protected final Serializer<BytesWritable> keySerializer;
-  protected final Serializer<BytesWritable> valSerializer;
   protected final CompressionCodec codec;
 
   protected final String auxiliaryService;
@@ -132,10 +128,6 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriterEd
       throw new RuntimeException(e);
     }
     this.numPartitions = numOutputs;
-    
-    // k/v serialization
-    keySerializer = SerializationContext.getKeySerializer();
-    valSerializer = SerializationContext.getValueSerializer();
     
     outputRecordsCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_RECORDS);
     outputLargeRecordsCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_LARGE_RECORDS);
