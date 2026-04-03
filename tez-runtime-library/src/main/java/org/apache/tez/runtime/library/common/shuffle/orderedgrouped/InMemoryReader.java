@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.tez.common.io.NonSyncByteArrayInputStream;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
@@ -252,11 +253,61 @@ public class InMemoryReader extends Reader {
     }
   }
 
+  @Override
+  public KeyState readRawKey(BytesWritable key) throws IOException {
+    try {
+      if (!positionToNextRecord(memDataIn)) {
+        return KeyState.NO_KEY;
+      }
+      int pos = memDataIn.getPosition();
+      byte[] data = memDataIn.getData();
+      if (currentKeyLength == IFile.RLE_MARKER) {
+        return KeyState.SAME_KEY;
+      }
+      key.set(data, pos, currentKeyLength);
+      // Position for the next value
+      long skipped = memDataIn.skip(currentKeyLength);
+      if (skipped != currentKeyLength) {
+        throw new IOException("Rec# " + recNo +
+            ": Failed to skip past key of length: " +
+            currentKeyLength);
+      }
+      bytesRead += currentKeyLength;
+      return KeyState.NEW_KEY;
+    } catch (IOException ioe) {
+      dumpOnError();
+      throw ioe;
+    }
+  }
+
   public void nextRawValue(DataInputBuffer value) throws IOException {
     try {
       int pos = memDataIn.getPosition();
       byte[] data = memDataIn.getData();
       value.reset(data, pos, currentValueLength);
+
+      // Position for the next record
+      long skipped = memDataIn.skip(currentValueLength);
+      if (skipped != currentValueLength) {
+        throw new IOException("Rec# " + recNo +
+            ": Failed to skip past value of length: " +
+            currentValueLength);
+      }
+      // Record the byte
+      bytesRead += currentValueLength;
+      ++recNo;
+    } catch (IOException ioe) {
+      dumpOnError();
+      throw ioe;
+    }
+  }
+
+  @Override
+  public void nextRawValue(BytesWritable value) throws IOException {
+    try {
+      int pos = memDataIn.getPosition();
+      byte[] data = memDataIn.getData();
+      value.set(data, pos, currentValueLength);
 
       // Position for the next record
       long skipped = memDataIn.skip(currentValueLength);
