@@ -226,32 +226,6 @@ public class TezMerger {
     final DecompressorPool inputContext;
 
     public DiskSegment(FileSystem fs, Path file,
-        CompressionCodec codec, boolean ifileReadAhead,
-        int ifileReadAheadLength, boolean preserve, DecompressorPool inputContext)
-    throws IOException {
-      this(fs, file, codec, ifileReadAhead, ifileReadAheadLength,
-          preserve, null, inputContext);
-    }
-
-    public DiskSegment(FileSystem fs, Path file,
-                   CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLenth,
-                   boolean preserve, TezCounter mergedMapOutputsCounter, DecompressorPool inputContext)
-    throws IOException {
-      this(fs, file, 0, fs.getFileStatus(file).getLen(), codec,
-          ifileReadAhead, ifileReadAheadLenth, preserve,
-          mergedMapOutputsCounter, inputContext);
-    }
-
-    public DiskSegment(FileSystem fs, Path file,
-                   long segmentOffset, long segmentLength,
-                   CompressionCodec codec, boolean ifileReadAhead,
-                   int ifileReadAheadLength,
-                   boolean preserve, DecompressorPool inputContext) throws IOException {
-      this(fs, file, segmentOffset, segmentLength, codec, ifileReadAhead,
-          ifileReadAheadLength, preserve, null, inputContext);
-    }
-
-    public DiskSegment(FileSystem fs, Path file,
         long segmentOffset, long segmentLength, CompressionCodec codec,
         boolean ifileReadAhead, int ifileReadAheadLength,
         boolean preserve, TezCounter mergedMapOutputsCounter, DecompressorPool inputContext)
@@ -608,9 +582,9 @@ public class TezMerger {
           this.close();
 
           // Add the newly create segment to the list of segments to be merged
-          Segment tempSegment = 
-            new DiskSegment(fs, outputFile, codec, ifileReadAhead,
-                ifileReadAheadLength, false, inputContext);
+          Segment tempSegment =
+            new DiskSegment(fs, outputFile, 0, fs.getFileStatus(outputFile).getLen(), codec,
+                ifileReadAhead, ifileReadAheadLength, false, null, inputContext);
 
           // Insert new merged segment into the sorted list
           int pos = Collections.binarySearch(segments, tempSegment,

@@ -942,7 +942,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         final Path file = fileChunk.getPath();
         approxOutputSize += size;
         DiskSegment segment = new DiskSegment(rfs, file, offset, size, codec, ifileReadAhead,
-            ifileReadAheadLength, preserve, inputContext);
+            ifileReadAheadLength, preserve, null, inputContext);
         inputSegments.add(segment);
       }
 
