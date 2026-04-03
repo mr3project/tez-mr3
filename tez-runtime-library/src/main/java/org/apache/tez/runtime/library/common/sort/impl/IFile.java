@@ -963,6 +963,10 @@ public class IFile {
       return readRawKey(key) != KeyState.NO_KEY;
     }
 
+    public final boolean nextRawKey(BytesWritable key) throws IOException {
+      return readRawKey(key) != KeyState.NO_KEY;
+    }
+
     private static byte[] createLargerArray(int currentLength) {
       if (currentLength > MAX_BUFFER_SIZE) {
         throw new IllegalArgumentException(
@@ -1005,6 +1009,32 @@ public class IFile {
       return KeyState.NEW_KEY;
     }
 
+    public KeyState readRawKey(BytesWritable key) throws IOException {
+      if (!positionToNextRecord(dataIn)) {
+        if (isDebugEnabled) {
+          LOG.debug("currentKeyLength=" + currentKeyLength +
+              ", currentValueLength=" + currentValueLength +
+              ", bytesRead=" + bytesRead +
+              ", length=" + fileLength);
+        }
+        return KeyState.NO_KEY;
+      }
+      if(currentKeyLength == RLE_MARKER) {
+        // BytesWritable readers reuse the same key object across records, so on RLE paths
+        // the previous key is already present in "key".
+        return KeyState.SAME_KEY;
+      }
+      key.setSize(currentKeyLength);
+      byte[] keyData = key.getBytes();
+      keyBytes = keyData;
+      int i = readData(keyData, currentKeyLength);
+      if (i != currentKeyLength) {
+        throw new IOException(String.format(INCOMPLETE_READ, currentKeyLength, i));
+      }
+      bytesRead += currentKeyLength;
+      return KeyState.NEW_KEY;
+    }
+
     public void nextRawValue(DataInputBuffer value) throws IOException {
       final byte[] valBytes;
       if ((value.getData().length < currentValueLength) || (value.getData() == keyBytes)) {
@@ -1018,6 +1048,21 @@ public class IFile {
         throw new IOException(String.format(INCOMPLETE_READ, currentValueLength, i));
       }
       value.reset(valBytes, currentValueLength);
+
+      // Record the bytes read
+      bytesRead += currentValueLength;
+
+      ++recNo;
+      ++numRecordsRead;
+    }
+
+    public void nextRawValue(BytesWritable value) throws IOException {
+      value.setSize(currentValueLength);
+      byte[] valueBytes = value.getBytes();
+      int i = readData(valueBytes, currentValueLength);
+      if (i != currentValueLength) {
+        throw new IOException(String.format(INCOMPLETE_READ, currentValueLength, i));
+      }
 
       // Record the bytes read
       bytesRead += currentValueLength;

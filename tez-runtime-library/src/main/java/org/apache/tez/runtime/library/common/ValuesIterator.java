@@ -25,9 +25,7 @@ import java.util.NoSuchElementException;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.RawComparator;
-import org.apache.hadoop.io.serializer.Deserializer;
 import org.apache.tez.common.counters.TezCounter;
-import org.apache.tez.runtime.library.common.serializer.SerializationContext;
 import org.apache.tez.runtime.library.common.sort.impl.TezRawKeyValueIterator;
 
 import org.apache.tez.common.Preconditions;
@@ -47,10 +45,6 @@ public class ValuesIterator {
   private BytesWritable value;          // current value
   private boolean more;                 // more in file
   private final RawComparator<BytesWritable> comparator;
-  private final Deserializer<BytesWritable> keyDeserializer;
-  private final Deserializer<BytesWritable> valDeserializer;
-  private final DataInputBuffer keyIn = new DataInputBuffer();
-  private final DataInputBuffer valueIn = new DataInputBuffer();
   private final TezCounter inputKeyCounter;
   private final TezCounter inputValueCounter;
   
@@ -69,10 +63,6 @@ public class ValuesIterator {
     this.comparator = comparator;
     this.inputKeyCounter = inputKeyCounter;
     this.inputValueCounter = inputValueCounter;
-    this.keyDeserializer = SerializationContext.getKeyDeserializer();
-    this.keyDeserializer.open(this.keyIn);
-    this.valDeserializer = SerializationContext.getValueDeserializer();
-    this.valDeserializer.open(this.valueIn);
   }
 
   TezRawKeyValueIterator getRawIterator() { return in; }
@@ -169,9 +159,7 @@ public class ValuesIterator {
     if (more) {      
       DataInputBuffer nextKeyBytes = in.getKey();
       if (!in.isSameKey()) {
-        keyIn.reset(nextKeyBytes.getData(), nextKeyBytes.getPosition(),
-            nextKeyBytes.getLength() - nextKeyBytes.getPosition());
-        nextKey = keyDeserializer.deserialize(nextKey);
+        nextKey = copyToWritable(nextKey, nextKeyBytes);
         // hasMoreValues = is it first key or is key the same?
         hasMoreValues = (key == null) || (comparator.compare(key, nextKey) == 0);
         if (key == null || false == hasMoreValues) {
@@ -196,9 +184,16 @@ public class ValuesIterator {
    */
   private void readNextValue() throws IOException {
     DataInputBuffer nextValueBytes = in.getValue();
-    valueIn.reset(nextValueBytes.getData(), nextValueBytes.getPosition(),
-        nextValueBytes.getLength() - nextValueBytes.getPosition());
-    value = valDeserializer.deserialize(value);
+    value = copyToWritable(value, nextValueBytes);
+  }
+
+  private BytesWritable copyToWritable(BytesWritable writable, DataInputBuffer source) {
+    BytesWritable target = writable;
+    if (target == null) {
+      target = new BytesWritable();
+    }
+    target.set(source.getData(), source.getPosition(), source.getLength() - source.getPosition());
+    return target;
   }
 
   /**
