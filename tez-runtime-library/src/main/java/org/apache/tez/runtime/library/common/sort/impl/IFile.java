@@ -1020,18 +1020,20 @@ public class IFile {
         return KeyState.NO_KEY;
       }
       if(currentKeyLength == RLE_MARKER) {
-        // get key length from original key
-        key.set(keyBytes, 0, originalKeyLength);
+        // BytesWritable readers reuse the same key object across records, so on RLE paths
+        // the previous key is already present in "key". Fall back to keyBytes only if needed.
+        if (key.getLength() != originalKeyLength) {
+          key.set(keyBytes, 0, originalKeyLength);
+        }
         return KeyState.SAME_KEY;
       }
-      if (keyBytes.length < currentKeyLength) {
-        keyBytes = createLargerArray(currentKeyLength);
-      }
-      int i = readData(keyBytes, currentKeyLength);
+      key.setSize(currentKeyLength);
+      byte[] keyData = key.getBytes();
+      keyBytes = keyData;
+      int i = readData(keyData, currentKeyLength);
       if (i != currentKeyLength) {
         throw new IOException(String.format(INCOMPLETE_READ, currentKeyLength, i));
       }
-      key.set(keyBytes, 0, currentKeyLength);
       bytesRead += currentKeyLength;
       return KeyState.NEW_KEY;
     }
@@ -1058,14 +1060,12 @@ public class IFile {
     }
 
     public void nextRawValue(BytesWritable value) throws IOException {
-      if (keyBytes.length < currentValueLength) {
-        keyBytes = createLargerArray(currentValueLength);
-      }
-      int i = readData(keyBytes, currentValueLength);
+      value.setSize(currentValueLength);
+      byte[] valueBytes = value.getBytes();
+      int i = readData(valueBytes, currentValueLength);
       if (i != currentValueLength) {
         throw new IOException(String.format(INCOMPLETE_READ, currentValueLength, i));
       }
-      value.set(keyBytes, 0, currentValueLength);
 
       // Record the bytes read
       bytesRead += currentValueLength;
