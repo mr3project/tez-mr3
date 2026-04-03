@@ -1057,6 +1057,23 @@ public class IFile {
       ++numRecordsRead;
     }
 
+    public void nextRawValue(BytesWritable value) throws IOException {
+      if (keyBytes.length < currentValueLength) {
+        keyBytes = createLargerArray(currentValueLength);
+      }
+      int i = readData(keyBytes, currentValueLength);
+      if (i != currentValueLength) {
+        throw new IOException(String.format(INCOMPLETE_READ, currentValueLength, i));
+      }
+      value.set(keyBytes, 0, currentValueLength);
+
+      // Record the bytes read
+      bytesRead += currentValueLength;
+
+      ++recNo;
+      ++numRecordsRead;
+    }
+
     private static void verifyHeaderMagic(byte[] header) throws IOException {
       if (!(header[0] == 'T' && header[1] == 'I'
           && header[2] == 'F')) {

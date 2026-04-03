@@ -26,7 +26,6 @@ import org.apache.tez.runtime.library.api.IOInterruptedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.runtime.library.api.KeyValueReaderEdge;
@@ -44,8 +43,6 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
   private final ShuffleManager shuffleManager;
   private final CompressionCodec codec;
   
-  private final DataInputBuffer valIn;
-
   private final boolean ifileReadAhead;
   private final int ifileReadAheadLength;
 
@@ -72,7 +69,6 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
     this.ifileReadAheadLength = ifileReadAheadLength;
     this.inputRecordCounter = inputRecordCounter;
 
-    this.valIn = new DataInputBuffer();
     this.key = new BytesWritable();
     this.value = new BytesWritable();
   }
@@ -130,8 +126,7 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
     } else {
       boolean hasMore = this.currentReader.nextRawKey(key);
       if (hasMore) {
-        this.currentReader.nextRawValue(valIn);
-        this.value.set(valIn.getData(), valIn.getPosition(), valIn.getLength() - valIn.getPosition());
+        this.currentReader.nextRawValue(value);
         return true;
       }
       return false;
