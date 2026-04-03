@@ -47,8 +47,6 @@ import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.io.compress.CompressionOutputStream;
 import org.apache.hadoop.io.compress.Compressor;
 import org.apache.hadoop.io.compress.Decompressor;
-import org.apache.hadoop.io.serializer.Serializer;
-import org.apache.tez.runtime.library.common.serializer.SerializationContext;
 import org.apache.tez.common.counters.TezCounter;
 
 import javax.annotation.Nullable;
@@ -602,10 +600,6 @@ public class IFile {
 
   public static class WriterBytesWritable extends Writer {
 
-    private final Serializer<BytesWritable> keySerializer;
-    private final Serializer<BytesWritable> valueSerializer;
-    private final DataOutputBuffer buffer = new DataOutputBuffer();
-
     public WriterBytesWritable(FileSystem fs, Path file,
         CompressionCodec codec,
         TezCounter writesCounter,
@@ -619,30 +613,16 @@ public class IFile {
         CompressionCodec codec, TezCounter writesCounter, TezCounter serializedBytesCounter,
         byte[] writeBuffer, @Nullable Compressor compressorExternal) throws IOException {
       super(outputStream, codec, writesCounter, serializedBytesCounter, writeBuffer, compressorExternal);
-      this.keySerializer = SerializationContext.getKeySerializer();
-      this.keySerializer.open(buffer);
-      this.valueSerializer = SerializationContext.getValueSerializer();
-      this.valueSerializer.open(buffer);
     }
 
     public void append(BytesWritable key, BytesWritable value) throws IOException {
-      keySerializer.serialize(key);
-      int keyLength = buffer.getLength();
+      int keyLength = key.getLength();
       assert (keyLength >= 0);
 
-      valueSerializer.serialize(value);
-      int valueLength = buffer.getLength() - keyLength;
+      int valueLength = value.getLength();
       assert (valueLength >= 0);
-      writeKVPair(buffer.getData(), 0, keyLength, buffer.getData(), keyLength, valueLength);
-
-      buffer.reset();
+      writeKVPair(key.getBytes(), 0, keyLength, value.getBytes(), 0, valueLength);
       incrementRecordsWritten();
-    }
-
-    @Override
-    protected void onClose() throws IOException {
-      keySerializer.close();
-      valueSerializer.close();
     }
   }
 
