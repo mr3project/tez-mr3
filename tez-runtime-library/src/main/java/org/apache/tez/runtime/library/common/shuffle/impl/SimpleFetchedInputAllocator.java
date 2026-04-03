@@ -37,8 +37,7 @@ import org.apache.tez.runtime.library.common.shuffle.MemoryFetchedInput;
  * Usage: Create instance, setInitialMemoryAvailable(long), configureAndStart()
  *
  */
-public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
-    FetchedInputCallback {
+public class SimpleFetchedInputAllocator implements FetchedInputAllocator, FetchedInputCallback {
 
   private static final Logger LOG = LoggerFactory.getLogger(SimpleFetchedInputAllocator.class);
   
@@ -222,5 +221,4 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator,
       LOG.debug(srcNameTrimmed + ": " + "Used memory after freeing " + size  + " : " + this.usedMemory);
     }
   }
-
 }

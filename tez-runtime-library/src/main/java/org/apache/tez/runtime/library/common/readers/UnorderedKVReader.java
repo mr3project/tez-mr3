@@ -88,7 +88,7 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
     } else {
       boolean nextInputExists = moveToNextInput();
       while (nextInputExists) {
-        if(readNextFromCurrentReader()) {
+        if (readNextFromCurrentReader()) {
           inputRecordCounter.increment(1);
           numRecordsRead++;
           return true;

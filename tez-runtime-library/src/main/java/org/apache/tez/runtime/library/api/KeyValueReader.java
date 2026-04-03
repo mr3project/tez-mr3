@@ -49,13 +49,11 @@ public abstract class KeyValueReader implements Reader {
    */
   public abstract boolean next() throws IOException;
 
-  
   /**
    * Returns the current key
    * @return the current key
    */
   public abstract Object getCurrentKey() throws IOException;
-  
   
   /**
    * Returns the current value

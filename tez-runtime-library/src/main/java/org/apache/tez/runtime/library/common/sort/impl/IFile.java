@@ -992,7 +992,7 @@ public class IFile {
         }
         return KeyState.NO_KEY;
       }
-      if(currentKeyLength == RLE_MARKER) {
+      if (currentKeyLength == RLE_MARKER) {
         // get key length from original key
         key.reset(keyBytes, originalKeyLength);
         return KeyState.SAME_KEY;
@@ -1026,7 +1026,6 @@ public class IFile {
       }
       key.setSize(currentKeyLength);
       byte[] keyData = key.getBytes();
-      keyBytes = keyData;
       int i = readData(keyData, currentKeyLength);
       if (i != currentKeyLength) {
         throw new IOException(String.format(INCOMPLETE_READ, currentKeyLength, i));
