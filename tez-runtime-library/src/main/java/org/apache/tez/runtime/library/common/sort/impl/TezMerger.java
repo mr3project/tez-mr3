@@ -353,18 +353,6 @@ public class TezMerger {
 
     public MergeQueue(Configuration conf, FileSystem fs,
         List<Segment> segments, RawComparator comparator,
-        Progressable reporter, boolean sortSegments) {
-      this(conf, fs, segments, comparator, reporter, sortSegments, null, true);
-    }
-
-    public MergeQueue(Configuration conf, FileSystem fs,
-        List<Segment> segments, RawComparator comparator,
-        Progressable reporter, boolean sortSegments, CompressionCodec codec) {
-      this(conf, fs, segments, comparator, reporter, sortSegments, codec, true);
-    }
-
-    public MergeQueue(Configuration conf, FileSystem fs,
-        List<Segment> segments, RawComparator comparator,
         Progressable reporter, boolean sortSegments, CompressionCodec codec,
         boolean checkForSameKeys) {
       this.conf = conf;
