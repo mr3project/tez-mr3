@@ -1021,10 +1021,7 @@ public class IFile {
       }
       if(currentKeyLength == RLE_MARKER) {
         // BytesWritable readers reuse the same key object across records, so on RLE paths
-        // the previous key is already present in "key". Fall back to keyBytes only if needed.
-        if (key.getLength() != originalKeyLength) {
-          key.set(keyBytes, 0, originalKeyLength);
-        }
+        // the previous key is already present in "key".
         return KeyState.SAME_KEY;
       }
       key.setSize(currentKeyLength);
