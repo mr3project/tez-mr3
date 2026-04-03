@@ -963,6 +963,10 @@ public class IFile {
       return readRawKey(key) != KeyState.NO_KEY;
     }
 
+    public final boolean nextRawKey(BytesWritable key) throws IOException {
+      return readRawKey(key) != KeyState.NO_KEY;
+    }
+
     private static byte[] createLargerArray(int currentLength) {
       if (currentLength > MAX_BUFFER_SIZE) {
         throw new IllegalArgumentException(
@@ -1001,6 +1005,33 @@ public class IFile {
         throw new IOException(String.format(INCOMPLETE_READ, currentKeyLength, i));
       }
       key.reset(keyBytes, currentKeyLength);
+      bytesRead += currentKeyLength;
+      return KeyState.NEW_KEY;
+    }
+
+    public KeyState readRawKey(BytesWritable key) throws IOException {
+      if (!positionToNextRecord(dataIn)) {
+        if (isDebugEnabled) {
+          LOG.debug("currentKeyLength=" + currentKeyLength +
+              ", currentValueLength=" + currentValueLength +
+              ", bytesRead=" + bytesRead +
+              ", length=" + fileLength);
+        }
+        return KeyState.NO_KEY;
+      }
+      if(currentKeyLength == RLE_MARKER) {
+        // get key length from original key
+        key.set(keyBytes, 0, originalKeyLength);
+        return KeyState.SAME_KEY;
+      }
+      if (keyBytes.length < currentKeyLength) {
+        keyBytes = createLargerArray(currentKeyLength);
+      }
+      int i = readData(keyBytes, currentKeyLength);
+      if (i != currentKeyLength) {
+        throw new IOException(String.format(INCOMPLETE_READ, currentKeyLength, i));
+      }
+      key.set(keyBytes, 0, currentKeyLength);
       bytesRead += currentKeyLength;
       return KeyState.NEW_KEY;
     }
