@@ -24,6 +24,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.PriorityQueue;
 import java.util.concurrent.*;
@@ -394,6 +395,15 @@ public class PipelinedSorter extends ExternalSorter {
   public void write(BytesWritable key, BytesWritable value)
       throws IOException {
     collect(key, value, partitioner.getPartition(key, value, partitions));
+  }
+
+  // TODO: optimize by directly calling collect() and passing hasher.getProxy(key), if this method is actually called
+  @Override
+  public void write(BytesWritable key, Iterable<BytesWritable> values) throws IOException {
+    Iterator<BytesWritable> it = values.iterator();
+    while (it.hasNext()) {
+      write(key, it.next());
+    }
   }
 
   /**

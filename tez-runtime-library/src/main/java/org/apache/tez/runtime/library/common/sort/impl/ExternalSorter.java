@@ -28,14 +28,12 @@ import com.google.common.collect.Maps;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.api.Event;
-import org.apache.tez.runtime.library.api.IOInterruptedException;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.io.RawComparator;
@@ -241,12 +239,7 @@ public abstract class ExternalSorter {
 
   public abstract void write(BytesWritable key, BytesWritable value) throws IOException;
 
-  public void write(BytesWritable key, Iterable<BytesWritable> values) throws IOException {
-    Iterator<BytesWritable> it = values.iterator();
-    while (it.hasNext()) {
-      write(key, it.next());
-    }
-  }
+  public abstract void write(BytesWritable key, Iterable<BytesWritable> values) throws IOException;
 
   public TezTaskOutput getMapOutput() {
     return mapOutputFile;

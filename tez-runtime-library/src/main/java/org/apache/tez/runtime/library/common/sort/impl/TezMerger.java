@@ -271,6 +271,7 @@ public class TezMerger {
         fs.delete(file, false);
       }
     }
+
     // This method is used by BackupStore to extract the absolute position after a reset
     @Override
     long getActualPosition() throws IOException {
