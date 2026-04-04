@@ -23,6 +23,7 @@ import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.IntBuffer;
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.PriorityQueue;
@@ -59,6 +60,8 @@ import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterBytesWritable
 import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterInputBuffer;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger.DiskSegment;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger.Segment;
+import org.apache.tez.runtime.library.common.comparator.TezBytesComparator;
+import org.apache.tez.runtime.library.utils.FastByteComparisons;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
@@ -393,7 +396,20 @@ public class PipelinedSorter extends ExternalSorter {
   @Override
   public void write(BytesWritable key, BytesWritable value)
       throws IOException {
-    collect(key, value, partitioner.getPartition(key, value, partitions));
+    final int keyHash = hasher != null ? hasher.getProxy(key) : 0;
+    collect(key, key.getBytes(), key.getLength(), value,
+        partitioner.getPartition(key, value, partitions), keyHash);
+  }
+
+  @Override
+  public void write(BytesWritable key, Iterable<BytesWritable> values) throws IOException {
+    final byte[] keyBytes = key.getBytes();
+    final int keyLength = key.getLength();
+    final int keyHash = hasher != null ? hasher.getProxy(key) : 0;
+    for (BytesWritable value : values) {
+      collect(key, keyBytes, keyLength, value,
+          partitioner.getPartition(key, value, partitions), keyHash);
+    }
   }
 
   /**
@@ -401,7 +417,8 @@ public class PipelinedSorter extends ExternalSorter {
    * When this method returns, kvindex must refer to sufficient unused
    * storage to store one METADATA.
    */
-  synchronized void collect(BytesWritable key, BytesWritable value, final int partition) throws IOException {
+  synchronized void collect(BytesWritable key, byte[] keyBytes, int keyLength,
+      BytesWritable value, final int partition, int keyHash) throws IOException {
     if (partition < 0 || partition >= partitions) {
       throw new IOException("Illegal partition for " + key + " (" +
           partition + ")");
@@ -418,7 +435,7 @@ public class PipelinedSorter extends ExternalSorter {
     int valstart = -1;
     int valend = -1;
     try {
-      span.out.write(key.getBytes(), 0, key.getLength());
+      span.out.write(keyBytes, 0, keyLength);
       valstart = span.kvbuffer.position();      
       span.out.write(value.getBytes(), 0, value.getLength());
       valend = span.kvbuffer.position();
@@ -434,7 +451,7 @@ public class PipelinedSorter extends ExternalSorter {
       }
       bufferOverflowRecursion++;
       // try again
-      this.collect(key, value, partition);
+      this.collect(key, keyBytes, keyLength, value, partition, keyHash);
       return;
     }
 
@@ -442,13 +459,7 @@ public class PipelinedSorter extends ExternalSorter {
       bufferOverflowRecursion--;
     }
 
-    int prefix = 0;
-
-    if (hasher != null) {
-      prefix = hasher.getProxy(key);
-    }
-
-    prefix = (partition << (32 - partitionBits)) | (prefix >>> partitionBits);
+    int prefix = (partition << (32 - partitionBits)) | (keyHash >>> partitionBits);
 
     /* maintain order as in PARTITION, KEYSTART, VALSTART, VALLEN */
     span.kvmeta.put(prefix);
@@ -989,6 +1000,7 @@ public class PipelinedSorter extends ExternalSorter {
     final ByteBuffer kvbuffer;
     final NonSyncDataOutputStream out;
     final RawComparator comparator;
+    final boolean useFastByteCompare;
     final byte[] imeta = new byte[METASIZE];
 
     private int index = 0;
@@ -1023,15 +1035,34 @@ public class PipelinedSorter extends ExternalSorter {
       out = new NonSyncDataOutputStream(
               new BufferStreamWrapper(kvbuffer));
       this.comparator = comparator;
+      this.useFastByteCompare = comparator instanceof TezBytesComparator;
     }
 
     public SpanIterator sort(IndexedSorter sorter) {
       if (length() > 1) {
-        sorter.sort(this, 0, length(), progressable);
+        sortUsingJavaArrays();
       }
       if (isDebugEnabled) { LOG.debug("{}: done sorting span={}, length={}",
           outputContext.getDestinationVertexName(), index, length()); }
       return new SpanIterator((SortSpan)this);
+    }
+
+    private void sortUsingJavaArrays() {
+      final int len = length();
+      final Integer[] order = new Integer[len];
+      for (int i = 0; i < len; i++) {
+        order[i] = i;
+      }
+      Arrays.sort(order, this::compare);
+
+      final byte[] sortedMeta = new byte[len * METASIZE];
+      for (int dst = 0; dst < len; dst++) {
+        final int src = order[dst];
+        final int srcOffset = kvmetabase + (src * METASIZE);
+        final int dstOffset = dst * METASIZE;
+        System.arraycopy(rawkvmeta, srcOffset, sortedMeta, dstOffset, METASIZE);
+      }
+      System.arraycopy(sortedMeta, 0, rawkvmeta, kvmetabase, sortedMeta.length);
     }
 
     int offsetFor(int i) {
@@ -1066,7 +1097,9 @@ public class PipelinedSorter extends ExternalSorter {
       final int off = kvbuffer.arrayOffset();
 
       // sort by key
-      final int cmp = comparator.compare(buf, off + istart, ilen, buf, off + jstart, jlen);
+      final int cmp = useFastByteCompare
+          ? FastByteComparisons.compareTo(buf, off + istart, ilen, buf, off + jstart, jlen)
+          : comparator.compare(buf, off + istart, ilen, buf, off + jstart, jlen);
       if(cmp == 0) eq++;
       return cmp;
     }
@@ -1160,10 +1193,17 @@ public class PipelinedSorter extends ExternalSorter {
         valstart = kvmeta.get(this.offsetFor(index) + VALSTART);
         final byte[] buf = kvbuffer.array();
         final int off = kvbuffer.arrayOffset();
-        cmp = comparator.compare(buf,
-            keystart + off , (valstart - keystart),
-            needle.getData(),
-            needle.getPosition(), (needle.getLength() - needle.getPosition()));
+        cmp = useFastByteCompare
+            ? FastByteComparisons.compareTo(
+                buf,
+                keystart + off, (valstart - keystart),
+                needle.getData(),
+                needle.getPosition(), (needle.getLength() - needle.getPosition()))
+            : comparator.compare(
+                buf,
+                keystart + off , (valstart - keystart),
+                needle.getData(),
+                needle.getPosition(), (needle.getLength() - needle.getPosition()));
       }
       return cmp;
     }
