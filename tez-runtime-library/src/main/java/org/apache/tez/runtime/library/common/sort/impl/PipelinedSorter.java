@@ -79,6 +79,7 @@ public class PipelinedSorter extends ExternalSorter {
   private final static int APPROX_HEADER_LENGTH = 150;
 
   private final int partitionBits;
+  private final int partitionBytes;
 
   private static final int PARTITION = 0;        // partition offset in acct
   private static final int KEYSTART = 1;         // key offset in acct
@@ -131,6 +132,8 @@ public class PipelinedSorter extends ExternalSorter {
     super(outputContext, conf, numOutputs, initialMemoryAvailable);
 
     this.partitionBits = bitcount(partitions) + 1;
+    this.partitionBytes = 4 - (1 + (partitionBits - 1) / 8);
+    assert partitionBytes <= 3;   // we extract 3 bytes in TezBytesComparator.getProxy()
 
     this.lazyAllocateMem = this.conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_LAZY_ALLOCATE_MEMORY,
@@ -985,6 +988,9 @@ public class PipelinedSorter extends ExternalSorter {
     private boolean reinit = false;
     private int capacity;
 
+    private final byte[] buf;
+    private final int off;
+
     public SortSpan(ByteBuffer source, int maxItems, int perItem, RawComparator comparator) {
       capacity = source.remaining();
       int metasize = METASIZE*maxItems;
@@ -1007,9 +1013,11 @@ public class PipelinedSorter extends ExternalSorter {
       ByteBuffer orderedMetaBuffer = kvmetabuffer.order(ByteOrder.nativeOrder());
       kvmeta = orderedMetaBuffer.asIntBuffer();
       kvmetalong = orderedMetaBuffer.asLongBuffer();
-      out = new NonSyncDataOutputStream(
-              new BufferStreamWrapper(kvbuffer));
+      out = new NonSyncDataOutputStream(new BufferStreamWrapper(kvbuffer));
       this.comparator = comparator;
+
+      buf = kvbuffer.array();
+      off = kvbuffer.arrayOffset();
     }
 
     public SpanIterator sort(IndexedSorter sorter) {
@@ -1043,20 +1051,22 @@ public class PipelinedSorter extends ExternalSorter {
     }
 
     protected int compareKeys(final int kvi, final int kvj) {
-      final int istart = kvmeta.get(kvi + KEYSTART);
-      final int jstart = kvmeta.get(kvj + KEYSTART);
-      final int ilen   = kvmeta.get(kvi + VALSTART) - istart;
-      final int jlen   = kvmeta.get(kvj + VALSTART) - jstart;
+      int istart = kvmeta.get(kvi + KEYSTART);
+      int jstart = kvmeta.get(kvj + KEYSTART);
+      int ilen   = kvmeta.get(kvi + VALSTART) - istart;
+      int jlen   = kvmeta.get(kvj + VALSTART) - jstart;
+
+      // kvmeta[PARTITION] may encode up to the first 3 key bytes via proxy.
+      final int prefixSkip = Math.min(Math.min(ilen, jlen), partitionBytes);
+      istart += prefixSkip;
+      jstart += prefixSkip;
+      ilen -= prefixSkip;
+      jlen -= prefixSkip;
 
       if (ilen == 0 || jlen == 0) {
-        if (ilen == jlen) {
-          eq++;
-        }
+        if (ilen == jlen) eq++;
         return ilen - jlen;
       }
-
-      final byte[] buf = kvbuffer.array();
-      final int off = kvbuffer.arrayOffset();
 
       // sort by key
       final int cmp = comparator.compare(buf, off + istart, ilen, buf, off + jstart, jlen);
