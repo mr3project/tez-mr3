@@ -21,7 +21,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -1012,17 +1011,13 @@ public class PipelinedSorter extends ExternalSorter {
       reserved.flip();
       reserved.limit(partitionMetaSize);
       ByteBuffer partitionmetabuffer = reserved.slice();
-      partitionmeta = partitionmetabuffer
-          .order(ByteOrder.nativeOrder())
-          .asIntBuffer();
+      partitionmeta = partitionmetabuffer.asIntBuffer();
       reserved.position(partitionMetaSize);
       reserved.limit(metasize);
       ByteBuffer kvmetabuffer = reserved.slice();
       rawkvmeta = kvmetabuffer.array();
       kvmetabase = kvmetabuffer.arrayOffset();
-      kvmeta = kvmetabuffer
-                .order(ByteOrder.nativeOrder())
-               .asIntBuffer();
+      kvmeta = kvmetabuffer.asIntBuffer();
       out = new NonSyncDataOutputStream(
               new BufferStreamWrapper(kvbuffer));
       this.comparator = comparator;
