@@ -23,6 +23,7 @@ import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.IntBuffer;
+import java.nio.LongBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -974,12 +975,10 @@ public class PipelinedSorter extends ExternalSorter {
 
   private final class SortSpan implements IndexedSortable {
     final IntBuffer kvmeta;
-    final byte[] rawkvmeta;
-    final int kvmetabase;
+    final LongBuffer kvmetalong;
     final ByteBuffer kvbuffer;
     final NonSyncDataOutputStream out;
     final RawComparator comparator;
-    final byte[] imeta = new byte[METASIZE];
 
     private int index = 0;
     private long eq = 0;
@@ -1005,11 +1004,9 @@ public class PipelinedSorter extends ExternalSorter {
       reserved.flip();
       reserved.limit(metasize);
       ByteBuffer kvmetabuffer = reserved.slice();
-      rawkvmeta = kvmetabuffer.array();
-      kvmetabase = kvmetabuffer.arrayOffset();
-      kvmeta = kvmetabuffer
-                .order(ByteOrder.nativeOrder())
-               .asIntBuffer();
+      ByteBuffer orderedMetaBuffer = kvmetabuffer.order(ByteOrder.nativeOrder());
+      kvmeta = orderedMetaBuffer.asIntBuffer();
+      kvmetalong = orderedMetaBuffer.asLongBuffer();
       out = new NonSyncDataOutputStream(
               new BufferStreamWrapper(kvbuffer));
       this.comparator = comparator;
@@ -1028,15 +1025,21 @@ public class PipelinedSorter extends ExternalSorter {
       return (i * NMETA);
     }
 
-    public void swap(final int mi, final int mj) {
-      final int kvi = offsetFor(mi);
-      final int kvj = offsetFor(mj);
+    int longOffsetFor(int i) {
+      return i * (NMETA / 2);
+    }
 
-      final int kvioff = kvmetabase + (kvi << 2);
-      final int kvjoff = kvmetabase + (kvj << 2);
-      System.arraycopy(rawkvmeta, kvioff, imeta, 0, METASIZE);
-      System.arraycopy(rawkvmeta, kvjoff, rawkvmeta, kvioff, METASIZE);
-      System.arraycopy(imeta, 0, rawkvmeta, kvjoff, METASIZE);
+    public void swap(final int mi, final int mj) {
+      final int kvi = longOffsetFor(mi);
+      final int kvj = longOffsetFor(mj);
+      final long l1 = kvmetalong.get(kvi);
+      final long l2 = kvmetalong.get(kvi + 1);
+
+      kvmetalong.put(kvi, kvmetalong.get(kvj));
+      kvmetalong.put(kvi + 1, kvmetalong.get(kvj + 1));
+
+      kvmetalong.put(kvj, l1);
+      kvmetalong.put(kvj + 1, l2);
     }
 
     protected int compareKeys(final int kvi, final int kvj) {
