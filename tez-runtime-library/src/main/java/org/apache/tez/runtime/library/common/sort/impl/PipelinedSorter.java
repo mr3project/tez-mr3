@@ -975,15 +975,12 @@ public class PipelinedSorter extends ExternalSorter {
 
   private final class SortSpan implements IndexedSortable {
     final IntBuffer partitionmeta;
-    final byte[] rawpartitionmeta;
-    final int partitionmetabase;
     final IntBuffer kvmeta;
     final byte[] rawkvmeta;
     final int kvmetabase;
     final ByteBuffer kvbuffer;
     final NonSyncDataOutputStream out;
     final RawComparator comparator;
-    final byte[] ipartitionmeta = new byte[PARTITION_METASIZE];
     final byte[] ikvmeta = new byte[METASIZE];
 
     private int index = 0;
@@ -1015,8 +1012,6 @@ public class PipelinedSorter extends ExternalSorter {
       reserved.flip();
       reserved.limit(partitionMetaSize);
       ByteBuffer partitionmetabuffer = reserved.slice();
-      rawpartitionmeta = partitionmetabuffer.array();
-      partitionmetabase = partitionmetabuffer.arrayOffset();
       partitionmeta = partitionmetabuffer
           .order(ByteOrder.nativeOrder())
           .asIntBuffer();
@@ -1050,11 +1045,9 @@ public class PipelinedSorter extends ExternalSorter {
       final int kvi = offsetFor(mi);
       final int kvj = offsetFor(mj);
 
-      final int pmioff = partitionmetabase + (mi << 2);
-      final int pmjoff = partitionmetabase + (mj << 2);
-      System.arraycopy(rawpartitionmeta, pmioff, ipartitionmeta, 0, PARTITION_METASIZE);
-      System.arraycopy(rawpartitionmeta, pmjoff, rawpartitionmeta, pmioff, PARTITION_METASIZE);
-      System.arraycopy(ipartitionmeta, 0, rawpartitionmeta, pmjoff, PARTITION_METASIZE);
+      final int ipart = partitionmeta.get(mi);
+      partitionmeta.put(mi, partitionmeta.get(mj));
+      partitionmeta.put(mj, ipart);
 
       final int kvioff = kvmetabase + (kvi << 2);
       final int kvjoff = kvmetabase + (kvj << 2);
