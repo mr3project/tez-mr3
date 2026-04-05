@@ -79,12 +79,14 @@ public class PipelinedSorter extends ExternalSorter {
 
   private final int partitionBits;
 
-  private static final int PARTITION = 0;        // partition offset in acct
-  private static final int KEYSTART = 1;         // key offset in acct
-  private static final int VALSTART = 2;         // val offset in acct
-  private static final int VALLEN = 3;           // val len in acct
-  private static final int NMETA = 4;            // num meta ints
-  private static final int METASIZE = NMETA * 4; // size in bytes
+  private static final int PARTITION = 0;                 // partition offset in partition metadata
+  private static final int KEYSTART = 0;                  // key offset in kv metadata
+  private static final int VALSTART = 1;                  // value offset in kv metadata
+  private static final int VALLEN = 2;                    // value length in kv metadata
+  private static final int NMETA = 3;                     // num kv metadata ints per record
+  private static final int PARTITION_METASIZE = 4;        // partition metadata size in bytes
+  private static final int METASIZE = NMETA * 4;          // kv metadata size in bytes
+  private static final int TOTAL_METASIZE = PARTITION_METASIZE + METASIZE; // total metadata size per record
 
   private final boolean lazyAllocateMem;
   private final int MIN_BLOCK_SIZE;
@@ -172,7 +174,7 @@ public class PipelinedSorter extends ExternalSorter {
     int numBlocks = 0;
     while (availableMem > 0) {
       long size = Math.min(availableMem, computeBlockSize(availableMem, maxMemLimit));
-      int sizeWithoutMeta = (int) ((size) - (size % METASIZE));
+      int sizeWithoutMeta = (int) ((size) - (size % TOTAL_METASIZE));
       totalCapacityWithoutMeta += sizeWithoutMeta;
       availableMem -= size;
       numBlocks++;
@@ -402,7 +404,7 @@ public class PipelinedSorter extends ExternalSorter {
           partition + ")");
     }
     // TBD:FIX in TEZ-2574
-    if (span.kvmeta.remaining() < METASIZE) {
+    if (span.kvmeta.remaining() < NMETA) {
       this.sort();
       if (span.length() == 0) {
         spillSingleRecord(key, value, partition);
@@ -440,8 +442,7 @@ public class PipelinedSorter extends ExternalSorter {
     int prefix = comparator.getProxy(key);
     prefix = (partition << (32 - partitionBits)) | (prefix >>> partitionBits);
 
-    /* maintain order as in PARTITION, KEYSTART, VALSTART, VALLEN */
-    span.kvmeta.put(prefix);
+    span.partitionmeta.put(prefix);
     span.kvmeta.put(keystart);
     span.kvmeta.put(valstart);
     span.kvmeta.put(valend - valstart);
@@ -973,13 +974,17 @@ public class PipelinedSorter extends ExternalSorter {
   }
 
   private final class SortSpan implements IndexedSortable {
+    final IntBuffer partitionmeta;
+    final byte[] rawpartitionmeta;
+    final int partitionmetabase;
     final IntBuffer kvmeta;
     final byte[] rawkvmeta;
     final int kvmetabase;
     final ByteBuffer kvbuffer;
     final NonSyncDataOutputStream out;
     final RawComparator comparator;
-    final byte[] imeta = new byte[METASIZE];
+    final byte[] ipartitionmeta = new byte[PARTITION_METASIZE];
+    final byte[] ikvmeta = new byte[METASIZE];
 
     private int index = 0;
     private long eq = 0;
@@ -988,11 +993,16 @@ public class PipelinedSorter extends ExternalSorter {
 
     public SortSpan(ByteBuffer source, int maxItems, int perItem, RawComparator comparator) {
       capacity = source.remaining();
-      int metasize = METASIZE*maxItems;
+      int partitionMetaSize = PARTITION_METASIZE * maxItems;
+      int kvMetaSize = METASIZE * maxItems;
+      int metasize = partitionMetaSize + kvMetaSize;
       long dataSize = (long) maxItems * (long) perItem;
       if (capacity < (metasize+dataSize)) {
         // try to allocate less meta space, because we have sample data
-        metasize = METASIZE*(capacity/(perItem+METASIZE));
+        int records = capacity / (perItem + TOTAL_METASIZE);
+        partitionMetaSize = PARTITION_METASIZE * records;
+        kvMetaSize = METASIZE * records;
+        metasize = partitionMetaSize + kvMetaSize;
       }
       ByteBuffer reserved = source.duplicate();
       reserved.mark();
@@ -1003,6 +1013,14 @@ public class PipelinedSorter extends ExternalSorter {
       reserved.position(metasize);
       kvbuffer = reserved.slice();
       reserved.flip();
+      reserved.limit(partitionMetaSize);
+      ByteBuffer partitionmetabuffer = reserved.slice();
+      rawpartitionmeta = partitionmetabuffer.array();
+      partitionmetabase = partitionmetabuffer.arrayOffset();
+      partitionmeta = partitionmetabuffer
+          .order(ByteOrder.nativeOrder())
+          .asIntBuffer();
+      reserved.position(partitionMetaSize);
       reserved.limit(metasize);
       ByteBuffer kvmetabuffer = reserved.slice();
       rawkvmeta = kvmetabuffer.array();
@@ -1032,11 +1050,17 @@ public class PipelinedSorter extends ExternalSorter {
       final int kvi = offsetFor(mi);
       final int kvj = offsetFor(mj);
 
+      final int pmioff = partitionmetabase + (mi << 2);
+      final int pmjoff = partitionmetabase + (mj << 2);
+      System.arraycopy(rawpartitionmeta, pmioff, ipartitionmeta, 0, PARTITION_METASIZE);
+      System.arraycopy(rawpartitionmeta, pmjoff, rawpartitionmeta, pmioff, PARTITION_METASIZE);
+      System.arraycopy(ipartitionmeta, 0, rawpartitionmeta, pmjoff, PARTITION_METASIZE);
+
       final int kvioff = kvmetabase + (kvi << 2);
       final int kvjoff = kvmetabase + (kvj << 2);
-      System.arraycopy(rawkvmeta, kvioff, imeta, 0, METASIZE);
+      System.arraycopy(rawkvmeta, kvioff, ikvmeta, 0, METASIZE);
       System.arraycopy(rawkvmeta, kvjoff, rawkvmeta, kvioff, METASIZE);
-      System.arraycopy(imeta, 0, rawkvmeta, kvjoff, METASIZE);
+      System.arraycopy(ikvmeta, 0, rawkvmeta, kvjoff, METASIZE);
     }
 
     protected int compareKeys(final int kvi, final int kvj) {
@@ -1064,8 +1088,8 @@ public class PipelinedSorter extends ExternalSorter {
     public int compare(final int mi, final int mj) {
       final int kvi = offsetFor(mi);
       final int kvj = offsetFor(mj);
-      final int kvip = kvmeta.get(kvi + PARTITION);
-      final int kvjp = kvmeta.get(kvj + PARTITION);
+      final int kvip = partitionmeta.get(mi + PARTITION);
+      final int kvjp = partitionmeta.get(mj + PARTITION);
       // sort by partition      
       if (kvip != kvjp) {
         return kvip - kvjp;
@@ -1105,7 +1129,11 @@ public class PipelinedSorter extends ExternalSorter {
       remaining.position(kvbuffer.position());
       remaining = remaining.slice();
       kvbuffer.limit(kvbuffer.position());
+      partitionmeta.limit(partitionmeta.position());
       kvmeta.limit(kvmeta.position());
+      Preconditions.checkState(partitionmeta.limit() == (kvmeta.limit() / NMETA),
+          "Partition and KV metadata out of sync: partitionEntries=%s, kvEntries=%s",
+          partitionmeta.limit(), (kvmeta.limit() / NMETA));
       int items = length();
       if (items == 0) {
         return null;
@@ -1115,7 +1143,7 @@ public class PipelinedSorter extends ExternalSorter {
         LOG.debug("{}: {}", outputContext.getDestinationVertexName(),
             String.format("Span%d.length = %d, perItem = %d", index, length(), perItem));
       }
-      if (remaining.remaining() < METASIZE+perItem) {
+      if (remaining.remaining() < TOTAL_METASIZE + perItem) {
         //Check if we can get the next Buffer from the main buffer list
         ByteBuffer space = allocateSpace();
         if (space != null) {
@@ -1134,7 +1162,7 @@ public class PipelinedSorter extends ExternalSorter {
       final int keystart;
       final int valstart;
       final int partition;
-      partition = kvmeta.get(this.offsetFor(index) + PARTITION);
+      partition = partitionmeta.get(index + PARTITION);
       if (partition != needlePart) {
           cmp = (partition-needlePart);
       } else {
@@ -1156,13 +1184,16 @@ public class PipelinedSorter extends ExternalSorter {
     
     @Override
     public String toString() {
-        return String.format("Span[%d,%d]", NMETA*kvmeta.capacity(), kvbuffer.limit());
+        return String.format("Span[%d,%d]",
+            (partitionmeta.capacity() + NMETA * kvmeta.capacity()) * 4,
+            kvbuffer.limit());
     }
   }
 
   private static class SpanIterator implements PartitionedRawKeyValueIterator, Comparable<SpanIterator> {
     private int kvindex = -1;
     private final int maxindex;
+    private final IntBuffer partitionmeta;
     private final IntBuffer kvmeta;
     private final ByteBuffer kvbuffer;
     private final SortSpan span;
@@ -1172,10 +1203,14 @@ public class PipelinedSorter extends ExternalSorter {
     private static final int minrun = (1 << 4);
 
     public SpanIterator(SortSpan span) {
+      this.partitionmeta = span.partitionmeta;
       this.kvmeta = span.kvmeta;
       this.kvbuffer = span.kvbuffer;
       this.span = span;
-      this.maxindex = (kvmeta.limit()/NMETA) - 1;
+      Preconditions.checkState(span.partitionmeta.limit() == (kvmeta.limit() / NMETA),
+          "Partition and KV metadata out of sync: partitionEntries=%s, kvEntries=%s",
+          span.partitionmeta.limit(), (kvmeta.limit() / NMETA));
+      this.maxindex = span.partitionmeta.limit() - 1;
     }
 
     public DataInputBuffer getKey()  {
@@ -1217,7 +1252,7 @@ public class PipelinedSorter extends ExternalSorter {
     }
 
     public int getPartition() {
-      final int partition = kvmeta.get(span.offsetFor(kvindex) + PARTITION);
+      final int partition = partitionmeta.get(kvindex + PARTITION);
       return partition;
     }
 
@@ -1225,7 +1260,7 @@ public class PipelinedSorter extends ExternalSorter {
       if (!hasNext()) {
         return null;
       } else {
-          return kvmeta.get(span.offsetFor(kvindex + 1) + PARTITION);
+          return partitionmeta.get((kvindex + 1) + PARTITION);
       }
     }
 
