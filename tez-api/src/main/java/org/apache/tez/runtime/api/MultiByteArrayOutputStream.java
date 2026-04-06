@@ -5,6 +5,7 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.handler.ssl.SslHandler;
 import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.ReadaheadPool;
@@ -166,6 +167,36 @@ public class MultiByteArrayOutputStream extends OutputStream {
     }
     if (fileOut != null) {
       fileOut.close();
+    }
+  }
+
+  public synchronized void writeTo(OutputStream out) throws IOException {
+    List<byte[]> buffersFinal = buffers;
+    int posInBufFinal = posInBuf;
+    FSDataOutputStream fileOutFinal = fileOut;
+    if (buffersFinal == null) {
+      throw new IOException("MultiByteArrayOutputStream is cleaned");
+    }
+
+    for (int i = 0; i < buffersFinal.size(); i++) {
+      byte[] bufferElement = buffersFinal.get(i);
+      int length = (i < buffersFinal.size() - 1) ? bufferElement.length : posInBufFinal;
+      if (length > 0) {
+        out.write(bufferElement, 0, length);
+      }
+    }
+
+    if (fileOutFinal != null) {
+      fileOutFinal.hflush();
+      try (FSDataInputStream in = fs.open(outputPath)) {
+        byte[] copyBuffer = new byte[64 * 1024];
+        int bytesRead;
+        while ((bytesRead = in.read(copyBuffer)) >= 0) {
+          if (bytesRead > 0) {
+            out.write(copyBuffer, 0, bytesRead);
+          }
+        }
+      }
     }
   }
 

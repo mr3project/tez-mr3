@@ -236,8 +236,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     // useFreeMemoryWriterOutput = false if compositeFetch == false, i.e, when using mapreduce_shuffle
     this.useFreeMemoryWriterOutput = compositeFetch && conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT,
-        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT_DEFAULT)
-        && !isFinalMergeEnabled;
+        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT_DEFAULT);
 
     this.rfs = FileSystem.getLocal(this.conf).getRaw();
     this.rfsSpillFilePerms = TezSpillRecord.SPILL_FILE_PERMS.equals(
@@ -531,9 +530,11 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       }
       pendingSpillCount.incrementAndGet();
       int spillNumber = numSpills.getAndIncrement();
+      boolean spillToFreeMemory = isPipelinedShuffle && useFreeMemoryWriterOutput;
 
       ListenableFuture<SpillResult> future = spillExecutor.submit(new SpillCallable(
-          new ArrayList<WrappedBuffer>(filledBuffers), codec, spilledRecordsCounter, spillNumber));
+          new ArrayList<WrappedBuffer>(filledBuffers), codec, spilledRecordsCounter,
+          spillNumber, spillToFreeMemory));
       filledBuffers.clear();
       Futures.addCallback(future, new SpillCallback(spillNumber));
       // Update once per buffer (instead of every record)
@@ -589,20 +590,22 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     private final TezCounter numRecordsCounter;
     private SpillPathDetails spillPathDetails;
     private final int spillNumber;
+    private final boolean spillToFreeMemory;
 
     public SpillCallable(List<WrappedBuffer> filledBuffers, CompressionCodec codec,
-        TezCounter numRecordsCounter, SpillPathDetails spillPathDetails) {
-      this(filledBuffers, codec, numRecordsCounter, spillPathDetails.spillIndex);
+        TezCounter numRecordsCounter, SpillPathDetails spillPathDetails, boolean spillToFreeMemory) {
+      this(filledBuffers, codec, numRecordsCounter, spillPathDetails.spillIndex, spillToFreeMemory);
       Preconditions.checkArgument(spillPathDetails.outputFilePath != null, "Spill output file path can not be null");
       this.spillPathDetails = spillPathDetails;
     }
 
     public SpillCallable(List<WrappedBuffer> filledBuffers, CompressionCodec codec,
-        TezCounter numRecordsCounter, int spillNumber) {
+        TezCounter numRecordsCounter, int spillNumber, boolean spillToFreeMemory) {
       this.filledBuffers = filledBuffers;
       this.codec = codec;
       this.numRecordsCounter = numRecordsCounter;
       this.spillNumber = spillNumber;
+      this.spillToFreeMemory = spillToFreeMemory;
     }
 
     @Override
@@ -618,7 +621,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
       MultiByteArrayOutputStream byteArrayOutput = null;
       boolean canUseBuffers = false;
-      if (useFreeMemoryWriterOutput) {
+      if (spillToFreeMemory) {
         canUseBuffers = MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold);
         if (canUseBuffers) {
           byteArrayOutput = new MultiByteArrayOutputStream(rfs, spillPathDetails.outputFilePath);
@@ -1039,7 +1042,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
       //setup output file and index file
       SpillPathDetails spillPathDetails = getSpillPathDetails(true, -1);
-      SpillCallable spillCallable = new SpillCallable(filledBuffers, codec, null, spillPathDetails);
+      SpillCallable spillCallable = new SpillCallable(
+          filledBuffers, codec, null, spillPathDetails, useFreeMemoryWriterOutput);
       try {
         SpillResult spillResult = spillCallable.call();
 
@@ -1145,10 +1149,22 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     DataInputBuffer keyBufferIFile = new DataInputBuffer();
     DataInputBuffer valBufferIFile = new DataInputBuffer();
 
+    MultiByteArrayOutputStream byteArrayOutput = null;
+    if (useFreeMemoryWriterOutput) {
+      if (MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold)) {
+        byteArrayOutput = new MultiByteArrayOutputStream(rfs, finalOutPath);
+      }
+    }
+
     FSDataOutputStream out = null;
+    long finalOutSize = 0;
     try {
-      out = rfs.create(finalOutPath);
-      ensureSpillFilePermissions(finalOutPath, rfs, rfsSpillFilePerms);
+      if (byteArrayOutput == null) {
+        out = rfs.create(finalOutPath);
+        ensureSpillFilePermissions(finalOutPath, rfs, rfsSpillFilePerms);
+      } else {
+        out = new FSDataOutputStream(byteArrayOutput, null);
+      }
       WriterInputBuffer writer = null;
 
       byte[] writeBuffer = IFile.allocateWriteBuffer();
@@ -1200,8 +1216,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
             }
           }
           writer.close();
-          // written to local disk, so increment fileOutputBytesCounter
-          fileOutputBytesCounter.increment(writer.getCompressedLength());
+          finalOutSize += writer.getCompressedLength();
           TezIndexRecord indexRecord = new TezIndexRecord(segmentStart, writer.getRawLength(),
               writer.getCompressedLength());
           writer = null;
@@ -1220,11 +1235,20 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       }
     }
 
+    if (byteArrayOutput == null) {
+      fileOutputBytesCounter.increment(finalOutSize);
+    } else {
+      fileOutputBytesMemoryCounter.increment(finalOutSize);
+      assert !writeSpillRecord;
+    }
+
     if (writeSpillRecord) {
       finalSpillRecord.writeToFile(finalIndexPath, localFs, localFsSpillFilePerms);
       fileOutputBytesCounter.increment(indexFileSizeEstimate);
     } else {
-      ShuffleUtils.writeToIndexPathCacheAndByteCache(outputContext, finalOutPath, finalSpillRecord, null);
+      Path outputPath = byteArrayOutput == null ? finalOutPath : null;
+      ShuffleUtils.writeToIndexPathCacheAndByteCache(outputContext,
+          outputPath, finalSpillRecord, byteArrayOutput);
     }
     LOG.info("{}: Finished final spill after merging: {} spills", destNameTrimmed, numSpills.get());
   }

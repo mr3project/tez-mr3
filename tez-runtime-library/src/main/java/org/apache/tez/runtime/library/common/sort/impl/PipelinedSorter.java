@@ -109,6 +109,7 @@ public class PipelinedSorter extends ExternalSorter {
   // Merger
   private final SpanMerger merger;
   private final ExecutorService sortmaster;
+  private final ExecutorService spillMaterializeExecutor;
 
   private final Deflater deflater;
 
@@ -123,6 +124,7 @@ public class PipelinedSorter extends ExternalSorter {
   private final boolean useFreeMemoryWriterOutput;  // use availableMemory as threshold
 
   private final ArrayList<TezSpillRecord> indexCacheList = new ArrayList<TezSpillRecord>();
+  private PendingMemorySpill pendingMemorySpill;
 
   // track buffer overflow recursively in all buffers
   private int bufferOverflowRecursion = 0;
@@ -218,6 +220,10 @@ public class PipelinedSorter extends ExternalSorter {
         new ThreadFactoryBuilder().setDaemon(true)
         .setNameFormat("Sorter {" + outputContext.getDestinationVertexName() + "} #%d")
         .build());
+    this.spillMaterializeExecutor = Executors.newSingleThreadExecutor(
+        new ThreadFactoryBuilder().setDaemon(true)
+            .setNameFormat("SpillMaterializer {" + outputContext.getDestinationVertexName() + "} #%d")
+            .build());
 
     this.deflater = TezCommonUtils.newBestCompressionDeflater();
 
@@ -231,8 +237,7 @@ public class PipelinedSorter extends ExternalSorter {
     // useFreeMemoryWriterOutput = false if compositeFetch == false, i.e, when using mapreduce_shuffle
     this.useFreeMemoryWriterOutput = compositeFetch && conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT,
-        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT_DEFAULT)
-        && !isFinalMergeEnabled;
+        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT_DEFAULT);
   }
 
   ByteBuffer allocateSpace() {
@@ -561,19 +566,32 @@ public class PipelinedSorter extends ExternalSorter {
     }
 
     // create spill file
+    if (isFinalMergeEnabled && pendingMemorySpill != null) {
+      materializePendingSpillToDisk();
+    }
 
+    final int spillNumber = numSpills;
     final long size = capacity + (partitions * APPROX_HEADER_LENGTH);
     final TezSpillRecord spillRec = new TezSpillRecord(partitions);
-    final Path spillFileName = mapOutputFile.getSpillFileForWrite(numSpills, size);
-    spillFilePaths.put(numSpills, spillFileName);
+    final Path spillFileName = mapOutputFile.getSpillFileForWrite(spillNumber, size);
 
     MultiByteArrayOutputStream byteArrayOutput = null;
     boolean canUseBuffers = false;
-    if (useFreeMemoryWriterOutput) {
+    boolean keepPendingInMemory = false;
+    // For final-merge mode, intermediate spills remain on local disk, except
+    // spill 0 which may stay pending in memory until a later spill is created.
+    boolean spillToFreeMemory = !isFinalMergeEnabled && useFreeMemoryWriterOutput;
+    if (isFinalMergeEnabled && spillNumber == 0 && useFreeMemoryWriterOutput) {
+      canUseBuffers = MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold);
+      keepPendingInMemory = canUseBuffers;
+    }
+    if (spillToFreeMemory) {
       canUseBuffers = MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold);
       if (canUseBuffers) {
         byteArrayOutput = new MultiByteArrayOutputStream(localFs, spillFileName);
       }
+    } else if (keepPendingInMemory) {
+      byteArrayOutput = new MultiByteArrayOutputStream(localFs, spillFileName);
     }
 
     FSDataOutputStream fsOutput = null;
@@ -641,16 +659,22 @@ public class PipelinedSorter extends ExternalSorter {
 
     if (writeSpillRecord) {
       Path indexFilename = mapOutputFile.getSpillIndexFileForWrite(
-          numSpills, partitions * MAP_OUTPUT_INDEX_RECORD_LENGTH);
-      spillFileIndexPaths.put(numSpills, indexFilename);
+          spillNumber, partitions * MAP_OUTPUT_INDEX_RECORD_LENGTH);
+      spillFileIndexPaths.put(spillNumber, indexFilename);
       spillRec.writeToFile(indexFilename, localFs, localFsSpillFilePerms);
     } else {
       Path outputFilePath = byteArrayOutput == null ? spillFileName : null;
       ShuffleUtils.writeSpillInfoToIndexPathCacheAndByteCache(
-          outputContext, numSpills, outputFilePath, spillRec, byteArrayOutput);
+          outputContext, spillNumber, outputFilePath, spillRec, byteArrayOutput);
     }
     if (isDebugEnabled) {
-      LOG.debug("{}: Finished spill {}", outputContext.getDestinationVertexName(), numSpills);
+      LOG.debug("{}: Finished spill {}", outputContext.getDestinationVertexName(), spillNumber);
+    }
+
+    if (byteArrayOutput == null) {
+      spillFilePaths.put(spillNumber, spillFileName);
+    } else if (isFinalMergeEnabled) {
+      pendingMemorySpill = new PendingMemorySpill(spillNumber, spillFileName, spillRec, byteArrayOutput);
     }
 
     // TODO: honor cache limits
@@ -677,6 +701,7 @@ public class PipelinedSorter extends ExternalSorter {
         cleanup();
       }
       sortmaster.shutdownNow();
+      spillMaterializeExecutor.shutdownNow();
       LOG.info("{}: Thread interrupted, cleaned up stale data, sorter threads shutdown={}, terminated={}",
           outputContext.getDestinationVertexName(), sortmaster.isShutdown(), sortmaster.isTerminated());
       return true;
@@ -711,6 +736,7 @@ public class PipelinedSorter extends ExternalSorter {
       // we can send pipeline shuffle event with last event true.
       spill(false);
       sortmaster.shutdown();
+      spillMaterializeExecutor.shutdown();
 
       if (useSoftReference) {
         for (ByteBuffer buffer: buffers) {
@@ -762,16 +788,23 @@ public class PipelinedSorter extends ExternalSorter {
 
       // In case final merge is required, the following code path is executed.
       if (numSpills == 1) {
+        PendingMemorySpill pendingSpill = pendingMemorySpill;
+        if (pendingSpill != null) {
+          TezSpillRecord spillRecord = pendingSpill.spillRecord;
+          finalIndexComputed = true;  // spill info is already cached in memory
+
+          if (reportPartitionStats()) {
+            for (int i = 0; i < spillRecord.size(); i++) {
+              partitionStats[i] += spillRecord.getIndex(i).getRawLength();
+            }
+          }
+          fileOutputBytesMemoryCounter.increment(pendingSpill.getTotalPartLength());
+          pendingMemorySpill = null;
+          return;
+        }
+
         // TODO: someday be able to pass this directly to shuffle without writing to disk
-        //
-        // Originally we rename the directory by removing the suffix _0, e.g.:
-        //   .../attempt_1734148871257_0437_1_02_000001_0_10031_0/file.out
-        //   -->
-        //   .../attempt_1734148871257_0437_1_02_000001_0_10031/file.out
-        //
-        // As a minor optimization, we skip renaming and use the existing output, e.g., ".../...10031_0/file.out".
-        // OrderedPartitionedKVOutput.generateEvents() adjusts pathComponent by appending "_0" so that
-        // downstream tasks can request ".../...10031_0/file.out" instead of ".../...10031/file.out".
+        // As a minor optimization, keep using ".../...10031_0/file.out" for final output.
         finalOutputFile = spillFilePaths.get(0);
         if (writeSpillRecord) {
           finalIndexFile = spillFileIndexPaths.get(0);
@@ -785,7 +818,6 @@ public class PipelinedSorter extends ExternalSorter {
 
         String uniqueId = ShuffleUtils.getUniqueIdentifierSpillId(outputContext, 0);
         String pathComponent = ShuffleUtils.expandPathComponent(outputContext, compositeFetch, uniqueId);
-        // read back TezSpillRecord (which might be on local disk)
         TezSpillRecord spillRecord = ShuffleUtils.getTezSpillRecord(
             outputContext, pathComponent, finalIndexFile, localFs);
 
@@ -794,14 +826,7 @@ public class PipelinedSorter extends ExternalSorter {
             partitionStats[i] += spillRecord.getIndex(i).getRawLength();
           }
         }
-        // numShuffleChunks.setValue(numSpills);
-
-        // useFreeMemoryWriterOutput == false because isFinalMergeEnabled == true,
-        // so finalOutputFile was actually written to local disk.
-        // finalOutputFile is be served to downstream tasks, so increment fileOutputByteCounter
         fileOutputBytesCounter.increment(localFs.getFileStatus(finalOutputFile).getLen());
-
-        // TODO: why are events not being sent here???
         return;
       }
 
@@ -816,80 +841,100 @@ public class PipelinedSorter extends ExternalSorter {
             ", finalOutputFile:" + finalOutputFile + ", finalIndexFile:" + finalIndexFile);
       }
 
+      MultiByteArrayOutputStream byteArrayOutput = null;
+      if (useFreeMemoryWriterOutput
+          && MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold)) {
+        byteArrayOutput = new MultiByteArrayOutputStream(localFs, finalOutputFile);
+      }
+
       // the output stream for the final single output file
-      // TODO: use try/finally to always close finalOut
-      FSDataOutputStream finalOut = localFs.create(finalOutputFile, true, 4096);
-      ensureSpillFilePermissions(finalOutputFile, localFs, localFsSpillFilePerms);
+      FSDataOutputStream finalOut = null;
+      if (byteArrayOutput == null) {
+        finalOut = localFs.create(finalOutputFile, true, 4096);
+        ensureSpillFilePermissions(finalOutputFile, localFs, localFsSpillFilePerms);
+      } else {
+        finalOut = new FSDataOutputStream(byteArrayOutput, null);
+      }
 
       final TezSpillRecord spillRec = new TezSpillRecord(partitions);
+      long finalOutputSize = 0;
+      try {
+        for (int parts = 0; parts < partitions; parts++) {
+          boolean shouldWrite = false;
+          //create the segments to be merged
+          List<Segment> segmentList = new ArrayList<Segment>(numSpills);
+          for (int i = 0; i < numSpills; i++) {
+            Path spillFilename = spillFilePaths.get(i);
+            TezIndexRecord indexRecord = indexCacheList.get(i).getIndex(parts);
+            if (indexRecord.hasData() || !sendEmptyPartitionDetails) {
+              shouldWrite = true;
+              DiskSegment s =
+                  new DiskSegment(localFs, spillFilename, indexRecord.getStartOffset(),
+                      indexRecord.getPartLength(), codec, ifileReadAhead,
+                      ifileReadAheadLength, true, null, outputContext);
+              segmentList.add(s);
+            }
+          }
 
-      for (int parts = 0; parts < partitions; parts++) {
-        boolean shouldWrite = false;
-        //create the segments to be merged
-        List<Segment> segmentList = new ArrayList<Segment>(numSpills);
-        for (int i = 0; i < numSpills; i++) {
-          Path spillFilename = spillFilePaths.get(i);
-          TezIndexRecord indexRecord = indexCacheList.get(i).getIndex(parts);
-          if (indexRecord.hasData() || !sendEmptyPartitionDetails) {
-            shouldWrite = true;
-            DiskSegment s =
-                new DiskSegment(localFs, spillFilename, indexRecord.getStartOffset(),
-                    indexRecord.getPartLength(), codec, ifileReadAhead,
-                    ifileReadAheadLength, true, null, outputContext);
-            segmentList.add(s);
+          int mergeFactor = this.conf.getInt(TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_FACTOR,
+              TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_FACTOR_DEFAULT);
+          // sort the segments only if there are intermediate merges
+          boolean sortSegments = segmentList.size() > mergeFactor;
+          //merge
+          TezRawKeyValueIterator kvIter = TezMerger.merge(conf, localFs,
+              codec, segmentList, mergeFactor, 0,
+              new Path(uniqueIdentifier),
+              SerializationContext.getKeyComparator(),
+              progressable, sortSegments, null, spilledRecordsCounter,
+              additionalSpillBytesReadCounter, merger.needsRLE(), outputContext);
+          //write merged output to disk
+          long segmentStart = finalOut.getPos();
+          long rawLength = 0;
+          long partLength = 0;
+          if (shouldWrite) {
+            IFile.WriterInputBuffer writer = new WriterInputBuffer(
+                finalOut,
+                codec, spilledRecordsCounter, null, merger.needsRLE(),
+                writeBuffer, null);
+            TezMerger.writeFile(kvIter, writer, progressable,
+                TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
+
+            //close
+            writer.close();
+            rawLength = writer.getRawLength();
+            partLength = writer.getCompressedLength();
+          }
+          outputBytesWithOverheadCounter.increment(rawLength);
+          finalOutputSize += partLength;
+
+          // record offsets
+          final TezIndexRecord rec = new TezIndexRecord(segmentStart, rawLength, partLength);
+          spillRec.putIndex(rec, parts);
+          if (reportPartitionStats()) {
+            partitionStats[parts] += rawLength;
           }
         }
-
-        int mergeFactor = this.conf.getInt(TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_FACTOR,
-            TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_FACTOR_DEFAULT);
-        // sort the segments only if there are intermediate merges
-        boolean sortSegments = segmentList.size() > mergeFactor;
-        //merge
-        TezRawKeyValueIterator kvIter = TezMerger.merge(conf, localFs,
-            codec, segmentList, mergeFactor, 0,
-            new Path(uniqueIdentifier),
-            SerializationContext.getKeyComparator(),
-            progressable, sortSegments, null, spilledRecordsCounter,
-            additionalSpillBytesReadCounter, merger.needsRLE(), outputContext);
-        //write merged output to disk
-        long segmentStart = finalOut.getPos();
-        long rawLength = 0;
-        long partLength = 0;
-        if (shouldWrite) {
-          IFile.WriterInputBuffer writer = new WriterInputBuffer(
-              finalOut,
-              codec, spilledRecordsCounter, null, merger.needsRLE(),
-              writeBuffer, null);
-          TezMerger.writeFile(kvIter, writer, progressable,
-              TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
-
-          //close
-          writer.close();
-          rawLength = writer.getRawLength();
-          partLength = writer.getCompressedLength();
-        }
-        outputBytesWithOverheadCounter.increment(rawLength);
-
-        // record offsets
-        final TezIndexRecord rec = new TezIndexRecord(segmentStart, rawLength, partLength);
-        spillRec.putIndex(rec, parts);
-        if (reportPartitionStats()) {
-          partitionStats[parts] += rawLength;
-        }
+      } finally {
+        finalOut.close();
       }
 
       // numShuffleChunks.setValue(1); // final merge has happened.
 
-      // finalOutputFile is the new file to be served to downstream tasks, so increment fileOutputByteCounter
-      // Here, we do not use free memory to store the merged output.
-      fileOutputBytesCounter.increment(localFs.getFileStatus(finalOutputFile).getLen());
+      // final output is served to downstream tasks.
+      if (byteArrayOutput == null) {
+        fileOutputBytesCounter.increment(finalOutputSize);
+      } else {
+        fileOutputBytesMemoryCounter.increment(finalOutputSize);
+        assert !writeSpillRecord;
+      }
 
       if (writeSpillRecord) {
         spillRec.writeToFile(finalIndexFile, localFs, localFsSpillFilePerms);
       } else {
-        ShuffleUtils.writeToIndexPathCacheAndByteCache(outputContext, finalOutputFile, spillRec, null);
+        Path outputFilePath = byteArrayOutput == null ? finalOutputFile : null;
+        ShuffleUtils.writeToIndexPathCacheAndByteCache(outputContext,
+            outputFilePath, spillRec, byteArrayOutput);
       }
-      finalOut.close();
 
       for (int i = 0; i < numSpills; i++) {
         Path spillFilename = spillFilePaths.get(i);
@@ -921,6 +966,64 @@ public class PipelinedSorter extends ExternalSorter {
   public final List<Event> close() throws IOException {
     super.close();
     return finalEvents;
+  }
+
+  private void materializePendingSpillToDisk() throws IOException {
+    final PendingMemorySpill pendingSpill = pendingMemorySpill;
+    if (pendingSpill == null) {
+      return;
+    }
+
+    Future<Void> future = spillMaterializeExecutor.submit(new Callable<Void>() {
+      @Override
+      public Void call() throws Exception {
+        try (FSDataOutputStream fsOut = localFs.create(pendingSpill.outputPath, true, 4096)) {
+          ensureSpillFilePermissions(pendingSpill.outputPath, localFs, localFsSpillFilePerms);
+          pendingSpill.byteArrayOutput.writeTo(fsOut);
+        }
+        return null;
+      }
+    });
+
+    try {
+      future.get();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IOInterruptedException("Interrupted while materializing pending spill to disk", e);
+    } catch (ExecutionException e) {
+      Throwable cause = e.getCause();
+      throw (cause instanceof IOException) ? (IOException) cause : new IOException(cause);
+    }
+
+    spillFilePaths.put(pendingSpill.spillNumber, pendingSpill.outputPath);
+    if (!writeSpillRecord) {
+      ShuffleUtils.writeSpillInfoToIndexPathCacheAndByteCache(outputContext,
+          pendingSpill.spillNumber, pendingSpill.outputPath, pendingSpill.spillRecord, null);
+    }
+    pendingMemorySpill = null;
+  }
+
+  private static class PendingMemorySpill {
+    final int spillNumber;
+    final Path outputPath;
+    final TezSpillRecord spillRecord;
+    final MultiByteArrayOutputStream byteArrayOutput;
+
+    PendingMemorySpill(int spillNumber, Path outputPath, TezSpillRecord spillRecord,
+        MultiByteArrayOutputStream byteArrayOutput) {
+      this.spillNumber = spillNumber;
+      this.outputPath = outputPath;
+      this.spillRecord = spillRecord;
+      this.byteArrayOutput = byteArrayOutput;
+    }
+
+    long getTotalPartLength() {
+      long sumPartLength = 0L;
+      for (int i = 0; i < spillRecord.size(); i++) {
+        sumPartLength += spillRecord.getIndex(i).getPartLength();
+      }
+      return sumPartLength;
+    }
   }
 
 
