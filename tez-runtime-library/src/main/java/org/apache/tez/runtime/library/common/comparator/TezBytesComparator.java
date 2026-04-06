@@ -30,9 +30,37 @@ public final class TezBytesComparator extends WritableComparator implements Prox
   /**
    * Compare the buffers in serialized form.
    */
+  // copy of FastByteComparisons.UnsafeComparer.compareTo()
   @Override
-  public int compare(byte[] b1, int s1, int l1, byte[] b2, int s2, int l2) {
-    return FastByteComparisons.compareTo(b1, s1, l1, b2, s2, l2);
+  public int compare(byte[] buffer1, int offset1, int length1, byte[] buffer2, int offset2, int length2) {
+    assert !(buffer1 == buffer2 && offset1 == offset2);
+
+    final int stride = 8;
+    int minLength = Math.min(length1, length2);
+    int strideLimit = minLength & ~(stride - 1);
+    int offset1Adj = offset1 + FastByteComparisons.BYTE_ARRAY_BASE_OFFSET;
+    int offset2Adj = offset2 + FastByteComparisons.BYTE_ARRAY_BASE_OFFSET;
+    int i;
+
+    for (i = 0; i < strideLimit; i += stride) {
+      long lw = FastByteComparisons.theUnsafe.getLong(buffer1, offset1Adj + (long) i);
+      long rw = FastByteComparisons.theUnsafe.getLong(buffer2, offset2Adj + (long) i);
+
+      if (lw != rw) {
+        long bw = Long.reverseBytes(lw);
+        long br = Long.reverseBytes(rw);
+        return Long.compareUnsigned(bw, br);
+      }
+    }
+
+    for (; i < minLength; i++) {
+      int b1 = buffer1[offset1 + i] & 0xFF;
+      int b2 = buffer2[offset2 + i] & 0xFF;
+      if (b1 != b2) {
+        return b1 - b2;
+      }
+    }
+    return length1 - length2;
   }
 
   @Override
@@ -42,14 +70,14 @@ public final class TezBytesComparator extends WritableComparator implements Prox
 
     switch (len) {
       default:
-        return ((content[0] & 0xff) << 16)
-            | ((content[1] & 0xff) << 8)
-            | (content[2] & 0xff);
+        return ((content[0] & 0xff) << 24)
+            | ((content[1] & 0xff) << 16)
+            | ((content[2] & 0xff) << 8);
       case 2:
-        return ((content[0] & 0xff) << 16)
-            | ((content[1] & 0xff) << 8);
+        return ((content[0] & 0xff) << 24)
+            | ((content[1] & 0xff) << 16);
       case 1:
-        return (content[0] & 0xff) << 16;
+        return (content[0] & 0xff) << 24;
       case 0:
         return 0;
     }

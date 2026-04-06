@@ -34,6 +34,42 @@ import sun.misc.Unsafe;
  */
 public final class FastByteComparisons {
 
+  public static final Unsafe theUnsafe;
+
+  /** The offset to the first element in a byte array. */
+  public static final int BYTE_ARRAY_BASE_OFFSET;
+
+  static {
+    if (ByteOrder.nativeOrder().equals(ByteOrder.BIG_ENDIAN)) {
+      throw new AssertionError("ERROR: Big-endian architectures are not supported.");
+    }
+
+    theUnsafe = (Unsafe) AccessController.doPrivileged(
+      new PrivilegedAction<Object>() {
+        @Override
+        public Object run() {
+          try {
+            Field f = Unsafe.class.getDeclaredField("theUnsafe");
+            f.setAccessible(true);
+            return f.get(null);
+          } catch (NoSuchFieldException e) {
+            // It doesn't matter what we throw;
+            // it's swallowed in getBestComparer().
+            throw new Error();
+          } catch (IllegalAccessException e) {
+            throw new Error();
+          }
+        }
+      });
+
+    BYTE_ARRAY_BASE_OFFSET = theUnsafe.arrayBaseOffset(byte[].class);
+
+    // sanity check - this should never fail
+    if (theUnsafe.arrayIndexScale(byte[].class) != 1) {
+      throw new AssertionError();
+    }
+  }
+
   /**
    * Lexicographically compare two byte arrays.
    */
@@ -165,42 +201,6 @@ public final class FastByteComparisons {
     @SuppressWarnings("unused") // used via reflection
     private enum UnsafeComparer implements Comparer<byte[]> {
       INSTANCE;
-
-      static final Unsafe theUnsafe;
-
-      /** The offset to the first element in a byte array. */
-      static final int BYTE_ARRAY_BASE_OFFSET;
-
-      static {
-        if (ByteOrder.nativeOrder().equals(ByteOrder.BIG_ENDIAN)) {
-          throw new AssertionError("ERROR: Big-endian architectures are not supported.");
-        }
-
-        theUnsafe = (Unsafe) AccessController.doPrivileged(
-            new PrivilegedAction<Object>() {
-              @Override
-              public Object run() {
-                try {
-                  Field f = Unsafe.class.getDeclaredField("theUnsafe");
-                  f.setAccessible(true);
-                  return f.get(null);
-                } catch (NoSuchFieldException e) {
-                  // It doesn't matter what we throw;
-                  // it's swallowed in getBestComparer().
-                  throw new Error();
-                } catch (IllegalAccessException e) {
-                  throw new Error();
-                }
-              }
-            });
-
-        BYTE_ARRAY_BASE_OFFSET = theUnsafe.arrayBaseOffset(byte[].class);
-
-        // sanity check - this should never fail
-        if (theUnsafe.arrayIndexScale(byte[].class) != 1) {
-          throw new AssertionError();
-        }
-      }
 
       /**
        * Returns true if x1 is less than x2, when both values are treated as
