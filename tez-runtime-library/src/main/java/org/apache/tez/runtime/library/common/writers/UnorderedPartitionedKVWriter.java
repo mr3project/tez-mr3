@@ -18,6 +18,7 @@
 package org.apache.tez.runtime.library.common.writers;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -530,7 +531,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       }
       pendingSpillCount.incrementAndGet();
       int spillNumber = numSpills.getAndIncrement();
-      boolean spillToFreeMemory = isPipelinedShuffle && useFreeMemoryWriterOutput;
+      boolean spillToFreeMemory = useFreeMemoryWriterOutput;
 
       ListenableFuture<SpillResult> future = spillExecutor.submit(new SpillCallable(
           new ArrayList<WrappedBuffer>(filledBuffers), codec, spilledRecordsCounter,
@@ -1194,11 +1195,30 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
                 // Skip empty partitions within a spill
                 continue;
               }
-              FSDataInputStream in = rfs.open(spillInfo.outPath);
-              in.seek(indexRecord.getStartOffset());
-              IFile.Reader reader = new IFile.Reader(in, indexRecord.getPartLength(), codec, null,
-                  additionalSpillBytesReadCounter, ifileReadAhead, ifileReadAheadLength,
-                  outputContext);
+              InputStream input = null;
+              IFile.Reader reader = null;
+              if (spillInfo.byteArrayOutput == null) {
+                FSDataInputStream in = rfs.open(spillInfo.outPath);
+                in.seek(indexRecord.getStartOffset());
+                input = in;
+                reader = new IFile.Reader(in, indexRecord.getPartLength(), codec, null,
+                    additionalSpillBytesReadCounter, ifileReadAhead, ifileReadAheadLength,
+                    outputContext);
+              } else {
+                input = spillInfo.byteArrayOutput.createInputStream();
+                long remaining = indexRecord.getStartOffset();
+                while (remaining > 0) {
+                  long skipped = input.skip(remaining);
+                  if (skipped <= 0) {
+                    input.close();
+                    throw new IOException("Failed to seek spill to offset "
+                        + indexRecord.getStartOffset());
+                  }
+                  remaining -= skipped;
+                }
+                reader = new IFile.Reader(input, indexRecord.getPartLength(), codec, null, null,
+                    ifileReadAhead, ifileReadAheadLength, outputContext);
+              }
               // reader.close() may not be called if the following while{} block throws IOException.
               // In this case, reader.decompressor is not returned to the pool.
               // However, this is not memory leak because reader is eventually garbage collected, at which point
@@ -1232,6 +1252,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         out.close();
         // always call deleteIntermediateSpills() because it does not affect VertexRerun and fault-tolerance
         deleteIntermediateSpills();
+        cleanIntermediateSpills();
       }
     }
 
@@ -1268,8 +1289,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
               synchronized (spillInfoList) {
                 for (SpillInfo spill : spillInfoList) {
                   try {
-                    LOG.info("Deleting intermediate spill: " + spill.outPath);
-                    rfs.delete(spill.outPath, false);
+                    if (spill.outPath != null && rfs.exists(spill.outPath)) {
+                      LOG.info("Deleting intermediate spill: " + spill.outPath);
+                      rfs.delete(spill.outPath, false);
+                    }
                   } catch (IOException e) {
                     LOG.warn("Unable to delete intermediate spill " + spill.outPath, e);
                   }
@@ -1285,6 +1308,16 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         }
       }
     });
+  }
+
+  private void cleanIntermediateSpills() {
+    synchronized (spillInfoList) {
+      for (SpillInfo spill : spillInfoList) {
+        if (spill.byteArrayOutput != null) {
+          spill.byteArrayOutput.clean();
+        }
+      }
+    }
   }
 
   private void writeLargeRecord(final BytesWritable key, final BytesWritable value, final int partition)
@@ -1390,7 +1423,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       }
     } else {
       // add to cache
-      SpillInfo spillInfo = new SpillInfo(spillRecord, spillPathDetails.outputFilePath);
+      Path spillPath = (byteArrayOutput == null) ? spillPathDetails.outputFilePath : null;
+      SpillInfo spillInfo = new SpillInfo(spillRecord, spillPath, byteArrayOutput);
       spillInfoList.add(spillInfo);
       numAdditionalSpillsCounter.increment(1);
     }
@@ -1641,11 +1675,17 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
   private static class SpillInfo {
     final TezSpillRecord spillRecord;
-    final Path outPath;
+    // Exactly one of outPath and byteArrayOutput must be non-null.
+    @Nullable final Path outPath;
+    // Optional memory-backed spill representation for merge-time reads.
+    @Nullable final MultiByteArrayOutputStream byteArrayOutput;
 
-    SpillInfo(TezSpillRecord spillRecord, Path outPath) {
+    SpillInfo(TezSpillRecord spillRecord, @Nullable Path outPath,
+        @Nullable MultiByteArrayOutputStream byteArrayOutput) {
+      assert (outPath == null) != (byteArrayOutput == null);
       this.spillRecord = spillRecord;
       this.outPath = outPath;
+      this.byteArrayOutput = byteArrayOutput;
     }
   }
 
