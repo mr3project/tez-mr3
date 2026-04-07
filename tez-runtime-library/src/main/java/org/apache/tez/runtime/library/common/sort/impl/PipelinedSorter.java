@@ -18,6 +18,7 @@
 package org.apache.tez.runtime.library.common.sort.impl;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
@@ -43,7 +44,6 @@ import org.apache.tez.runtime.library.utils.CodecUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.DataInputBuffer;
@@ -123,6 +123,8 @@ public class PipelinedSorter extends ExternalSorter {
   private final boolean useFreeMemoryWriterOutput;  // use availableMemory as threshold
 
   private final ArrayList<TezSpillRecord> indexCacheList = new ArrayList<TezSpillRecord>();
+  private final ArrayList<MultiByteArrayOutputStream> spillInMemoryList =
+      new ArrayList<MultiByteArrayOutputStream>();
 
   // track buffer overflow recursively in all buffers
   private int bufferOverflowRecursion = 0;
@@ -528,6 +530,7 @@ public class PipelinedSorter extends ExternalSorter {
 
       //TODO: honor cache limits
       indexCacheList.add(spillRec);
+      spillInMemoryList.add(null);
       ++numSpills;
 
       if (isPipelinedShuffle) {
@@ -566,8 +569,7 @@ public class PipelinedSorter extends ExternalSorter {
 
     MultiByteArrayOutputStream byteArrayOutput = null;
     boolean canUseBuffers = false;
-    // For final-merge mode, intermediate spills must remain on local disk.
-    boolean spillToFreeMemory = !isFinalMergeEnabled && useFreeMemoryWriterOutput;
+    boolean spillToFreeMemory = useFreeMemoryWriterOutput;
     if (spillToFreeMemory) {
       canUseBuffers = MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold);
       if (canUseBuffers) {
@@ -654,6 +656,7 @@ public class PipelinedSorter extends ExternalSorter {
 
     // TODO: honor cache limits
     indexCacheList.add(spillRec);
+    spillInMemoryList.add(byteArrayOutput);
     ++numSpills;
 
     if (!isFinalMergeEnabled) {
@@ -681,6 +684,33 @@ public class PipelinedSorter extends ExternalSorter {
       return true;
     }
     return false;
+  }
+
+  private Segment createSegmentFromSpill(int spillNumber, int partitionNumber) throws IOException {
+    TezIndexRecord indexRecord = indexCacheList.get(spillNumber).getIndex(partitionNumber);
+    MultiByteArrayOutputStream byteArrayOutput = spillInMemoryList.get(spillNumber);
+    if (byteArrayOutput == null) {
+      Path spillFilename = spillFilePaths.get(spillNumber);
+      return new DiskSegment(localFs, spillFilename, indexRecord.getStartOffset(),
+          indexRecord.getPartLength(), codec, ifileReadAhead, ifileReadAheadLength,
+          true, null, outputContext);
+    }
+
+    InputStream input = byteArrayOutput.createInputStream();
+    long remaining = indexRecord.getStartOffset();
+    while (remaining > 0) {
+      long skipped = input.skip(remaining);
+      if (skipped <= 0) {
+        input.close();
+        throw new IOException("Failed to seek spill " + spillNumber + " to offset "
+            + indexRecord.getStartOffset());
+      }
+      remaining -= skipped;
+    }
+
+    IFile.Reader reader = new IFile.Reader(input, indexRecord.getPartLength(),
+        codec, null, null, ifileReadAhead, ifileReadAheadLength, outputContext);
+    return new Segment(reader, null);
   }
 
   @Override
@@ -761,8 +791,7 @@ public class PipelinedSorter extends ExternalSorter {
 
       // In case final merge is required, the following code path is executed.
       if (numSpills == 1) {
-        boolean canUseFreeMemoryFinalOutput = useFreeMemoryWriterOutput
-            && MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold);
+        MultiByteArrayOutputStream spillByteArrayOutput = spillInMemoryList.get(0);
         // TODO: someday be able to pass this directly to shuffle without writing to disk
         //
         // Originally we rename the directory by removing the suffix _0, e.g.:
@@ -797,34 +826,17 @@ public class PipelinedSorter extends ExternalSorter {
         }
         // numShuffleChunks.setValue(numSpills);
 
-        if (!canUseFreeMemoryFinalOutput) {
+        if (spillByteArrayOutput == null) {
           // finalOutputFile is served to downstream tasks, so increment fileOutputByteCounter
           fileOutputBytesCounter.increment(localFs.getFileStatus(finalOutputFile).getLen());
           return;
         }
-
-        MultiByteArrayOutputStream byteArrayOutput = new MultiByteArrayOutputStream(localFs, finalOutputFile);
-        byte[] copyBuffer = new byte[64 * 1024];
-        try (FSDataInputStream in = localFs.open(finalOutputFile)) {
-          int bytesRead;
-          while ((bytesRead = in.read(copyBuffer)) >= 0) {
-            if (bytesRead > 0) {
-              byteArrayOutput.write(copyBuffer, 0, bytesRead);
-            }
-          }
-        }
-        assert !writeSpillRecord;
-        ShuffleUtils.writeSpillInfoToIndexPathCacheAndByteCache(outputContext,
-            0, null, spillRecord, byteArrayOutput);
 
         long sumPartLength = 0L;
         for (int i = 0; i < spillRecord.size(); i++) {
           sumPartLength += spillRecord.getIndex(i).getPartLength();
         }
         fileOutputBytesMemoryCounter.increment(sumPartLength);
-
-        localFs.delete(finalOutputFile, true);
-        spillFilePaths.clear();
 
         // TODO: why are events not being sent here???
         return;
@@ -864,15 +876,10 @@ public class PipelinedSorter extends ExternalSorter {
           //create the segments to be merged
           List<Segment> segmentList = new ArrayList<Segment>(numSpills);
           for (int i = 0; i < numSpills; i++) {
-            Path spillFilename = spillFilePaths.get(i);
             TezIndexRecord indexRecord = indexCacheList.get(i).getIndex(parts);
             if (indexRecord.hasData() || !sendEmptyPartitionDetails) {
               shouldWrite = true;
-              DiskSegment s =
-                  new DiskSegment(localFs, spillFilename, indexRecord.getStartOffset(),
-                      indexRecord.getPartLength(), codec, ifileReadAhead,
-                      ifileReadAheadLength, true, null, outputContext);
-              segmentList.add(s);
+              segmentList.add(createSegmentFromSpill(i, parts));
             }
           }
 

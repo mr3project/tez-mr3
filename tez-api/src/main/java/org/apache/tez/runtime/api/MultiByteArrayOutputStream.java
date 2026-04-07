@@ -11,12 +11,16 @@ import org.apache.hadoop.io.ReadaheadPool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.InputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Vector;
 
 /**
  * An OutputStream that grows in fixed-size chunks up to a limit, after which
@@ -292,6 +296,42 @@ public class MultiByteArrayOutputStream extends OutputStream {
     }
 
     return ch.write(Unpooled.EMPTY_BUFFER);
+  }
+
+  public InputStream createInputStream() throws IOException {
+    List<byte[]> buffersFinal;
+    int posInBufFinal;
+    long bufferBytesFinal;
+    synchronized (this) {
+      buffersFinal = buffers;
+      posInBufFinal = posInBuf;
+      bufferBytesFinal = bufferBytes;
+      if (fileOut != null) {
+        fileOut.flush();
+      }
+    }
+
+    if (buffersFinal == null) {
+      return new ByteArrayInputStream(new byte[0]);
+    }
+
+    Vector<InputStream> streams = new Vector<>();
+    for (int i = 0; i < buffersFinal.size(); i++) {
+      byte[] bufferElement = buffersFinal.get(i);
+      int bufferLength = (i < buffersFinal.size() - 1) ? bufferElement.length : posInBufFinal;
+      if (bufferLength > 0) {
+        streams.add(new ByteArrayInputStream(bufferElement, 0, bufferLength));
+      }
+    }
+
+    if (totalBytes > bufferBytesFinal) {
+      streams.add(fs.open(outputPath));
+    }
+
+    if (streams.isEmpty()) {
+      return new ByteArrayInputStream(new byte[0]);
+    }
+    return new java.io.SequenceInputStream(Collections.enumeration(streams));
   }
 
   // 3. called from ShuffleHandlerDaemonProcessor thread
