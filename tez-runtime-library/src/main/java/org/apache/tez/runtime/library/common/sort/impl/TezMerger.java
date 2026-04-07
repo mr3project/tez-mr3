@@ -295,18 +295,27 @@ public class TezMerger {
   private static final class IntermediateMemorySegment extends Segment {
     private final FileSystem fs;
     private final Path outputFile;
+    private final MultiByteArrayOutputStream byteArrayOutput;
 
-    IntermediateMemorySegment(Reader reader, FileSystem fs, Path outputFile) {
+    IntermediateMemorySegment(Reader reader, FileSystem fs, Path outputFile,
+        MultiByteArrayOutputStream byteArrayOutput) {
       super(reader, null);
       this.fs = fs;
       this.outputFile = outputFile;
+      this.byteArrayOutput = byteArrayOutput;
     }
 
     @Override
     void close() throws IOException {
-      super.close();
-      if (outputFile != null) {
-        fs.delete(outputFile, false);
+      try {
+        super.close();
+      } finally {
+        if (byteArrayOutput != null) {
+          byteArrayOutput.clean();
+        }
+        if (outputFile != null) {
+          fs.delete(outputFile, false);
+        }
       }
     }
   }
@@ -626,7 +635,7 @@ public class TezMerger {
           } else {
             Reader reader = new Reader(byteArrayOutput.createInputStream(), byteArrayOutput.getTotalBytes(),
                 codec, null, null, ifileReadAhead, ifileReadAheadLength, inputContext);
-            tempSegment = new IntermediateMemorySegment(reader, fs, outputFile);
+            tempSegment = new IntermediateMemorySegment(reader, fs, outputFile, byteArrayOutput);
           }
 
           // Insert new merged segment into the sorted list
