@@ -843,6 +843,7 @@ public class PipelinedSorter extends ExternalSorter {
         if (spillByteArrayOutput == null) {
           // finalOutputFile is served to downstream tasks, so increment fileOutputByteCounter
           fileOutputBytesCounter.increment(localFs.getFileStatus(finalOutputFile).getLen());
+          spillInfoList.clear();
           return;
         }
 
