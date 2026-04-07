@@ -50,7 +50,6 @@ public class MultiByteArrayOutputStream extends OutputStream {
 
   private long totalBytes = 0;
   private long bufferBytes = 0;
-  private volatile boolean closed = false;
 
   // spill fields
   private final FileSystem fs;
@@ -172,7 +171,6 @@ public class MultiByteArrayOutputStream extends OutputStream {
     if (fileOut != null) {
       fileOut.close();
     }
-    closed = true;
   }
 
   // write data to Channel ch atomically
@@ -301,17 +299,18 @@ public class MultiByteArrayOutputStream extends OutputStream {
   }
 
   public InputStream createInputStream() throws IOException {
-    if (!closed) {
-      throw new IOException("createInputStream() requires closed stream: " + outputPath);
-    }
-
-    List<byte[]> buffersFinal = buffers;
-    int posInBufFinal = posInBuf;
-    long bufferBytesFinal = bufferBytes;
-    long totalBytesFinal = totalBytes;
-
-    if (fileOut != null) {
-      fileOut.flush();
+    List<byte[]> buffersFinal;
+    int posInBufFinal;
+    long bufferBytesFinal;
+    long totalBytesFinal;
+    synchronized (this) {
+      buffersFinal = buffers;
+      posInBufFinal = posInBuf;
+      bufferBytesFinal = bufferBytes;
+      totalBytesFinal = totalBytes;
+      if (fileOut != null) {
+        fileOut.flush();
+      }
     }
 
     if (buffersFinal == null) {
