@@ -29,6 +29,7 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ChecksumFileSystem;
 import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
@@ -40,6 +41,7 @@ import org.apache.hadoop.util.PriorityQueue;
 import org.apache.hadoop.util.Progressable;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.counters.TezCounter;
+import org.apache.tez.runtime.api.MultiByteArrayOutputStream;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader.KeyState;
@@ -290,6 +292,27 @@ public class TezMerger {
     }
   }
 
+  public static final class IntermediateMemorySegment extends Segment {
+    private final MultiByteArrayOutputStream byteArrayOutput;
+
+    IntermediateMemorySegment(Reader reader,
+        MultiByteArrayOutputStream byteArrayOutput) {
+      super(reader, null);
+      this.byteArrayOutput = byteArrayOutput;
+    }
+
+    @Override
+    void close() throws IOException {
+      try {
+        super.close();
+      } finally {
+        if (byteArrayOutput != null) {
+          byteArrayOutput.clean();
+        }
+      }
+    }
+  }
+
   static class MergeQueue<K extends Object, V extends Object>
   extends PriorityQueue<Segment> implements TezRawKeyValueIterator {
     final Configuration conf;
@@ -299,7 +322,8 @@ public class TezMerger {
     static final boolean ifileReadAhead = TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_DEFAULT;
     static final int ifileReadAheadLength = TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_BYTES_DEFAULT;
     static final long recordsBeforeProgress = TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT;
-    
+
+    // Invariant: Segment.close() is called for all Segment objects
     List<Segment> segments = new ArrayList<Segment>();
     
     final RawComparator comparator;
@@ -571,10 +595,25 @@ public class TezMerger {
                                               tmpFilename.toString(),
                                               approxOutputSize, conf);
 
-          // TODO Would it ever make sense to make this an in-memory writer ?
-          // Merging because of too many disk segments - might fit in memory.
-          IFile.WriterAppend writer = new WriterInputBuffer(fs, outputFile, codec,
-              writesCounter, null, writeBuffer);
+          boolean useFreeMemoryWriterOutput = conf.getBoolean(
+              TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT,
+              TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT_DEFAULT);
+          long freeMemoryThreshold = 1024L * 1024L * conf.getInt(
+              TezRuntimeConfiguration.TEZ_RUNTIME_FREE_MEMORY_WRITER_OUTPUT_THRESHOLD_MB,
+              TezRuntimeConfiguration.TEZ_RUNTIME_FREE_MEMORY_WRITER_OUTPUT_THRESHOLD_MB_DEFAULT);
+          boolean writeIntermediateToMemory = useFreeMemoryWriterOutput
+              && MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold);
+
+          MultiByteArrayOutputStream byteArrayOutput = null;
+          IFile.WriterAppend writer;
+          if (writeIntermediateToMemory) {
+            byteArrayOutput = new MultiByteArrayOutputStream(fs, outputFile);
+            FSDataOutputStream outputStream = new FSDataOutputStream(byteArrayOutput, null);
+            writer = new WriterInputBuffer(outputStream, codec, writesCounter, null,
+                checkForSameKeys, writeBuffer, null);
+          } else {
+            writer = new WriterInputBuffer(fs, outputFile, codec, writesCounter, null, writeBuffer);
+          }
 
           writeFile(this, writer, reporter, recordsBeforeProgress);
           writer.close();
@@ -583,9 +622,15 @@ public class TezMerger {
           this.close();
 
           // Add the newly create segment to the list of segments to be merged
-          Segment tempSegment =
-            new DiskSegment(fs, outputFile, 0, fs.getFileStatus(outputFile).getLen(), codec,
+          Segment tempSegment;
+          if (byteArrayOutput == null) {
+            tempSegment = new DiskSegment(fs, outputFile, 0, fs.getFileStatus(outputFile).getLen(), codec,
                 ifileReadAhead, ifileReadAheadLength, false, null, inputContext);
+          } else {
+            Reader reader = new Reader(byteArrayOutput.createInputStream(), byteArrayOutput.getTotalBytes(),
+                codec, null, null, ifileReadAhead, ifileReadAheadLength, inputContext);
+            tempSegment = new IntermediateMemorySegment(reader, byteArrayOutput);
+          }
 
           // Insert new merged segment into the sorted list
           int pos = Collections.binarySearch(segments, tempSegment,
