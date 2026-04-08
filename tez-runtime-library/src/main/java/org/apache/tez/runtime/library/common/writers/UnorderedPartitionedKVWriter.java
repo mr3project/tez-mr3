@@ -531,7 +531,12 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       }
       pendingSpillCount.incrementAndGet();
       int spillNumber = numSpills.getAndIncrement();
-      boolean spillToFreeMemory = useFreeMemoryWriterOutput;
+
+      // spill to free memory only in pipelined shuffling:
+      //   - In non-pipelined shuffling, spilling to free memory causes too much memory pressure before merging.
+      //   - E.g., query 5 and query 17
+      // TODO: introduce a runtime configuration key for controlling spillToFreeMemory in non-pipelined shuffling
+      boolean spillToFreeMemory = isPipelinedShuffle && useFreeMemoryWriterOutput;
 
       ListenableFuture<SpillResult> future = spillExecutor.submit(new SpillCallable(
           new ArrayList<WrappedBuffer>(filledBuffers), codec, spilledRecordsCounter,
@@ -1195,17 +1200,15 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
                 // Skip empty partitions within a spill
                 continue;
               }
-              InputStream input = null;
               IFile.Reader reader = null;
               if (spillInfo.byteArrayOutput == null) {
                 FSDataInputStream in = rfs.open(spillInfo.outPath);
                 in.seek(indexRecord.getStartOffset());
-                input = in;
                 reader = new IFile.Reader(in, indexRecord.getPartLength(), codec, null,
                     additionalSpillBytesReadCounter, ifileReadAhead, ifileReadAheadLength,
                     outputContext);
               } else {
-                input = spillInfo.byteArrayOutput.createInputStream();
+                InputStream input = spillInfo.byteArrayOutput.createInputStream();
                 long remaining = indexRecord.getStartOffset();
                 while (remaining > 0) {
                   long skipped = input.skip(remaining);
