@@ -1055,9 +1055,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
       //setup output file and index file
       SpillPathDetails spillPathDetails = getSpillPathDetails(true, -1);
-      CompressionCodec spillCodec = spillCompressed ? codec : null;
       SpillCallable spillCallable = new SpillCallable(
-          filledBuffers, spillCodec, null, spillPathDetails, useFreeMemoryWriterOutput);
+          filledBuffers, codec, null, spillPathDetails, useFreeMemoryWriterOutput);
       try {
         SpillResult spillResult = spillCallable.call();
 
