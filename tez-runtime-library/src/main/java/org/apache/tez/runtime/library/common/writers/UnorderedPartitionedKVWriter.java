@@ -276,9 +276,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
     baos = new ByteArrayOutputStream();
     if (!skipBuffers) {
-      // originally the default value of TEZ_RUNTIME_UNORDERED_OUTPUT_MAX_PER_BUFFER_SIZE_BYTES
-      int maxSingleBufferSizeBytes = Integer.MAX_VALUE;
-      computeNumBuffersAndSize(maxSingleBufferSizeBytes);
+      computeNumBuffersAndSize();
 
       availableBuffers = new LinkedBlockingQueue<WrappedBuffer>();
       buffers = new WrappedBuffer[numBuffers];
@@ -330,47 +328,29 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     }
   }
 
-  private static final int ALLOC_OVERHEAD = 64;
-  private void computeNumBuffersAndSize(int bufferLimit) {
-    numBuffers = (int)(availableMemory / bufferLimit);
-
-    if (numBuffers >= 2) {
-      sizePerBuffer = bufferLimit - ALLOC_OVERHEAD;
-      lastBufferSize = (int)(availableMemory % bufferLimit);
-      // Use leftover memory last buffer only if the leftover memory > 50% of bufferLimit
-      if (lastBufferSize > bufferLimit / 2) {
-        numBuffers += 1;
-      } else {
-        if (lastBufferSize > 0) {
-          LOG.warn("Underallocating memory. Unused memory size: {}.",  lastBufferSize);
-        }
-        lastBufferSize = sizePerBuffer;
-      }
+  private void computeNumBuffersAndSize() {
+    // Non-pipelined + final merge path: keep more in-memory buffers to reduce spill frequency.
+    // Pipelined path: preserve existing behavior of eager spilling with 2 buffers.
+    if (!isPipelinedShuffle && isFinalMergeEnabled) {
+      numBuffers = 4;
     } else {
-      // We should have minimum of 2 buffers.
       numBuffers = 2;
-      if (availableMemory / numBuffers > Integer.MAX_VALUE) {
-        sizePerBuffer = Integer.MAX_VALUE;
-      } else {
-        sizePerBuffer = (int)(availableMemory / numBuffers);
-      }
-      // 2 equal sized buffers.
-      lastBufferSize = sizePerBuffer;
     }
+    if (availableMemory / numBuffers > Integer.MAX_VALUE) {
+      sizePerBuffer = Integer.MAX_VALUE;
+    } else {
+      sizePerBuffer = (int)(availableMemory / numBuffers);
+    }
+    // equal sized buffers
+    lastBufferSize = sizePerBuffer;
     // Ensure allocation size is multiple of INT_SIZE, truncate down.
     sizePerBuffer = sizePerBuffer - (sizePerBuffer % INT_SIZE);
     lastBufferSize = lastBufferSize - (lastBufferSize % INT_SIZE);
 
-    int mergePercent = conf.getInt(
-        TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_PARTITIONED_KVWRITER_BUFFER_MERGE_PERCENT,
-        TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_PARTITIONED_KVWRITER_BUFFER_MERGE_PERCENT_DEFAULT);
-    spillLimit = numBuffers * mergePercent / 100;
-    // Keep within limits.
-    if (spillLimit < 1) {
+    if (!isPipelinedShuffle && isFinalMergeEnabled) {
+      spillLimit = 3;
+    } else {
       spillLimit = 1;
-    }
-    if (spillLimit > numBuffers) {
-      spillLimit = numBuffers;
     }
   }
 
@@ -549,10 +529,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       boolean spillToFreeMemory = isPipelinedShuffle && useFreeMemoryWriterOutput;
 
       CompressionCodec spillCodec = spillCompressed ? codec : null;
+      WrappedBuffer oldestBuffer = filledBuffers.remove(0);
       ListenableFuture<SpillResult> future = spillExecutor.submit(new SpillCallable(
-          new ArrayList<WrappedBuffer>(filledBuffers), spillCodec, spilledRecordsCounter,
+          Collections.singletonList(oldestBuffer), spillCodec, spilledRecordsCounter,
           spillNumber, spillToFreeMemory));
-      filledBuffers.clear();
       Futures.addCallback(future, new SpillCallback(spillNumber));
       // Update once per buffer (instead of every record)
       updateTezCountersAndNotify();
@@ -799,8 +779,11 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
   @Override
   public List<Event> close() throws IOException, InterruptedException {
-    // In case there are buffers to be spilled, schedule spilling
-    scheduleSpill(true);
+    // In case there are buffers to be spilled, schedule spilling.
+    // For final-merge mode, filledBuffers are merged directly in mergeAll().
+    if (!isFinalMergeEnabled) {
+      scheduleSpill(true);
+    }
     List<Event> eventList = Lists.newLinkedList();
     isShutdown.set(true);
     spillLock.lock();
@@ -828,8 +811,6 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       if (isDebugEnabled) {
         LOG.debug(destNameTrimmed + ": All spills complete");
       }
-      // Assuming close will be called on the same thread as the write
-      cleanup();
 
       List<Event> events = Lists.newLinkedList();
       if (!isPipelinedShuffle) {
@@ -871,6 +852,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           eventList.add(generateDMEvent(false, -1, false,
               outputContext.getUniqueIdentifier(), emptyPartitions));
 
+          cleanup();
           return eventList;
         }
 
@@ -883,10 +865,12 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
              - If finalSpill did not generate data, it would automatically populate events
          */
         if (isFinalMergeEnabled) {
-          if (numSpills.get() > 0) {
+          // Keep the no-data fast path that existed in finalSpill() when there were no prior spills.
+          // In this case, final output generation should be skipped.
+          boolean noDataWithNoSpills =
+              (numSpills.get() == 0) && filledBuffers.isEmpty() && (currentBuffer.nextPosition == 0);
+          if (!noDataWithNoSpills) {
             mergeAll();
-          } else {
-            finalSpill();
           }
           updateTezCountersAndNotify();
           eventList.add(generateVMEvent());
@@ -912,6 +896,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           //all events to be sent out are in finalEvents.
           eventList.addAll(finalEvents);
         }
+        cleanup();
+        filledBuffers.clear();
         cleanupCurrentBuffer();   // skipBuffers == false
         return eventList;
       }
@@ -926,6 +912,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         mayBeSendEventsForSpill(currentBuffer.recordsPerPartition,
             sizePerPartition, numSpills.get() - 1, true);
       }
+      cleanup();
       cleanupCurrentBuffer();
       return events;
     }
@@ -1153,6 +1140,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
   private void mergeAll() throws IOException {
     long expectedSize = spilledSize;
+    for (WrappedBuffer buffer : filledBuffers) {
+      expectedSize += buffer.nextPosition - (buffer.numRecords * META_SIZE)
+          - buffer.skipSize + numPartitions * APPROX_HEADER_LENGTH;
+    }
     if (currentBuffer.nextPosition != 0) {
       expectedSize += currentBuffer.nextPosition - (currentBuffer.numRecords * META_SIZE)
           - currentBuffer.skipSize + numPartitions * APPROX_HEADER_LENGTH;
@@ -1212,6 +1203,11 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
             // Write current buffer.
             writePartition(currentBuffer.partitionHeads[i], currentBuffer, writer, keyBuffer,
                 valBuffer);
+          }
+          for (WrappedBuffer buffer : filledBuffers) {
+            if (buffer.partitionHeads[i] != WrappedBuffer.PARTITION_ABSENT_POSITION) {
+              writePartition(buffer.partitionHeads[i], buffer, writer, keyBuffer, valBuffer);
+            }
           }
           synchronized (spillInfoList) {
             for (SpillInfo spillInfo : spillInfoList) {
