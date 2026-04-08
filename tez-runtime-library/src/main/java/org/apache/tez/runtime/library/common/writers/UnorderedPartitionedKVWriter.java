@@ -1219,16 +1219,26 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
                 Preconditions.checkState(rawDataLength >= 0,
                     "Invalid raw data length for partition %s from spill %s", i, spillInfo.outPath);
                 if (spillInfo.byteArrayOutput == null) {
-                  try (FSDataInputStream in = rfs.open(spillInfo.outPath)) {
+                  FSDataInputStream in = rfs.open(spillInfo.outPath);
+                  boolean closeInput = true;
+                  try {
                     in.seek(indexRecord.getStartOffset());
-                    try (IFileInputStream inputStream = IFile.Reader.openIFileInputStream(
-                        in, indexRecord.getPartLength(), ifileReadAhead, ifileReadAheadLength)) {
-                      writer.append(inputStream, rawDataLength);
+                    IFileInputStream inputStream = IFile.Reader.openIFileInputStream(
+                        in, indexRecord.getPartLength(), ifileReadAhead, ifileReadAheadLength);
+                    closeInput = false;
+                    try (IFileInputStream stream = inputStream) {
+                      writer.append(stream, rawDataLength);
+                    }
+                  } finally {
+                    if (closeInput) {
+                      in.close();
                     }
                   }
                   additionalSpillBytesReadCounter.increment(indexRecord.getPartLength());
                 } else {
-                  try (InputStream input = spillInfo.byteArrayOutput.createInputStream()) {
+                  InputStream input = spillInfo.byteArrayOutput.createInputStream();
+                  boolean closeInput = true;
+                  try {
                     long remaining = indexRecord.getStartOffset();
                     while (remaining > 0) {
                       long skipped = input.skip(remaining);
@@ -1238,9 +1248,15 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
                       }
                       remaining -= skipped;
                     }
-                    try (IFileInputStream inputStream = IFile.Reader.openIFileInputStream(
-                        input, indexRecord.getPartLength(), ifileReadAhead, ifileReadAheadLength)) {
-                      writer.append(inputStream, rawDataLength);
+                    IFileInputStream inputStream = IFile.Reader.openIFileInputStream(
+                        input, indexRecord.getPartLength(), ifileReadAhead, ifileReadAheadLength);
+                    closeInput = false;
+                    try (IFileInputStream stream = inputStream) {
+                      writer.append(stream, rawDataLength);
+                    }
+                  } finally {
+                    if (closeInput) {
+                      input.close();
                     }
                   }
                 }
