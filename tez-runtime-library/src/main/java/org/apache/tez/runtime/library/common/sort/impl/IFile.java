@@ -89,6 +89,14 @@ public class IFile {
     return new byte[8 * 2];   // TODO: 8 bytes is enough
   }
 
+  public static int getHeaderLength() {
+    return HEADER.length;
+  }
+
+  public static int getEOFMarkerLength() {
+    return 2 * INT_SIZE;
+  }
+
   public interface WriterAppend {
     public void append(DataInputBuffer key, DataInputBuffer value) throws IOException;
     public void close() throws IOException;
@@ -596,6 +604,30 @@ public class IFile {
             + totalKeySaving + "; number of RLEs written=" + rleWritten);
       }
     }
+
+    /**
+     * Append raw uncompressed record bytes to this IFile writer.
+     * This API is intended for merging existing uncompressed IFile segments
+     * without materializing every key/value record.
+     *
+     * @param in input stream positioned at the start of raw record bytes
+     * @param rawDataLength number of raw record bytes to copy
+     */
+    public void append(IFileInputStream in, long rawDataLength) throws IOException {
+      final int chunkSize = 64 * 1024;
+      byte[] buffer = new byte[chunkSize];
+      long remaining = rawDataLength;
+      while (remaining > 0) {
+        int toRead = (int) Math.min(remaining, chunkSize);
+        int read = in.read(buffer, 0, toRead);
+        if (read < 0) {
+          throw new IOException("Unexpected EOF while copying raw IFile data");
+        }
+        bufferWriteBytes(buffer, 0, read);
+        incrementDecompressedBytesWritten(read);
+        remaining -= read;
+      }
+    }
   }
 
   public static class WriterBytesWritable extends Writer {
@@ -1062,6 +1094,21 @@ public class IFile {
       IOUtils.readFully(in, header, 0, HEADER.length);
       verifyHeaderMagic(header);
       return (header[3] == 1);
+    }
+
+    /**
+     * Open IFile data stream after validating header and consuming it.
+     * The returned stream reads the payload+EOF marker and validates checksum on close.
+     *
+     * @param in stream positioned at IFile segment start
+     * @param length IFile segment length including header/checksum bytes
+     */
+    public static IFileInputStream openIFileInputStream(InputStream in, long length,
+        boolean readAhead, int readAheadLength) throws IOException {
+      byte[] header = new byte[HEADER.length];
+      IOUtils.readFully(in, header, 0, HEADER.length);
+      verifyHeaderMagic(header);
+      return new IFileInputStream(in, length - HEADER.length, readAhead, readAheadLength);
     }
 
     public void close() throws IOException {
