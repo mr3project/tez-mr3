@@ -867,43 +867,20 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         }
 
         /*
-          1. Final merge enabled
+          Final merge enabled
              - When lots of spills are there, mergeAll, generate events and return
              - If there are no existing spills, check for final spill and generate events
-          2. Final merge disabled
-             - If finalSpill generated data, generate events and return
-             - If finalSpill did not generate data, it would automatically populate events
          */
-        if (isFinalMergeEnabled) {
-          assert filledBuffers.isEmpty();   // because we called scheduleSpill(true) earlier
-          boolean noDataWithNoSpills = (numSpills.get() == 0) && (currentBuffer.nextPosition == 0);
-          if (!noDataWithNoSpills) {
-            mergeAll();
-          }
-          updateTezCountersAndNotify();
-          eventList.add(generateVMEvent());
-          eventList.add(generateDMEvent());
+        assert isFinalMergeEnabled;
+        if (numSpills.get() > 0) {
+          mergeAll();
         } else {
-          // if no data is generated, finalSpill would create VMEvent & add to finalEvents
-          SpillResult result = finalSpill();
-          if (result != null) {
-            updateTezCountersAndNotify();
-            // Generate vm event
-            finalEvents.add(generateVMEvent());
-
-            // compute empty partitions based on spill result and generate DME
-            int spillNum = numSpills.get() - 1;
-            SpillCallback callback = new SpillCallback(spillNum);
-            callback.computePartitionStats(result);
-            BitSet emptyPartitions = getEmptyPartitions(callback.getRecordsPerPartition());
-            String pathComponent = generatePathComponent(outputContext.getUniqueIdentifier(), spillNum);
-            Event finalEvent = generateDMEvent(true, spillNum,
-                true, pathComponent, emptyPartitions);
-            finalEvents.add(finalEvent);
-          }
-          //all events to be sent out are in finalEvents.
-          eventList.addAll(finalEvents);
+          finalSpill();
         }
+        updateTezCountersAndNotify();
+        eventList.add(generateVMEvent());
+        eventList.add(generateDMEvent());
+
         cleanupCurrentBuffer();   // skipBuffers == false
         return eventList;
       }
