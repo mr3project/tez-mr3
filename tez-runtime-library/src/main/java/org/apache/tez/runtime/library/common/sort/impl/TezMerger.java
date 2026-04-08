@@ -294,11 +294,13 @@ public class TezMerger {
 
   public static final class IntermediateMemorySegment extends Segment {
     private final MultiByteArrayOutputStream byteArrayOutput;
+    private final boolean cleanupOnClose;
 
     IntermediateMemorySegment(Reader reader,
-        MultiByteArrayOutputStream byteArrayOutput) {
+        MultiByteArrayOutputStream byteArrayOutput, boolean cleanupOnClose) {
       super(reader, null);
       this.byteArrayOutput = byteArrayOutput;
+      this.cleanupOnClose = cleanupOnClose;
     }
 
     @Override
@@ -306,7 +308,7 @@ public class TezMerger {
       try {
         super.close();
       } finally {
-        if (byteArrayOutput != null) {
+        if (cleanupOnClose && byteArrayOutput != null) {
           byteArrayOutput.clean();
         }
       }
@@ -629,12 +631,11 @@ public class TezMerger {
           } else {
             Reader reader = new Reader(byteArrayOutput.createInputStream(), byteArrayOutput.getTotalBytes(),
                 codec, null, null, ifileReadAhead, ifileReadAheadLength, inputContext);
-            tempSegment = new IntermediateMemorySegment(reader, byteArrayOutput);
+            tempSegment = new IntermediateMemorySegment(reader, byteArrayOutput, true);
           }
 
           // Insert new merged segment into the sorted list
-          int pos = Collections.binarySearch(segments, tempSegment,
-                                             segmentComparator);
+          int pos = Collections.binarySearch(segments, tempSegment, segmentComparator);
           if (pos < 0) {
             // binary search failed. So position to be inserted at is -pos-1
             pos = -pos-1;

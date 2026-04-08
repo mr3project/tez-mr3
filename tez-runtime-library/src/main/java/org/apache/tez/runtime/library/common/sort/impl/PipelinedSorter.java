@@ -723,7 +723,17 @@ public class PipelinedSorter extends ExternalSorter {
 
     IFile.Reader reader = new IFile.Reader(input, indexRecord.getPartLength(),
         codec, null, null, ifileReadAhead, ifileReadAheadLength, outputContext);
-    return new TezMerger.IntermediateMemorySegment(reader, byteArrayOutput);
+    // This spill output (byteArrayOutput) can be consumed for multiple partitions during the final merge.
+    // Keep it alive across partition segments and clean once all partitions are merged in cleanSpillOutputBuffers().
+    return new TezMerger.IntermediateMemorySegment(reader, byteArrayOutput, false);
+  }
+
+  private void cleanSpillOutputBuffers() {
+    for (SpillInfo spillInfo : spillInfoList) {
+      if (spillInfo.spillOutput != null) {
+        spillInfo.spillOutput.clean();
+      }
+    }
   }
 
   @Override
@@ -973,6 +983,7 @@ public class PipelinedSorter extends ExternalSorter {
         }
         spillFileIndexPaths.clear();
       }
+      cleanSpillOutputBuffers();
       spillInfoList.clear();
     } catch(InterruptedException ie) {
       if (cleanup) {
