@@ -1055,8 +1055,15 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
       //setup output file and index file
       SpillPathDetails spillPathDetails = getSpillPathDetails(true, -1);
+      // finalSpill() serves two scenarios:
+      //  1) isFinalMergeEnabled == true && numSpills == 0:
+      //     this spill is the final output and must follow final-output compression (codec).
+      //  2) otherwise (pipelined path / additional spill generation):
+      //     keep spill compression consistent with prior intermediate spills.
+      CompressionCodec finalSpillCodec =
+          (isFinalMergeEnabled && numSpills.get() == 0) ? codec : (spillCompressed ? codec : null);
       SpillCallable spillCallable = new SpillCallable(
-          filledBuffers, codec, null, spillPathDetails, useFreeMemoryWriterOutput);
+          filledBuffers, finalSpillCodec, null, spillPathDetails, useFreeMemoryWriterOutput);
       try {
         SpillResult spillResult = spillCallable.call();
 
