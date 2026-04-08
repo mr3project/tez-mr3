@@ -164,16 +164,6 @@ public class TezRuntimeConfiguration {
   public static final int TEZ_RUNTIME_PIPELINED_SORTER_SORT_THREADS_DEFAULT = 2;
 
   /**
-   * Integer value. Percentage of buffer to be filled before we spill to disk. Default value is 0,
-   * which will spill for every buffer.
-   */
-  @ConfigurationProperty(type = "integer")
-  public static final String TEZ_RUNTIME_UNORDERED_PARTITIONED_KVWRITER_BUFFER_MERGE_PERCENT =
-      TEZ_RUNTIME_PREFIX + "unordered-partitioned-kvwriter.buffer-merge-percent";
-  public static final int TEZ_RUNTIME_UNORDERED_PARTITIONED_KVWRITER_BUFFER_MERGE_PERCENT_DEFAULT =
-      0;
-
-  /**
    * Size of the buffer to use if not writing directly to disk.
    */
   @ConfigurationProperty(type = "integer")
@@ -326,7 +316,7 @@ public class TezRuntimeConfiguration {
   @ConfigurationProperty(type = "boolean")
   public static final String TEZ_RUNTIME_UNORDERED_NON_PIPELINED_SPILL_COMPRESS =
       TEZ_RUNTIME_PREFIX + "unordered.non.pipelined.spill.compress";
-  public static final boolean TEZ_RUNTIME_UNORDERED_NON_PIPELINED_SPILL_COMPRESS_DEFAULT = true;
+  public static final boolean TEZ_RUNTIME_UNORDERED_NON_PIPELINED_SPILL_COMPRESS_DEFAULT = false;
 
   @ConfigurationProperty(type = "boolean")
   public static final String TEZ_RUNTIME_COMPRESS = TEZ_RUNTIME_PREFIX + "compress";
