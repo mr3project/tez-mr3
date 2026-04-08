@@ -72,6 +72,7 @@ import org.apache.tez.runtime.library.api.TezRuntimeConfiguration.ReportPartitio
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
+import org.apache.tez.runtime.library.common.sort.impl.IFileInputStream;
 import org.apache.tez.runtime.library.common.sort.impl.TezIndexRecord;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterBytesWritable;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterInputBuffer;
@@ -125,6 +126,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   private final boolean useCachedStream;
 
   private final boolean writeSpillRecord;
+  private final boolean spillCompressed;
 
   private final long availableMemory;
 
@@ -222,6 +224,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     this.useCachedStream = this.dataViaEventsEnabled && (numPartitions == 1) && !isPipelinedShuffle;
 
     this.writeSpillRecord = !this.compositeFetch;
+
+    this.spillCompressed = conf.getBoolean(
+        TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_SPILL_COMPRESS,
+        TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_SPILL_COMPRESS_DEFAULT) && codec != null;
 
     if (availableMemoryBytes == 0) {
       Preconditions.checkArgument(((numPartitions == 1) && !isPipelinedShuffle),
@@ -538,8 +544,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       // TODO: introduce a runtime configuration key for controlling spillToFreeMemory in non-pipelined shuffling
       boolean spillToFreeMemory = isPipelinedShuffle && useFreeMemoryWriterOutput;
 
+      CompressionCodec spillCodec = spillCompressed ? codec : null;
       ListenableFuture<SpillResult> future = spillExecutor.submit(new SpillCallable(
-          new ArrayList<WrappedBuffer>(filledBuffers), codec, spilledRecordsCounter,
+          new ArrayList<WrappedBuffer>(filledBuffers), spillCodec, spilledRecordsCounter,
           spillNumber, spillToFreeMemory));
       filledBuffers.clear();
       Futures.addCallback(future, new SpillCallback(spillNumber));
@@ -1048,8 +1055,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
       //setup output file and index file
       SpillPathDetails spillPathDetails = getSpillPathDetails(true, -1);
+      CompressionCodec spillCodec = spillCompressed ? codec : null;
       SpillCallable spillCallable = new SpillCallable(
-          filledBuffers, codec, null, spillPathDetails, useFreeMemoryWriterOutput);
+          filledBuffers, spillCodec, null, spillPathDetails, useFreeMemoryWriterOutput);
       try {
         SpillResult spillResult = spillCallable.call();
 
@@ -1201,41 +1209,71 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
                 continue;
               }
               IFile.Reader reader = null;
-              if (spillInfo.byteArrayOutput == null) {
-                FSDataInputStream in = rfs.open(spillInfo.outPath);
-                in.seek(indexRecord.getStartOffset());
-                reader = new IFile.Reader(in, indexRecord.getPartLength(), codec, null,
-                    additionalSpillBytesReadCounter, ifileReadAhead, ifileReadAheadLength,
-                    outputContext);
-              } else {
-                InputStream input = spillInfo.byteArrayOutput.createInputStream();
-                long remaining = indexRecord.getStartOffset();
-                while (remaining > 0) {
-                  long skipped = input.skip(remaining);
-                  if (skipped <= 0) {
-                    input.close();
-                    throw new IOException("Failed to seek spill to offset "
-                        + indexRecord.getStartOffset());
+              if (!spillCompressed) {
+                long rawDataLength = indexRecord.getRawLength()
+                    - IFile.getHeaderLength() - IFile.getEOFMarkerLength();
+                Preconditions.checkState(rawDataLength >= 0,
+                    "Invalid raw data length for partition %s from spill %s", i, spillInfo.outPath);
+                if (spillInfo.byteArrayOutput == null) {
+                  FSDataInputStream in = rfs.open(spillInfo.outPath);
+                  in.seek(indexRecord.getStartOffset());
+                  IFileInputStream inputStream = IFile.Reader.openIFileInputStream(
+                      in, indexRecord.getPartLength(), ifileReadAhead, ifileReadAheadLength);
+                  writer.append(inputStream, rawDataLength);
+                  inputStream.close();
+                  additionalSpillBytesReadCounter.increment(indexRecord.getPartLength());
+                } else {
+                  InputStream input = spillInfo.byteArrayOutput.createInputStream();
+                  long remaining = indexRecord.getStartOffset();
+                  while (remaining > 0) {
+                    long skipped = input.skip(remaining);
+                    if (skipped <= 0) {
+                      input.close();
+                      throw new IOException("Failed to seek spill to offset "
+                          + indexRecord.getStartOffset());
+                    }
+                    remaining -= skipped;
                   }
-                  remaining -= skipped;
+                  IFileInputStream inputStream = IFile.Reader.openIFileInputStream(
+                      input, indexRecord.getPartLength(), ifileReadAhead, ifileReadAheadLength);
+                  writer.append(inputStream, rawDataLength);
+                  inputStream.close();
                 }
-                reader = new IFile.Reader(input, indexRecord.getPartLength(), codec, null, null,
-                    ifileReadAhead, ifileReadAheadLength, outputContext);
+              } else {
+                if (spillInfo.byteArrayOutput == null) {
+                  FSDataInputStream in = rfs.open(spillInfo.outPath);
+                  in.seek(indexRecord.getStartOffset());
+                  reader = new IFile.Reader(in, indexRecord.getPartLength(), codec, null,
+                      additionalSpillBytesReadCounter, ifileReadAhead, ifileReadAheadLength,
+                      outputContext);
+                } else {
+                  InputStream input = spillInfo.byteArrayOutput.createInputStream();
+                  long remaining = indexRecord.getStartOffset();
+                  while (remaining > 0) {
+                    long skipped = input.skip(remaining);
+                    if (skipped <= 0) {
+                      input.close();
+                      throw new IOException("Failed to seek spill to offset "
+                          + indexRecord.getStartOffset());
+                    }
+                    remaining -= skipped;
+                  }
+                  reader = new IFile.Reader(input, indexRecord.getPartLength(), codec, null, null,
+                      ifileReadAhead, ifileReadAheadLength, outputContext);
+                }
+                // reader.close() may not be called if the following while{} block throws IOException.
+                // In this case, reader.decompressor is not returned to the pool.
+                // However, this is not memory leak because reader is eventually garbage collected, at which point
+                // reader.decompressor is also garbage collected. It is just that reader.decompressor is not reused.
+                // Note that reader.close() itself may throw IOException and reader.decompressor may not be returned to the pool.
+                // For the same reason, this not memory leak because reader.decompressor is eventually garbage collected.
+                while (reader.nextRawKey(keyBufferIFile)) {
+                  // TODO Inefficient for large records, since the entire record will be read into memory.
+                  reader.nextRawValue(valBufferIFile);
+                  writer.append(keyBufferIFile, valBufferIFile);
+                }
+                reader.close();
               }
-              // reader.close() may not be called if the following while{} block throws IOException.
-              // In this case, reader.decompressor is not returned to the pool.
-              // However, this is not memory leak because reader is eventually garbage collected, at which point
-              // reader.decompressor is also garbage collected. It is just that reader.decompressor is not reused.
-              // Note that reader.close() itself may throw IOException and reader.decompressor may not be returned to the pool.
-              // For the same reason, this not memory leak because reader.decompressor is eventually garbage collected.
-              while (reader.nextRawKey(keyBufferIFile)) {
-                // TODO Inefficient. If spills are not compressed, a direct copy should be possible
-                // given the current IFile format. Also exteremely inefficient for large records,
-                // since the entire record will be read into memory.
-                reader.nextRawValue(valBufferIFile);
-                writer.append(keyBufferIFile, valBufferIFile);
-              }
-              reader.close();
             }
           }
           writer.close();
