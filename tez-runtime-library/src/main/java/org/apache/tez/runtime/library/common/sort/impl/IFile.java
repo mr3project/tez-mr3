@@ -1105,9 +1105,9 @@ public class IFile {
      */
     public static IFileInputStream openIFileInputStream(InputStream in, long length,
         boolean readAhead, int readAheadLength) throws IOException {
-      if (isCompressedFlagEnabled(in)) {
-        throw new IOException("Expected uncompressed IFile segment");
-      }
+      byte[] header = new byte[HEADER.length];
+      IOUtils.readFully(in, header, 0, HEADER.length);
+      verifyHeaderMagic(header);
       return new IFileInputStream(in, length - HEADER.length, readAhead, readAheadLength);
     }
 
