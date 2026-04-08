@@ -225,9 +225,13 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
     this.writeSpillRecord = !this.compositeFetch;
 
-    this.spillCompressed = conf.getBoolean(
-        TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_SPILL_COMPRESS,
-        TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_SPILL_COMPRESS_DEFAULT) && codec != null;
+    if (isPipelinedShuffle) {
+      this.spillCompressed = codec != null;
+    } else {
+      this.spillCompressed = conf.getBoolean(
+          TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_NON_PIPELINED_SPILL_COMPRESS,
+          TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_NON_PIPELINED_SPILL_COMPRESS_DEFAULT) && codec != null;
+    }
 
     if (availableMemoryBytes == 0) {
       Preconditions.checkArgument(((numPartitions == 1) && !isPipelinedShuffle),

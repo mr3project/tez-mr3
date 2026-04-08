@@ -324,9 +324,9 @@ public class TezRuntimeConfiguration {
   public static final int TEZ_RUNTIME_SHUFFLE_MAX_SPECULATIVE_FETCH_ATTEMPTS_DEFAULT = 2;
 
   @ConfigurationProperty(type = "boolean")
-  public static final String TEZ_RUNTIME_UNORDERED_SPILL_COMPRESS =
-      TEZ_RUNTIME_PREFIX + "unordered.spill.compress";
-  public static final boolean TEZ_RUNTIME_UNORDERED_SPILL_COMPRESS_DEFAULT = true;
+  public static final String TEZ_RUNTIME_UNORDERED_NON_PIPELINED_SPILL_COMPRESS =
+      TEZ_RUNTIME_PREFIX + "unordered.non.pipelined.spill.compress";
+  public static final boolean TEZ_RUNTIME_UNORDERED_NON_PIPELINED_SPILL_COMPRESS_DEFAULT = true;
 
   @ConfigurationProperty(type = "boolean")
   public static final String TEZ_RUNTIME_COMPRESS = TEZ_RUNTIME_PREFIX + "compress";
@@ -473,7 +473,7 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_THRESHOLD_MILLIS);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_STUCK_FETCHER_RELEASE_MILLIS);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_MAX_SPECULATIVE_FETCH_ATTEMPTS);
-    tezRuntimeKeys.add(TEZ_RUNTIME_UNORDERED_SPILL_COMPRESS);
+    tezRuntimeKeys.add(TEZ_RUNTIME_UNORDERED_NON_PIPELINED_SPILL_COMPRESS);
     tezRuntimeKeys.add(TEZ_RUNTIME_COMPRESS);
     tezRuntimeKeys.add(TEZ_RUNTIME_COMPRESS_CODEC);
 
