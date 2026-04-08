@@ -276,9 +276,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
     baos = new ByteArrayOutputStream();
     if (!skipBuffers) {
-      // originally the default value of TEZ_RUNTIME_UNORDERED_OUTPUT_MAX_PER_BUFFER_SIZE_BYTES
-      int maxSingleBufferSizeBytes = Integer.MAX_VALUE;
-      computeNumBuffersAndSize(maxSingleBufferSizeBytes);
+      computeNumBuffersAndSize();
 
       availableBuffers = new LinkedBlockingQueue<WrappedBuffer>();
       buffers = new WrappedBuffer[numBuffers];
@@ -331,7 +329,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   }
 
   private static final int ALLOC_OVERHEAD = 64;
-  private void computeNumBuffersAndSize(int bufferLimit) {
+  private void computeNumBuffersAndSize() {
+    int bufferLimit = Integer.MAX_VALUE;
     numBuffers = (int)(availableMemory / bufferLimit);
 
     if (numBuffers >= 2) {
@@ -361,17 +360,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     sizePerBuffer = sizePerBuffer - (sizePerBuffer % INT_SIZE);
     lastBufferSize = lastBufferSize - (lastBufferSize % INT_SIZE);
 
-    int mergePercent = conf.getInt(
-        TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_PARTITIONED_KVWRITER_BUFFER_MERGE_PERCENT,
-        TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_PARTITIONED_KVWRITER_BUFFER_MERGE_PERCENT_DEFAULT);
-    spillLimit = numBuffers * mergePercent / 100;
-    // Keep within limits.
-    if (spillLimit < 1) {
-      spillLimit = 1;
-    }
-    if (spillLimit > numBuffers) {
-      spillLimit = numBuffers;
-    }
+    spillLimit = 1;
   }
 
   @Override
@@ -801,8 +790,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   public List<Event> close() throws IOException, InterruptedException {
     // In case there are buffers to be spilled, schedule spilling
     scheduleSpill(true);
-    List<Event> eventList = Lists.newLinkedList();
+
     isShutdown.set(true);
+
     spillLock.lock();
     try {
       if (pendingSpillCount.get() != 0) {
@@ -814,6 +804,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     } finally {
       spillLock.unlock();
     }
+
+    List<Event> eventList = Lists.newLinkedList();
     if (spillException != null) {
       LOG.error(destNameTrimmed + ": Error during spill, throwing");
       // Assuming close will be called on the same thread as the write
@@ -883,10 +875,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
              - If finalSpill did not generate data, it would automatically populate events
          */
         if (isFinalMergeEnabled) {
-          if (numSpills.get() > 0) {
+          assert filledBuffers.isEmpty();   // because we called scheduleSpill(true) earlier
+          boolean noDataWithNoSpills = (numSpills.get() == 0) && (currentBuffer.nextPosition == 0);
+          if (!noDataWithNoSpills) {
             mergeAll();
-          } else {
-            finalSpill();
           }
           updateTezCountersAndNotify();
           eventList.add(generateVMEvent());
