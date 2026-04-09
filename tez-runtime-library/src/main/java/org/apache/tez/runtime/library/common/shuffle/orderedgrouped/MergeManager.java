@@ -1050,7 +1050,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       this.size = size;
     }
 
-    @Override
     public IFile.Reader.KeyState readRawKey(DataInputBuffer key) throws IOException {
       if (kvIter.next()) {
         final DataInputBuffer kb = kvIter.getKey();

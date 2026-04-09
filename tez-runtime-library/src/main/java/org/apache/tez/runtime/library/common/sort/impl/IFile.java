@@ -662,7 +662,6 @@ public class IFile {
    * <code>IFile.Reader</code> to read intermediate map-outputs.
    */
   public interface KeyValueInputReader {
-    Reader.KeyState readRawKey(DataInputBuffer key) throws IOException;
     /**
      * Read the next key into {@code key}.
      * <p>

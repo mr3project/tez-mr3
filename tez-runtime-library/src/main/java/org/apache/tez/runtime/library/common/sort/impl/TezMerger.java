@@ -33,6 +33,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.RawComparator;
@@ -110,38 +111,11 @@ public class TezMerger {
     } */
   }
 
-  static class KeyValueBuffer {
-    private byte[] buf;
-    private int position;
-    private int length;
-
-    public KeyValueBuffer(byte buf[], int position, int length) {
-      reset(buf, position, length);
-    }
-
-    public void reset(byte[] input, int position, int length) {
-      this.buf = input;
-      this.position = position;
-      this.length = length;
-    }
-
-    public byte[] getData() {
-      return buf;
-    }
-
-    public int getPosition() {
-      return position;
-    }
-
-    public int getLength() {
-      return length;
-    }
-  }
-
   public static class Segment {
     static final byte[] EMPTY_BYTES = new byte[0];
     KeyValueInputReader reader = null;
-    final KeyValueBuffer key = new KeyValueBuffer(EMPTY_BYTES, 0, 0);
+    final BytesWritable key = new BytesWritable(EMPTY_BYTES);
+    final BytesWritable valueBytes = new BytesWritable(EMPTY_BYTES);
     TezCounter mapOutputsCounter = null;
 
     public Segment(KeyValueInputReader reader, TezCounter mapOutputsCounter) {
@@ -159,7 +133,7 @@ public class TezMerger {
       return true;
     }
 
-    KeyValueBuffer getKey() { return key; }
+    BytesWritable getKey() { return key; }
 
     DataInputBuffer getValue(DataInputBuffer value) throws IOException {
       nextRawValue(value);
@@ -170,20 +144,21 @@ public class TezMerger {
       return reader.getLength();
     }
 
-    KeyState readRawKey(DataInputBuffer nextKey) throws IOException {
+    KeyState readRawKey(BytesWritable nextKey) throws IOException {
       KeyState keyState = reader.readRawKey(nextKey);
-      key.reset(nextKey.getData(), nextKey.getPosition(), nextKey.getLength() - nextKey.getPosition());
+      key.set(nextKey);
       return keyState;
     }
 
-    boolean nextRawKey(DataInputBuffer nextKey) throws IOException {
+    boolean nextRawKey(BytesWritable nextKey) throws IOException {
       boolean hasNext = reader.readRawKey(nextKey) != KeyState.NO_KEY;
-      key.reset(nextKey.getData(), nextKey.getPosition(), nextKey.getLength() - nextKey.getPosition());
+      key.set(nextKey);
       return hasNext;
     }
 
     void nextRawValue(DataInputBuffer value) throws IOException {
-      reader.nextRawValue(value);
+      reader.nextRawValue(valueBytes);
+      value.reset(valueBytes.getBytes(), valueBytes.getLength());
     }
 
     void closeReader() throws IOException {
@@ -335,7 +310,7 @@ public class TezMerger {
     
     final DataInputBuffer key = new DataInputBuffer();
     final DataInputBuffer value = new DataInputBuffer();
-    final DataInputBuffer nextKey = new DataInputBuffer();
+    final BytesWritable nextKey = new BytesWritable();
     final DataInputBuffer diskIFileValue = new DataInputBuffer();
     
     Segment minSegment;
@@ -436,7 +411,7 @@ public class TezMerger {
       Segment nextTop = top();
       if (checkForSameKeys && nextTop != current) {
         // we have a different file. Compare it with previous key
-        KeyValueBuffer nextKey = nextTop.getKey();
+        BytesWritable nextKey = nextTop.getKey();
         int compare = compare(nextKey, prevKey);
         if (compare == 0) {
           // Same key is available in the next segment.
@@ -451,8 +426,8 @@ public class TezMerger {
       }
 
       minSegment = top();
-      KeyValueBuffer nextKey = minSegment.getKey();
-      key.reset(nextKey.getData(), nextKey.getPosition(), nextKey.getLength());
+      BytesWritable nextKey = minSegment.getKey();
+      key.reset(nextKey.getBytes(), nextKey.getLength());
       if (!minSegment.inMemory()) {
         // When we load the value from an inmemory segment, we reset
         // the "value" DIB in this class to the inmem segment's byte[].
@@ -471,10 +446,10 @@ public class TezMerger {
       return true;
     }
 
-    int compare(KeyValueBuffer nextKey, DataOutputBuffer buf2) {
-      byte[] b1 = nextKey.getData();
+    int compare(BytesWritable nextKey, DataOutputBuffer buf2) {
+      byte[] b1 = nextKey.getBytes();
       byte[] b2 = buf2.getData();
-      int s1 = nextKey.getPosition();
+      int s1 = 0;
       int s2 = 0;
       int l1 = nextKey.getLength();
       int l2 = buf2.getLength();
@@ -482,14 +457,14 @@ public class TezMerger {
     }
 
     protected boolean lessThan(Object a, Object b) {
-      KeyValueBuffer key1 = ((Segment)a).getKey();
-      KeyValueBuffer key2 = ((Segment)b).getKey();
-      int s1 = key1.getPosition();
+      BytesWritable key1 = ((Segment)a).getKey();
+      BytesWritable key2 = ((Segment)b).getKey();
+      int s1 = 0;
       int l1 = key1.getLength();
-      int s2 = key2.getPosition();
+      int s2 = 0;
       int l2 = key2.getLength();;
 
-      return comparator.compare(key1.getData(), s1, l1, key2.getData(), s2, l2) < 0;
+      return comparator.compare(key1.getBytes(), s1, l1, key2.getBytes(), s2, l2) < 0;
     }
     
     TezRawKeyValueIterator merge(int factor, int inMem, Path tmpDir,
