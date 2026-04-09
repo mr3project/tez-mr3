@@ -661,7 +661,17 @@ public class IFile {
   /**
    * <code>IFile.Reader</code> to read intermediate map-outputs.
    */
-  public static class Reader {
+  public interface KeyValueInputReader {
+    Reader.KeyState readRawKey(DataInputBuffer key) throws IOException;
+    void nextRawValue(DataInputBuffer value) throws IOException;
+    long getPosition() throws IOException;
+    long getLength();
+    void close() throws IOException;
+    default void reset(int offset) {
+    }
+  }
+
+  public static class Reader implements KeyValueInputReader {
 
     public enum KeyState {NO_KEY, NEW_KEY, SAME_KEY}
 

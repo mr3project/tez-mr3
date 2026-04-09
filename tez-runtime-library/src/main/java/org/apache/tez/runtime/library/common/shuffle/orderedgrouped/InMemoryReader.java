@@ -28,12 +28,13 @@ import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.tez.common.io.NonSyncByteArrayInputStream;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
-import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader;
+import org.apache.tez.runtime.library.common.sort.impl.IFile.KeyValueInputReader;
+import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader.KeyState;
 
 /**
  * <code>IFile.InMemoryReader</code> to read map-outputs present in-memory.
  */
-public class InMemoryReader extends Reader {
+public class InMemoryReader implements KeyValueInputReader {
 
   private static class ByteArrayDataInput extends NonSyncByteArrayInputStream implements DataInput {
 
@@ -151,6 +152,13 @@ public class InMemoryReader extends Reader {
 
   private final MergeManager merger;
   private final InputAttemptIdentifier taskAttemptId;
+  private boolean eof = false;
+  private int recNo = 1;
+  private int originalKeyLength;
+  private int prevKeyLength;
+  private int currentKeyLength;
+  private int currentValueLength;
+  private long bytesRead;
   private int originalKeyPos;
 
   private byte[] buffer = null;
@@ -163,7 +171,6 @@ public class InMemoryReader extends Reader {
   public InMemoryReader(MergeManager merger, InputAttemptIdentifier taskAttemptId,
                         byte[] data, int start, int length, int usedMemoryForMergeManager)
       throws IOException {
-    super(null, length - start, null, null, null, false, 0, null);
     this.merger = merger;
     this.taskAttemptId = taskAttemptId;
 
@@ -218,12 +225,52 @@ public class InMemoryReader extends Reader {
   }
 
   protected void readKeyValueLength(DataInput dIn) throws IOException {
-    super.readKeyValueLength(dIn);
+    currentKeyLength = dIn.readInt();
+    currentValueLength = dIn.readInt();
     if (currentKeyLength != IFile.RLE_MARKER) {
+      originalKeyLength = currentKeyLength;
       originalKeyPos = memDataIn.getPosition();
+    }
+    bytesRead += Integer.BYTES + Integer.BYTES;
+  }
+
+  protected void readValueLength(DataInput dIn) throws IOException {
+    currentValueLength = dIn.readInt();
+    bytesRead += Integer.BYTES;
+    if (currentValueLength == IFile.V_END_MARKER) {
+      readKeyValueLength(dIn);
     }
   }
 
+  protected boolean positionToNextRecord(DataInput dIn) throws IOException {
+    if (eof) {
+      throw new IOException(String.format("Reached EOF. Completed reading %d", bytesRead));
+    }
+    prevKeyLength = currentKeyLength;
+
+    if (prevKeyLength == IFile.RLE_MARKER) {
+      readValueLength(dIn);
+    } else {
+      readKeyValueLength(dIn);
+    }
+
+    if (currentKeyLength == IFile.EOF_MARKER && currentValueLength == IFile.EOF_MARKER) {
+      eof = true;
+      return false;
+    }
+
+    if (currentKeyLength != IFile.RLE_MARKER && currentKeyLength < 0) {
+      throw new IOException("Rec# " + recNo + ": Negative key-length: " +
+          currentKeyLength + " PreviousKeyLen: " + prevKeyLength);
+    }
+    if (currentValueLength < 0) {
+      throw new IOException("Rec# " + recNo + ": Negative value-length: " +
+          currentValueLength);
+    }
+    return true;
+  }
+
+  @Override
   public KeyState readRawKey(DataInputBuffer key) throws IOException {
     try {
       if (!positionToNextRecord(memDataIn)) {
@@ -253,7 +300,6 @@ public class InMemoryReader extends Reader {
     }
   }
 
-  @Override
   public KeyState readRawKey(BytesWritable key) throws IOException {
     try {
       if (!positionToNextRecord(memDataIn)) {
@@ -280,6 +326,7 @@ public class InMemoryReader extends Reader {
     }
   }
 
+  @Override
   public void nextRawValue(DataInputBuffer value) throws IOException {
     try {
       int pos = memDataIn.getPosition();
@@ -302,7 +349,6 @@ public class InMemoryReader extends Reader {
     }
   }
 
-  @Override
   public void nextRawValue(BytesWritable value) throws IOException {
     try {
       int pos = memDataIn.getPosition();
@@ -325,6 +371,7 @@ public class InMemoryReader extends Reader {
     }
   }
 
+  @Override
   public void close() {
     // Release
     buffer = null;

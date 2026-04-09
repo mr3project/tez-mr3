@@ -43,6 +43,7 @@ import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.runtime.api.MultiByteArrayOutputStream;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
+import org.apache.tez.runtime.library.common.sort.impl.IFile.KeyValueInputReader;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader.KeyState;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterInputBuffer;
@@ -139,11 +140,11 @@ public class TezMerger {
 
   public static class Segment {
     static final byte[] EMPTY_BYTES = new byte[0];
-    Reader reader = null;
+    KeyValueInputReader reader = null;
     final KeyValueBuffer key = new KeyValueBuffer(EMPTY_BYTES, 0, 0);
     TezCounter mapOutputsCounter = null;
 
-    public Segment(Reader reader, TezCounter mapOutputsCounter) {
+    public Segment(KeyValueInputReader reader, TezCounter mapOutputsCounter) {
       this.reader = reader;
       this.mapOutputsCounter = mapOutputsCounter;
     }
@@ -176,7 +177,7 @@ public class TezMerger {
     }
 
     boolean nextRawKey(DataInputBuffer nextKey) throws IOException {
-      boolean hasNext = reader.nextRawKey(nextKey);
+      boolean hasNext = reader.readRawKey(nextKey) != KeyState.NO_KEY;
       key.reset(nextKey.getData(), nextKey.getPosition(), nextKey.getLength() - nextKey.getPosition());
       return hasNext;
     }
@@ -205,7 +206,7 @@ public class TezMerger {
       return reader.getPosition();
     }
 
-    Reader getReader() {
+    KeyValueInputReader getReader() {
       return reader;
     }
 
@@ -296,7 +297,7 @@ public class TezMerger {
     private final MultiByteArrayOutputStream byteArrayOutput;
     private final boolean cleanupOnClose;
 
-    IntermediateMemorySegment(Reader reader,
+    IntermediateMemorySegment(KeyValueInputReader reader,
         MultiByteArrayOutputStream byteArrayOutput, boolean cleanupOnClose) {
       super(reader, null);
       this.byteArrayOutput = byteArrayOutput;
