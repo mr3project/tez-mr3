@@ -663,6 +663,13 @@ public class IFile {
    */
   public interface KeyValueInputReader {
     Reader.KeyState readRawKey(DataInputBuffer key) throws IOException;
+    /**
+     * Read the next key into {@code key}.
+     * <p>
+     * On {@link Reader.KeyState#SAME_KEY}, implementations may assume {@code key} already
+     * contains the previous key read from this stream and may avoid rewriting it.
+     * On the first call, {@code key} can be any {@link BytesWritable} instance.
+     */
     Reader.KeyState readRawKey(BytesWritable key) throws IOException;
     void nextRawValue(DataInputBuffer value) throws IOException;
     void nextRawValue(BytesWritable value) throws IOException;
@@ -1042,8 +1049,8 @@ public class IFile {
         return KeyState.NO_KEY;
       }
       if(currentKeyLength == RLE_MARKER) {
-        // Keep BytesWritable path robust even if callers do not reuse the same key object.
-        key.set(keyBytes, 0, originalKeyLength);
+        // BytesWritable readers reuse the same key object across records, so on RLE paths
+        // the previous key is already present in "key".
         return KeyState.SAME_KEY;
       }
       key.setSize(currentKeyLength);
@@ -1052,7 +1059,6 @@ public class IFile {
       if (i != currentKeyLength) {
         throw new IOException(String.format(INCOMPLETE_READ, currentKeyLength, i));
       }
-      keyBytes = keyData;
       bytesRead += currentKeyLength;
       return KeyState.NEW_KEY;
     }

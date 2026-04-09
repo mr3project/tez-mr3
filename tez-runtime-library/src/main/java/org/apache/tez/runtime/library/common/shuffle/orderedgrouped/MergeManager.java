@@ -1066,13 +1066,16 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     @Override
     public IFile.Reader.KeyState readRawKey(BytesWritable key) throws IOException {
       if (kvIter.next()) {
+        if (kvIter.isSameKey()) {
+          return IFile.Reader.KeyState.SAME_KEY;
+        }
         final DataInputBuffer kb = kvIter.getKey();
         final int kp = kb.getPosition();
         final int klen = kb.getLength() - kp;
         key.setSize(klen);
         System.arraycopy(kb.getData(), kp, key.getBytes(), 0, klen);
         bytesRead += klen;
-        return kvIter.isSameKey() ? IFile.Reader.KeyState.SAME_KEY : IFile.Reader.KeyState.NEW_KEY;
+        return IFile.Reader.KeyState.NEW_KEY;
       }
       return IFile.Reader.KeyState.NO_KEY;
     }
