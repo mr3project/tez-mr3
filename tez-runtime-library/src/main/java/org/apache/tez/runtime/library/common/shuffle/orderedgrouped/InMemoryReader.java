@@ -305,6 +305,8 @@ public class InMemoryReader implements KeyValueInputReader {
         return KeyState.NO_KEY;
       }
       if (currentKeyLength == IFile.RLE_MARKER) {
+        byte[] data = memDataIn.getData();
+        key.set(data, originalKeyPos, originalKeyLength);
         return KeyState.SAME_KEY;
       }
       int pos = memDataIn.getPosition();
