@@ -66,6 +66,8 @@ public class IFile {
   public static final int EOF_MARKER = -1; // End of File Marker
   public static final int RLE_MARKER = -2; // Repeat same key marker
   public static final int V_END_MARKER = -3; // End of values marker
+  private static final byte FLAG_COMPRESSED = 0x01;
+  private static final byte FLAG_RLE = 0x02;
 
   // REPEAT_KEY is primarily an ordered-path optimization, and never used for unordered output.
   public static final DataInputBuffer REPEAT_KEY = new DataInputBuffer();
@@ -319,11 +321,13 @@ public class IFile {
     private int writeOffset;
 
     private final Compressor compressorExternal;  // not to be shared with concurrent threads
+    private final boolean rleEnabled;
 
     protected Writer(FSDataOutputStream outputStream,
                      CompressionCodec codec, TezCounter writesCounter,
                      TezCounter serializedBytesCounter,
                      byte[] writeBuffer,
+                     boolean rleEnabled,
                      @Nullable Compressor compressorExternal) throws IOException {
       this.rawOut = outputStream;
       this.writtenRecordsCounter = writesCounter;
@@ -335,6 +339,7 @@ public class IFile {
       this.writeByteBuffer = ByteBuffer.wrap(writeBuffer).order(ByteOrder.BIG_ENDIAN);
       this.writeOffset = 0;
 
+      this.rleEnabled = rleEnabled;
       this.compressorExternal = compressorExternal;
 
       setupOutputStream(codec);
@@ -365,8 +370,15 @@ public class IFile {
 
     protected void writeHeader(OutputStream outputStream) throws IOException {
       if (!headerWritten) {
+        byte headerFlag = 0;
+        if (compressOutput) {
+          headerFlag |= FLAG_COMPRESSED;
+        }
+        if (rleEnabled) {
+          headerFlag |= FLAG_RLE;
+        }
         outputStream.write(HEADER, 0, HEADER.length - 1);
-        outputStream.write((compressOutput) ? (byte) 1 : (byte) 0);
+        outputStream.write(headerFlag);
         headerWritten = true;
       }
     }
@@ -531,7 +543,8 @@ public class IFile {
     public WriterInputBuffer(FSDataOutputStream outputStream,
         CompressionCodec codec, TezCounter writesCounter, TezCounter serializedBytesCounter,
         boolean rle, byte[] writeBuffer, @Nullable Compressor compressorExternal) throws IOException {
-      super(outputStream, codec, writesCounter, serializedBytesCounter, writeBuffer, compressorExternal);
+      super(outputStream, codec, writesCounter, serializedBytesCounter, writeBuffer, rle,
+          compressorExternal);
       this.rle = rle;
     }
 
@@ -644,7 +657,8 @@ public class IFile {
     public WriterBytesWritable(FSDataOutputStream outputStream,
         CompressionCodec codec, TezCounter writesCounter, TezCounter serializedBytesCounter,
         byte[] writeBuffer, @Nullable Compressor compressorExternal) throws IOException {
-      super(outputStream, codec, writesCounter, serializedBytesCounter, writeBuffer, compressorExternal);
+      super(outputStream, codec, writesCounter, serializedBytesCounter, writeBuffer, false,
+          compressorExternal);
     }
 
     public void append(BytesWritable key, BytesWritable value) throws IOException {
@@ -696,6 +710,17 @@ public class IFile {
 
     private CompressionCodec codec;
     private DecompressorPool taskContext;
+    private final boolean rleEnabled;
+
+    static final class HeaderFlags {
+      final boolean compressed;
+      final boolean rle;
+
+      HeaderFlags(boolean compressed, boolean rle) {
+        this.compressed = compressed;
+        this.rle = rle;
+      }
+    }
 
     /**
      * Construct an IFile Reader.
@@ -714,10 +739,19 @@ public class IFile {
         DecompressorPool taskContext) throws IOException {
       this(in, ((in != null) ? (length - HEADER.length) : length), codec,
           readsCounter, bytesReadCounter, readAhead, readAheadLength,
-          taskContext, ((in != null) ? isCompressedFlagEnabled(in) : false));
+          taskContext, ((in != null) ? readHeaderFlags(in) : new HeaderFlags(false, false)));
       if (in != null && bytesReadCounter != null) {
         bytesReadCounter.increment(IFile.HEADER.length);
       }
+    }
+
+    private Reader(InputStream in, long length,
+        CompressionCodec codec,
+        TezCounter readsCounter, TezCounter bytesReadCounter,
+        boolean readAhead, int readAheadLength,
+        DecompressorPool taskContext, HeaderFlags headerFlags) throws IOException {
+      this(in, length, codec, readsCounter, bytesReadCounter, readAhead, readAheadLength,
+          taskContext, headerFlags.compressed, headerFlags.rle);
     }
 
     /**
@@ -734,7 +768,7 @@ public class IFile {
                   CompressionCodec codec,
                   TezCounter readsCounter, TezCounter bytesReadCounter,
                   boolean readAhead, int readAheadLength,
-                  DecompressorPool taskContext, boolean isCompressed) throws IOException {
+                  DecompressorPool taskContext, boolean isCompressed, boolean isRLE) throws IOException {
       if (in != null) {
         checksumIn = new IFileInputStream(in, length, readAhead,
             readAheadLength/* , isCompressed */);
@@ -763,6 +797,7 @@ public class IFile {
       this.readRecordsCounter = readsCounter;
       this.bytesReadCounter = bytesReadCounter;
       this.fileLength = length;
+      this.rleEnabled = isRLE;
     }
 
     /**
@@ -780,7 +815,8 @@ public class IFile {
         CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLength,
         TaskContext taskContext, boolean useThreadLocalDecompressor)
         throws IOException {
-      boolean isCompressed = IFile.Reader.isCompressedFlagEnabled(in);
+      HeaderFlags headerFlags = IFile.Reader.readHeaderFlags(in);
+      boolean isCompressed = headerFlags.compressed;
       IFileInputStream checksumIn = new IFileInputStream(in,
           compressedLength - IFile.HEADER.length, ifileReadAhead,
           ifileReadAheadLength);
@@ -909,15 +945,15 @@ public class IFile {
       return len;
     }
 
-    protected void readValueLength(DataInput dIn) throws IOException {
+    protected void readValueLengthRLE(DataInput dIn) throws IOException {
       currentValueLength = dIn.readInt();
       bytesRead += INT_SIZE;
       if (currentValueLength == V_END_MARKER) {
-        readKeyValueLength(dIn);
+        readKeyValueLengthRLE(dIn);
       }
     }
 
-    protected void readKeyValueLength(DataInput dIn) throws IOException {
+    protected void readKeyValueLengthRLE(DataInput dIn) throws IOException {
       currentKeyLength = dIn.readInt();
       currentValueLength = dIn.readInt();
       // long combined = dIn.readLong();
@@ -931,6 +967,13 @@ public class IFile {
       bytesRead += INT_SIZE + INT_SIZE;
     }
 
+    protected void readKeyValueLengthRaw(DataInput dIn) throws IOException {
+      currentKeyLength = dIn.readInt();
+      currentValueLength = dIn.readInt();
+      originalKeyLength = currentKeyLength;
+      bytesRead += INT_SIZE + INT_SIZE;
+    }
+
     /**
      * Reset key length and value length for next record in the file
      *
@@ -939,7 +982,7 @@ public class IFile {
      *         false if end of file (EOF) marker was reached
      * @throws IOException
      */
-    protected boolean positionToNextRecord(DataInput dIn) throws IOException {
+    protected boolean positionToNextRecordRLE(DataInput dIn) throws IOException {
       // Sanity check
       if (eof) {
         throw new IOException(String.format("Reached EOF. Completed reading %d", bytesRead));
@@ -948,9 +991,9 @@ public class IFile {
 
       if (prevKeyLength == RLE_MARKER) {
         // Same key as previous one. Just read value length alone
-        readValueLength(dIn);
+        readValueLengthRLE(dIn);
       } else {
-        readKeyValueLength(dIn);
+        readKeyValueLengthRLE(dIn);
       }
 
       // Check for EOF
@@ -969,6 +1012,40 @@ public class IFile {
                               currentValueLength);
       }
       return true;
+    }
+
+    protected boolean positionToNextRecordRaw(DataInput dIn) throws IOException {
+      // Sanity check
+      if (eof) {
+        throw new IOException(String.format("Reached EOF. Completed reading %d", bytesRead));
+      }
+      prevKeyLength = currentKeyLength;
+      readKeyValueLengthRaw(dIn);
+
+      // Check for EOF
+      if (currentKeyLength == EOF_MARKER && currentValueLength == EOF_MARKER) {
+        eof = true;
+        return false;
+      }
+
+      // Sanity check
+      if (currentKeyLength < 0) {
+        throw new IOException("Rec# " + recNo + ": Negative key-length: " +
+            currentKeyLength + " PreviousKeyLen: " + prevKeyLength);
+      }
+      if (currentValueLength < 0) {
+        throw new IOException("Rec# " + recNo + ": Negative value-length: " +
+            currentValueLength);
+      }
+      return true;
+    }
+
+    protected boolean positionToNextRecord(DataInput dIn) throws IOException {
+      if (rleEnabled) {
+        return positionToNextRecordRLE(dIn);
+      } else {
+        return positionToNextRecordRaw(dIn);
+      }
     }
 
     public final boolean nextRawKey(DataInputBuffer key) throws IOException {
@@ -1004,7 +1081,7 @@ public class IFile {
         }
         return KeyState.NO_KEY;
       }
-      if (currentKeyLength == RLE_MARKER) {
+      if (rleEnabled && currentKeyLength == RLE_MARKER) {
         // get key length from original key
         key.reset(keyBytes, originalKeyLength);
         return KeyState.SAME_KEY;
@@ -1031,7 +1108,7 @@ public class IFile {
         }
         return KeyState.NO_KEY;
       }
-      if(currentKeyLength == RLE_MARKER) {
+      if(rleEnabled && currentKeyLength == RLE_MARKER) {
         // BytesWritable readers reuse the same key object across records, so on RLE paths
         // the previous key is already present in "key".
         return KeyState.SAME_KEY;
@@ -1090,10 +1167,21 @@ public class IFile {
     }
 
     public static boolean isCompressedFlagEnabled(InputStream in) throws IOException {
+      HeaderFlags headerFlags = readHeaderFlags(in);
+      return headerFlags.compressed;
+    }
+
+    public static boolean isRLEFlagEnabled(InputStream in) throws IOException {
+      HeaderFlags headerFlags = readHeaderFlags(in);
+      return headerFlags.rle;
+    }
+
+    private static HeaderFlags readHeaderFlags(InputStream in) throws IOException {
       byte[] header = new byte[HEADER.length];
       IOUtils.readFully(in, header, 0, HEADER.length);
       verifyHeaderMagic(header);
-      return (header[3] == 1);
+      byte flag = header[3];
+      return new HeaderFlags((flag & FLAG_COMPRESSED) != 0, (flag & FLAG_RLE) != 0);
     }
 
     /**

@@ -217,8 +217,8 @@ public class InMemoryReader extends Reader {
     }
   }
 
-  protected void readKeyValueLength(DataInput dIn) throws IOException {
-    super.readKeyValueLength(dIn);
+  protected void readKeyValueLengthRLE(DataInput dIn) throws IOException {
+    super.readKeyValueLengthRLE(dIn);
     if (currentKeyLength != IFile.RLE_MARKER) {
       originalKeyPos = memDataIn.getPosition();
     }
