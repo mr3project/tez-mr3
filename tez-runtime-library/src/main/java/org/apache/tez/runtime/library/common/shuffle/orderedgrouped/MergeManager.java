@@ -26,6 +26,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.FileChunk;
 import org.apache.hadoop.io.RawComparator;
@@ -1063,11 +1064,35 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     }
 
     @Override
+    public IFile.Reader.KeyState readRawKey(BytesWritable key) throws IOException {
+      if (kvIter.next()) {
+        final DataInputBuffer kb = kvIter.getKey();
+        final int kp = kb.getPosition();
+        final int klen = kb.getLength() - kp;
+        key.setSize(klen);
+        System.arraycopy(kb.getData(), kp, key.getBytes(), 0, klen);
+        bytesRead += klen;
+        return kvIter.isSameKey() ? IFile.Reader.KeyState.SAME_KEY : IFile.Reader.KeyState.NEW_KEY;
+      }
+      return IFile.Reader.KeyState.NO_KEY;
+    }
+
+    @Override
     public void nextRawValue(DataInputBuffer value) throws IOException {
       final DataInputBuffer vb = kvIter.getValue();
       final int vp = vb.getPosition();
       final int vlen = vb.getLength() - vp;
       value.reset(vb.getData(), vp, vlen);
+      bytesRead += vlen;
+    }
+
+    @Override
+    public void nextRawValue(BytesWritable value) throws IOException {
+      final DataInputBuffer vb = kvIter.getValue();
+      final int vp = vb.getPosition();
+      final int vlen = vb.getLength() - vp;
+      value.setSize(vlen);
+      System.arraycopy(vb.getData(), vp, value.getBytes(), 0, vlen);
       bytesRead += vlen;
     }
 

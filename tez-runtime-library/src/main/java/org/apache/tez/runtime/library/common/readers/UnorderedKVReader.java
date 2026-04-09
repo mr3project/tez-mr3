@@ -21,7 +21,6 @@ package org.apache.tez.runtime.library.common.readers;
 import java.io.IOException;
 
 import org.apache.hadoop.io.BytesWritable;
-import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
 import org.slf4j.Logger;
@@ -52,8 +51,6 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
   
   private final BytesWritable key;
   private final BytesWritable value;
-  private final DataInputBuffer keyIn;
-  private final DataInputBuffer valueIn;
   
   private FetchedInput currentFetchedInput;
   private IFile.KeyValueInputReader currentReader;
@@ -74,8 +71,6 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
 
     this.key = new BytesWritable();
     this.value = new BytesWritable();
-    this.keyIn = new DataInputBuffer();
-    this.valueIn = new DataInputBuffer();
   }
 
   /**
@@ -129,20 +124,13 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
     if (this.currentReader == null) {
       return false;
     } else {
-      boolean hasMore = this.currentReader.readRawKey(keyIn) != IFile.Reader.KeyState.NO_KEY;
+      boolean hasMore = this.currentReader.readRawKey(key) != IFile.Reader.KeyState.NO_KEY;
       if (hasMore) {
-        setBytesWritableFromDataInputBuffer(keyIn, key);
-        this.currentReader.nextRawValue(valueIn);
-        setBytesWritableFromDataInputBuffer(valueIn, value);
+        this.currentReader.nextRawValue(value);
         return true;
       }
       return false;
     }
-  }
-
-  private static void setBytesWritableFromDataInputBuffer(DataInputBuffer in, BytesWritable out) {
-    final int position = in.getPosition();
-    out.set(in.getData(), position, in.getLength() - position);
   }
   
   /**

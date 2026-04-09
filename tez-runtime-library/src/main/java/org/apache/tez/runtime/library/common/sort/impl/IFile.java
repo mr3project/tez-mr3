@@ -663,7 +663,9 @@ public class IFile {
    */
   public interface KeyValueInputReader {
     Reader.KeyState readRawKey(DataInputBuffer key) throws IOException;
+    Reader.KeyState readRawKey(BytesWritable key) throws IOException;
     void nextRawValue(DataInputBuffer value) throws IOException;
+    void nextRawValue(BytesWritable value) throws IOException;
     long getPosition() throws IOException;
     long getLength();
     void close() throws IOException;
