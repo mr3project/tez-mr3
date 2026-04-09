@@ -183,7 +183,6 @@ public class InMemoryReader implements KeyValueInputReader {
     this.usedMemoryForMergeManager = usedMemoryForMergeManager;
   }
 
-  @Override
   public void reset(int offset) {
     memDataIn.reset(buffer, start + offset, length);
     bytesRead = offset;

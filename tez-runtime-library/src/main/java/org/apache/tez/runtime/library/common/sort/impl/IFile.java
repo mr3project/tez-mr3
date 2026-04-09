@@ -667,8 +667,6 @@ public class IFile {
     long getPosition() throws IOException;
     long getLength();
     void close() throws IOException;
-    default void reset(int offset) {
-    }
   }
 
   public static class Reader implements KeyValueInputReader {
