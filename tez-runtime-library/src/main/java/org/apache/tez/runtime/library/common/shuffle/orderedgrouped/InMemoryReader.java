@@ -269,6 +269,7 @@ public class InMemoryReader implements KeyValueInputReader {
     return true;
   }
 
+  @Override
   public KeyState readRawKey(DataInputBuffer key) throws IOException {
     try {
       if (!positionToNextRecord(memDataIn)) {
