@@ -151,11 +151,11 @@ public class InMemoryReader implements IFile.KeyValueReader {
   private long bytesRead;
 
   private byte[] buffer;
-  private final int bufferSize;
-  private final ByteArrayDataInput memDataIn;
   private final int length;
+  private final ByteArrayDataInput memDataIn;
+  private final boolean isRleEnabled;
+
   private final int usedMemoryForMergeManager;
-  private final boolean rleEnabled;
 
   public InMemoryReader(MergeManager merger, InputAttemptIdentifier taskAttemptId,
                         byte[] data, int start, int length, int usedMemoryForMergeManager) {
@@ -163,19 +163,20 @@ public class InMemoryReader implements IFile.KeyValueReader {
     this.taskAttemptId = taskAttemptId;
 
     this.buffer = data;
-    this.bufferSize = length;
+    this.length = length;
+
     if (length < IFile.getHeaderLength()) {
       throw new IllegalArgumentException("Missing IFile header");
     }
     if (!(data[start] == 'T' && data[start + 1] == 'I' && data[start + 2] == 'F')) {
       throw new IllegalArgumentException("Not a valid IFile header");
     }
+
     byte flag = data[start + 3];
     int dataStart = start + IFile.getHeaderLength();
     int dataLength = length - IFile.getHeaderLength();
     this.memDataIn = new ByteArrayDataInput(buffer, dataStart, dataLength);
-    this.length = length;
-    this.rleEnabled = (flag & IFile.FLAG_RLE_ENABLED) != 0;
+    this.isRleEnabled = (flag & IFile.FLAG_RLE_ENABLED) != 0;
 
     this.usedMemoryForMergeManager = usedMemoryForMergeManager;
   }
@@ -192,7 +193,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
     FileOutputStream fos = null;
     try {
       fos = new FileOutputStream(dumpFile);
-      fos.write(buffer, 0, bufferSize);
+      fos.write(buffer, 0, length);
     } catch (IOException ioe) {
       System.err.println("Failed to dump map-output of " + taskAttemptId);
     } finally {
@@ -209,7 +210,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
   private void readKeyValueLength(DataInput dIn) throws IOException {
     currentKeyLength = dIn.readInt();
     currentValueLength = dIn.readInt();
-    if (rleEnabled && currentKeyLength != IFile.RLE_MARKER) {
+    if (isRleEnabled && currentKeyLength != IFile.RLE_MARKER) {
       originalKeyLength = currentKeyLength;
       originalKeyPos = memDataIn.getPosition();
     }
@@ -219,7 +220,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
   private void readValueLength(DataInput dIn) throws IOException {
     currentValueLength = dIn.readInt();
     bytesRead += Integer.BYTES;
-    if (rleEnabled && currentValueLength == IFile.V_END_MARKER) {
+    if (isRleEnabled && currentValueLength == IFile.V_END_MARKER) {
       readKeyValueLength(dIn);
     }
   }
@@ -230,7 +231,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
     }
     int prevKeyLength = currentKeyLength;
 
-    if (rleEnabled && prevKeyLength == IFile.RLE_MARKER) {
+    if (isRleEnabled && prevKeyLength == IFile.RLE_MARKER) {
       readValueLength(dIn);
     } else {
       readKeyValueLength(dIn);
@@ -242,7 +243,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
     }
 
     boolean isAllowedNegativeKeyLength =
-        rleEnabled && currentKeyLength == IFile.RLE_MARKER;
+        isRleEnabled && currentKeyLength == IFile.RLE_MARKER;
     if (!isAllowedNegativeKeyLength && currentKeyLength < 0) {
       throw new IOException("Rec# " + recNo + ": Negative key-length: " +
           currentKeyLength + " PreviousKeyLen: " + prevKeyLength);
@@ -263,7 +264,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
       // Setup the key
       int pos = memDataIn.getPosition();
       byte[] data = memDataIn.getData();
-      if (rleEnabled && currentKeyLength == IFile.RLE_MARKER) {
+      if (isRleEnabled && currentKeyLength == IFile.RLE_MARKER) {
         // get key length from original key
         key.reset(data, originalKeyPos, originalKeyLength);
         return KeyState.SAME_KEY;
@@ -289,7 +290,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
       if (!positionToNextRecord(memDataIn)) {
         return KeyState.NO_KEY;
       }
-      if (rleEnabled && currentKeyLength == IFile.RLE_MARKER) {
+      if (isRleEnabled && currentKeyLength == IFile.RLE_MARKER) {
         return KeyState.SAME_KEY;
       }
 
@@ -364,7 +365,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
     buffer = null;
     // Inform the MergeManager
     if (merger != null) {
-      merger.releaseCommittedMemory(bufferSize, usedMemoryForMergeManager);
+      merger.releaseCommittedMemory(length, usedMemoryForMergeManager);
     }
   }
 }

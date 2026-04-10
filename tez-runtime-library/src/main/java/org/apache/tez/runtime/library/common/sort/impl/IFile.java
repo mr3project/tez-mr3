@@ -524,7 +524,7 @@ public class IFile {
 
     private final DataOutputBuffer previous = new DataOutputBuffer();
     // de-dup keys or not
-    private final boolean rle;
+    private final boolean isRleEnabled;
     private DataInputBuffer prevKey = null;
     private long rleWritten = 0;      //number of RLE markers written
     private long totalKeySaving = 0;  //number of keys saved due to multi KV writes + RLE
@@ -548,8 +548,7 @@ public class IFile {
         throws IOException {
       super(outputStream, codec, writesCounter, serializedBytesCounter, isRleEnabled, writeBuffer,
           compressorExternal);
-      boolean rle = isRleEnabled;
-      this.rle = rle;
+      this.isRleEnabled = isRleEnabled;
     }
 
     @Override
@@ -580,18 +579,18 @@ public class IFile {
       int valueLength = value.getLength() - value.getPosition();
       assert (valueLength >= 0);
 
-      if (!rle && key == REPEAT_KEY) {
+      if (!isRleEnabled && key == REPEAT_KEY) {
         throw new IOException("REPEAT_KEY is not allowed when RLE is disabled");
       }
-      boolean sameKey = rle && (key == REPEAT_KEY);
-      if (!sameKey && rle) {
+      boolean sameKey = isRleEnabled && (key == REPEAT_KEY);
+      if (!sameKey && isRleEnabled) {
         sameKey = (keyLength != 0) && BufferUtils.compareEqual(previous, key);
       }
 
       if (!sameKey) {
         writeKVPair(key.getData(), key.getPosition(), keyLength,
             value.getData(), value.getPosition(), valueLength);
-        if (rle) {
+        if (isRleEnabled) {
           BufferUtils.copy(key, previous);
         }
       } else {
@@ -620,7 +619,7 @@ public class IFile {
     protected void onClose() throws IOException {
       writeValueMarker();
       if (isDebugEnabled) {
-        LOG.debug("WriterInputBuffer rleEnabled=" + rle + "; Savings(due to multi-kv/rle)="
+        LOG.debug("WriterInputBuffer rleEnabled=" + isRleEnabled + "; Savings(due to multi-kv/rle)="
             + totalKeySaving + "; number of RLEs written=" + rleWritten);
       }
     }
@@ -722,27 +721,26 @@ public class IFile {
     private final TezCounter readRecordsCounter;
     private final TezCounter bytesReadCounter;
 
-    final InputStream in;        // Possibly decompressed stream that we read
-    Decompressor decompressor;
-    public long bytesRead = 0;
-    final long fileLength;
-    protected boolean eof = false;
-    IFileInputStream checksumIn;
-
-    protected DataInputStream dataIn = null;
-
-    protected int recNo = 1;
-    protected int originalKeyLength;
-    protected int prevKeyLength;
-    byte keyBytes[] = new byte[0];  // backing array for DataInputBuffer in readRawKey()
-
-    protected int currentKeyLength;
-    protected int currentValueLength;
-    long startPos;
-    private final boolean rleEnabled;
-
     private CompressionCodec codec;
     private DecompressorPool taskContext;
+    private Decompressor decompressor;
+    private final IFileInputStream checksumIn;
+    private final InputStream in;        // Possibly decompressed stream that we read
+    private final long startPos;
+
+    private DataInputStream dataIn;
+    private final long fileLength;
+    private final boolean isRleEnabled;
+
+    private int currentKeyLength;
+    private int currentValueLength;
+    private boolean eof = false;
+    private int originalKeyLength;
+    private byte keyBytes[] = new byte[0];  // backing array for DataInputBuffer in readRawKey()
+
+    // for reporting errors
+    private long bytesRead = 0;
+    private int recNo = 1;
 
     /**
      * Construct an IFile Reader.
@@ -759,10 +757,11 @@ public class IFile {
         TezCounter readsCounter, TezCounter bytesReadCounter,
         boolean readAhead, int readAheadLength,
         DecompressorPool taskContext) throws IOException {
-      this(in, ((in != null) ? (length - HEADER.length) : length), codec,
+      this(in, length - HEADER.length, codec,
           readsCounter, bytesReadCounter, readAhead, readAheadLength,
-          taskContext, (in != null) ? readHeaderFlag(in) : 0);
-      if (in != null && bytesReadCounter != null) {
+          taskContext, readHeaderFlag(in));
+      assert in != null;
+      if (bytesReadCounter != null) {
         bytesReadCounter.increment(IFile.HEADER.length);
       }
     }
@@ -782,37 +781,34 @@ public class IFile {
                   TezCounter readsCounter, TezCounter bytesReadCounter,
                   boolean readAhead, int readAheadLength,
                   DecompressorPool taskContext, byte headerFlag) throws IOException {
+      assert in != null;
       boolean isCompressed = (headerFlag & FLAG_COMPRESSED) != 0;
       boolean isRleEnabled = (headerFlag & FLAG_RLE_ENABLED) != 0;
-      if (in != null) {
-        checksumIn = new IFileInputStream(in, length, readAhead,
-            readAheadLength/* , isCompressed */);
-        if (isCompressed && codec != null) {
-          assert taskContext != null;
-          this.codec = codec;
-          this.taskContext = taskContext;
-          decompressor = taskContext.getDecompressor(codec);
-          if (decompressor != null) {
-            this.in = CodecUtils.createInputStream(codec, checksumIn, decompressor);
-          } else {
-            LOG.warn("Could not obtain decompressor from CodecPool");
-            this.in = checksumIn;
-          }
-        } else {
-          this.in = checksumIn;
-        }
-        startPos = checksumIn.getPosition();
-      } else {
-        this.in = null;
-      }
 
-      if (in != null) {
-        this.dataIn = new DataInputStream(this.in);
-      }
       this.readRecordsCounter = readsCounter;
       this.bytesReadCounter = bytesReadCounter;
+
+      checksumIn = new IFileInputStream(in, length, readAhead,
+          readAheadLength/* , isCompressed */);
+      if (isCompressed && codec != null) {
+        assert taskContext != null;
+        this.codec = codec;
+        this.taskContext = taskContext;
+        decompressor = taskContext.getDecompressor(codec);
+        if (decompressor != null) {
+          this.in = CodecUtils.createInputStream(codec, checksumIn, decompressor);
+        } else {
+          LOG.warn("Could not obtain decompressor from CodecPool");
+          this.in = checksumIn;
+        }
+      } else {
+        this.in = checksumIn;
+      }
+      startPos = checksumIn.getPosition();
+
+      this.dataIn = new DataInputStream(this.in);
       this.fileLength = length;
-      this.rleEnabled = isRleEnabled;
+      this.isRleEnabled = isRleEnabled;
     }
 
     /**
@@ -963,7 +959,7 @@ public class IFile {
     protected void readValueLength(DataInput dIn) throws IOException {
       currentValueLength = dIn.readInt();
       bytesRead += INT_SIZE;
-      if (rleEnabled && currentValueLength == V_END_MARKER) {
+      if (isRleEnabled && currentValueLength == V_END_MARKER) {
         readKeyValueLength(dIn);
       }
     }
@@ -975,7 +971,7 @@ public class IFile {
       // currentKeyLength = (int) (combined >> 32);
       // currentValueLength = (int) combined;
 
-      if (!rleEnabled || currentKeyLength != RLE_MARKER) {
+      if (!isRleEnabled || currentKeyLength != RLE_MARKER) {
         // original key length
         originalKeyLength = currentKeyLength;
       }
@@ -995,9 +991,9 @@ public class IFile {
       if (eof) {
         throw new IOException(String.format("Reached EOF. Completed reading %d", bytesRead));
       }
-      prevKeyLength = currentKeyLength;
+      int prevKeyLength = currentKeyLength;
 
-      if (rleEnabled && prevKeyLength == RLE_MARKER) {
+      if (isRleEnabled && prevKeyLength == RLE_MARKER) {
         // Same key as previous one. Just read value length alone
         readValueLength(dIn);
       } else {
@@ -1012,7 +1008,7 @@ public class IFile {
 
       // Sanity check
       boolean isAllowedNegativeKeyLength =
-          rleEnabled && currentKeyLength == RLE_MARKER;
+          isRleEnabled && currentKeyLength == RLE_MARKER;
       if (!isAllowedNegativeKeyLength && currentKeyLength < 0) {
         throw new IOException("Rec# " + recNo + ": Negative key-length: " +
                               currentKeyLength + " PreviousKeyLen: " + prevKeyLength);
@@ -1043,7 +1039,7 @@ public class IFile {
       if (!positionToNextRecord(dataIn)) {
         return KeyState.NO_KEY;
       }
-      if (rleEnabled && currentKeyLength == RLE_MARKER) {
+      if (isRleEnabled && currentKeyLength == RLE_MARKER) {
         // get key length from original key
         key.reset(keyBytes, originalKeyLength);
         return KeyState.SAME_KEY;
@@ -1064,7 +1060,7 @@ public class IFile {
       if (!positionToNextRecord(dataIn)) {
         return KeyState.NO_KEY;
       }
-      if (rleEnabled && currentKeyLength == RLE_MARKER) {
+      if (isRleEnabled && currentKeyLength == RLE_MARKER) {
         // BytesWritable readers reuse the same key object across records, so on RLE paths
         // the previous key is already present in "key".
         return KeyState.SAME_KEY;
