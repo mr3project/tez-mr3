@@ -720,7 +720,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
             }
           } else {
             mergeOutputSize += mo.getSize();
-            IFile.Reader reader = new InMemoryReader(MergeManager.this,
+            IFile.KeyValueReaderDataInputBuffer reader = new InMemoryReader(MergeManager.this,
                 mo.getAttemptIdentifier(), mo.getMemory(), 0, mo.getMemory().length,
                 (int)mo.getUsedMemoryForMergeManager());
             inMemorySegments.add(new Segment(reader,
@@ -1026,7 +1026,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       long size = data.length;
       totalSize += size;
       fullSize -= size;
-      IFile.Reader reader = new InMemoryReader(MergeManager.this, 
+      IFile.KeyValueReaderDataInputBuffer reader = new InMemoryReader(MergeManager.this,
           mo.getAttemptIdentifier(), data, 0, (int)size,
           (int)mo.getUsedMemoryForMergeManager());
       inMemorySegments.add(new Segment(reader,
@@ -1037,32 +1037,31 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     return totalSize;
   }
 
-  class RawKVIteratorReader extends IFile.Reader {
+  static class RawKVIteratorReader implements IFile.KeyValueReaderDataInputBuffer {
 
     private final TezRawKeyValueIterator kvIter;
     private final long size;
+    private long bytesRead;
 
-    public RawKVIteratorReader(TezRawKeyValueIterator kvIter, long size)
-        throws IOException {
-      super(null, size, null, spilledRecordsCounter, null, ifileReadAhead,
-          ifileReadAheadLength, inputContext);
+    public RawKVIteratorReader(TezRawKeyValueIterator kvIter, long size) {
       this.kvIter = kvIter;
       this.size = size;
     }
 
     @Override
-    public KeyState readRawKey(DataInputBuffer key) throws IOException {
+    public IFile.Reader.KeyState readRawKey(DataInputBuffer key) throws IOException {
       if (kvIter.next()) {
         final DataInputBuffer kb = kvIter.getKey();
         final int kp = kb.getPosition();
         final int klen = kb.getLength() - kp;
         key.reset(kb.getData(), kp, klen);
         bytesRead += klen;
-        return kvIter.isSameKey() ? KeyState.SAME_KEY : KeyState.NEW_KEY;
+        return kvIter.isSameKey() ? IFile.Reader.KeyState.SAME_KEY : IFile.Reader.KeyState.NEW_KEY;
       }
-      return KeyState.NO_KEY;
+      return IFile.Reader.KeyState.NO_KEY;
     }
 
+    @Override
     public void nextRawValue(DataInputBuffer value) throws IOException {
       final DataInputBuffer vb = kvIter.getValue();
       final int vp = vb.getPosition();
@@ -1071,10 +1070,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       bytesRead += vlen;
     }
 
-    public long getPosition() throws IOException {
-      return bytesRead;
-    }
-
+    @Override
     public void close() throws IOException {
       kvIter.close();
     }

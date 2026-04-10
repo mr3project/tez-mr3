@@ -139,11 +139,11 @@ public class TezMerger {
 
   public static class Segment {
     static final byte[] EMPTY_BYTES = new byte[0];
-    Reader reader = null;
+    IFile.KeyValueReaderDataInputBuffer reader = null;
     final KeyValueBuffer key = new KeyValueBuffer(EMPTY_BYTES, 0, 0);
     TezCounter mapOutputsCounter = null;
 
-    public Segment(Reader reader, TezCounter mapOutputsCounter) {
+    public Segment(IFile.KeyValueReaderDataInputBuffer reader, TezCounter mapOutputsCounter) {
       this.reader = reader;
       this.mapOutputsCounter = mapOutputsCounter;
     }
@@ -176,7 +176,7 @@ public class TezMerger {
     }
 
     boolean nextRawKey(DataInputBuffer nextKey) throws IOException {
-      boolean hasNext = reader.nextRawKey(nextKey);
+      boolean hasNext = reader.readRawKey(nextKey) != KeyState.NO_KEY;
       key.reset(nextKey.getData(), nextKey.getPosition(), nextKey.getLength() - nextKey.getPosition());
       return hasNext;
     }
@@ -194,23 +194,6 @@ public class TezMerger {
 
     void close() throws IOException {
       closeReader();
-    }
-
-    public long getPosition() throws IOException {
-      return reader.getPosition();
-    }
-
-    // This method is used by BackupStore to extract the absolute position after a reset
-    long getActualPosition() throws IOException {
-      return reader.getPosition();
-    }
-
-    Reader getReader() {
-      return reader;
-    }
-
-    // This method is used by BackupStore to reinitialize the reader to start reading from a different segment offset
-    void reinitReader(int offset) throws IOException {
     }
   }
 
@@ -230,8 +213,7 @@ public class TezMerger {
     public DiskSegment(FileSystem fs, Path file,
         long segmentOffset, long segmentLength, CompressionCodec codec,
         boolean ifileReadAhead, int ifileReadAheadLength,
-        boolean preserve, TezCounter mergedMapOutputsCounter, DecompressorPool inputContext)
-    throws IOException {
+        boolean preserve, TezCounter mergedMapOutputsCounter, DecompressorPool inputContext) {
       super(null, mergedMapOutputsCounter);
       this.fs = fs;
       this.file = file;
@@ -273,31 +255,14 @@ public class TezMerger {
         fs.delete(file, false);
       }
     }
-
-    // This method is used by BackupStore to extract the absolute position after a reset
-    @Override
-    long getActualPosition() throws IOException {
-      return segmentOffset + reader.getPosition();
-    }
-
-    // This method is used by BackupStore to reinitialize the reader to start reading from a different segment offset
-    @Override
-    void reinitReader(int offset) throws IOException {
-      if (!inMemory()) {
-        closeReader();
-        segmentOffset = offset;
-        segmentLength = fs.getFileStatus(file).getLen() - segmentOffset;
-        init(null, null);
-      }
-    }
   }
 
   public static final class IntermediateMemorySegment extends Segment {
     private final MultiByteArrayOutputStream byteArrayOutput;
     private final boolean cleanupOnClose;
 
-    IntermediateMemorySegment(Reader reader,
-        MultiByteArrayOutputStream byteArrayOutput, boolean cleanupOnClose) {
+    IntermediateMemorySegment(IFile.KeyValueReaderDataInputBuffer reader,
+                              MultiByteArrayOutputStream byteArrayOutput, boolean cleanupOnClose) {
       super(reader, null);
       this.byteArrayOutput = byteArrayOutput;
       this.cleanupOnClose = cleanupOnClose;
@@ -629,7 +594,7 @@ public class TezMerger {
             tempSegment = new DiskSegment(fs, outputFile, 0, fs.getFileStatus(outputFile).getLen(), codec,
                 ifileReadAhead, ifileReadAheadLength, false, null, inputContext);
           } else {
-            Reader reader = new Reader(byteArrayOutput.createInputStream(), byteArrayOutput.getTotalBytes(),
+            IFile.KeyValueReaderDataInputBuffer reader = new Reader(byteArrayOutput.createInputStream(), byteArrayOutput.getTotalBytes(),
                 codec, null, null, ifileReadAhead, ifileReadAheadLength, inputContext);
             tempSegment = new IntermediateMemorySegment(reader, byteArrayOutput, true);
           }

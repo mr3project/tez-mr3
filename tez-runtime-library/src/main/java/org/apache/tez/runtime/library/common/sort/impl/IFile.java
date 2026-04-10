@@ -658,10 +658,32 @@ public class IFile {
     }
   }
 
+  public interface KeyValueReaderBase {
+    long getLength();
+    void close() throws IOException;
+  }
+
+  public interface KeyValueReaderDataInputBuffer extends KeyValueReaderBase {
+    Reader.KeyState readRawKey(DataInputBuffer key) throws IOException;
+    void nextRawValue(DataInputBuffer value) throws IOException;
+  }
+
+  public interface KeyValueReaderBytesWritable extends KeyValueReaderBase {
+    // Invariant: key already contains the previous key read from this stream.
+    // On the first call, key can be any BytesWritable instance.
+    // The contents of key are mutable and overwritten on subsequent reads.
+    Reader.KeyState readRawKey(BytesWritable key) throws IOException;
+    // The contents of value are mutable and overwritten on subsequent reads.
+    void nextRawValue(BytesWritable value) throws IOException;
+  }
+
+  public interface KeyValueReader extends KeyValueReaderDataInputBuffer, KeyValueReaderBytesWritable {
+  }
+
   /**
    * <code>IFile.Reader</code> to read intermediate map-outputs.
    */
-  public static class Reader {
+  public static class Reader implements KeyValueReader {
 
     public enum KeyState {NO_KEY, NEW_KEY, SAME_KEY}
 
@@ -688,7 +710,7 @@ public class IFile {
     protected int recNo = 1;
     protected int originalKeyLength;
     protected int prevKeyLength;
-    byte keyBytes[] = new byte[0];
+    byte keyBytes[] = new byte[0];  // backing array for DataInputBuffer in readRawKey()
 
     protected int currentKeyLength;
     protected int currentValueLength;
@@ -885,10 +907,6 @@ public class IFile {
       return fileLength - checksumIn.getSize();
     }
 
-    public long getPosition() throws IOException {
-      return checksumIn.getPosition();
-    }
-
     /**
      * Read up to len bytes into buf starting at offset off.
      *
@@ -971,14 +989,6 @@ public class IFile {
       return true;
     }
 
-    public final boolean nextRawKey(DataInputBuffer key) throws IOException {
-      return readRawKey(key) != KeyState.NO_KEY;
-    }
-
-    public final boolean nextRawKey(BytesWritable key) throws IOException {
-      return readRawKey(key) != KeyState.NO_KEY;
-    }
-
     private static byte[] createLargerArray(int currentLength) {
       if (currentLength > MAX_BUFFER_SIZE) {
         throw new IllegalArgumentException(
@@ -996,12 +1006,6 @@ public class IFile {
 
     public KeyState readRawKey(DataInputBuffer key) throws IOException {
       if (!positionToNextRecord(dataIn)) {
-        if (isDebugEnabled) {
-          LOG.debug("currentKeyLength=" + currentKeyLength +
-              ", currentValueLength=" + currentValueLength +
-              ", bytesRead=" + bytesRead +
-              ", length=" + fileLength);
-        }
         return KeyState.NO_KEY;
       }
       if (currentKeyLength == RLE_MARKER) {
@@ -1023,22 +1027,18 @@ public class IFile {
 
     public KeyState readRawKey(BytesWritable key) throws IOException {
       if (!positionToNextRecord(dataIn)) {
-        if (isDebugEnabled) {
-          LOG.debug("currentKeyLength=" + currentKeyLength +
-              ", currentValueLength=" + currentValueLength +
-              ", bytesRead=" + bytesRead +
-              ", length=" + fileLength);
-        }
         return KeyState.NO_KEY;
       }
-      if(currentKeyLength == RLE_MARKER) {
+      if (currentKeyLength == RLE_MARKER) {
         // BytesWritable readers reuse the same key object across records, so on RLE paths
         // the previous key is already present in "key".
         return KeyState.SAME_KEY;
       }
+
+      // directly copy to the byte[] array of key after resizing if necessary
       key.setSize(currentKeyLength);
-      byte[] keyData = key.getBytes();
-      int i = readData(keyData, currentKeyLength);
+      int i = readData(key.getBytes(), currentKeyLength);
+
       if (i != currentKeyLength) {
         throw new IOException(String.format(INCOMPLETE_READ, currentKeyLength, i));
       }
@@ -1068,9 +1068,10 @@ public class IFile {
     }
 
     public void nextRawValue(BytesWritable value) throws IOException {
+      // directly copy to the byte[] array of value after resizing if necessary
       value.setSize(currentValueLength);
-      byte[] valueBytes = value.getBytes();
-      int i = readData(valueBytes, currentValueLength);
+      int i = readData(value.getBytes(), currentValueLength);
+
       if (i != currentValueLength) {
         throw new IOException(String.format(INCOMPLETE_READ, currentValueLength, i));
       }

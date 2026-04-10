@@ -53,7 +53,7 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
   private final BytesWritable value;
   
   private FetchedInput currentFetchedInput;
-  private IFile.Reader currentReader;
+  private IFile.KeyValueReaderBytesWritable currentReader;
   
   // TODO Remove this once per I/O counters are separated properly. Relying on
   // the counter at the moment will generate aggregate numbers. 
@@ -124,7 +124,7 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
     if (this.currentReader == null) {
       return false;
     } else {
-      boolean hasMore = this.currentReader.nextRawKey(key);
+      boolean hasMore = this.currentReader.readRawKey(key) != IFile.Reader.KeyState.NO_KEY;
       if (hasMore) {
         this.currentReader.nextRawValue(value);
         return true;
@@ -166,7 +166,7 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
     }
   }
 
-  private IFile.Reader openIFileReader(FetchedInput fetchedInput)
+  private IFile.KeyValueReaderBytesWritable openIFileReader(FetchedInput fetchedInput)
       throws IOException {
     if (fetchedInput.getType() == Type.MEMORY) {
       MemoryFetchedInput mfi = (MemoryFetchedInput) fetchedInput;

@@ -77,7 +77,7 @@ public class NonSyncByteArrayInputStream extends ByteArrayInputStream {
       k = n < 0 ? 0 : n;
     }
 
-    pos += k;
+    pos += (int)k;
     return k;
   }
 

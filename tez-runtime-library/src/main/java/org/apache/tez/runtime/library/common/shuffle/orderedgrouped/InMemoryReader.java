@@ -28,12 +28,12 @@ import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.tez.common.io.NonSyncByteArrayInputStream;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
-import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader;
+import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader.KeyState;
 
 /**
  * <code>IFile.InMemoryReader</code> to read map-outputs present in-memory.
  */
-public class InMemoryReader extends Reader {
+public class InMemoryReader implements IFile.KeyValueReader {
 
   private static class ByteArrayDataInput extends NonSyncByteArrayInputStream implements DataInput {
 
@@ -41,17 +41,8 @@ public class InMemoryReader extends Reader {
       super(buf, offset, length);
     }
 
-    public void reset(byte[] input, int start, int length) {
-      this.buf = input;
-      this.count = start+length;
-      this.mark = start;
-      this.pos = start;
-    }
-
     public byte[] getData() { return buf; }
     public int getPosition() { return pos; }
-    public int getLength() { return count; }
-    public int getMark() { return mark; }
 
     @Override
     public void readFully(byte[] b) throws IOException {
@@ -153,42 +144,30 @@ public class InMemoryReader extends Reader {
   private final InputAttemptIdentifier taskAttemptId;
   private int originalKeyPos;
 
-  private byte[] buffer = null;
+  private boolean eof = false;
+  private int recNo = 1;
+  private int originalKeyLength;
+  private int currentKeyLength;
+  private int currentValueLength;
+  private long bytesRead;
+
+  private byte[] buffer;
   private final int bufferSize;
   private final ByteArrayDataInput memDataIn;
-  private final int start;
   private final int length;
   private final int usedMemoryForMergeManager;
 
   public InMemoryReader(MergeManager merger, InputAttemptIdentifier taskAttemptId,
-                        byte[] data, int start, int length, int usedMemoryForMergeManager)
-      throws IOException {
-    super(null, length - start, null, null, null, false, 0, null);
+                        byte[] data, int start, int length, int usedMemoryForMergeManager) {
     this.merger = merger;
     this.taskAttemptId = taskAttemptId;
 
     this.buffer = data;
-    this.bufferSize = (int) length;
+    this.bufferSize = length;
     this.memDataIn = new ByteArrayDataInput(buffer, start, length);
-    this.start = start;
     this.length = length;
 
     this.usedMemoryForMergeManager = usedMemoryForMergeManager;
-  }
-
-  @Override
-  public void reset(int offset) {
-    memDataIn.reset(buffer, start + offset, length);
-    bytesRead = offset;
-    eof = false;
-  }
-
-  @Override
-  public long getPosition() throws IOException {
-    // InMemoryReader does not initialize streams like Reader, so in.getPos()
-    // would not work. Instead, return the number of uncompressed bytes read,
-    // which will be correct since in-memory data is not compressed.
-    return bytesRead;
   }
 
   @Override
@@ -217,13 +196,53 @@ public class InMemoryReader extends Reader {
     }
   }
 
-  protected void readKeyValueLength(DataInput dIn) throws IOException {
-    super.readKeyValueLength(dIn);
+  private void readKeyValueLength(DataInput dIn) throws IOException {
+    currentKeyLength = dIn.readInt();
+    currentValueLength = dIn.readInt();
     if (currentKeyLength != IFile.RLE_MARKER) {
+      originalKeyLength = currentKeyLength;
       originalKeyPos = memDataIn.getPosition();
+    }
+    bytesRead += Integer.BYTES + Integer.BYTES;
+  }
+
+  private void readValueLength(DataInput dIn) throws IOException {
+    currentValueLength = dIn.readInt();
+    bytesRead += Integer.BYTES;
+    if (currentValueLength == IFile.V_END_MARKER) {
+      readKeyValueLength(dIn);
     }
   }
 
+  private boolean positionToNextRecord(DataInput dIn) throws IOException {
+    if (eof) {
+      throw new IOException(String.format("Reached EOF. Completed reading %d", bytesRead));
+    }
+    int prevKeyLength = currentKeyLength;
+
+    if (prevKeyLength == IFile.RLE_MARKER) {
+      readValueLength(dIn);
+    } else {
+      readKeyValueLength(dIn);
+    }
+
+    if (currentKeyLength == IFile.EOF_MARKER && currentValueLength == IFile.EOF_MARKER) {
+      eof = true;
+      return false;
+    }
+
+    if (currentKeyLength != IFile.RLE_MARKER && currentKeyLength < 0) {
+      throw new IOException("Rec# " + recNo + ": Negative key-length: " +
+          currentKeyLength + " PreviousKeyLen: " + prevKeyLength);
+    }
+    if (currentValueLength < 0) {
+      throw new IOException("Rec# " + recNo + ": Negative value-length: " +
+          currentValueLength);
+    }
+    return true;
+  }
+
+  @Override
   public KeyState readRawKey(DataInputBuffer key) throws IOException {
     try {
       if (!positionToNextRecord(memDataIn)) {
@@ -253,7 +272,6 @@ public class InMemoryReader extends Reader {
     }
   }
 
-  @Override
   public KeyState readRawKey(BytesWritable key) throws IOException {
     try {
       if (!positionToNextRecord(memDataIn)) {
@@ -262,16 +280,19 @@ public class InMemoryReader extends Reader {
       if (currentKeyLength == IFile.RLE_MARKER) {
         return KeyState.SAME_KEY;
       }
+
       int pos = memDataIn.getPosition();
       byte[] data = memDataIn.getData();
-      key.set(data, pos, currentKeyLength);
+      // directly copy to the byte[] array of key after resizing if necessary
+      key.setSize(currentKeyLength);
+      System.arraycopy(data, pos, key.getBytes(), 0, currentKeyLength);
+
       // Position for the next value
       long skipped = memDataIn.skip(currentKeyLength);
       if (skipped != currentKeyLength) {
-        throw new IOException("Rec# " + recNo +
-            ": Failed to skip past key of length: " +
-            currentKeyLength);
+        throw new IOException("Rec# " + recNo + ": Failed to skip past key of length: " + currentKeyLength);
       }
+
       bytesRead += currentKeyLength;
       return KeyState.NEW_KEY;
     } catch (IOException ioe) {
@@ -280,6 +301,7 @@ public class InMemoryReader extends Reader {
     }
   }
 
+  @Override
   public void nextRawValue(DataInputBuffer value) throws IOException {
     try {
       int pos = memDataIn.getPosition();
@@ -302,21 +324,20 @@ public class InMemoryReader extends Reader {
     }
   }
 
-  @Override
   public void nextRawValue(BytesWritable value) throws IOException {
     try {
       int pos = memDataIn.getPosition();
       byte[] data = memDataIn.getData();
-      value.set(data, pos, currentValueLength);
+      // directly copy to the byte[] array of value after resizing if necessary
+      value.setSize(currentValueLength);
+      System.arraycopy(data, pos, value.getBytes(), 0, currentValueLength);
 
       // Position for the next record
       long skipped = memDataIn.skip(currentValueLength);
       if (skipped != currentValueLength) {
-        throw new IOException("Rec# " + recNo +
-            ": Failed to skip past value of length: " +
-            currentValueLength);
+        throw new IOException("Rec# " + recNo + ": Failed to skip past value of length: " + currentValueLength);
       }
-      // Record the byte
+
       bytesRead += currentValueLength;
       ++recNo;
     } catch (IOException ioe) {
@@ -325,6 +346,7 @@ public class InMemoryReader extends Reader {
     }
   }
 
+  @Override
   public void close() {
     // Release
     buffer = null;

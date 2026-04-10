@@ -1266,7 +1266,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
                 // Note that reader.close() itself may throw IOException and reader.decompressor may not be returned to the pool.
                 // For the same reason, this not memory leak because reader.decompressor is eventually garbage collected.
                 try {
-                  while (reader.nextRawKey(keyBufferIFile)) {
+                  while (reader.readRawKey(keyBufferIFile) != IFile.Reader.KeyState.NO_KEY) {
                     // TODO Inefficient for large records, since the entire record will be read into memory.
                     reader.nextRawValue(valBufferIFile);
                     writer.append(keyBufferIFile, valBufferIFile);

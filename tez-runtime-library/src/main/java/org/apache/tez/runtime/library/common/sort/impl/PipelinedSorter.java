@@ -721,7 +721,7 @@ public class PipelinedSorter extends ExternalSorter {
       remaining -= skipped;
     }
 
-    IFile.Reader reader = new IFile.Reader(input, indexRecord.getPartLength(),
+    IFile.KeyValueReaderDataInputBuffer reader = new IFile.Reader(input, indexRecord.getPartLength(),
         codec, null, null, ifileReadAhead, ifileReadAheadLength, outputContext);
     // This spill output (byteArrayOutput) can be consumed for multiple partitions during the final merge.
     // Keep it alive across partition segments and clean once all partitions are merged in cleanSpillOutputBuffers().
