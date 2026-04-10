@@ -1298,7 +1298,7 @@ public class PipelinedSorter extends ExternalSorter {
     }
 
     @Override
-    public boolean isSameKey() throws IOException {
+    public boolean isSameKey() {
       return false;
     }
 
@@ -1412,7 +1412,7 @@ public class PipelinedSorter extends ExternalSorter {
     public void close() throws IOException { }
 
     @Override
-    public boolean isSameKey() throws IOException {
+    public boolean isSameKey() {
       return iter.isSameKey();
     }
 
@@ -1610,7 +1610,7 @@ public class PipelinedSorter extends ExternalSorter {
     }
 
     @Override
-    public boolean isSameKey() throws IOException {
+    public boolean isSameKey() {
       return false;
     }
 

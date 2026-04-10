@@ -61,7 +61,7 @@ public class OrderedGroupedInputLegacy extends OrderedGroupedKVInput {
         }
 
         @Override
-        public boolean isSameKey() throws IOException {
+        public boolean isSameKey() {
           throw new UnsupportedOperationException("isSameKey is not supported");
         }
       };

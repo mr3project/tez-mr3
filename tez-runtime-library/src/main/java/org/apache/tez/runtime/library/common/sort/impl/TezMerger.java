@@ -650,7 +650,7 @@ public class TezMerger {
     }
     
     @Override
-    public boolean isSameKey() throws IOException {
+    public boolean isSameKey() {
       return (hasNext != null) && (hasNext == KeyState.SAME_KEY);
     }
 
@@ -700,7 +700,7 @@ public class TezMerger {
     }
 
     @Override
-    public boolean isSameKey() throws IOException {
+    public boolean isSameKey() {
       throw new UnsupportedOperationException("isSameKey is not supported");
     }
   }
