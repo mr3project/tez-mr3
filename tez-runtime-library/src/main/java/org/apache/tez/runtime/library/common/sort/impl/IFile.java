@@ -830,7 +830,7 @@ public class IFile {
         CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLength,
         TaskContext taskContext, boolean useThreadLocalDecompressor)
         throws IOException {
-      boolean isCompressed = IFile.Reader.isCompressedFlagEnabled(in);
+      boolean isCompressed = (readHeaderFlag(in) & FLAG_COMPRESSED) != 0;
       IFileInputStream checksumIn = new IFileInputStream(in,
           compressedLength - IFile.HEADER.length, ifileReadAhead,
           ifileReadAheadLength);
@@ -1125,14 +1125,6 @@ public class IFile {
       IOUtils.readFully(in, header, 0, HEADER.length);
       verifyHeaderMagic(header);
       return header[3];
-    }
-
-    public static boolean isCompressedFlagEnabled(InputStream in) throws IOException {
-      return (readHeaderFlag(in) & FLAG_COMPRESSED) != 0;
-    }
-
-    public static boolean isRLEFlagEnabled(InputStream in) throws IOException {
-      return (readHeaderFlag(in) & FLAG_RLE_ENABLED) != 0;
     }
 
     /**
