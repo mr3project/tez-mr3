@@ -287,31 +287,12 @@ public class IFile {
   public abstract static class Writer {
     // DataOutput: rawOut <-- checksumOut <-- compressedOut <-- out <-- [writeBuffer]
 
-    protected DataOutputStream out;
-    private long start = 0;
-
-    private CompressionOutputStream compressedOut;
-    private Compressor compressor;
-    private boolean compressOutput = false;
-
-    private IFileOutputStream checksumOut;
-
     protected FSDataOutputStream rawOut;
-    // true iff this Writer created and owns rawOut
-    // if true, close() closes rawOut.
-    protected boolean ownOutputStream = false;
-
-    private final AtomicBoolean closed = new AtomicBoolean(false);
-
-    private long decompressedBytesWritten = 0;
-    private long compressedBytesWritten = 0;
-
-    // Count records written to disk
-    private long numRecordsWritten = 0;
     private final TezCounter writtenRecordsCounter;
     private final TezCounter serializedUncompressedBytes;
+    private long start;
 
-    protected boolean headerWritten = false;
+    protected final boolean isRleEnabled;
 
     // We use writeBuffer[] to reduce the number of writes to 'out' and thus
     // to reduce the number of writes to 'compressedOut'.
@@ -321,19 +302,38 @@ public class IFile {
     private int writeOffset;
 
     private final Compressor compressorExternal;  // not to be shared with concurrent threads
-    private final boolean isRleEnabled;
+
+    private IFileOutputStream checksumOut;
+    private CompressionOutputStream compressedOut;
+    private Compressor compressor;
+    private boolean compressOutput = false;
+    protected DataOutputStream out;
+
+    // true iff this Writer created and owns rawOut
+    // if true, close() closes rawOut.
+    protected boolean ownOutputStream = false;
+
+    protected boolean headerWritten = false;
+
+    private long decompressedBytesWritten = 0;
+    private long compressedBytesWritten = 0;
+    // Count records written to disk
+    private long numRecordsWritten = 0;
+
+    private final AtomicBoolean closed = new AtomicBoolean(false);
 
     protected Writer(FSDataOutputStream outputStream,
-                     CompressionCodec codec, TezCounter writesCounter,
-                     TezCounter serializedBytesCounter,
+                     CompressionCodec codec,
+                     TezCounter writesCounter, TezCounter serializedBytesCounter,
                      boolean isRleEnabled,
                      byte[] writeBuffer,
                      @Nullable Compressor compressorExternal) throws IOException {
       this.rawOut = outputStream;
       this.writtenRecordsCounter = writesCounter;
       this.serializedUncompressedBytes = serializedBytesCounter;
-      this.isRleEnabled = isRleEnabled;
       this.start = this.rawOut.getPos();
+
+      this.isRleEnabled = isRleEnabled;
 
       this.writeBuffer = writeBuffer;
       this.writeBufferLength = writeBuffer.length;
@@ -523,11 +523,11 @@ public class IFile {
   public static class WriterInputBuffer extends Writer implements WriterAppend {
 
     private final DataOutputBuffer previous = new DataOutputBuffer();
-    // de-dup keys or not
-    private final boolean isRleEnabled;
     private DataInputBuffer prevKey = null;
+
     private long rleWritten = 0;      //number of RLE markers written
     private long totalKeySaving = 0;  //number of keys saved due to multi KV writes + RLE
+
     private static final int RLE_MARKER_SIZE = INT_SIZE;
     private static final int V_END_MARKER_SIZE = INT_SIZE;
 
@@ -539,7 +539,7 @@ public class IFile {
         byte[] writeBuffer) throws IOException {
       this(fs.create(file), codec, writesCounter, serializedBytesCounter, isRleEnabled,
           writeBuffer, null);
-      ownOutputStream = true;
+      this.ownOutputStream = true;
     }
 
     public WriterInputBuffer(FSDataOutputStream outputStream,
@@ -548,7 +548,6 @@ public class IFile {
         throws IOException {
       super(outputStream, codec, writesCounter, serializedBytesCounter, isRleEnabled, writeBuffer,
           compressorExternal);
-      this.isRleEnabled = isRleEnabled;
     }
 
     @Override
