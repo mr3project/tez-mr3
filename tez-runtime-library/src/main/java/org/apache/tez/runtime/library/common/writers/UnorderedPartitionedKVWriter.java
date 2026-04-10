@@ -1188,16 +1188,16 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
             out, codec, null, null, false,
             writeBuffer, null);
         try {
-          if (currentBuffer.nextPosition != 0
-              && currentBuffer.partitionHeads[i] != WrappedBuffer.PARTITION_ABSENT_POSITION) {
-            // Write current buffer.
-            writePartition(currentBuffer.partitionHeads[i], currentBuffer, writer, keyBuffer,
-                valBuffer);
-          }
           for (WrappedBuffer buffer : filledBuffers) {
             if (buffer.partitionHeads[i] != WrappedBuffer.PARTITION_ABSENT_POSITION) {
               writePartition(buffer.partitionHeads[i], buffer, writer, keyBuffer, valBuffer);
             }
+          }
+          if (currentBuffer.nextPosition != 0
+              && currentBuffer.partitionHeads[i] != WrappedBuffer.PARTITION_ABSENT_POSITION) {
+            // Write current buffer last to preserve oldest->newest in-memory buffer ordering.
+            writePartition(currentBuffer.partitionHeads[i], currentBuffer, writer, keyBuffer,
+                valBuffer);
           }
           synchronized (spillInfoList) {
             for (SpillInfo spillInfo : spillInfoList) {
