@@ -830,10 +830,10 @@ public class IFile {
         CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLength,
         TaskContext taskContext, boolean useThreadLocalDecompressor)
         throws IOException {
-      byte headerFlag = readHeaderFlag(in);
+      byte[] header = new byte[HEADER.length];
+      byte headerFlag = readHeader(in, header);
       boolean isCompressed = (headerFlag & FLAG_COMPRESSED) != 0;
-      System.arraycopy(HEADER, 0, buffer, 0, HEADER.length);
-      buffer[HEADER.length - 1] = headerFlag;
+      System.arraycopy(header, 0, buffer, 0, HEADER.length);
       IFileInputStream checksumIn = new IFileInputStream(in,
           compressedLength - IFile.HEADER.length, ifileReadAhead,
           ifileReadAheadLength);
@@ -917,8 +917,9 @@ public class IFile {
       if (length < HEADER.length) {
         throw new IOException("Missing IFile header");
       }
-      IOUtils.readFully(in, buf, 0, HEADER.length);
-      verifyHeaderMagic(buf);
+      byte[] header = new byte[HEADER.length];
+      readHeader(in, header);
+      System.arraycopy(header, 0, buf, 0, HEADER.length);
       out.write(buf, 0, HEADER.length);
       long bytesLeft = length - HEADER.length;
       @SuppressWarnings("resource")
@@ -1124,11 +1125,15 @@ public class IFile {
       }
     }
 
-    private static byte readHeaderFlag(InputStream in) throws IOException {
-      byte[] header = new byte[HEADER.length];
+    private static byte readHeader(InputStream in, byte[] header) throws IOException {
       IOUtils.readFully(in, header, 0, HEADER.length);
       verifyHeaderMagic(header);
       return header[3];
+    }
+
+    private static byte readHeaderFlag(InputStream in) throws IOException {
+      byte[] header = new byte[HEADER.length];
+      return readHeader(in, header);
     }
 
     /**
@@ -1141,8 +1146,7 @@ public class IFile {
     public static IFileInputStream openIFileInputStream(InputStream in, long length,
         boolean readAhead, int readAheadLength) throws IOException {
       byte[] header = new byte[HEADER.length];
-      IOUtils.readFully(in, header, 0, HEADER.length);
-      verifyHeaderMagic(header);
+      readHeader(in, header);
       return new IFileInputStream(in, length - HEADER.length, readAhead, readAheadLength);
     }
 
