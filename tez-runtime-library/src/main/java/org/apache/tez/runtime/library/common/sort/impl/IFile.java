@@ -99,9 +99,14 @@ public class IFile {
     return 2 * INT_SIZE;
   }
 
-  public interface WriterAppend {
-    public void append(DataInputBuffer key, DataInputBuffer value) throws IOException;
-    public void close() throws IOException;
+  public interface WriterAppendDataInputBuffer {
+    void append(DataInputBuffer key, DataInputBuffer value) throws IOException;
+    void close() throws IOException;
+  }
+
+  public interface WriterAppendBytesWritable {
+    void append(BytesWritable key, BytesWritable value) throws IOException;
+    void close() throws IOException;
   }
 
   private static final int checksumSize = IFileOutputStream.getCheckSumSize();
@@ -520,7 +525,7 @@ public class IFile {
     }
   }
 
-  public static class WriterInputBuffer extends Writer implements WriterAppend {
+  public static class WriterDataInputBuffer extends Writer implements WriterAppendDataInputBuffer {
 
     private final DataOutputBuffer previous = new DataOutputBuffer();
     private DataInputBuffer prevKey = null;
@@ -531,20 +536,20 @@ public class IFile {
     private static final int RLE_MARKER_SIZE = INT_SIZE;
     private static final int V_END_MARKER_SIZE = INT_SIZE;
 
-    public WriterInputBuffer(FileSystem fs, Path file,
-        CompressionCodec codec,
-        TezCounter writesCounter,
-        TezCounter serializedBytesCounter,
-        boolean isRleEnabled,
-        byte[] writeBuffer) throws IOException {
+    public WriterDataInputBuffer(FileSystem fs, Path file,
+                                 CompressionCodec codec,
+                                 TezCounter writesCounter,
+                                 TezCounter serializedBytesCounter,
+                                 boolean isRleEnabled,
+                                 byte[] writeBuffer) throws IOException {
       this(fs.create(file), codec, writesCounter, serializedBytesCounter, isRleEnabled,
           writeBuffer, null);
       this.ownOutputStream = true;
     }
 
-    public WriterInputBuffer(FSDataOutputStream outputStream,
-        CompressionCodec codec, TezCounter writesCounter, TezCounter serializedBytesCounter,
-        boolean isRleEnabled, byte[] writeBuffer, @Nullable Compressor compressorExternal)
+    public WriterDataInputBuffer(FSDataOutputStream outputStream,
+                                 CompressionCodec codec, TezCounter writesCounter, TezCounter serializedBytesCounter,
+                                 boolean isRleEnabled, byte[] writeBuffer, @Nullable Compressor compressorExternal)
         throws IOException {
       super(outputStream, codec, writesCounter, serializedBytesCounter, isRleEnabled, writeBuffer,
           compressorExternal);
@@ -648,7 +653,7 @@ public class IFile {
     }
   }
 
-  public static class WriterBytesWritable extends Writer {
+  public static class WriterBytesWritable extends Writer implements WriterAppendBytesWritable {
 
     public WriterBytesWritable(FileSystem fs, Path file,
         CompressionCodec codec,

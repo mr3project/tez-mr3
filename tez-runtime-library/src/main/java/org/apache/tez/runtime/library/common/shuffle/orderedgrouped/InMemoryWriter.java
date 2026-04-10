@@ -26,7 +26,7 @@ import org.apache.tez.common.io.NonSyncDataOutputStream;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.apache.tez.runtime.library.common.sort.impl.IFileOutputStream;
 
-public class InMemoryWriter implements IFile.WriterAppend {
+public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
 
   // BoundedByteArrayOutputStream(array, 0, array.length) is protected and cannot be used directly
   private static class InMemoryBoundedByteArrayOutputStream extends BoundedByteArrayOutputStream {

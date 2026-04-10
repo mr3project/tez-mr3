@@ -45,7 +45,7 @@ import org.apache.tez.runtime.api.MultiByteArrayOutputStream;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader.KeyState;
-import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterInputBuffer;
+import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterDataInputBuffer;
 import org.apache.tez.runtime.library.utils.BufferUtils;
 
 /**
@@ -78,7 +78,7 @@ public class TezMerger {
         readsCounter, writesCounter, bytesReadCounter, inputContext);
   }
 
-  public static void writeFile(TezRawKeyValueIterator records, IFile.WriterAppend writer,
+  public static void writeFile(TezRawKeyValueIterator records, IFile.WriterAppendDataInputBuffer writer,
       Progressable progressable, long recordsBeforeProgress)
       throws IOException, InterruptedException {
     long recordCtr = 0;
@@ -572,14 +572,14 @@ public class TezMerger {
               && MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold);
 
           MultiByteArrayOutputStream byteArrayOutput = null;
-          IFile.WriterAppend writer;
+          IFile.WriterAppendDataInputBuffer writer;
           if (writeIntermediateToMemory) {
             byteArrayOutput = new MultiByteArrayOutputStream(fs, outputFile);
             FSDataOutputStream outputStream = new FSDataOutputStream(byteArrayOutput, null);
-            writer = new WriterInputBuffer(outputStream, codec, writesCounter, null,
+            writer = new WriterDataInputBuffer(outputStream, codec, writesCounter, null,
                 checkForSameKeys, writeBuffer, null);
           } else {
-            writer = new WriterInputBuffer(fs, outputFile, codec, writesCounter, null,
+            writer = new WriterDataInputBuffer(fs, outputFile, codec, writesCounter, null,
                 checkForSameKeys, writeBuffer);
           }
 

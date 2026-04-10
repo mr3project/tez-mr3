@@ -49,7 +49,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.tez.common.io.NonSyncDataOutputStream;
 import org.apache.tez.runtime.api.Event;
-import org.apache.tez.runtime.library.common.comparator.ProxyComparator;
 import org.apache.hadoop.io.RawComparator;
 import org.apache.hadoop.util.IndexedSortable;
 import org.apache.hadoop.util.IndexedSorter;
@@ -59,7 +58,7 @@ import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.serializer.SerializationContext;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterBytesWritable;
-import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterInputBuffer;
+import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterDataInputBuffer;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger.DiskSegment;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger.Segment;
 
@@ -613,13 +612,13 @@ public class PipelinedSorter extends ExternalSorter {
         TezRawKeyValueIterator kvIter = merger.filter(i);
         // write merged output to disk
         long segmentStart = fsOutput.getPos();
-        WriterInputBuffer writer = null;
+        WriterDataInputBuffer writer = null;
         boolean hasNext = kvIter.hasNext();
         if (hasNext || !sendEmptyPartitionDetails) {
           if (codec != null && compressorExternal == null) {
             compressorExternal = CodecUtils.getCompressor(codec);
           }
-          writer = new WriterInputBuffer(
+          writer = new WriterDataInputBuffer(
               fsOutput,
               codec, spilledRecordsCounter, null, merger.needsRLE(),
               writeBuffer, compressorExternal);
@@ -926,7 +925,7 @@ public class PipelinedSorter extends ExternalSorter {
           long rawLength = 0;
           long partLength = 0;
           if (shouldWrite) {
-            IFile.WriterInputBuffer writer = new WriterInputBuffer(
+            WriterDataInputBuffer writer = new WriterDataInputBuffer(
                 finalOut,
                 codec, spilledRecordsCounter, null, merger.needsRLE(),
                 writeBuffer, null);

@@ -75,7 +75,7 @@ import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.apache.tez.runtime.library.common.sort.impl.IFileInputStream;
 import org.apache.tez.runtime.library.common.sort.impl.TezIndexRecord;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterBytesWritable;
-import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterInputBuffer;
+import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterDataInputBuffer;
 import org.apache.tez.runtime.library.common.sort.impl.TezSpillRecord;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.shuffle.impl.ShuffleUserPayloads;
@@ -666,7 +666,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         byte[] writeBuffer = IFile.allocateWriteBuffer();
 
         for (int i = 0; i < numPartitions; i++) {
-          WriterInputBuffer writer = null;
+          WriterDataInputBuffer writer = null;
           try {
             long segmentStart = fsOutput.getPos();
             long numRecords = 0;
@@ -680,7 +680,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
                   compressorExternal = CodecUtils.getCompressor(codec);
                 }
                 // all Writer instances share the same FSDataOutputStream out
-                writer = new WriterInputBuffer(
+                writer = new WriterDataInputBuffer(
                     fsOutput, codec, null, null, false,
                     writeBuffer, compressorExternal);
               }
@@ -730,7 +730,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     }
   }
 
-  private long writePartition(int pos, WrappedBuffer wrappedBuffer, WriterInputBuffer writer,
+  private long writePartition(int pos, WrappedBuffer wrappedBuffer, WriterDataInputBuffer writer,
       DataInputBuffer keyBuffer, DataInputBuffer valBuffer) throws IOException {
     long numRecords = 0;
     while (pos != WrappedBuffer.PARTITION_ABSENT_POSITION) {
@@ -1172,7 +1172,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       } else {
         out = new FSDataOutputStream(byteArrayOutput, null);
       }
-      WriterInputBuffer writer = null;
+      WriterDataInputBuffer writer = null;
 
       byte[] writeBuffer = IFile.allocateWriteBuffer();
       for (int i = 0; i < numPartitions; i++) {
@@ -1184,7 +1184,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           continue;
         }
         // inside close()
-        writer = new WriterInputBuffer(
+        writer = new WriterDataInputBuffer(
             out, codec, null, null, false,
             writeBuffer, null);
         try {
