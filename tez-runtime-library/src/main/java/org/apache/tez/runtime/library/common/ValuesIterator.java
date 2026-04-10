@@ -162,7 +162,7 @@ public class ValuesIterator {
         nextKey = copyToWritable(nextKey, nextKeyBytes);
         // hasMoreValues = is it first key or is key the same?
         hasMoreValues = (key == null) || (comparator.compare(key, nextKey) == 0);
-        if (key == null || false == hasMoreValues) {
+        if (key == null || !hasMoreValues) {
           // invariant: more=true & there are no more values in an existing key group
           // so this indicates start of new key group
           if(inputKeyCounter != null) {
@@ -192,7 +192,13 @@ public class ValuesIterator {
     if (target == null) {
       target = new BytesWritable();
     }
-    target.set(source.getData(), source.getPosition(), source.getLength() - source.getPosition());
+
+    int pos = source.getPosition();
+    int length = source.getLength() - pos;
+    byte[] data = source.getData();
+    target.setSize(length);
+    System.arraycopy(data, pos, target.getBytes(), 0, length);
+
     return target;
   }
 

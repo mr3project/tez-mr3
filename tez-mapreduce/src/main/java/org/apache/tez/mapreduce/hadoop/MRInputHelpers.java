@@ -206,8 +206,7 @@ public class MRInputHelpers {
     Deserializer<org.apache.hadoop.mapreduce.InputSplit> deserializer = serializationFactory
         .getDeserializer(clazz);
     deserializer.open(splitProto.getSplitBytes().newInput());
-    org.apache.hadoop.mapreduce.InputSplit inputSplit = deserializer
-        .deserialize(null);
+    org.apache.hadoop.mapreduce.InputSplit inputSplit = deserializer.deserialize(null);
     deserializer.close();
     return inputSplit;
   }
