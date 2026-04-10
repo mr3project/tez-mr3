@@ -830,7 +830,10 @@ public class IFile {
         CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLength,
         TaskContext taskContext, boolean useThreadLocalDecompressor)
         throws IOException {
-      boolean isCompressed = (readHeaderFlag(in) & FLAG_COMPRESSED) != 0;
+      byte headerFlag = readHeaderFlag(in);
+      boolean isCompressed = (headerFlag & FLAG_COMPRESSED) != 0;
+      System.arraycopy(HEADER, 0, buffer, 0, HEADER.length);
+      buffer[HEADER.length - 1] = headerFlag;
       IFileInputStream checksumIn = new IFileInputStream(in,
           compressedLength - IFile.HEADER.length, ifileReadAhead,
           ifileReadAheadLength);
@@ -858,7 +861,8 @@ public class IFile {
         }
       }
       try {
-        IOUtils.readFully(in, buffer, 0, buffer.length - IFile.HEADER.length);
+        IOUtils.readFully(in, buffer, IFile.HEADER.length,
+            buffer.length - IFile.HEADER.length);
         /*
          * We've gotten the amount of data we were expecting. Verify the
          * decompressor has nothing more to offer. This action also forces the
