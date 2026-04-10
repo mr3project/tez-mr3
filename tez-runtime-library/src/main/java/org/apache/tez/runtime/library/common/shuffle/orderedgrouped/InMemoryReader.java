@@ -142,11 +142,10 @@ public class InMemoryReader implements IFile.KeyValueReader {
 
   private final MergeManager merger;
   private final InputAttemptIdentifier taskAttemptId;
-  private int originalKeyPos;
+  private int originalKeyPos, originalKeyLength;
 
   private boolean eof = false;
   private int recNo = 1;
-  private int originalKeyLength;
   private int currentKeyLength;
   private int currentValueLength;
   private long bytesRead;
@@ -210,7 +209,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
   private void readKeyValueLength(DataInput dIn) throws IOException {
     currentKeyLength = dIn.readInt();
     currentValueLength = dIn.readInt();
-    if (!rleEnabled || currentKeyLength != IFile.RLE_MARKER) {
+    if (rleEnabled && currentKeyLength != IFile.RLE_MARKER) {
       originalKeyLength = currentKeyLength;
       originalKeyPos = memDataIn.getPosition();
     }
