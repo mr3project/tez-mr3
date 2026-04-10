@@ -1006,7 +1006,9 @@ public class IFile {
       }
 
       // Sanity check
-      if (((!rleEnabled) || currentKeyLength != RLE_MARKER) && currentKeyLength < 0) {
+      boolean isAllowedNegativeKeyLength =
+          rleEnabled && currentKeyLength == RLE_MARKER;
+      if (!isAllowedNegativeKeyLength && currentKeyLength < 0) {
         throw new IOException("Rec# " + recNo + ": Negative key-length: " +
                               currentKeyLength + " PreviousKeyLen: " + prevKeyLength);
       }

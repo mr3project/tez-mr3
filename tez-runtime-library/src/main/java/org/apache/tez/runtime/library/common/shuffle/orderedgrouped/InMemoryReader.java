@@ -241,7 +241,9 @@ public class InMemoryReader implements IFile.KeyValueReader {
       return false;
     }
 
-    if (((!rleEnabled) || currentKeyLength != IFile.RLE_MARKER) && currentKeyLength < 0) {
+    boolean isAllowedNegativeKeyLength =
+        rleEnabled && currentKeyLength == IFile.RLE_MARKER;
+    if (!isAllowedNegativeKeyLength && currentKeyLength < 0) {
       throw new IOException("Rec# " + recNo + ": Negative key-length: " +
           currentKeyLength + " PreviousKeyLen: " + prevKeyLength);
     }
