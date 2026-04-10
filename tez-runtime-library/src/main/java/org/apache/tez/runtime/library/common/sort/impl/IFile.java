@@ -71,7 +71,7 @@ public class IFile {
 
   // REPEAT_KEY is primarily an ordered-path optimization, and never used for unordered output.
   public static final DataInputBuffer REPEAT_KEY = new DataInputBuffer();
-  static final byte[] HEADER = new byte[] { (byte) 'T', (byte) 'I', (byte) 'F', (byte) 0};
+  public static final byte[] HEADER = new byte[] { (byte) 'T', (byte) 'I', (byte) 'F', (byte) 0};
 
   private static final String INCOMPLETE_READ = "Requested to read %d got %d";
   private static final String REQ_BUFFER_SIZE_TOO_LARGE = "Size of data %d is greater than the max allowed of %d";
