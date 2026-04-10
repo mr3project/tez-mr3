@@ -580,7 +580,10 @@ public class IFile {
       int valueLength = value.getLength() - value.getPosition();
       assert (valueLength >= 0);
 
-      boolean sameKey = (key == REPEAT_KEY);
+      if (!rle && key == REPEAT_KEY) {
+        throw new IOException("REPEAT_KEY is not allowed when RLE is disabled");
+      }
+      boolean sameKey = rle && (key == REPEAT_KEY);
       if (!sameKey && rle) {
         sameKey = (keyLength != 0) && BufferUtils.compareEqual(previous, key);
       }
@@ -967,7 +970,7 @@ public class IFile {
       // currentKeyLength = (int) (combined >> 32);
       // currentValueLength = (int) combined;
 
-      if (currentKeyLength != RLE_MARKER) {
+      if (!rleEnabled || currentKeyLength != RLE_MARKER) {
         // original key length
         originalKeyLength = currentKeyLength;
       }
@@ -1003,7 +1006,7 @@ public class IFile {
       }
 
       // Sanity check
-      if (currentKeyLength != RLE_MARKER && currentKeyLength < 0) {
+      if (((!rleEnabled) || currentKeyLength != RLE_MARKER) && currentKeyLength < 0) {
         throw new IOException("Rec# " + recNo + ": Negative key-length: " +
                               currentKeyLength + " PreviousKeyLen: " + prevKeyLength);
       }

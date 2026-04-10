@@ -57,6 +57,9 @@ public class InMemoryWriter implements IFile.WriterAppend {
       int keyLength = key.getLength() - key.getPosition();
       int valueLength = value.getLength() - value.getPosition();
 
+      if (!rle && key == IFile.REPEAT_KEY) {
+          throw new IOException("REPEAT_KEY is not allowed when RLE is disabled");
+      }
       boolean sameKey = (key == IFile.REPEAT_KEY) && rle;
 
       if (!sameKey) {

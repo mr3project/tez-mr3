@@ -210,7 +210,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
   private void readKeyValueLength(DataInput dIn) throws IOException {
     currentKeyLength = dIn.readInt();
     currentValueLength = dIn.readInt();
-    if (currentKeyLength != IFile.RLE_MARKER) {
+    if (!rleEnabled || currentKeyLength != IFile.RLE_MARKER) {
       originalKeyLength = currentKeyLength;
       originalKeyPos = memDataIn.getPosition();
     }
@@ -242,7 +242,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
       return false;
     }
 
-    if (currentKeyLength != IFile.RLE_MARKER && currentKeyLength < 0) {
+    if (((!rleEnabled) || currentKeyLength != IFile.RLE_MARKER) && currentKeyLength < 0) {
       throw new IOException("Rec# " + recNo + ": Negative key-length: " +
           currentKeyLength + " PreviousKeyLen: " + prevKeyLength);
     }
