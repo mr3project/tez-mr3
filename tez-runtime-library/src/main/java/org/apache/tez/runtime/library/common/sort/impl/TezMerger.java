@@ -579,7 +579,8 @@ public class TezMerger {
             writer = new WriterInputBuffer(outputStream, codec, writesCounter, null,
                 checkForSameKeys, writeBuffer, null);
           } else {
-            writer = new WriterInputBuffer(fs, outputFile, codec, writesCounter, null, writeBuffer);
+            writer = new WriterInputBuffer(fs, outputFile, codec, writesCounter, null,
+                checkForSameKeys, writeBuffer);
           }
 
           writeFile(this, writer, reporter, recordsBeforeProgress);

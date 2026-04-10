@@ -505,7 +505,7 @@ public class PipelinedSorter extends ExternalSorter {
           if (!sendEmptyPartitionDetails || (i == partition)) {
             writer = new WriterBytesWritable(out,
                 codec, spilledRecordsCounter, null,
-                writeBuffer, null);
+                false, writeBuffer, null);
           }
           // we need not check for combiner since its a single record
           if (i == partition) {

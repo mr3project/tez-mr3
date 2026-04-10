@@ -754,7 +754,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
       int noInMemorySegments = inMemorySegments.size();
 
-      IFile.WriterAppend writer = new InMemoryWriter(mergedMapOutputs.getMemory());
+      IFile.WriterAppend writer = new InMemoryWriter(mergedMapOutputs.getMemory(), true);
 
       if (isDebugEnabled) {
         LOG.debug("{}: Initiating Memory-to-Memory merge with {} segments of total-size: {}",
@@ -846,7 +846,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       long outFileLen = 0;
       try {
         writer = new WriterInputBuffer(rfs, outputPath, codec,
-            null, null, writeBuffer);
+            null, null, true, writeBuffer);
 
         TezRawKeyValueIterator rIter = null;
         LOG.info("Initiating in-memory merge with {} segments", noInMemorySegments);
@@ -969,7 +969,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       outputPath = outputPath.suffix(Constants.MERGED_OUTPUT_PREFIX + mergeFileSequenceId.getAndIncrement());
 
       WriterInputBuffer writer = new WriterInputBuffer(rfs, outputPath, codec, null,
-          null, writeBuffer);
+          null, true, writeBuffer);
       tmpDir = new Path(inputContext.getUniqueIdentifier());
       try {
         TezRawKeyValueIterator iter = TezMerger.merge(conf, rfs,
@@ -1115,7 +1115,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
             comparator, progressable, false, spilledRecordsCounter, null,
             additionalSpillBytesRead, true, inputContext);
         final byte[] writeBuffer = IFile.allocateWriteBuffer();
-        final WriterInputBuffer writer = new WriterInputBuffer(fs, outputPath, codec, null, null, writeBuffer);
+        final WriterInputBuffer writer = new WriterInputBuffer(fs, outputPath, codec, null, null,
+            true, writeBuffer);
         try {
           TezMerger.writeFile(rIter, writer, progressable, TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
         } catch (IOException e) {
