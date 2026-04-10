@@ -118,6 +118,7 @@ public class UnorderedPartitionedKVOutput extends AbstractLogicalOutput implemen
     confKeys.add(TezRuntimeConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_BYTES);
+    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_PARTITIONED_NON_PIPELINED_NUM_BUFFERS);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_OUTPUT_BUFFER_SIZE_MB);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_PARTITIONER_CLASS);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED);
@@ -133,9 +134,6 @@ public class UnorderedPartitionedKVOutput extends AbstractLogicalOutput implemen
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS_CODEC);
   }
-
-  // TODO Maybe add helper methods to extract keys
-  // TODO Maybe add constants or an Enum to access the keys
 
   public static Set<String> getConfigurationKeySet() {
     return Collections.unmodifiableSet(confKeys);

@@ -163,6 +163,12 @@ public class TezRuntimeConfiguration {
       TEZ_RUNTIME_PREFIX + "pipelined.sorter.sort.threads";
   public static final int TEZ_RUNTIME_PIPELINED_SORTER_SORT_THREADS_DEFAULT = 2;
 
+  @ConfigurationProperty(type = "integer")
+  public static final String TEZ_RUNTIME_UNORDERED_PARTITIONED_NON_PIPELINED_NUM_BUFFERS =
+      TEZ_RUNTIME_PREFIX + "unordered.partitioned.non.pipelined.num.buffers";
+  public static final int TEZ_RUNTIME_UNORDERED_PARTITIONED_NON_PIPELINED_NUM_BUFFERS_DEFAULT =
+      4;
+
   /**
    * Size of the buffer to use if not writing directly to disk.
    */
@@ -434,6 +440,7 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SORTER_USE_SOFT_REFERENCE);
     tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SORTER_LAZY_ALLOCATE_MEMORY);
     tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SORTER_SORT_THREADS);
+    tezRuntimeKeys.add(TEZ_RUNTIME_UNORDERED_PARTITIONED_NON_PIPELINED_NUM_BUFFERS);
     tezRuntimeKeys.add(TEZ_RUNTIME_UNORDERED_OUTPUT_BUFFER_SIZE_MB);
     tezRuntimeKeys.add(TEZ_RUNTIME_REPORT_PARTITION_STATS);
     tezRuntimeKeys.add(TEZ_RUNTIME_PARTITIONER_CLASS);
