@@ -164,7 +164,7 @@ public class IFile {
         CompressionCodec codec, TezCounter writesCounter,
         TezCounter serializedBytesCounter, int cacheSize, byte[] writeBuffer) throws IOException {
       super(new FSDataOutputStream(createBoundedBuffer(cacheSize), null), null,
-          writesCounter, serializedBytesCounter, false, writeBuffer, null);
+          writesCounter, serializedBytesCounter, writeBuffer, null);
       this.fs = fs;
       this.cacheStream = (BoundedByteArrayOutputStream) this.rawOut.getWrappedStream();
       this.taskOutput = taskOutput;
@@ -655,23 +655,24 @@ public class IFile {
 
   public static class WriterBytesWritable extends Writer implements WriterAppendBytesWritable {
 
+    // WriterBytesWritable.append() does not support RLE encoding, so isRleEnabled is set to false.
+
     public WriterBytesWritable(FileSystem fs, Path file,
         CompressionCodec codec,
         TezCounter writesCounter,
         TezCounter serializedBytesCounter,
-        boolean isRleEnabled,
         byte[] writeBuffer) throws IOException {
-      this(fs.create(file), codec, writesCounter, serializedBytesCounter, isRleEnabled,
+      this(fs.create(file), codec, writesCounter, serializedBytesCounter,
           writeBuffer, null);
       ownOutputStream = true;
     }
 
     public WriterBytesWritable(FSDataOutputStream outputStream,
         CompressionCodec codec, TezCounter writesCounter, TezCounter serializedBytesCounter,
-        boolean isRleEnabled, byte[] writeBuffer, @Nullable Compressor compressorExternal)
+        byte[] writeBuffer, @Nullable Compressor compressorExternal)
         throws IOException {
-      super(outputStream, codec, writesCounter, serializedBytesCounter, isRleEnabled, writeBuffer,
-          compressorExternal);
+      super(outputStream, codec, writesCounter, serializedBytesCounter, false,
+          writeBuffer, compressorExternal);
     }
 
     public void append(BytesWritable key, BytesWritable value) throws IOException {
