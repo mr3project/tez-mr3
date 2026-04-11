@@ -637,7 +637,9 @@ public class IFile {
 
     @Override
     protected void onClose() throws IOException {
-      writeValueMarker();
+      if (isRleEnabled) {
+        writeValueMarker();
+      }
       if (isDebugEnabled) {
         LOG.debug("WriterInputBuffer rleEnabled=" + isRleEnabled + "; Savings(due to multi-kv/rle)="
             + totalKeySaving + "; number of RLEs written=" + rleWritten);

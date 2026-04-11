@@ -106,7 +106,7 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
 
   public void close() throws IOException {
       // Write V_END_MARKER if needed
-      if (prevKey == IFile.REPEAT_KEY) {
+      if (isRleEnabled && prevKey == IFile.REPEAT_KEY) {
           out.writeInt(IFile.V_END_MARKER);
       }
 
