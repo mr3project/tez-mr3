@@ -54,12 +54,12 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
   }
 
   public void append(DataInputBuffer key, DataInputBuffer value) throws IOException {
+      if (!isRleEnabled && key == IFile.REPEAT_KEY) {
+          throw new IOException("REPEAT_KEY is not allowed when RLE is disabled");
+      }
       if (isRleEnabled) {
           appendRle(key, value);
       } else {
-          if (key == IFile.REPEAT_KEY) {
-              throw new IOException("REPEAT_KEY is not allowed when RLE is disabled");
-          }
           appendNoRle(key, value);
       }
   }
