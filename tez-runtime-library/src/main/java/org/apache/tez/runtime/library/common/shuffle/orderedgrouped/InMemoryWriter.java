@@ -69,7 +69,6 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
       out.writeLong(combined);
       out.write(key.getData(), key.getPosition(), keyLength);
       out.write(value.getData(), value.getPosition(), valueLength);
-      prevKey = key;
   }
 
   private void appendRle(DataInputBuffer key, DataInputBuffer value) throws IOException {
@@ -105,9 +104,8 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
   }
 
   public void close() throws IOException {
-      // Write V_END_MARKER if needed
-      if (isRleEnabled && prevKey == IFile.REPEAT_KEY) {
-          out.writeInt(IFile.V_END_MARKER);
+      if (isRleEnabled) {
+          closeRle();
       }
 
       // Write EOF_MARKER for key/value length
@@ -116,5 +114,12 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
 
       out.close();
       out = null;
+  }
+
+  private void closeRle() throws IOException {
+      // Write V_END_MARKER if needed
+      if (prevKey == IFile.REPEAT_KEY) {
+          out.writeInt(IFile.V_END_MARKER);
+      }
   }
 }
