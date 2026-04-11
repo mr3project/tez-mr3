@@ -555,15 +555,22 @@ public class IFile {
           compressorExternal);
     }
 
-    @Override
-    protected void writeValue(byte[] data, int offset, int length) throws IOException {
+    private void writeValueNoRle(byte[] data, int offset, int length) throws IOException {
+      super.writeValue(data, offset, length);
+    }
+
+    private void writeValueRle(byte[] data, int offset, int length) throws IOException {
       writeRLE();
       super.writeValue(data, offset, length);
       totalKeySaving++;
     }
 
-    @Override
-    protected void writeKVPair(byte[] keyData, int keyPos, int keyLength,
+    private void writeKVPairNoRle(byte[] keyData, int keyPos, int keyLength,
+        byte[] valueData, int valPos, int valueLength) throws IOException {
+      super.writeKVPair(keyData, keyPos, keyLength, valueData, valPos, valueLength);
+    }
+
+    private void writeKVPairRle(byte[] keyData, int keyPos, int keyLength,
         byte[] valueData, int valPos, int valueLength) throws IOException {
       writeValueMarker();
       super.writeKVPair(keyData, keyPos, keyLength, valueData, valPos, valueLength);
@@ -591,7 +598,7 @@ public class IFile {
       int valueLength = value.getLength() - value.getPosition();
       assert (valueLength >= 0);
 
-      writeKVPair(key.getData(), key.getPosition(), keyLength,
+      writeKVPairNoRle(key.getData(), key.getPosition(), keyLength,
           value.getData(), value.getPosition(), valueLength);
       prevKey = key;
       incrementRecordsWritten();
@@ -610,11 +617,11 @@ public class IFile {
       }
 
       if (!sameKey) {
-        writeKVPair(key.getData(), key.getPosition(), keyLength,
+        writeKVPairRle(key.getData(), key.getPosition(), keyLength,
             value.getData(), value.getPosition(), valueLength);
         BufferUtils.copy(key, previous);
       } else {
-        writeValue(value.getData(), value.getPosition(), valueLength);
+        writeValueRle(value.getData(), value.getPosition(), valueLength);
       }
       prevKey = sameKey ? REPEAT_KEY : key;
       incrementRecordsWritten();
