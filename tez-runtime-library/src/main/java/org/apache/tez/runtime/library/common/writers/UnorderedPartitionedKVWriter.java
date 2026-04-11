@@ -389,7 +389,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       // The reason outputRecordsCounter isn't updated here:
       // For skipBuffers case, IFile writer has the reference to outputRecordsCounter and
       // during its close method call, it will update the outputRecordsCounter.
-      writer.append(key, value);
+      writer.appendNoRle(key, value);
     } else {
       int partition = partitioner.getPartition(key, value, numPartitions);
       write(key, value, partition);
@@ -739,7 +739,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       keyBuffer.reset(wrappedBuffer.buffer, pos + META_SIZE, keyLength);
       valBuffer.reset(wrappedBuffer.buffer, pos + META_SIZE + keyLength, valLength);
 
-      writer.append(keyBuffer, valBuffer);
+      writer.appendNoRle(keyBuffer, valBuffer);
       numRecords++;
       pos = wrappedBuffer.metaBuffer.get(metaIndex + INDEX_NEXT);
     }
@@ -1171,7 +1171,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       } else {
         out = new FSDataOutputStream(byteArrayOutput, null);
       }
-      WriterDataInputBuffer writer = null;
+      WriterDataInputBuffer writer;
 
       byte[] writeBuffer = IFile.allocateWriteBuffer();
       for (int i = 0; i < numPartitions; i++) {
@@ -1285,7 +1285,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
                   while (reader.readRawKey(keyBufferIFile) != IFile.Reader.KeyState.NO_KEY) {
                     // TODO Inefficient for large records, since the entire record will be read into memory.
                     reader.nextRawValue(valBufferIFile);
-                    writer.append(keyBufferIFile, valBufferIFile);
+                    writer.appendNoRle(keyBufferIFile, valBufferIFile);
                   }
                 } finally {
                   reader.close();
@@ -1405,7 +1405,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           try {
             writer = new IFile.WriterBytesWritable(out, codec, null, null,
                 IFile.allocateWriteBufferSingle(), null);
-            writer.append(key, value);
+            writer.appendNoRle(key, value);
             outputLargeRecordsCounter.increment(1);
             numRecordsPerPartition[i]++;
             if (reportPartitionStats()) {

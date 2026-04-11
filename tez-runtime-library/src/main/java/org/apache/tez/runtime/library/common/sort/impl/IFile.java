@@ -100,13 +100,16 @@ public class IFile {
   }
 
   public interface WriterAppendDataInputBuffer {
-    void append(DataInputBuffer key, DataInputBuffer value) throws IOException;
     boolean isRleEnabled();
+    // call when isRleEnabled is not statically known
+    void appendNoRle(DataInputBuffer key, DataInputBuffer value) throws IOException;
+    void appendRle(DataInputBuffer key, DataInputBuffer value) throws IOException;
     void close() throws IOException;
   }
 
+  // WriterBytesWritable does not use RLE encoding
   public interface WriterAppendBytesWritable {
-    void append(BytesWritable key, BytesWritable value) throws IOException;
+    void appendNoRle(BytesWritable key, BytesWritable value) throws IOException;
     void close() throws IOException;
   }
 
@@ -577,27 +580,11 @@ public class IFile {
       super.writeKVPair(keyData, keyPos, keyLength, valueData, valPos, valueLength);
     }
 
-    /**
-     * Send key/value to be appended to IFile. To represent same key as previous
-     * one, send IFile.REPEAT_KEY as key parameter.  Should not call this method with
-     * IFile.REPEAT_KEY as the first key. It is caller's responsibility to pass non-negative
-     * key/value lengths. Otherwise,IndexOutOfBoundsException could be thrown at runtime.
-     */
-    @Override
-    public void append(DataInputBuffer key, DataInputBuffer value) throws IOException {
-      if (isRleEnabled) {
-        appendRle(key, value);
-      } else {
-        appendNoRle(key, value);
-      }
-    }
-
-    @Override
     public boolean isRleEnabled() {
       return isRleEnabled;
     }
 
-    private void appendNoRle(DataInputBuffer key, DataInputBuffer value) throws IOException {
+    public void appendNoRle(DataInputBuffer key, DataInputBuffer value) throws IOException {
       int keyLength = key.getLength() - key.getPosition();
       assert (keyLength >=0);
 
@@ -610,7 +597,7 @@ public class IFile {
       incrementRecordsWritten();
     }
 
-    private void appendRle(DataInputBuffer key, DataInputBuffer value) throws IOException {
+    public void appendRle(DataInputBuffer key, DataInputBuffer value) throws IOException {
       int keyLength = key.getLength() - key.getPosition();
       assert (key == REPEAT_KEY || keyLength >=0);
 
@@ -633,7 +620,7 @@ public class IFile {
       incrementRecordsWritten();
     }
 
-    protected void writeRLE() throws IOException {
+    private void writeRLE() throws IOException {
       if (prevKey != REPEAT_KEY) {
         bufferWriteInt(RLE_MARKER);
         incrementDecompressedBytesWritten(RLE_MARKER_SIZE);
@@ -641,7 +628,7 @@ public class IFile {
       }
     }
 
-    protected void writeValueMarker() throws IOException {
+    private void writeValueMarker() throws IOException {
       if (prevKey == REPEAT_KEY) {
         bufferWriteInt(V_END_MARKER);
         incrementDecompressedBytesWritten(V_END_MARKER_SIZE);
@@ -706,7 +693,7 @@ public class IFile {
           writeBuffer, compressorExternal);
     }
 
-    public void append(BytesWritable key, BytesWritable value) throws IOException {
+    public void appendNoRle(BytesWritable key, BytesWritable value) throws IOException {
       int keyLength = key.getLength();
       assert (keyLength >= 0);
 

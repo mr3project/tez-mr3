@@ -509,7 +509,7 @@ public class PipelinedSorter extends ExternalSorter {
           // we need not check for combiner since its a single record
           if (i == partition) {
             final long recordStart = out.getPos();
-            writer.append(key, value);
+            writer.appendNoRle(key, value);
             outputRecordsCounter.increment(1);
             outputRecordBytesCounter.increment(out.getPos() - recordStart);
           }
@@ -614,17 +614,24 @@ public class PipelinedSorter extends ExternalSorter {
         long segmentStart = fsOutput.getPos();
         WriterDataInputBuffer writer = null;
         boolean hasNext = kvIter.hasNext();
+        boolean isRleEnabled = merger.needsRLE();
         if (hasNext || !sendEmptyPartitionDetails) {
           if (codec != null && compressorExternal == null) {
             compressorExternal = CodecUtils.getCompressor(codec);
           }
           writer = new WriterDataInputBuffer(
               fsOutput,
-              codec, spilledRecordsCounter, null, merger.needsRLE(),
+              codec, spilledRecordsCounter, null, isRleEnabled,
               writeBuffer, compressorExternal);
         }
-        while (kvIter.next()) {
-          writer.append(kvIter.getKey(), kvIter.getValue());
+        if (isRleEnabled) {
+          while (kvIter.next()) {
+            writer.appendRle(kvIter.getKey(), kvIter.getValue());
+          }
+        } else {
+          while (kvIter.next()) {
+            writer.appendNoRle(kvIter.getKey(), kvIter.getValue());
+          }
         }
 
         long rawLength = 0;

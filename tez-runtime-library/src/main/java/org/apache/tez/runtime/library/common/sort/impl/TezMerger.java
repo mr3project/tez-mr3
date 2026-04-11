@@ -83,13 +83,15 @@ public class TezMerger {
       throws IOException, InterruptedException {
     long recordCtr = 0;
     boolean isRleEnabled = writer.isRleEnabled();
-    // long count = 0;
     while (records.next()) {
-      if (isRleEnabled && records.isSameKey()) {
-        writer.append(IFile.REPEAT_KEY, records.getValue());
-        // count++;
+      if (isRleEnabled) {
+        if (records.isSameKey()) {
+          writer.appendRle(IFile.REPEAT_KEY, records.getValue());
+        } else {
+          writer.appendRle(records.getKey(), records.getValue());
+        }
       } else {
-        writer.append(records.getKey(), records.getValue());
+        writer.appendNoRle(records.getKey(), records.getValue());
       }
       
       if (((recordCtr++) % recordsBeforeProgress) == 0) {
@@ -105,9 +107,6 @@ public class TezMerger {
         }
       }
     }
-    /* if ((count > 0) && LOG.isTraceEnabled()) {
-      LOG.trace("writeFile SAME_KEY count=" + count);
-    } */
   }
 
   static class KeyValueBuffer {
