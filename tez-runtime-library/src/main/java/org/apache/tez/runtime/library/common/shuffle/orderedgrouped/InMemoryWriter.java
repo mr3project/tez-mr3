@@ -21,10 +21,12 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 
 import org.apache.hadoop.io.BoundedByteArrayOutputStream;
+import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.tez.common.io.NonSyncDataOutputStream;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.apache.tez.runtime.library.common.sort.impl.IFileOutputStream;
+import org.apache.tez.runtime.library.utils.BufferUtils;
 
 public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
 
@@ -39,6 +41,7 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
   private final boolean isRleEnabled;
 
   private DataInputBuffer prevKey = null;
+  private final DataOutputBuffer previous = new DataOutputBuffer();
 
   // InMemoryWriter does not use another byte[] buffer, unlike IFile.Writer
   public InMemoryWriter(byte[] array, boolean isRleEnabled) throws IOException {
@@ -68,7 +71,15 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
   }
 
   public void appendRle(DataInputBuffer key, DataInputBuffer value) throws IOException {
-    assert false;
+    int keyLength = key.getLength() - key.getPosition();
+    assert (key == IFile.REPEAT_KEY || keyLength >= 0);
+
+    boolean sameKey = key == IFile.REPEAT_KEY;
+    if (!sameKey) {
+      sameKey = (keyLength != 0) && BufferUtils.compareEqual(previous, key);
+    }
+
+    appendRleAccurate(sameKey ? IFile.REPEAT_KEY : key, value);
   }
 
   public void appendRleAccurate(DataInputBuffer key, DataInputBuffer value) throws IOException {
@@ -88,6 +99,7 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
 
       out.write(key.getData(), key.getPosition(), keyLength);
       out.write(value.getData(), value.getPosition(), valueLength);
+      BufferUtils.copy(key, previous);
     } else {
       // Repeated key
       if (prevKey != IFile.REPEAT_KEY) {

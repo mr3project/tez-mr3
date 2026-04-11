@@ -610,14 +610,22 @@ public class IFile {
       int keyLength = key.getLength() - key.getPosition();
       assert (key == REPEAT_KEY || keyLength >=0);
 
-      int valueLength = value.getLength() - value.getPosition();
-      assert (valueLength >= 0);
-
       boolean sameKey = key == REPEAT_KEY;
       if (!sameKey) {
         sameKey = (keyLength != 0) && BufferUtils.compareEqual(previous, key);
       }
 
+      appendRleAccurate(sameKey ? REPEAT_KEY : key, value);
+    }
+
+    public void appendRleAccurate(DataInputBuffer key, DataInputBuffer value) throws IOException {
+      int keyLength = key.getLength() - key.getPosition();
+      assert (key == REPEAT_KEY || keyLength >= 0);
+
+      int valueLength = value.getLength() - value.getPosition();
+      assert (valueLength >= 0);
+
+      boolean sameKey = key == REPEAT_KEY;
       if (!sameKey) {
         writeKVPairRle(key.getData(), key.getPosition(), keyLength,
           value.getData(), value.getPosition(), valueLength);
@@ -627,10 +635,6 @@ public class IFile {
       }
       prevKey = sameKey ? REPEAT_KEY : key;
       incrementRecordsWritten();
-    }
-
-    public void appendRleAccurate(DataInputBuffer key, DataInputBuffer value) throws IOException {
-      assert false;
     }
 
     private void writeRLE() throws IOException {
