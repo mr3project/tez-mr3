@@ -577,26 +577,45 @@ public class IFile {
      */
     @Override
     public void append(DataInputBuffer key, DataInputBuffer value) throws IOException {
+      if (isRleEnabled) {
+        appendRle(key, value);
+      } else {
+        appendNoRle(key, value);
+      }
+    }
+
+    private void appendNoRle(DataInputBuffer key, DataInputBuffer value) throws IOException {
       int keyLength = key.getLength() - key.getPosition();
       assert (key == REPEAT_KEY || keyLength >=0);
 
       int valueLength = value.getLength() - value.getPosition();
       assert (valueLength >= 0);
 
-      if (!isRleEnabled && key == REPEAT_KEY) {
+      if (key == REPEAT_KEY) {
         throw new IOException("REPEAT_KEY is not allowed when RLE is disabled");
       }
-      boolean sameKey = isRleEnabled && (key == REPEAT_KEY);
-      if (!sameKey && isRleEnabled) {
+      writeKVPair(key.getData(), key.getPosition(), keyLength,
+          value.getData(), value.getPosition(), valueLength);
+      prevKey = key;
+      incrementRecordsWritten();
+    }
+
+    private void appendRle(DataInputBuffer key, DataInputBuffer value) throws IOException {
+      int keyLength = key.getLength() - key.getPosition();
+      assert (key == REPEAT_KEY || keyLength >=0);
+
+      int valueLength = value.getLength() - value.getPosition();
+      assert (valueLength >= 0);
+
+      boolean sameKey = key == REPEAT_KEY;
+      if (!sameKey) {
         sameKey = (keyLength != 0) && BufferUtils.compareEqual(previous, key);
       }
 
       if (!sameKey) {
         writeKVPair(key.getData(), key.getPosition(), keyLength,
             value.getData(), value.getPosition(), valueLength);
-        if (isRleEnabled) {
-          BufferUtils.copy(key, previous);
-        }
+        BufferUtils.copy(key, previous);
       } else {
         writeValue(value.getData(), value.getPosition(), valueLength);
       }
@@ -962,21 +981,49 @@ public class IFile {
     }
 
     protected void readValueLength(DataInput dIn) throws IOException {
+      if (isRleEnabled) {
+        readValueLengthRle(dIn);
+      } else {
+        readValueLengthNoRle(dIn);
+      }
+    }
+
+    private void readValueLengthNoRle(DataInput dIn) throws IOException {
       currentValueLength = dIn.readInt();
       bytesRead += INT_SIZE;
-      if (isRleEnabled && currentValueLength == V_END_MARKER) {
-        readKeyValueLength(dIn);
+    }
+
+    private void readValueLengthRle(DataInput dIn) throws IOException {
+      currentValueLength = dIn.readInt();
+      bytesRead += INT_SIZE;
+      if (currentValueLength == V_END_MARKER) {
+        readKeyValueLengthRle(dIn);
       }
     }
 
     protected void readKeyValueLength(DataInput dIn) throws IOException {
+      if (isRleEnabled) {
+        readKeyValueLengthRle(dIn);
+      } else {
+        readKeyValueLengthNoRle(dIn);
+      }
+    }
+
+    private void readKeyValueLengthNoRle(DataInput dIn) throws IOException {
+      currentKeyLength = dIn.readInt();
+      currentValueLength = dIn.readInt();
+      originalKeyLength = currentKeyLength;
+      bytesRead += INT_SIZE + INT_SIZE;
+    }
+
+    private void readKeyValueLengthRle(DataInput dIn) throws IOException {
       currentKeyLength = dIn.readInt();
       currentValueLength = dIn.readInt();
       // long combined = dIn.readLong();
       // currentKeyLength = (int) (combined >> 32);
       // currentValueLength = (int) combined;
 
-      if (!isRleEnabled || currentKeyLength != RLE_MARKER) {
+      if (currentKeyLength != RLE_MARKER) {
         // original key length
         originalKeyLength = currentKeyLength;
       }
@@ -992,17 +1039,52 @@ public class IFile {
      * @throws IOException
      */
     protected boolean positionToNextRecord(DataInput dIn) throws IOException {
+      if (isRleEnabled) {
+        return positionToNextRecordRle(dIn);
+      } else {
+        return positionToNextRecordNoRle(dIn);
+      }
+    }
+
+    private boolean positionToNextRecordNoRle(DataInput dIn) throws IOException {
       // Sanity check
       if (eof) {
         throw new IOException(String.format("Reached EOF. Completed reading %d", bytesRead));
       }
       int prevKeyLength = currentKeyLength;
 
-      if (isRleEnabled && prevKeyLength == RLE_MARKER) {
+      readKeyValueLengthNoRle(dIn);
+
+      // Check for EOF
+      if (currentKeyLength == EOF_MARKER && currentValueLength == EOF_MARKER) {
+        eof = true;
+        return false;
+      }
+
+      // Sanity check
+      if (currentKeyLength < 0) {
+        throw new IOException("Rec# " + recNo + ": Negative key-length: " +
+                              currentKeyLength + " PreviousKeyLen: " + prevKeyLength);
+      }
+      if (currentValueLength < 0) {
+        throw new IOException("Rec# " + recNo + ": Negative value-length: " +
+                              currentValueLength);
+      }
+      return true;
+    }
+
+    private boolean positionToNextRecordRle(DataInput dIn) throws IOException {
+      // Sanity check
+      if (eof) {
+        throw new IOException(String.format("Reached EOF. Completed reading %d", bytesRead));
+      }
+      int prevKeyLength = currentKeyLength;
+
+      if (prevKeyLength == RLE_MARKER) {
         // Same key as previous one. Just read value length alone
-        readValueLength(dIn);
+        readValueLengthRle(dIn);
       } else {
-        readKeyValueLength(dIn);
+        readKeyValueLengthRle(dIn);
       }
 
       // Check for EOF
@@ -1012,8 +1094,7 @@ public class IFile {
       }
 
       // Sanity check
-      boolean isAllowedNegativeKeyLength =
-          isRleEnabled && currentKeyLength == RLE_MARKER;
+      boolean isAllowedNegativeKeyLength = currentKeyLength == RLE_MARKER;
       if (!isAllowedNegativeKeyLength && currentKeyLength < 0) {
         throw new IOException("Rec# " + recNo + ": Negative key-length: " +
                               currentKeyLength + " PreviousKeyLen: " + prevKeyLength);
@@ -1041,10 +1122,34 @@ public class IFile {
     }
 
     public KeyState readRawKey(DataInputBuffer key) throws IOException {
-      if (!positionToNextRecord(dataIn)) {
+      if (isRleEnabled) {
+        return readRawKeyRle(key);
+      } else {
+        return readRawKeyNoRle(key);
+      }
+    }
+
+    private KeyState readRawKeyNoRle(DataInputBuffer key) throws IOException {
+      if (!positionToNextRecordNoRle(dataIn)) {
         return KeyState.NO_KEY;
       }
-      if (isRleEnabled && currentKeyLength == RLE_MARKER) {
+      if (keyBytes.length < currentKeyLength) {
+        keyBytes = createLargerArray(currentKeyLength);
+      }
+      int i = readData(keyBytes, currentKeyLength);
+      if (i != currentKeyLength) {
+        throw new IOException(String.format(INCOMPLETE_READ, currentKeyLength, i));
+      }
+      key.reset(keyBytes, currentKeyLength);
+      bytesRead += currentKeyLength;
+      return KeyState.NEW_KEY;
+    }
+
+    private KeyState readRawKeyRle(DataInputBuffer key) throws IOException {
+      if (!positionToNextRecordRle(dataIn)) {
+        return KeyState.NO_KEY;
+      }
+      if (currentKeyLength == RLE_MARKER) {
         // get key length from original key
         key.reset(keyBytes, originalKeyLength);
         return KeyState.SAME_KEY;
@@ -1062,15 +1167,37 @@ public class IFile {
     }
 
     public KeyState readRawKey(BytesWritable key) throws IOException {
-      if (!positionToNextRecord(dataIn)) {
+      if (isRleEnabled) {
+        return readRawKeyRle(key);
+      } else {
+        return readRawKeyNoRle(key);
+      }
+    }
+
+    private KeyState readRawKeyNoRle(BytesWritable key) throws IOException {
+      if (!positionToNextRecordNoRle(dataIn)) {
         return KeyState.NO_KEY;
       }
-      if (isRleEnabled && currentKeyLength == RLE_MARKER) {
+      // directly copy to the byte[] array of key after resizing if necessary
+      key.setSize(currentKeyLength);
+      int i = readData(key.getBytes(), currentKeyLength);
+
+      if (i != currentKeyLength) {
+        throw new IOException(String.format(INCOMPLETE_READ, currentKeyLength, i));
+      }
+      bytesRead += currentKeyLength;
+      return KeyState.NEW_KEY;
+    }
+
+    private KeyState readRawKeyRle(BytesWritable key) throws IOException {
+      if (!positionToNextRecordRle(dataIn)) {
+        return KeyState.NO_KEY;
+      }
+      if (currentKeyLength == RLE_MARKER) {
         // BytesWritable readers reuse the same key object across records, so on RLE paths
         // the previous key is already present in "key".
         return KeyState.SAME_KEY;
       }
-
       // directly copy to the byte[] array of key after resizing if necessary
       key.setSize(currentKeyLength);
       int i = readData(key.getBytes(), currentKeyLength);

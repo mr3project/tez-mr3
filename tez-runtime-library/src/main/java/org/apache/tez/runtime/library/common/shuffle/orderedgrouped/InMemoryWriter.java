@@ -54,13 +54,36 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
   }
 
   public void append(DataInputBuffer key, DataInputBuffer value) throws IOException {
+      if (isRleEnabled) {
+          appendRle(key, value);
+      } else {
+          appendNoRle(key, value);
+      }
+  }
+
+  private void appendNoRle(DataInputBuffer key, DataInputBuffer value) throws IOException {
       int keyLength = key.getLength() - key.getPosition();
       int valueLength = value.getLength() - value.getPosition();
 
-      if (!isRleEnabled && key == IFile.REPEAT_KEY) {
+      if (key == IFile.REPEAT_KEY) {
           throw new IOException("REPEAT_KEY is not allowed when RLE is disabled");
       }
-      boolean sameKey = (key == IFile.REPEAT_KEY) && isRleEnabled;
+
+      if (prevKey == IFile.REPEAT_KEY) {
+          out.writeInt(IFile.V_END_MARKER);
+      }
+
+      long combined = ((long) keyLength << 32) | (valueLength & 0xFFFFFFFFL);
+      out.writeLong(combined);
+      out.write(key.getData(), key.getPosition(), keyLength);
+      out.write(value.getData(), value.getPosition(), valueLength);
+      prevKey = key;
+  }
+
+  private void appendRle(DataInputBuffer key, DataInputBuffer value) throws IOException {
+      int keyLength = key.getLength() - key.getPosition();
+      int valueLength = value.getLength() - value.getPosition();
+      boolean sameKey = key == IFile.REPEAT_KEY;
 
       if (!sameKey) {
           // Normal key-value pair

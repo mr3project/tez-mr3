@@ -208,9 +208,23 @@ public class InMemoryReader implements IFile.KeyValueReader {
   }
 
   private void readKeyValueLength(DataInput dIn) throws IOException {
+    if (isRleEnabled) {
+      readKeyValueLengthRle(dIn);
+    } else {
+      readKeyValueLengthNoRle(dIn);
+    }
+  }
+
+  private void readKeyValueLengthNoRle(DataInput dIn) throws IOException {
     currentKeyLength = dIn.readInt();
     currentValueLength = dIn.readInt();
-    if (isRleEnabled && currentKeyLength != IFile.RLE_MARKER) {
+    bytesRead += Integer.BYTES + Integer.BYTES;
+  }
+
+  private void readKeyValueLengthRle(DataInput dIn) throws IOException {
+    currentKeyLength = dIn.readInt();
+    currentValueLength = dIn.readInt();
+    if (currentKeyLength != IFile.RLE_MARKER) {
       originalKeyLength = currentKeyLength;
       originalKeyPos = memDataIn.getPosition();
     }
@@ -218,23 +232,67 @@ public class InMemoryReader implements IFile.KeyValueReader {
   }
 
   private void readValueLength(DataInput dIn) throws IOException {
+    if (isRleEnabled) {
+      readValueLengthRle(dIn);
+    } else {
+      readValueLengthNoRle(dIn);
+    }
+  }
+
+  private void readValueLengthNoRle(DataInput dIn) throws IOException {
     currentValueLength = dIn.readInt();
     bytesRead += Integer.BYTES;
-    if (isRleEnabled && currentValueLength == IFile.V_END_MARKER) {
-      readKeyValueLength(dIn);
+  }
+
+  private void readValueLengthRle(DataInput dIn) throws IOException {
+    currentValueLength = dIn.readInt();
+    bytesRead += Integer.BYTES;
+    if (currentValueLength == IFile.V_END_MARKER) {
+      readKeyValueLengthRle(dIn);
     }
   }
 
   private boolean positionToNextRecord(DataInput dIn) throws IOException {
+    if (isRleEnabled) {
+      return positionToNextRecordRle(dIn);
+    } else {
+      return positionToNextRecordNoRle(dIn);
+    }
+  }
+
+  private boolean positionToNextRecordNoRle(DataInput dIn) throws IOException {
+    if (eof) {
+      throw new IOException(String.format("Reached EOF. Completed reading %d", bytesRead));
+    }
+    int prevKeyLength = currentKeyLength;
+    readKeyValueLengthNoRle(dIn);
+
+    if (currentKeyLength == IFile.EOF_MARKER && currentValueLength == IFile.EOF_MARKER) {
+      eof = true;
+      return false;
+    }
+
+    if (currentKeyLength < 0) {
+      throw new IOException("Rec# " + recNo + ": Negative key-length: " +
+          currentKeyLength + " PreviousKeyLen: " + prevKeyLength);
+    }
+    if (currentValueLength < 0) {
+      throw new IOException("Rec# " + recNo + ": Negative value-length: " +
+          currentValueLength);
+    }
+    return true;
+  }
+
+  private boolean positionToNextRecordRle(DataInput dIn) throws IOException {
     if (eof) {
       throw new IOException(String.format("Reached EOF. Completed reading %d", bytesRead));
     }
     int prevKeyLength = currentKeyLength;
 
-    if (isRleEnabled && prevKeyLength == IFile.RLE_MARKER) {
-      readValueLength(dIn);
+    if (prevKeyLength == IFile.RLE_MARKER) {
+      readValueLengthRle(dIn);
     } else {
-      readKeyValueLength(dIn);
+      readKeyValueLengthRle(dIn);
     }
 
     if (currentKeyLength == IFile.EOF_MARKER && currentValueLength == IFile.EOF_MARKER) {
@@ -242,8 +300,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
       return false;
     }
 
-    boolean isAllowedNegativeKeyLength =
-        isRleEnabled && currentKeyLength == IFile.RLE_MARKER;
+    boolean isAllowedNegativeKeyLength = currentKeyLength == IFile.RLE_MARKER;
     if (!isAllowedNegativeKeyLength && currentKeyLength < 0) {
       throw new IOException("Rec# " + recNo + ": Negative key-length: " +
           currentKeyLength + " PreviousKeyLen: " + prevKeyLength);
@@ -258,60 +315,114 @@ public class InMemoryReader implements IFile.KeyValueReader {
   @Override
   public KeyState readRawKey(DataInputBuffer key) throws IOException {
     try {
-      if (!positionToNextRecord(memDataIn)) {
-        return KeyState.NO_KEY;
+      if (isRleEnabled) {
+        return readRawKeyRle(key);
+      } else {
+        return readRawKeyNoRle(key);
       }
-      // Setup the key
-      int pos = memDataIn.getPosition();
-      byte[] data = memDataIn.getData();
-      if (isRleEnabled && currentKeyLength == IFile.RLE_MARKER) {
-        // get key length from original key
-        key.reset(data, originalKeyPos, originalKeyLength);
-        return KeyState.SAME_KEY;
-      }
-      key.reset(data, pos, currentKeyLength);
-      // Position for the next value
-      long skipped = memDataIn.skip(currentKeyLength);
-      if (skipped != currentKeyLength) {
-        throw new IOException("Rec# " + recNo +
-            ": Failed to skip past key of length: " +
-            currentKeyLength);
-      }
-      bytesRead += currentKeyLength;
-      return KeyState.NEW_KEY;
     } catch (IOException ioe) {
       dumpOnError();
       throw ioe;
     }
   }
 
+  private KeyState readRawKeyNoRle(DataInputBuffer key) throws IOException {
+    if (!positionToNextRecordNoRle(memDataIn)) {
+      return KeyState.NO_KEY;
+    }
+    int pos = memDataIn.getPosition();
+    byte[] data = memDataIn.getData();
+    key.reset(data, pos, currentKeyLength);
+    long skipped = memDataIn.skip(currentKeyLength);
+    if (skipped != currentKeyLength) {
+      throw new IOException("Rec# " + recNo +
+          ": Failed to skip past key of length: " +
+          currentKeyLength);
+    }
+    bytesRead += currentKeyLength;
+    return KeyState.NEW_KEY;
+  }
+
+  private KeyState readRawKeyRle(DataInputBuffer key) throws IOException {
+    if (!positionToNextRecordRle(memDataIn)) {
+      return KeyState.NO_KEY;
+    }
+    // Setup the key
+    int pos = memDataIn.getPosition();
+    byte[] data = memDataIn.getData();
+    if (currentKeyLength == IFile.RLE_MARKER) {
+      // get key length from original key
+      key.reset(data, originalKeyPos, originalKeyLength);
+      return KeyState.SAME_KEY;
+    }
+    key.reset(data, pos, currentKeyLength);
+    // Position for the next value
+    long skipped = memDataIn.skip(currentKeyLength);
+    if (skipped != currentKeyLength) {
+      throw new IOException("Rec# " + recNo +
+          ": Failed to skip past key of length: " +
+          currentKeyLength);
+    }
+    bytesRead += currentKeyLength;
+    return KeyState.NEW_KEY;
+  }
+
   public KeyState readRawKey(BytesWritable key) throws IOException {
     try {
-      if (!positionToNextRecord(memDataIn)) {
-        return KeyState.NO_KEY;
+      if (isRleEnabled) {
+        return readRawKeyRle(key);
+      } else {
+        return readRawKeyNoRle(key);
       }
-      if (isRleEnabled && currentKeyLength == IFile.RLE_MARKER) {
-        return KeyState.SAME_KEY;
-      }
-
-      int pos = memDataIn.getPosition();
-      byte[] data = memDataIn.getData();
-      // directly copy to the byte[] array of key after resizing if necessary
-      key.setSize(currentKeyLength);
-      System.arraycopy(data, pos, key.getBytes(), 0, currentKeyLength);
-
-      // Position for the next value
-      long skipped = memDataIn.skip(currentKeyLength);
-      if (skipped != currentKeyLength) {
-        throw new IOException("Rec# " + recNo + ": Failed to skip past key of length: " + currentKeyLength);
-      }
-
-      bytesRead += currentKeyLength;
-      return KeyState.NEW_KEY;
     } catch (IOException ioe) {
       dumpOnError();
       throw ioe;
     }
+  }
+
+  private KeyState readRawKeyNoRle(BytesWritable key) throws IOException {
+    if (!positionToNextRecordNoRle(memDataIn)) {
+      return KeyState.NO_KEY;
+    }
+
+    int pos = memDataIn.getPosition();
+    byte[] data = memDataIn.getData();
+    // directly copy to the byte[] array of key after resizing if necessary
+    key.setSize(currentKeyLength);
+    System.arraycopy(data, pos, key.getBytes(), 0, currentKeyLength);
+
+    // Position for the next value
+    long skipped = memDataIn.skip(currentKeyLength);
+    if (skipped != currentKeyLength) {
+      throw new IOException("Rec# " + recNo + ": Failed to skip past key of length: " + currentKeyLength);
+    }
+
+    bytesRead += currentKeyLength;
+    return KeyState.NEW_KEY;
+  }
+
+  private KeyState readRawKeyRle(BytesWritable key) throws IOException {
+    if (!positionToNextRecordRle(memDataIn)) {
+      return KeyState.NO_KEY;
+    }
+    if (currentKeyLength == IFile.RLE_MARKER) {
+      return KeyState.SAME_KEY;
+    }
+
+    int pos = memDataIn.getPosition();
+    byte[] data = memDataIn.getData();
+    // directly copy to the byte[] array of key after resizing if necessary
+    key.setSize(currentKeyLength);
+    System.arraycopy(data, pos, key.getBytes(), 0, currentKeyLength);
+
+    // Position for the next value
+    long skipped = memDataIn.skip(currentKeyLength);
+    if (skipped != currentKeyLength) {
+      throw new IOException("Rec# " + recNo + ": Failed to skip past key of length: " + currentKeyLength);
+    }
+
+    bytesRead += currentKeyLength;
+    return KeyState.NEW_KEY;
   }
 
   @Override
