@@ -577,9 +577,6 @@ public class IFile {
      */
     @Override
     public void append(DataInputBuffer key, DataInputBuffer value) throws IOException {
-      if (!isRleEnabled && key == REPEAT_KEY) {
-        throw new IOException("REPEAT_KEY is not allowed when RLE is disabled");
-      }
       if (isRleEnabled) {
         appendRle(key, value);
       } else {
