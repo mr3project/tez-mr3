@@ -920,14 +920,14 @@ public class PipelinedSorter extends ExternalSorter {
               TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_FACTOR_DEFAULT);
           // sort the segments only if there are intermediate merges
           boolean sortSegments = segmentList.size() > mergeFactor;
-          //merge
+          // merge
           TezRawKeyValueIterator kvIter = TezMerger.merge(conf, localFs,
               codec, segmentList, mergeFactor, 0,
               new Path(uniqueIdentifier),
               SerializationContext.getKeyComparator(),
               progressable, sortSegments, null, spilledRecordsCounter,
               additionalSpillBytesReadCounter, merger.needsRLE(), outputContext);
-          //write merged output to disk
+          // write merged output to disk
           long segmentStart = finalOut.getPos();
           long rawLength = 0;
           long partLength = 0;

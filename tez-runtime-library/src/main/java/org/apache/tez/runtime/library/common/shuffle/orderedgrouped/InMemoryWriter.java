@@ -68,35 +68,39 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
   }
 
   public void appendRle(DataInputBuffer key, DataInputBuffer value) throws IOException {
-      int keyLength = key.getLength() - key.getPosition();
-      int valueLength = value.getLength() - value.getPosition();
-      boolean sameKey = key == IFile.REPEAT_KEY;
+    assert false;
+  }
 
-      if (!sameKey) {
-          // Normal key-value pair
-          // Write V_END_MARKER if needed (if previous was a REPEAT_KEY)
-          if (prevKey == IFile.REPEAT_KEY) {
-              out.writeInt(IFile.V_END_MARKER);
-          }
+  public void appendRleAccurate(DataInputBuffer key, DataInputBuffer value) throws IOException {
+    int keyLength = key.getLength() - key.getPosition();
+    int valueLength = value.getLength() - value.getPosition();
+    boolean sameKey = key == IFile.REPEAT_KEY;
 
-          long combined = ((long) keyLength << 32) | (valueLength & 0xFFFFFFFFL);
-          out.writeLong(combined);
-
-          out.write(key.getData(), key.getPosition(), keyLength);
-          out.write(value.getData(), value.getPosition(), valueLength);
-      } else {
-          // Repeated key
-          if (prevKey != IFile.REPEAT_KEY) {
-              // First repeated key, write RLE marker
-              out.writeInt(IFile.RLE_MARKER);
-          }
-
-          // Write just the value length and value
-          out.writeInt(valueLength);
-          out.write(value.getData(), value.getPosition(), valueLength);
+    if (!sameKey) {
+      // Normal key-value pair
+      // Write V_END_MARKER if needed (if previous was a REPEAT_KEY)
+      if (prevKey == IFile.REPEAT_KEY) {
+        out.writeInt(IFile.V_END_MARKER);
       }
 
-      prevKey = sameKey ? IFile.REPEAT_KEY : key;
+      long combined = ((long) keyLength << 32) | (valueLength & 0xFFFFFFFFL);
+      out.writeLong(combined);
+
+      out.write(key.getData(), key.getPosition(), keyLength);
+      out.write(value.getData(), value.getPosition(), valueLength);
+    } else {
+      // Repeated key
+      if (prevKey != IFile.REPEAT_KEY) {
+        // First repeated key, write RLE marker
+        out.writeInt(IFile.RLE_MARKER);
+      }
+
+      // Write just the value length and value
+      out.writeInt(valueLength);
+      out.write(value.getData(), value.getPosition(), valueLength);
+    }
+
+    prevKey = sameKey ? IFile.REPEAT_KEY : key;
   }
 
   public void close() throws IOException {

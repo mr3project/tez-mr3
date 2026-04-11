@@ -81,30 +81,35 @@ public class TezMerger {
   public static void writeFile(TezRawKeyValueIterator records, IFile.WriterAppendDataInputBuffer writer,
       Progressable progressable, long recordsBeforeProgress)
       throws IOException, InterruptedException {
-    long recordCtr = 0;
     boolean isRleEnabled = writer.isRleEnabled();
-    while (records.next()) {
-      if (isRleEnabled) {
-        if (records.isSameKey()) {
-          writer.appendRle(IFile.REPEAT_KEY, records.getValue());
-        } else {
-          writer.appendRle(records.getKey(), records.getValue());
+    boolean isSameKeyAccurate = records.isSameKeyAccurate();
+
+    long recordCtr = 0;
+    if (isRleEnabled) {
+      if (isSameKeyAccurate) {
+        while (records.next()) {
+          DataInputBuffer key = records.isSameKey() ? IFile.REPEAT_KEY : records.getKey();
+          writer.appendRleAccurate(key, records.getValue());
+          if (((recordCtr++) % recordsBeforeProgress) == 0) { checkProgress(progressable); }
         }
       } else {
-        writer.appendNoRle(records.getKey(), records.getValue());
-      }
-      
-      if (((recordCtr++) % recordsBeforeProgress) == 0) {
-        progressable.progress();
-        if (Thread.currentThread().isInterrupted()) {
-          /**
-           * Takes care DefaultSorter.mergeParts, MergeManager's merger threads,
-           * PipelinedSorter's flush(). This is not expensive check as it is carried out every
-           * 10000 records or so.
-           */
-          throw new InterruptedException("Current thread=" + Thread.currentThread().getName() + " interrupted");
+        while (records.next()) {
+          writer.appendRle(records.getKey(), records.getValue());
+          if (((recordCtr++) % recordsBeforeProgress) == 0) { checkProgress(progressable); }
         }
       }
+    } else {
+      while (records.next()) {
+        writer.appendNoRle(records.getKey(), records.getValue());
+        if (((recordCtr++) % recordsBeforeProgress) == 0) { checkProgress(progressable); }
+      }
+    }
+  }
+
+  private static void checkProgress(Progressable progressable) throws InterruptedException {
+    progressable.progress();
+    if (Thread.currentThread().isInterrupted()) {
+      throw new InterruptedException("Current thread=" + Thread.currentThread().getName() + " interrupted");
     }
   }
 

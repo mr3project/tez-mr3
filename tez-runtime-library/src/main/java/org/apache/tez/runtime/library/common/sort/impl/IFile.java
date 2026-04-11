@@ -101,9 +101,15 @@ public class IFile {
 
   public interface WriterAppendDataInputBuffer {
     boolean isRleEnabled();
+
     // call when isRleEnabled is not statically known
     void appendNoRle(DataInputBuffer key, DataInputBuffer value) throws IOException;
+
+    // if key != IFile.REPEAT_KEY, perform key comparison to check whether 'key' is a new key or not
     void appendRle(DataInputBuffer key, DataInputBuffer value) throws IOException;
+    // if key != IFile.REPEAT_KEY, do not perform key comparison because 'key' is a new key
+    void appendRleAccurate(DataInputBuffer key, DataInputBuffer value) throws IOException;
+
     void close() throws IOException;
   }
 
@@ -552,11 +558,14 @@ public class IFile {
     }
 
     public WriterDataInputBuffer(FSDataOutputStream outputStream,
-                                 CompressionCodec codec, TezCounter writesCounter, TezCounter serializedBytesCounter,
-                                 boolean isRleEnabled, byte[] writeBuffer, @Nullable Compressor compressorExternal)
+                                 CompressionCodec codec,
+                                 TezCounter writesCounter,
+                                 TezCounter serializedBytesCounter,
+                                 boolean isRleEnabled,
+                                 byte[] writeBuffer, @Nullable Compressor compressorExternal)
         throws IOException {
-      super(outputStream, codec, writesCounter, serializedBytesCounter, isRleEnabled, writeBuffer,
-          compressorExternal);
+      super(outputStream, codec, writesCounter, serializedBytesCounter, isRleEnabled,
+          writeBuffer, compressorExternal);
     }
 
     private void writeValueNoRle(byte[] data, int offset, int length) throws IOException {
@@ -611,13 +620,17 @@ public class IFile {
 
       if (!sameKey) {
         writeKVPairRle(key.getData(), key.getPosition(), keyLength,
-            value.getData(), value.getPosition(), valueLength);
+          value.getData(), value.getPosition(), valueLength);
         BufferUtils.copy(key, previous);
       } else {
         writeValueRle(value.getData(), value.getPosition(), valueLength);
       }
       prevKey = sameKey ? REPEAT_KEY : key;
       incrementRecordsWritten();
+    }
+
+    public void appendRleAccurate(DataInputBuffer key, DataInputBuffer value) throws IOException {
+      assert false;
     }
 
     private void writeRLE() throws IOException {
