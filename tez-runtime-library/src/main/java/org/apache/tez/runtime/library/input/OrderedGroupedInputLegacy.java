@@ -34,38 +34,43 @@ public class OrderedGroupedInputLegacy extends OrderedGroupedKVInput {
   public TezRawKeyValueIterator getIterator() throws IOException, InterruptedException, TezException {
     // wait for input so that iterator is available
     synchronized(this) {
-    if (getNumPhysicalInputs() == 0) {
-      return new TezRawKeyValueIterator() {
-        @Override
-        public DataInputBuffer getKey() throws IOException {
-          throw new RuntimeException("No data available in Input");
-        }
+      if (getNumPhysicalInputs() == 0) {
+        return new TezRawKeyValueIterator() {
+          @Override
+          public DataInputBuffer getKey() throws IOException {
+            throw new RuntimeException("No data available in Input");
+          }
 
-        @Override
-        public DataInputBuffer getValue() throws IOException {
-          throw new RuntimeException("No data available in Input");
-        }
+          @Override
+          public DataInputBuffer getValue() throws IOException {
+            throw new RuntimeException("No data available in Input");
+          }
 
-        @Override
-        public boolean next() throws IOException {
-          return false;
-        }
+          @Override
+          public boolean next() throws IOException {
+            return false;
+          }
 
-        @Override
-        public boolean hasNext() throws IOException {
-          return false;
-        }
+          @Override
+          public boolean hasNext() throws IOException {
+            return false;
+          }
 
-        @Override
-        public void close() throws IOException {
-        }
+          @Override
+          public void close() throws IOException {
+          }
 
-        @Override
-        public boolean isSameKey() {
-          throw new UnsupportedOperationException("isSameKey is not supported");
-        }
-      };
-    }
+          @Override
+          public boolean isSameKey() {
+            throw new UnsupportedOperationException("isSameKey is not supported");
+          }
+
+          @Override
+          public boolean isSameKeyAccurate() {
+            throw new UnsupportedOperationException("isSameKey is not supported");
+          }
+        };
+      }
     }
 
     waitForInputReady();

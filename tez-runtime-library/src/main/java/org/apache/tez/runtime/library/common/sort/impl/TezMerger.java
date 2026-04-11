@@ -102,8 +102,7 @@ public class TezMerger {
            * PipelinedSorter's flush(). This is not expensive check as it is carried out every
            * 10000 records or so.
            */
-          throw new InterruptedException("Current thread=" + Thread.currentThread().getName() + " got "
-              + "interrupted");
+          throw new InterruptedException("Current thread=" + Thread.currentThread().getName() + " interrupted");
         }
       }
     }
@@ -654,6 +653,11 @@ public class TezMerger {
       return (hasNext != null) && (hasNext == KeyState.SAME_KEY);
     }
 
+    @Override
+    public boolean isSameKeyAccurate() {
+      return true;
+    }
+
     public boolean hasNext() throws IOException {
       if (size() == 0)
         return false;
@@ -701,6 +705,11 @@ public class TezMerger {
 
     @Override
     public boolean isSameKey() {
+      throw new UnsupportedOperationException("isSameKey is not supported");
+    }
+
+    @Override
+    public boolean isSameKeyAccurate() {
       throw new UnsupportedOperationException("isSameKey is not supported");
     }
   }

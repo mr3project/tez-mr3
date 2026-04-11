@@ -73,4 +73,9 @@ public interface TezRawKeyValueIterator {
    * @return true if key is the same as the previous key
    */
   boolean isSameKey();
+
+  // true: isSameKey() is accurate and thus the consumer does not have to perform key comparison for IFile.REPEAT_KEY
+  // false: isSameKey() always returns false
+  // throws UnsupportedOperationException if isSameKey() is not supported
+  boolean isSameKeyAccurate();
 }
