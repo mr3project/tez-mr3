@@ -101,6 +101,7 @@ public class IFile {
 
   public interface WriterAppendDataInputBuffer {
     void append(DataInputBuffer key, DataInputBuffer value) throws IOException;
+    boolean isRleEnabled();
     void close() throws IOException;
   }
 
@@ -589,6 +590,11 @@ public class IFile {
       } else {
         appendNoRle(key, value);
       }
+    }
+
+    @Override
+    public boolean isRleEnabled() {
+      return isRleEnabled;
     }
 
     private void appendNoRle(DataInputBuffer key, DataInputBuffer value) throws IOException {

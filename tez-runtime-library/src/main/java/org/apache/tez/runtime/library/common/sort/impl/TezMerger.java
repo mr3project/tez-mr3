@@ -82,9 +82,10 @@ public class TezMerger {
       Progressable progressable, long recordsBeforeProgress)
       throws IOException, InterruptedException {
     long recordCtr = 0;
+    boolean isRleEnabled = writer.isRleEnabled();
     // long count = 0;
     while (records.next()) {
-      if (records.isSameKey()) {
+      if (isRleEnabled && records.isSameKey()) {
         writer.append(IFile.REPEAT_KEY, records.getValue());
         // count++;
       } else {
