@@ -55,13 +55,11 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
   private FetchedInput currentFetchedInput;
   private IFile.KeyValueReaderBytesWritable currentReader;
   
-  // TODO Remove this once per I/O counters are separated properly. Relying on
-  // the counter at the moment will generate aggregate numbers. 
   private int numRecordsRead = 0;
+
   public UnorderedKVReader(ShuffleManager shuffleManager, Configuration conf,
       CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLength,
-      TezCounter inputRecordCounter, InputContext context)
-      throws IOException {
+      TezCounter inputRecordCounter, InputContext context) {
     this.shuffleManager = shuffleManager;
     this.context = context;
     this.codec = codec;

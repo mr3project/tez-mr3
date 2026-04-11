@@ -1041,7 +1041,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
     private final TezRawKeyValueIterator kvIter;
     private final long size;
-    private long bytesRead;
 
     public RawKVIteratorReader(TezRawKeyValueIterator kvIter, long size) {
       this.kvIter = kvIter;
@@ -1055,7 +1054,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         final int kp = kb.getPosition();
         final int klen = kb.getLength() - kp;
         key.reset(kb.getData(), kp, klen);
-        bytesRead += klen;
         return kvIter.isSameKey() ? IFile.Reader.KeyState.SAME_KEY : IFile.Reader.KeyState.NEW_KEY;
       }
       return IFile.Reader.KeyState.NO_KEY;
@@ -1067,7 +1065,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       final int vp = vb.getPosition();
       final int vlen = vb.getLength() - vp;
       value.reset(vb.getData(), vp, vlen);
-      bytesRead += vlen;
     }
 
     @Override

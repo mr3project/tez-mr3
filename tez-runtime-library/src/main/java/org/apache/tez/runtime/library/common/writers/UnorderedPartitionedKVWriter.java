@@ -1643,6 +1643,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       }
     }
 
+    // onSuccess() is called only for intermediate spills, while finalSpill() calls SpillCallable.call() directly.
     @Override
     public void onSuccess(SpillResult result) {
       synchronized (UnorderedPartitionedKVWriter.this) {
@@ -1664,6 +1665,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       }
 
       if (!isPipelinedShuffle) {
+        // only for intermediate spills
         assert !result.useFreeMemoryForOutput;
         synchronized(additionalSpillBytesWrittenCounter) {
           // isPipelinedShuffle == false, so this is counted as an intermediate spill

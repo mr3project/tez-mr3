@@ -265,7 +265,7 @@ public class Shuffle implements ExceptionReporter {
       cleanupShuffleScheduler();
 
       // Finish the on-going merges...
-      TezRawKeyValueIterator kvIter = null;
+      TezRawKeyValueIterator kvIter;
       try {
         kvIter = merger.close(true);
       } catch (Throwable e) {

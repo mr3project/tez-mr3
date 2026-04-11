@@ -289,9 +289,11 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
     RawComparator rawComparator = SerializationContext.getKeyComparator();
     Class<?> keyClass = SerializationContext.getKeyClass();
     Class<?> valClass = SerializationContext.getValueClass();
-    LOG.info("{}: creating ValuesIterator with comparator={}, keyClass={}, valClass={}",
-        getContext().getSourceVertexName(), rawComparator.getClass().getName(),
-        keyClass.getName(), valClass.getName());
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("{}: creating ValuesIterator with comparator={}, keyClass={}, valClass={}",
+          getContext().getSourceVertexName(), rawComparator.getClass().getName(),
+          keyClass.getName(), valClass.getName());
+    }
 
     vIter = new ValuesIterator(rawIter, rawComparator, inputKeyCounter, inputValueCounter);
   }
