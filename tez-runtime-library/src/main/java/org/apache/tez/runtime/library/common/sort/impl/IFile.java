@@ -580,20 +580,20 @@ public class IFile {
       if (isRleEnabled) {
         appendRle(key, value);
       } else {
+        if (key == REPEAT_KEY) {
+          throw new IOException("REPEAT_KEY is not allowed when RLE is disabled");
+        }
         appendNoRle(key, value);
       }
     }
 
     private void appendNoRle(DataInputBuffer key, DataInputBuffer value) throws IOException {
       int keyLength = key.getLength() - key.getPosition();
-      assert (key == REPEAT_KEY || keyLength >=0);
+      assert (keyLength >=0);
 
       int valueLength = value.getLength() - value.getPosition();
       assert (valueLength >= 0);
 
-      if (key == REPEAT_KEY) {
-        throw new IOException("REPEAT_KEY is not allowed when RLE is disabled");
-      }
       writeKVPair(key.getData(), key.getPosition(), keyLength,
           value.getData(), value.getPosition(), valueLength);
       prevKey = key;
