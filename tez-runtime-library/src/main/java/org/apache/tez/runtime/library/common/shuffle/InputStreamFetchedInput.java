@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
-import org.apache.commons.io.input.BoundedInputStream;
 import org.apache.tez.common.Preconditions;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 
@@ -34,7 +33,6 @@ public class InputStreamFetchedInput extends FetchedInput {
   private InputStream inputStream;
   private final long startOffset;
   private final long size;
-  private boolean streamAccessed;
 
   public InputStreamFetchedInput(
       InputStream inputStream,
@@ -46,7 +44,6 @@ public class InputStreamFetchedInput extends FetchedInput {
     this.inputStream = inputStream;
     this.startOffset = startOffset;
     this.size = size;
-    this.streamAccessed = false;
   }
 
   @Override
@@ -66,20 +63,9 @@ public class InputStreamFetchedInput extends FetchedInput {
 
   @Override
   public InputStream getInputStream() throws IOException {
-    Preconditions.checkState(!streamAccessed,
-        "InputStreamFetchedInput.getInputStream() can be called at most once");
-    streamAccessed = true;
-
-    long remaining = startOffset;
-    while (remaining > 0) {
-      long skipped = inputStream.skip(remaining);
-      if (skipped <= 0) {
-        throw new IOException("Failed to seek input stream to offset " + startOffset);
-      }
-      remaining -= skipped;
-    }
-
-    return new BoundedInputStream(inputStream, size);
+    Preconditions.checkState(inputStream != null,
+        "InputStreamFetchedInput.inputStream cannot be null");
+    return inputStream;
   }
 
   @Override
@@ -94,9 +80,7 @@ public class InputStreamFetchedInput extends FetchedInput {
   public void abort() throws IOException {
     if (isState(State.PENDING)) {
       setState(State.ABORTED);
-      if (inputStream != null) {
-        inputStream.close();
-      }
+      inputStream.close();
       inputStream = null;
       notifyFetchFailure();
     }
@@ -105,11 +89,10 @@ public class InputStreamFetchedInput extends FetchedInput {
   @Override
   public void free() {
     Preconditions.checkState(
-        isState(State.COMMITTED) || isState(State.ABORTED),
-        "FetchedInput can only be freed after it is committed or aborted");
-    if (isState(State.COMMITTED)) {
-      setState(State.FREED);
-      notifyFreedResource();
-    }
+        isState(State.COMMITTED),
+        "FetchedInput can only be freed after it is committed");
+    setState(State.FREED);
+    inputStream = null;
+    notifyFreedResource();
   }
 }
