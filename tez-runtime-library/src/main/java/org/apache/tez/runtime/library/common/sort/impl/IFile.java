@@ -107,8 +107,6 @@ public class IFile {
 
     // if key != IFile.REPEAT_KEY, perform key comparison to check whether 'key' is a new key or not
     void appendRle(DataInputBuffer key, DataInputBuffer value) throws IOException;
-    // if key != IFile.REPEAT_KEY, do not perform key comparison because 'key' is a new key
-    void appendRleAccurate(DataInputBuffer key, DataInputBuffer value) throws IOException;
 
     void close() throws IOException;
   }
@@ -248,8 +246,7 @@ public class IFile {
     protected void writeKVPair(byte[] keyData, int keyPos, int keyLength,
         byte[] valueData, int valPos, int valueLength) throws IOException {
       if (!bufferFull) {
-        totalSize += INT_SIZE + keyLength
-            + INT_SIZE + valueLength;
+        totalSize += INT_SIZE + keyLength + INT_SIZE + valueLength;
 
         if (shouldWriteToDisk()) {
           resetToFileBasedWriter();
@@ -583,12 +580,6 @@ public class IFile {
       super.writeKVPair(keyData, keyPos, keyLength, valueData, valPos, valueLength);
     }
 
-    private void writeKVPairRle(byte[] keyData, int keyPos, int keyLength,
-        byte[] valueData, int valPos, int valueLength) throws IOException {
-      writeValueMarker();
-      super.writeKVPair(keyData, keyPos, keyLength, valueData, valPos, valueLength);
-    }
-
     public boolean isRleEnabled() {
       return isRleEnabled;
     }
@@ -608,6 +599,7 @@ public class IFile {
 
     public void appendRle(DataInputBuffer key, DataInputBuffer value) throws IOException {
       int keyLength = key.getLength() - key.getPosition();
+      int valueLength = value.getLength() - value.getPosition();
       assert (key == REPEAT_KEY || keyLength >=0);
 
       boolean sameKey = key == REPEAT_KEY;
@@ -615,23 +607,15 @@ public class IFile {
         sameKey = (keyLength != 0) && BufferUtils.compareEqual(previous, key);
       }
 
-      appendRleAccurate(sameKey ? REPEAT_KEY : key, value);
-    }
-
-    public void appendRleAccurate(DataInputBuffer key, DataInputBuffer value) throws IOException {
-      int keyLength = key.getLength() - key.getPosition();
-      assert (key == REPEAT_KEY || keyLength >= 0);
-
-      int valueLength = value.getLength() - value.getPosition();
-      assert (valueLength >= 0);
-
-      boolean sameKey = key == REPEAT_KEY;
       if (!sameKey) {
-        writeKVPairRle(key.getData(), key.getPosition(), keyLength,
-          value.getData(), value.getPosition(), valueLength);
+        writeValueMarker();
+        super.writeKVPair(key.getData(), key.getPosition(), keyLength,
+            value.getData(), value.getPosition(), valueLength);
         BufferUtils.copy(key, previous);
       } else {
-        writeValueRle(value.getData(), value.getPosition(), valueLength);
+        writeRLE();
+        super.writeValue(value.getData(), value.getPosition(), valueLength);
+        totalKeySaving++;
       }
       prevKey = sameKey ? REPEAT_KEY : key;
       incrementRecordsWritten();

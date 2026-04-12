@@ -1309,11 +1309,6 @@ public class PipelinedSorter extends ExternalSorter {
       return false;
     }
 
-    @Override
-    public boolean isSameKeyAccurate() {
-      return false;
-    }
-
     public int getPartition() {
       final int partition = kvmeta.get(span.offsetFor(kvindex) + PARTITION);
       return partition;
@@ -1426,11 +1421,6 @@ public class PipelinedSorter extends ExternalSorter {
     @Override
     public boolean isSameKey() {
       return iter.isSameKey();
-    }
-
-    @Override
-    public boolean isSameKeyAccurate() {
-      return iter.isSameKeyAccurate();
     }
 
     public boolean next() throws IOException {
@@ -1628,11 +1618,6 @@ public class PipelinedSorter extends ExternalSorter {
 
     @Override
     public boolean isSameKey() {
-      return false;
-    }
-
-    @Override
-    public boolean isSameKeyAccurate() {
       return false;
     }
 

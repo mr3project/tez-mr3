@@ -82,21 +82,14 @@ public class TezMerger {
       Progressable progressable, long recordsBeforeProgress)
       throws IOException, InterruptedException {
     boolean isRleEnabled = writer.isRleEnabled();
-    boolean isSameKeyAccurate = records.isSameKeyAccurate();
 
     long recordCtr = 0;
     if (isRleEnabled) {
-      if (isSameKeyAccurate) {
-        while (records.next()) {
-          DataInputBuffer key = records.isSameKey() ? IFile.REPEAT_KEY : records.getKey();
-          writer.appendRleAccurate(key, records.getValue());
-          if (((recordCtr++) % recordsBeforeProgress) == 0) { checkProgress(progressable); }
-        }
-      } else {
-        while (records.next()) {
-          writer.appendRle(records.getKey(), records.getValue());
-          if (((recordCtr++) % recordsBeforeProgress) == 0) { checkProgress(progressable); }
-        }
+      while (records.next()) {
+        // Even if records.isSameKey() is false, the two keys may be the same.
+        DataInputBuffer key = records.isSameKey() ? IFile.REPEAT_KEY : records.getKey();
+        writer.appendRle(key, records.getValue());
+        if (((recordCtr++) % recordsBeforeProgress) == 0) { checkProgress(progressable); }
       }
     } else {
       while (records.next()) {
@@ -658,11 +651,6 @@ public class TezMerger {
       return (hasNext != null) && (hasNext == KeyState.SAME_KEY);
     }
 
-    @Override
-    public boolean isSameKeyAccurate() {
-      return true;
-    }
-
     public boolean hasNext() throws IOException {
       if (size() == 0)
         return false;
@@ -710,11 +698,6 @@ public class TezMerger {
 
     @Override
     public boolean isSameKey() {
-      throw new UnsupportedOperationException("isSameKey is not supported");
-    }
-
-    @Override
-    public boolean isSameKeyAccurate() {
       throw new UnsupportedOperationException("isSameKey is not supported");
     }
   }
