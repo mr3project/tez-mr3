@@ -225,6 +225,7 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
           fetchedInput.getInputAttemptIdentifier(), inputContext, false);
       break;
     case WAIT:
+    case LOCAL_BYTE_CACHE:
     default:
       throw new TezUncheckedException("Unexpected type: " + fetchedInput.getType());
     }

@@ -31,7 +31,8 @@ public abstract class FetchedInput implements ShuffleInput {
     WAIT,
     MEMORY,
     DISK,
-    DISK_DIRECT
+    DISK_DIRECT,
+    LOCAL_BYTE_CACHE
   }
 
   // 1. PENDING --> COMMITTED --> FREED (never used)
@@ -124,8 +125,9 @@ public abstract class FetchedInput implements ShuffleInput {
 
   /**
    * Return an input stream to be used to read the previously fetched data.
-   * All calls to getInputStream() produce new reset streams for reading.
-   * Users are expected to close the InputStream when they're done.
+   * The returned InputStream is consumed at most once and may not support
+   * reset/mark semantics. Users are expected to close the InputStream when
+   * they're done.
    */
   public abstract InputStream getInputStream() throws IOException;
 

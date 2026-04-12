@@ -184,6 +184,7 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator, Fetch
     // Not tracking anything here.
     case DISK:
     case DISK_DIRECT:
+    case LOCAL_BYTE_CACHE:
     case MEMORY:
       break;
     default:
@@ -208,6 +209,9 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator, Fetch
       break;
     case MEMORY:
       unreserve(((MemoryFetchedInput) fetchedInput).getSize());
+      break;
+    case LOCAL_BYTE_CACHE:
+    case DISK_DIRECT:
       break;
     default:
       throw new TezUncheckedException("InputType: " + fetchedInput.getType()
