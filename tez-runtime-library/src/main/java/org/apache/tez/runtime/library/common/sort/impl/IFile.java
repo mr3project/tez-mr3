@@ -565,21 +565,6 @@ public class IFile {
           writeBuffer, compressorExternal);
     }
 
-    private void writeValueNoRle(byte[] data, int offset, int length) throws IOException {
-      super.writeValue(data, offset, length);
-    }
-
-    private void writeValueRle(byte[] data, int offset, int length) throws IOException {
-      writeRLE();
-      super.writeValue(data, offset, length);
-      totalKeySaving++;
-    }
-
-    private void writeKVPairNoRle(byte[] keyData, int keyPos, int keyLength,
-        byte[] valueData, int valPos, int valueLength) throws IOException {
-      super.writeKVPair(keyData, keyPos, keyLength, valueData, valPos, valueLength);
-    }
-
     public boolean isRleEnabled() {
       return isRleEnabled;
     }
@@ -591,7 +576,7 @@ public class IFile {
       int valueLength = value.getLength() - value.getPosition();
       assert (valueLength >= 0);
 
-      writeKVPairNoRle(key.getData(), key.getPosition(), keyLength,
+      super.writeKVPair(key.getData(), key.getPosition(), keyLength,
           value.getData(), value.getPosition(), valueLength);
       prevKey = key;
       incrementRecordsWritten();
@@ -613,20 +598,16 @@ public class IFile {
             value.getData(), value.getPosition(), valueLength);
         BufferUtils.copy(key, previous);
       } else {
-        writeRLE();
+        if (prevKey != REPEAT_KEY) {
+          bufferWriteInt(RLE_MARKER);
+          incrementDecompressedBytesWritten(RLE_MARKER_SIZE);
+          rleWritten++;
+        }
         super.writeValue(value.getData(), value.getPosition(), valueLength);
         totalKeySaving++;
       }
       prevKey = sameKey ? REPEAT_KEY : key;
       incrementRecordsWritten();
-    }
-
-    private void writeRLE() throws IOException {
-      if (prevKey != REPEAT_KEY) {
-        bufferWriteInt(RLE_MARKER);
-        incrementDecompressedBytesWritten(RLE_MARKER_SIZE);
-        rleWritten++;
-      }
     }
 
     private void writeValueMarker() throws IOException {
@@ -1009,22 +990,6 @@ public class IFile {
       bytesRead += INT_SIZE + INT_SIZE;
     }
 
-    /**
-     * Reset key length and value length for next record in the file
-     *
-     * @param dIn
-     * @return true if key length and value length were set to the next
-     *         false if end of file (EOF) marker was reached
-     * @throws IOException
-     */
-    protected boolean positionToNextRecord(DataInput dIn) throws IOException {
-      if (isRleEnabled) {
-        return positionToNextRecordRle(dIn);
-      } else {
-        return positionToNextRecordNoRle(dIn);
-      }
-    }
-
     private boolean positionToNextRecordNoRle(DataInput dIn) throws IOException {
       // Sanity check
       if (eof) {
@@ -1281,9 +1246,6 @@ public class IFile {
         }
         decompressor = null;
       }
-    }
-
-    public void reset(int offset) {
     }
   }
 }
