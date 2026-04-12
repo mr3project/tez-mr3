@@ -20,6 +20,7 @@ package org.apache.tez.runtime.library.common.shuffle.impl;
 
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.util.AbstractMap;
@@ -31,17 +32,18 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.commons.io.input.BoundedInputStream;
 import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.FetcherConfigCommon;
 import org.apache.tez.runtime.api.TaskContext;
-import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.shuffle.DiskFetchedInput;
 import org.apache.tez.runtime.library.common.shuffle.FetchResult;
 import org.apache.tez.runtime.library.common.shuffle.FetchedInput;
 import org.apache.tez.runtime.library.common.shuffle.FetchedInputCallback;
 import org.apache.tez.runtime.library.common.shuffle.Fetcher;
+import org.apache.tez.runtime.library.common.shuffle.InputStreamFetchedInput;
 import org.apache.tez.runtime.library.common.shuffle.InputHost;
 import org.apache.tez.runtime.library.common.shuffle.LocalDiskFetchedInput;
 import org.apache.tez.runtime.library.common.shuffle.MemoryFetchedInput;
@@ -136,31 +138,19 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     }
 
     boolean useLocalDiskFetch;
-    boolean useFreeMemoryWriterOutput = conf.getBoolean(
-        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT,
-        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT_DEFAULT);
-    boolean useFreeMemoryFetchedInput = conf.getBoolean(
-        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT,
-        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT_DEFAULT);
-    if (useFreeMemoryWriterOutput || useFreeMemoryFetchedInput) {
-      // useFreeMemoryWriterOutput == true: required
-      // useFreeMemoryFetchedInput == true: recommended for performance
-      useLocalDiskFetch = false;
-    } else {
-      if (fetcherConfigCommon.localDiskFetchEnabled &&
-          host.equals(fetcherConfigCommon.localHostName)) {
-        if (fetcherConfigCommon.compositeFetch) {
-          // inspect 'first' to find the container where all inputs originate from
-          CompositeInputAttemptIdentifier first = pendingInputsSeq.getInputs().get(0);
-          // true if inputs originate from the current ContainerWorker
-          useLocalDiskFetch = first.getPathComponent().startsWith(
-              taskContext.getExecutionContext().getEnvContainerId());
-        } else {
-          useLocalDiskFetch = true;
-        }
+    if (fetcherConfigCommon.localDiskFetchEnabled &&
+        host.equals(fetcherConfigCommon.localHostName)) {
+      if (fetcherConfigCommon.compositeFetch) {
+        // inspect 'first' to find the container where all inputs originate from
+        CompositeInputAttemptIdentifier first = pendingInputsSeq.getInputs().get(0);
+        // true if inputs originate from the current ContainerWorker
+        useLocalDiskFetch = first.getPathComponent().startsWith(
+            taskContext.getExecutionContext().getEnvContainerId());
       } else {
-        useLocalDiskFetch = false;
+        useLocalDiskFetch = true;
       }
+    } else {
+      useLocalDiskFetch = false;
     }
 
     HostFetchResult hostFetchResult;
@@ -458,7 +448,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
           TezIndexRecord indexRecord = spillRecord.getIndex(reduceId);
           // TODO: continue if !indexRecord.hasData()
 
-          fetchedInput = getLocalDiskFetchedInput(srcAttemptId, indexRecord, inputFilePath);
+          fetchedInput = getLocalFetchedInput(srcAttemptId, pathComponent, indexRecord, inputFilePath);
           long endTime = System.currentTimeMillis();
           fetcherCallback.fetchSucceeded(shuffleClientId, host, srcAttemptId, fetchedInput,
               indexRecord.getPartLength(), indexRecord.getRawLength(), (endTime - startTime));
@@ -507,24 +497,35 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     }
   }
 
-  private LocalDiskFetchedInput getLocalDiskFetchedInput(
-      InputAttemptIdentifier srcAttemptId, TezIndexRecord indexRecord, Path inputFilePath) {
-    LocalDiskFetchedInput fetchedInput = new LocalDiskFetchedInput(
-      indexRecord.getStartOffset(), indexRecord.getPartLength(),
-      srcAttemptId, inputFilePath, fetcherConfigCommon.localFs,
-      new FetchedInputCallback() {
-        @Override
-        public void fetchComplete(FetchedInput fetchedInput) {
+  private FetchedInput getLocalFetchedInput(
+      InputAttemptIdentifier srcAttemptId, String pathComponent,
+      TezIndexRecord indexRecord, Path inputFilePath) throws IOException {
+    FetchedInput fetchedInput;
+    if (inputFilePath != null) {
+      fetchedInput = new LocalDiskFetchedInput(
+          indexRecord.getStartOffset(), indexRecord.getPartLength(),
+          srcAttemptId, inputFilePath, fetcherConfigCommon.localFs, NO_OP_FETCHED_INPUT_CALLBACK);
+    } else {
+      org.apache.tez.runtime.api.MultiByteArrayOutputStream byteArrayOutput =
+          taskContext.getConcurrentByteCache().get(pathComponent);
+      if (byteArrayOutput == null) {
+        throw new IOException("ConcurrentByteCache not found for pathComponent=" + pathComponent);
+      }
+      InputStream inputStream = byteArrayOutput.createInputStream();
+      long remaining = indexRecord.getStartOffset();
+      while (remaining > 0) {
+        long skipped = inputStream.skip(remaining);
+        if (skipped <= 0) {
+          inputStream.close();
+          throw new IOException("Failed to seek spill to offset " + indexRecord.getStartOffset());
         }
-
-        @Override
-        public void fetchFailed(FetchedInput fetchedInput) {
-        }
-
-        @Override
-        public void freeResources(FetchedInput fetchedInput) {
-        }
-      });
+        remaining -= skipped;
+      }
+      fetchedInput = new InputStreamFetchedInput(
+          new BoundedInputStream(inputStream, indexRecord.getPartLength()),
+          indexRecord.getPartLength(),
+          srcAttemptId, NO_OP_FETCHED_INPUT_CALLBACK);
+    }
     if (isDebugEnabled) {
       LOG.debug("fetcher" + " about to shuffle output of srcAttempt (direct disk)" + srcAttemptId
         + " decomp: " + indexRecord.getRawLength() + " len: " + indexRecord.getPartLength()
@@ -533,6 +534,20 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
 
     return fetchedInput;
   }
+
+  private static final FetchedInputCallback NO_OP_FETCHED_INPUT_CALLBACK = new FetchedInputCallback() {
+    @Override
+    public void fetchComplete(FetchedInput fetchedInput) {
+    }
+
+    @Override
+    public void fetchFailed(FetchedInput fetchedInput) {
+    }
+
+    @Override
+    public void freeResources(FetchedInput fetchedInput) {
+    }
+  };
 
   static class HostFetchResult {
     private final FetchResult fetchResult;

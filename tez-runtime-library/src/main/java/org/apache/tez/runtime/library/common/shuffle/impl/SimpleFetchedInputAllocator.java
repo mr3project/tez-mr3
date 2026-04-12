@@ -181,9 +181,9 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator, Fetch
   @Override
   public synchronized void fetchComplete(FetchedInput fetchedInput) {
     switch (fetchedInput.getType()) {
-    // Not tracking anything here.
     case DISK:
     case DISK_DIRECT:
+    case LOCAL_BYTE_CACHE:
     case MEMORY:
       break;
     default:
@@ -204,10 +204,12 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator, Fetch
 
   private void cleanup(FetchedInput fetchedInput) {
     switch (fetchedInput.getType()) {
-    case DISK:
-      break;
     case MEMORY:
       unreserve(((MemoryFetchedInput) fetchedInput).getSize());
+      break;
+    case DISK:
+    case DISK_DIRECT:
+    case LOCAL_BYTE_CACHE:
       break;
     default:
       throw new TezUncheckedException("InputType: " + fetchedInput.getType()
