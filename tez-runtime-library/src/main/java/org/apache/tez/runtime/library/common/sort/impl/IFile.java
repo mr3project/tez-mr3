@@ -331,6 +331,8 @@ public class IFile {
     private long compressedBytesWritten = 0;
     // Count records written to disk
     private long numRecordsWritten = 0;
+    // Count serialized key/value bytes for counter updates.
+    private long numSerializedBytesWritten = 0;
 
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
@@ -441,6 +443,9 @@ public class IFile {
       if (writtenRecordsCounter != null) {
         writtenRecordsCounter.increment(numRecordsWritten);
       }
+      if (serializedUncompressedBytes != null) {
+        serializedUncompressedBytes.increment(numSerializedBytesWritten);
+      }
       if (isDebugEnabled) {
         LOG.debug("Total keys written=" + numRecordsWritten + "; compressedLen="
             + compressedBytesWritten + "; rawLen=" + decompressedBytesWritten);
@@ -456,9 +461,7 @@ public class IFile {
       bufferWriteBytes(data, offset, length);
       // Update bytes written
       decompressedBytesWritten += length + INT_SIZE;
-      if (serializedUncompressedBytes != null) {
-        serializedUncompressedBytes.increment(length);
-      }
+      numSerializedBytesWritten += length;
     }
 
     protected void writeKVPair(byte[] keyData, int keyPos, int keyLength,
@@ -471,9 +474,7 @@ public class IFile {
 
       // Update bytes written
       decompressedBytesWritten += keyLength + valueLength + INT_SIZE + INT_SIZE;
-      if (serializedUncompressedBytes != null) {
-        serializedUncompressedBytes.increment(keyLength + valueLength);
-      }
+      numSerializedBytesWritten += keyLength + valueLength;
     }
 
     protected void onClose() throws IOException {
