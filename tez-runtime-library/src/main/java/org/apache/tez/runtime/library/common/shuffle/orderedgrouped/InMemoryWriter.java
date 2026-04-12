@@ -73,7 +73,6 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
   public void appendRle(DataInputBuffer key, DataInputBuffer value) throws IOException {
     int keyLength = key.getLength() - key.getPosition();
     int valueLength = value.getLength() - value.getPosition();
-    assert (keyLength >= 0 || key == IFile.REPEAT_KEY);
 
     boolean sameKey = key == IFile.REPEAT_KEY;
     if (!sameKey) {

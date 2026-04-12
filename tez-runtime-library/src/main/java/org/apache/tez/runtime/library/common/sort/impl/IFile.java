@@ -571,10 +571,7 @@ public class IFile {
 
     public void appendNoRle(DataInputBuffer key, DataInputBuffer value) throws IOException {
       int keyLength = key.getLength() - key.getPosition();
-      assert (keyLength >=0);
-
       int valueLength = value.getLength() - value.getPosition();
-      assert (valueLength >= 0);
 
       super.writeKVPair(key.getData(), key.getPosition(), keyLength,
           value.getData(), value.getPosition(), valueLength);
@@ -585,7 +582,6 @@ public class IFile {
     public void appendRle(DataInputBuffer key, DataInputBuffer value) throws IOException {
       int keyLength = key.getLength() - key.getPosition();
       int valueLength = value.getLength() - value.getPosition();
-      assert (keyLength >= 0 || key == REPEAT_KEY);
 
       boolean sameKey = key == REPEAT_KEY;
       if (!sameKey) {
@@ -677,10 +673,8 @@ public class IFile {
 
     public void appendNoRle(BytesWritable key, BytesWritable value) throws IOException {
       int keyLength = key.getLength();
-      assert (keyLength >= 0);
-
       int valueLength = value.getLength();
-      assert (valueLength >= 0);
+
       writeKVPair(key.getBytes(), 0, keyLength, value.getBytes(), 0, valueLength);
       incrementRecordsWritten();
     }

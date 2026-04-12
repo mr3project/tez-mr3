@@ -207,14 +207,6 @@ public class InMemoryReader implements IFile.KeyValueReader {
     }
   }
 
-  private void readKeyValueLength(DataInput dIn) throws IOException {
-    if (isRleEnabled) {
-      readKeyValueLengthRle(dIn);
-    } else {
-      readKeyValueLengthNoRle(dIn);
-    }
-  }
-
   private void readKeyValueLengthNoRle(DataInput dIn) throws IOException {
     currentKeyLength = dIn.readInt();
     currentValueLength = dIn.readInt();
@@ -231,32 +223,11 @@ public class InMemoryReader implements IFile.KeyValueReader {
     bytesRead += Integer.BYTES + Integer.BYTES;
   }
 
-  private void readValueLength(DataInput dIn) throws IOException {
-    if (isRleEnabled) {
-      readValueLengthRle(dIn);
-    } else {
-      readValueLengthNoRle(dIn);
-    }
-  }
-
-  private void readValueLengthNoRle(DataInput dIn) throws IOException {
-    currentValueLength = dIn.readInt();
-    bytesRead += Integer.BYTES;
-  }
-
   private void readValueLengthRle(DataInput dIn) throws IOException {
     currentValueLength = dIn.readInt();
     bytesRead += Integer.BYTES;
     if (currentValueLength == IFile.V_END_MARKER) {
       readKeyValueLengthRle(dIn);
-    }
-  }
-
-  private boolean positionToNextRecord(DataInput dIn) throws IOException {
-    if (isRleEnabled) {
-      return positionToNextRecordRle(dIn);
-    } else {
-      return positionToNextRecordNoRle(dIn);
     }
   }
 
