@@ -674,12 +674,12 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       TezSpillRecord spillRecord = null;  // specific to each inputAttemptIdentifier/pathComponent
       Path inputFilePath = null;
 
-      MapOutput mapOutput = null;
       boolean hasFailures = false;
       // Fetch partition count number of map outputs (handles auto-reduce case)
       for (int k = 0; k < partitionCount; k++) {
         int reduceId = partitionId + k;
         InputAttemptIdentifier srcAttemptId = pathToAttemptMap.get(new PathPartition(pathComponent, reduceId));
+        MapOutput mapOutput = null;
 
         try {
           long startTime = System.currentTimeMillis();
@@ -702,6 +702,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
           long endTime = System.currentTimeMillis();
           fetcherCallback.fetchSucceeded(shuffleClientId, host, srcAttemptId, mapOutput,
               indexRecord.getPartLength(), indexRecord.getRawLength(), (endTime - startTime));
+          mapOutput = null;
         } catch (IOException | InternalError e) {
           if (mapOutput != null) {
             mapOutput.abort();
