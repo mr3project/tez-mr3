@@ -19,6 +19,7 @@ package org.apache.tez.runtime.library.common.shuffle.orderedgrouped;
 
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.util.AbstractMap;
@@ -33,11 +34,11 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.commons.io.input.BoundedInputStream;
 import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.FetcherConfigCommon;
 import org.apache.tez.runtime.api.TaskContext;
-import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.shuffle.FetchResult;
@@ -187,35 +188,19 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
 
   private Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> fetchNext() throws InterruptedException {
     boolean useLocalDiskFetch;
-    boolean useFreeMemoryWriterOutput = conf.getBoolean(
-        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT,
-        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT_DEFAULT);
-    boolean useFreeMemoryFetchedInput = conf.getBoolean(
-        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT,
-        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT_DEFAULT);
-    boolean shuffleMemToMem = conf.getBoolean(
-        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_ENABLE_MEMTOMEM,
-        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_ENABLE_MEMTOMEM_DEFAULT);
-    if (useFreeMemoryWriterOutput || useFreeMemoryFetchedInput || shuffleMemToMem) {
-      // useFreeMemoryWriterOutput == true: required
-      // useFreeMemoryFetchedInput == true: recommended for performance
-      // shuffleMemToMem == true: recommended for performance
-      useLocalDiskFetch = false;
-    } else {
-      if (fetcherConfigCommon.localDiskFetchOrderedEnabled &&
-          host.equals(fetcherConfigCommon.localHostName)) {
-        if (fetcherConfigCommon.compositeFetch) {
-          // inspect 'first' to find the container where all inputs originate from
-          CompositeInputAttemptIdentifier first = pendingInputsSeq.getInputs().get(0);
-          // true if inputs originate from the current ContainerWorker
-          useLocalDiskFetch = first.getPathComponent().startsWith(
-              taskContext.getExecutionContext().getEnvContainerId());
-        } else {
-          useLocalDiskFetch = true;
-        }
+    if (fetcherConfigCommon.localDiskFetchOrderedEnabled &&
+        host.equals(fetcherConfigCommon.localHostName)) {
+      if (fetcherConfigCommon.compositeFetch) {
+        // inspect 'first' to find the container where all inputs originate from
+        CompositeInputAttemptIdentifier first = pendingInputsSeq.getInputs().get(0);
+        // true if inputs originate from the current ContainerWorker
+        useLocalDiskFetch = first.getPathComponent().startsWith(
+            taskContext.getExecutionContext().getEnvContainerId());
       } else {
-        useLocalDiskFetch = false;
+        useLocalDiskFetch = true;
       }
+    } else {
+      useLocalDiskFetch = false;
     }
 
     List<CompositeInputAttemptIdentifier> failedFetches = null;
@@ -713,7 +698,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
             continue;
           }
 
-          mapOutput = getMapOutputForDirectDiskFetch(srcAttemptId, inputFilePath, indexRecord);
+          mapOutput = getMapOutputForDirectFetch(srcAttemptId, pathComponent, inputFilePath, indexRecord);
           long endTime = System.currentTimeMillis();
           fetcherCallback.fetchSucceeded(shuffleClientId, host, srcAttemptId, mapOutput,
               indexRecord.getPartLength(), indexRecord.getRawLength(), (endTime - startTime));
@@ -767,10 +752,33 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     }
   }
 
-  private MapOutput getMapOutputForDirectDiskFetch(InputAttemptIdentifier srcAttemptId, Path filename,
+  private MapOutput getMapOutputForDirectFetch(
+      InputAttemptIdentifier srcAttemptId, String pathComponent, Path filename,
       TezIndexRecord indexRecord) throws IOException {
-    return MapOutput.createLocalDiskMapOutput(srcAttemptId, allocator, filename,
-        indexRecord.getStartOffset(), indexRecord.getPartLength(), true);
+    if (filename != null) {
+      return MapOutput.createLocalDiskMapOutput(srcAttemptId, allocator, filename,
+          indexRecord.getStartOffset(), indexRecord.getPartLength(), true);
+    }
+    org.apache.tez.runtime.api.MultiByteArrayOutputStream byteArrayOutput =
+        taskContext.getConcurrentByteCache().get(pathComponent);
+    if (byteArrayOutput == null) {
+      throw new IOException("ConcurrentByteCache not found for pathComponent=" + pathComponent);
+    }
+    InputStream inputStream = byteArrayOutput.createInputStream();
+    long remaining = indexRecord.getStartOffset();
+    while (remaining > 0) {
+      long skipped = inputStream.skip(remaining);
+      if (skipped <= 0) {
+        inputStream.close();
+        throw new IOException("Failed to seek spill to offset " + indexRecord.getStartOffset());
+      }
+      remaining -= skipped;
+    }
+    return MapOutput.createInputStreamMapOutput(
+        srcAttemptId, allocator,
+        new BoundedInputStream(inputStream, indexRecord.getPartLength()),
+        indexRecord.getPartLength(),
+        true);
   }
 
   private boolean verifySanity(long compressedLength, long decompressedLength,

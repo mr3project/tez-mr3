@@ -88,6 +88,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     new TreeSet<MapOutput>(new MapOutput.MapOutputComparator());
   private final IntermediateMemoryToMemoryMerger memToMemMerger;
 
+  // InMemoryMapOutput or InputStreamMapOutput
   final Set<MapOutput> inMemoryMapOutputs =
     new TreeSet<MapOutput>(new MapOutput.MapOutputComparator());
   private final InMemoryMerger inMemoryMerger;
@@ -98,13 +99,23 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   private final long memoryLimit;
   final long postMergeMemLimit;
 
-  // Lifecycle of InMemoryOutput:
-  // - create InMemoryOutput, increase usedMemory
-  // - 1. InMemoryOutput.commit()
+  // Lifecycle of InMemoryMapOutput:
+  // - create InMemoryMapOutput, increase usedMemory
+  // - 1. InMemoryMapOutput.commit()
   //      --> closeInMemoryFile()
   //      --> InMemoryReader
   //      --> releaseCommittedMemory()
-  // - 2. InMemoryOutput.abort()
+  // - 2. InMemoryMapOutput.abort()
+
+  // Lifecycle of InputStreamMapOutput (LOCAL_BYTE_CACHE):
+  // - create InputStreamMapOutput, do not increase usedMemory
+  // - 1. InputStreamMapOutput.commit()
+  //      --> closeInMemoryFile()
+  //      --> createMapOutputReader() creates IFile.Reader over InputStream
+  //      --> stream is consumed while merging
+  //      --> IFile.Reader.close() releases stream resources
+  // - 2. InputStreamMapOutput.abort()
+  //      --> closes InputStream without enqueuing
 
   // MergeManager’s internal memory budget for controlling fetching
   // increases at the time of creating InMemoryMapOutput
@@ -474,7 +485,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
    */
   // InMemoryMapOutput must call unreserve(), either
   //   directly from InMemoryOutput.abort() or
-  //   indirectly via releaseCommittedMemory() after closeInMemoryFile() is called from InMemoryOutput.commit().
+  //   indirectly via releaseCommittedMemory() after closeInMemoryFile() is called from InMemoryMapOutput.commit().
   private synchronized MapOutput unconditionalReserve(
       InputAttemptIdentifier srcAttemptIdentifier,
       long usedMemoryForMergeManager,
@@ -688,7 +699,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
     @Override
     public void merge(List<MapOutput> inputs) throws IOException, InterruptedException {
-      if (inputs == null || inputs.size() == 0) {
+      if (inputs == null || inputs.isEmpty()) {
         return;
       }
 
@@ -720,9 +731,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
             }
           } else {
             mergeOutputSize += mo.getSize();
-            IFile.KeyValueReaderDataInputBuffer reader = new InMemoryReader(MergeManager.this,
-                mo.getAttemptIdentifier(), mo.getMemory(), 0, mo.getMemory().length,
-                (int)mo.getUsedMemoryForMergeManager());
+            IFile.KeyValueReaderDataInputBuffer reader = createMapOutputReader(mo);
             inMemorySegments.add(new Segment(reader,
                 (mo.isPrimaryMapOutput() ? mergedMapOutputsCounter : null)));
             lastAddedMapOutput = mo;
@@ -1022,19 +1031,30 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     int inMemoryMapOutputsOffset = 0;
     while((fullSize > leaveBytes) && !Thread.currentThread().isInterrupted()) {
       MapOutput mo = inMemoryMapOutputs.get(inMemoryMapOutputsOffset++);
-      byte[] data = mo.getMemory();
-      long size = data.length;
+      long size = mo.getSize();
       totalSize += size;
       fullSize -= size;
-      IFile.KeyValueReaderDataInputBuffer reader = new InMemoryReader(MergeManager.this,
-          mo.getAttemptIdentifier(), data, 0, (int)size,
-          (int)mo.getUsedMemoryForMergeManager());
+      IFile.KeyValueReaderDataInputBuffer reader = createMapOutputReader(mo);
       inMemorySegments.add(new Segment(reader,
           (mo.isPrimaryMapOutput() ? mergedMapOutputsCounter : null)));
     }
     // Bulk remove removed in-memory map outputs efficiently
     inMemoryMapOutputs.subList(0, inMemoryMapOutputsOffset).clear();
     return totalSize;
+  }
+
+  private IFile.KeyValueReaderDataInputBuffer createMapOutputReader(MapOutput mapOutput) throws IOException {
+    assert mapOutput.getType() == MapOutput.Type.MEMORY || mapOutput.getType() == MapOutput.Type.LOCAL_BYTE_CACHE;
+    if (mapOutput.getType() == MapOutput.Type.LOCAL_BYTE_CACHE) {
+      java.io.InputStream inputStream = mapOutput.getInputStream();
+      return new IFile.Reader(
+          inputStream, mapOutput.getSize(), codec,
+          null, null, ifileReadAhead, ifileReadAheadLength, inputContext);
+    }
+    byte[] data = mapOutput.getMemory();
+    return new InMemoryReader(
+        MergeManager.this, mapOutput.getAttemptIdentifier(), data, 0, data.length,
+        (int) mapOutput.getUsedMemoryForMergeManager());
   }
 
   static class RawKVIteratorReader implements IFile.KeyValueReaderDataInputBuffer {
