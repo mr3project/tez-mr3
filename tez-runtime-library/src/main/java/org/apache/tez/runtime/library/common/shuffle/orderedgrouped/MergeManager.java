@@ -720,9 +720,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
             }
           } else {
             mergeOutputSize += mo.getSize();
-            IFile.KeyValueReaderDataInputBuffer reader = new InMemoryReader(MergeManager.this,
-                mo.getAttemptIdentifier(), mo.getMemory(), 0, mo.getMemory().length,
-                (int)mo.getUsedMemoryForMergeManager());
+            IFile.KeyValueReaderDataInputBuffer reader = createMapOutputReader(mo);
             inMemorySegments.add(new Segment(reader,
                 (mo.isPrimaryMapOutput() ? mergedMapOutputsCounter : null)));
             lastAddedMapOutput = mo;
@@ -1022,19 +1020,35 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     int inMemoryMapOutputsOffset = 0;
     while((fullSize > leaveBytes) && !Thread.currentThread().isInterrupted()) {
       MapOutput mo = inMemoryMapOutputs.get(inMemoryMapOutputsOffset++);
-      byte[] data = mo.getMemory();
-      long size = data.length;
+      long size = mo.getSize();
       totalSize += size;
       fullSize -= size;
-      IFile.KeyValueReaderDataInputBuffer reader = new InMemoryReader(MergeManager.this,
-          mo.getAttemptIdentifier(), data, 0, (int)size,
-          (int)mo.getUsedMemoryForMergeManager());
+      IFile.KeyValueReaderDataInputBuffer reader = createMapOutputReader(mo);
       inMemorySegments.add(new Segment(reader,
           (mo.isPrimaryMapOutput() ? mergedMapOutputsCounter : null)));
     }
     // Bulk remove removed in-memory map outputs efficiently
     inMemoryMapOutputs.subList(0, inMemoryMapOutputsOffset).clear();
     return totalSize;
+  }
+
+  private IFile.KeyValueReaderDataInputBuffer createMapOutputReader(MapOutput mapOutput) throws IOException {
+    if (mapOutput.getType() == MapOutput.Type.LOCAL_BYTE_CACHE) {
+      java.io.InputStream inputStream = mapOutput.getInputStream();
+      if (inputStream == null) {
+        throw new IOException("InputStream already consumed for " + mapOutput.getAttemptIdentifier());
+      }
+      return new IFile.Reader(
+          inputStream, mapOutput.getSize(), codec,
+          null, null, ifileReadAhead, ifileReadAheadLength, inputContext);
+    }
+    if (mapOutput.getType() != MapOutput.Type.MEMORY) {
+      throw new IOException("Unexpected map output type in memory merge: " + mapOutput.getType());
+    }
+    byte[] data = mapOutput.getMemory();
+    return new InMemoryReader(
+        MergeManager.this, mapOutput.getAttemptIdentifier(), data, 0, data.length,
+        (int) mapOutput.getUsedMemoryForMergeManager());
   }
 
   static class RawKVIteratorReader implements IFile.KeyValueReaderDataInputBuffer {

@@ -17,6 +17,7 @@
  */
 package org.apache.tez.runtime.library.common.shuffle.orderedgrouped;
 
+import java.io.InputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Comparator;
@@ -40,7 +41,8 @@ public abstract class MapOutput implements ShuffleInput {
     WAIT,
     MEMORY,
     DISK,
-    DISK_DIRECT
+    DISK_DIRECT,
+    LOCAL_BYTE_CACHE
   }
 
   private final int id;
@@ -85,6 +87,15 @@ public abstract class MapOutput implements ShuffleInput {
     return new DiskDirectMapOutput(attemptIdentifier, callback, size, path, offset, primaryMapOutput);
   }
 
+  public static MapOutput createInputStreamMapOutput(
+      InputAttemptIdentifier attemptIdentifier,
+      FetchedInputAllocatorOrderedGrouped callback,
+      InputStream inputStream,
+      long size,
+      boolean primaryMapOutput) throws IOException {
+    return new InputStreamMapOutput(attemptIdentifier, callback, inputStream, size, primaryMapOutput);
+  }
+
   // may throw OutOfMemoryError
   public static MapOutput createMemoryMapOutput(InputAttemptIdentifier attemptIdentifier,
                                                 FetchedInputAllocatorOrderedGrouped callback,
@@ -124,6 +135,10 @@ public abstract class MapOutput implements ShuffleInput {
   }
   
   public OutputStream getDisk() {
+    return null;
+  }
+
+  public InputStream getInputStream() {
     return null;
   }
 
@@ -319,6 +334,56 @@ public abstract class MapOutput implements ShuffleInput {
     @Override
     public Type getType() {
       return Type.WAIT;
+    }
+  }
+
+  private static class InputStreamMapOutput extends MapOutput {
+    private InputStream inputStream;
+    private final long size;
+
+    private InputStreamMapOutput(InputAttemptIdentifier attemptIdentifier,
+                                 FetchedInputAllocatorOrderedGrouped callback,
+                                 InputStream inputStream,
+                                 long size,
+                                 boolean primaryMapOutput) throws IOException {
+      super(attemptIdentifier, callback, primaryMapOutput);
+      this.inputStream = inputStream;
+      this.size = size;
+    }
+
+    @Override
+    public InputStream getInputStream() {
+      InputStream stream = inputStream;
+      inputStream = null;
+      return stream;
+    }
+
+    @Override
+    public long getSize() {
+      return size;
+    }
+
+    @Override
+    public void commit() throws IOException {
+      callback.closeInMemoryFile(this);
+    }
+
+    @Override
+    public void abort() {
+      if (inputStream != null) {
+        try {
+          inputStream.close();
+        } catch (IOException ioe) {
+          LOG.info("Failure to close input stream for {}", this, ioe);
+        }
+      }
+      inputStream = null;
+      callback.unreserve(0L);
+    }
+
+    @Override
+    public Type getType() {
+      return Type.LOCAL_BYTE_CACHE;
     }
   }
 }
