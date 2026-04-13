@@ -1049,8 +1049,9 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     if (mapOutput.getType() == ShuffleClient.Type.LOCAL_BYTE_CACHE) {
       java.io.InputStream inputStream = mapOutput.getInputStream();
       final long size = mapOutput.getSize();
+      final long readerLength = mapOutput.getReaderLength();
       return new IFile.Reader(
-          inputStream, size, codec,
+          inputStream, readerLength, codec,
           null, null, ifileReadAhead, ifileReadAheadLength, inputContext) {
         @Override
         public void close() throws IOException {

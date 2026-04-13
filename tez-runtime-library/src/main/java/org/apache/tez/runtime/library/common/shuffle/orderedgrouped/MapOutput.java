@@ -85,8 +85,10 @@ public abstract class MapOutput implements ShuffleInput {
       FetchedInputAllocatorOrderedGrouped callback,
       InputStream inputStream,
       long size,
+      long readerLength,
       boolean primaryMapOutput) {
-    return new InputStreamMapOutput(attemptIdentifier, callback, inputStream, size, primaryMapOutput);
+    return new InputStreamMapOutput(
+        attemptIdentifier, callback, inputStream, size, readerLength, primaryMapOutput);
   }
 
   // may throw OutOfMemoryError
@@ -143,6 +145,13 @@ public abstract class MapOutput implements ShuffleInput {
 
   public long getSize() {
     return -1;
+  }
+
+  // Physical bytes that back this map output stream for IFile.Reader.
+  // This is the compressed segment length for streamed local fetch,
+  // and equals getSize() for regular in-memory map outputs.
+  public long getReaderLength() {
+    return getSize();
   }
 
   public long getUsedMemoryForMergeManager() {
@@ -333,15 +342,18 @@ public abstract class MapOutput implements ShuffleInput {
   private static class InputStreamMapOutput extends MapOutput {
     private InputStream inputStream;
     private final long size;
+    private final long readerLength;
 
     private InputStreamMapOutput(InputAttemptIdentifier attemptIdentifier,
                                  FetchedInputAllocatorOrderedGrouped callback,
                                  InputStream inputStream,
                                  long size,
+                                 long readerLength,
                                  boolean primaryMapOutput) {
       super(attemptIdentifier, callback, primaryMapOutput);
       this.inputStream = inputStream;
       this.size = size;
+      this.readerLength = readerLength;
     }
 
     @Override
@@ -352,6 +364,11 @@ public abstract class MapOutput implements ShuffleInput {
     @Override
     public long getSize() {
       return size;
+    }
+
+    @Override
+    public long getReaderLength() {
+      return readerLength;
     }
 
     @Override

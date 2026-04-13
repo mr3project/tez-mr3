@@ -776,6 +776,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     return MapOutput.createInputStreamMapOutput(
         srcAttemptId, allocator,
         new BoundedInputStream(inputStream, indexRecord.getPartLength()),
+        indexRecord.getRawLength(),
         indexRecord.getPartLength(),
         true);
   }
