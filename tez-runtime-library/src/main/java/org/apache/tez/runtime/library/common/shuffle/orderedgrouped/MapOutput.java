@@ -85,8 +85,10 @@ public abstract class MapOutput implements ShuffleInput {
       FetchedInputAllocatorOrderedGrouped callback,
       InputStream inputStream,
       long size,
+      long readerLength,
       boolean primaryMapOutput) {
-    return new InputStreamMapOutput(attemptIdentifier, callback, inputStream, size, primaryMapOutput);
+    return new InputStreamMapOutput(
+        attemptIdentifier, callback, inputStream, size, readerLength, primaryMapOutput);
   }
 
   // may throw OutOfMemoryError
@@ -141,7 +143,25 @@ public abstract class MapOutput implements ShuffleInput {
 
   public abstract ShuffleClient.Type getType();
 
-  public long getSize() {
+  /**
+   * Logical size of this map output as used by MergeManager for in-memory merge accounting,
+   * merge candidate ordering, and output buffer sizing decisions.
+   *
+   * For MEMORY/DISK map outputs this usually matches physical bytes.
+   * For LOCAL_BYTE_CACHE it represents the logical/raw footprint used by merge accounting.
+   */
+  public long getSizeForMergeAccounting() {
+    return -1;
+  }
+
+  /**
+   * Physical byte length presented to IFile.Reader.
+   *
+   * This can differ from getSizeForMergeAccounting() when the map output is streamed from local byte cache:
+   * getSizeForMergeAccounting() is the logical/raw accounting size, while getReaderLength() is the actual
+   * bounded stream length consumed by IFile.Reader.
+   */
+  public long getReaderLength() {
     return -1;
   }
 
@@ -165,10 +185,14 @@ public abstract class MapOutput implements ShuffleInput {
       if (o1.id == o2.id) { 
         return 0;
       }
-      
-      if (o1.getSize() < o2.getSize()) {
+
+      // Comparator is used for in-memory map-output collections that drive
+      // merge-triggering and merge candidate selection. It must therefore sort
+      // by the logical merge-accounting footprint, not by reader-length.
+      // (reader-length can diverge for LOCAL_BYTE_CACHE inputs).
+      if (o1.getSizeForMergeAccounting() < o2.getSizeForMergeAccounting()) {
         return -1;
-      } else if (o1.getSize() > o2.getSize()) {
+      } else if (o1.getSizeForMergeAccounting() > o2.getSizeForMergeAccounting()) {
         return 1;
       }
       
@@ -194,7 +218,13 @@ public abstract class MapOutput implements ShuffleInput {
     }
 
     @Override
-    public long getSize() {
+    public long getSizeForMergeAccounting() {
+      throw new UnsupportedOperationException(
+          "DiskDirectMapOutput does not support getSizeForMergeAccounting()");
+    }
+
+    @Override
+    public long getReaderLength() {
       return outputPath.getLength();
     }
 
@@ -238,7 +268,13 @@ public abstract class MapOutput implements ShuffleInput {
     }
 
     @Override
-    public long getSize() {
+    public long getSizeForMergeAccounting() {
+      throw new UnsupportedOperationException(
+          "DiskMapOutput does not support getSizeForMergeAccounting()");
+    }
+
+    @Override
+    public long getReaderLength() {
       return outputPath.getLength();
     }
 
@@ -284,7 +320,12 @@ public abstract class MapOutput implements ShuffleInput {
     }
 
     @Override
-    public long getSize() {
+    public long getSizeForMergeAccounting() {
+      return byteArray.length;
+    }
+
+    @Override
+    public long getReaderLength() {
       return byteArray.length;
     }
 
@@ -328,20 +369,28 @@ public abstract class MapOutput implements ShuffleInput {
     public ShuffleClient.Type getType() {
       return ShuffleClient.Type.WAIT;
     }
+
+    @Override
+    public long getReaderLength() {
+      return 0L;
+    }
   }
 
   private static class InputStreamMapOutput extends MapOutput {
     private InputStream inputStream;
     private final long size;
+    private final long readerLength;
 
     private InputStreamMapOutput(InputAttemptIdentifier attemptIdentifier,
                                  FetchedInputAllocatorOrderedGrouped callback,
                                  InputStream inputStream,
                                  long size,
+                                 long readerLength,
                                  boolean primaryMapOutput) {
       super(attemptIdentifier, callback, primaryMapOutput);
       this.inputStream = inputStream;
       this.size = size;
+      this.readerLength = readerLength;
     }
 
     @Override
@@ -350,8 +399,13 @@ public abstract class MapOutput implements ShuffleInput {
     }
 
     @Override
-    public long getSize() {
+    public long getSizeForMergeAccounting() {
       return size;
+    }
+
+    @Override
+    public long getReaderLength() {
+      return readerLength;
     }
 
     @Override

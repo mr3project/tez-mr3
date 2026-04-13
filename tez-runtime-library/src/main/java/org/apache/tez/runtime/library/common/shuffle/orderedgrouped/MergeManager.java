@@ -523,7 +523,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     inMemoryMapOutputs.add(mapOutput);
     trackAndLogCloseInMemoryFile(mapOutput);
 
-    this.commitMemory += mapOutput.getSize();
+    this.commitMemory += mapOutput.getSizeForMergeAccounting();
 
     if (this.commitMemory >= mergeThreshold) {
       startMemToDiskMerge();
@@ -540,10 +540,10 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   }
 
   private void trackAndLogCloseInMemoryFile(MapOutput mapOutput) {
-    statsInMemTotal.updateStats(mapOutput.getSize());
+    statsInMemTotal.updateStats(mapOutput.getSizeForMergeAccounting());
 
     if (isDebugEnabled) {
-      LOG.debug("closeInMemoryFile -> map-output of size: " + mapOutput.getSize()
+      LOG.debug("closeInMemoryFile -> map-output of size: " + mapOutput.getSizeForMergeAccounting()
           + ", inMemoryMapOutputs.size() -> " + inMemoryMapOutputs.size()
           + ", commitMemory -> " + this.commitMemory + ", usedMemory ->" +
           this.usedMemory + ", mapOutput=" + mapOutput);
@@ -567,12 +567,12 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     if (isDebugEnabled) {
       // This log could be moved to INFO level for a while, after mem-to-mem
       // merge is production ready.
-      LOG.debug("closeInMemoryMergedFile -> size: " + mapOutput.getSize() +
+      LOG.debug("closeInMemoryMergedFile -> size: " + mapOutput.getSizeForMergeAccounting() +
           ", inMemoryMergedMapOutputs.size() -> " +
           inMemoryMergedMapOutputs.size());
     }
 
-    this.commitMemory += mapOutput.getSize();
+    this.commitMemory += mapOutput.getSizeForMergeAccounting();
 
     if (this.commitMemory >= mergeThreshold) {
       startMemToDiskMerge();
@@ -717,21 +717,21 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         MapOutput lastAddedMapOutput = null;
         while (it.hasNext() && !Thread.currentThread().isInterrupted()) {
           MapOutput mo = it.next();
-          // We have to use mo.getSize(), not mo.getUsedMemoryForMergeManager(), because
+          // We have to use mo.getSizeForMergeAccounting(), not mo.getUsedMemoryForMergeManager(), because
           // we will create a buffer big enough to hold the sum of the actual sizes of all selected inputs.
           // Adding manager.getUsedMemory() is okay because
           // the guard is about whether we can safely charge the new merged buffer under the budget.
-          if ((mergeOutputSize + mo.getSize() + manager.getUsedMemory()) > memoryLimit) {
+          if ((mergeOutputSize + mo.getSizeForMergeAccounting() + manager.getUsedMemory()) > memoryLimit) {
             //Search for smaller segments that can fit into existing mem
             if (isDebugEnabled) {
               LOG.debug("Size is greater than usedMemory. "
                   + "mergeOutputSize=" + mergeOutputSize
-                  + ", moSize=" + mo.getSize()
+                  + ", moSize=" + mo.getSizeForMergeAccounting()
                   + ", usedMemory=" + manager.getUsedMemory()
                   + ", memoryLimit=" + memoryLimit);
             }
           } else {
-            mergeOutputSize += mo.getSize();
+            mergeOutputSize += mo.getSizeForMergeAccounting();
             IFile.KeyValueReaderDataInputBuffer reader = createMapOutputReader(mo);
             inMemorySegments.add(new Segment(reader,
                 (mo.isPrimaryMapOutput() ? mergedMapOutputsCounter : null)));
@@ -1027,12 +1027,12 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     // closed but not yet present in inMemoryMapOutputs
     long fullSize = 0L;
     for (MapOutput mo : inMemoryMapOutputs) {
-      fullSize += mo.getSize();
+      fullSize += mo.getSizeForMergeAccounting();
     }
     int inMemoryMapOutputsOffset = 0;
     while((fullSize > leaveBytes) && !Thread.currentThread().isInterrupted()) {
       MapOutput mo = inMemoryMapOutputs.get(inMemoryMapOutputsOffset++);
-      long size = mo.getSize();
+      long size = mo.getSizeForMergeAccounting();
       totalSize += size;
       fullSize -= size;
       IFile.KeyValueReaderDataInputBuffer reader = createMapOutputReader(mo);
@@ -1048,9 +1048,10 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     assert mapOutput.getType() == ShuffleClient.Type.MEMORY || mapOutput.getType() == ShuffleClient.Type.LOCAL_BYTE_CACHE;
     if (mapOutput.getType() == ShuffleClient.Type.LOCAL_BYTE_CACHE) {
       java.io.InputStream inputStream = mapOutput.getInputStream();
-      final long size = mapOutput.getSize();
+      final long size = mapOutput.getSizeForMergeAccounting();
+      final long readerLength = mapOutput.getReaderLength();
       return new IFile.Reader(
-          inputStream, size, codec,
+          inputStream, readerLength, codec,
           null, null, ifileReadAhead, ifileReadAheadLength, inputContext) {
         @Override
         public void close() throws IOException {
@@ -1252,11 +1253,11 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
                                   List<FileChunk> onDiskMapOutputs) {
     long inMemSegmentSize = 0;
     for (MapOutput inMemoryMapOutput : inMemoryMapOutputs) {
-      inMemSegmentSize += inMemoryMapOutput.getSize();
+      inMemSegmentSize += inMemoryMapOutput.getSizeForMergeAccounting();
 
       if (isDebugEnabled) {
         LOG.debug("finalMerge: inMemoryOutput=" + inMemoryMapOutput + ", size=" +
-            inMemoryMapOutput.getSize());
+            inMemoryMapOutput.getSizeForMergeAccounting());
       }
     }
     long onDiskSegmentSize = 0;
