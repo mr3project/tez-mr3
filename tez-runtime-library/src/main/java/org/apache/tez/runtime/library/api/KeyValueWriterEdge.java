@@ -24,6 +24,11 @@ import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.api.WriterEdge;
 
 public abstract class KeyValueWriterEdge implements WriterEdge {
+
+  public abstract void setDefaultLengths(int defaultKeyLen, int defaultValLen);
+
+  public abstract void closeWriter();
+
   /**
    * Writes a key/value pair.
    * 

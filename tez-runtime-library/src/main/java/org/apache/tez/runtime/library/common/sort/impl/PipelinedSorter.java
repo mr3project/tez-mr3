@@ -141,6 +141,13 @@ public class PipelinedSorter extends ExternalSorter {
   // track buffer overflow recursively in all buffers
   private int bufferOverflowRecursion = 0;
 
+  private int defaultKeyLen = -1;   // -1 = unspecified
+  private int defaultValLen = -1;   // -1 = unspecified
+  private int maxKeyLen = 0;
+  private int minKeyLen = Integer.MAX_VALUE;
+  private int maxValLen = 0;
+  private int minValLen = Integer.MAX_VALUE;
+
   public PipelinedSorter(OutputContext outputContext, Configuration conf, int numOutputs,
       long initialMemoryAvailable) throws IOException {
     super(outputContext, conf, numOutputs, initialMemoryAvailable);
@@ -389,6 +396,11 @@ public class PipelinedSorter extends ExternalSorter {
       LOG.debug("{}: Added spill event for spill (final update=false), spillId={}",
           outputContext.getDestinationVertexName(), (numSpills - 1));
     }
+  }
+
+  public void setDefaultLengths(int defaultKeyLen, int defaultValLen) {
+    this.defaultKeyLen = defaultKeyLen;
+    this.defaultValLen = defaultValLen;
   }
 
   @Override

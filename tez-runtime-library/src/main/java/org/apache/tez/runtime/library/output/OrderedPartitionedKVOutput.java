@@ -28,6 +28,7 @@ import java.util.zip.Deflater;
 import com.google.common.collect.Lists;
 
 import org.apache.hadoop.io.BytesWritable;
+import org.apache.tez.runtime.library.api.KeyValueWriterEdge;
 import org.apache.tez.runtime.library.api.LogicalOutputEdge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -123,6 +124,16 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput implements
   public synchronized KeyValuesWriterEdge getWriter() throws IOException {
     Preconditions.checkState(isStarted.get(), "Cannot get writer before starting the Output");
     return new KeyValuesWriterEdge() {
+      @Override
+      public void setDefaultLengths(int defaultKeyLen, int defaultValLen) {
+        sorter.setDefaultLengths(defaultKeyLen, defaultValLen);
+      }
+
+      @Override
+      public void closeWriter() {
+        // TODO
+      }
+
       @Override
       public void write(BytesWritable key, BytesWritable value) throws IOException {
         sorter.write(key, value);

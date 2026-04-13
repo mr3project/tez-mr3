@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
@@ -168,6 +169,13 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
   // uncompressed size for each partition
   private volatile long spilledSize = 0;
+
+  private int defaultKeyLen = -1;   // -1 = unspecified
+  private int defaultValLen = -1;   // -1 = unspecified
+  private int maxKeyLen = 0;
+  private int minKeyLen = Integer.MAX_VALUE;
+  private int maxValLen = 0;
+  private int minValLen = Integer.MAX_VALUE;
 
   static final ThreadLocal<Deflater> deflater = new ThreadLocal<Deflater>() {
     @Override
@@ -369,6 +377,26 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     // Ensure allocation size is multiple of INT_SIZE, truncate down.
     sizePerBuffer = sizePerBuffer - (sizePerBuffer % INT_SIZE);
     lastBufferSize = lastBufferSize - (lastBufferSize % INT_SIZE);
+  }
+
+  @Override
+  public void setDefaultLengths(int defaultKeyLen, int defaultValLen) {
+    this.defaultKeyLen = defaultKeyLen;
+    this.defaultValLen = defaultValLen;
+  }
+
+  @Override
+  public void closeWriter() {
+    // TODO
+  }
+
+  // TODO: optimize
+  @Override
+  public void write(BytesWritable key, Iterable<BytesWritable> values) throws IOException {
+    Iterator<BytesWritable> it = values.iterator();
+    while (it.hasNext()) {
+      write(key, it.next());
+    }
   }
 
   @Override
