@@ -150,15 +150,15 @@ public abstract class MapOutput implements ShuffleInput {
    * For MEMORY/DISK map outputs this usually matches physical bytes.
    * For LOCAL_BYTE_CACHE it represents the logical/raw footprint used by merge accounting.
    */
-  public long getSize() {
+  public long getSizeForMergeAccounting() {
     return -1;
   }
 
   /**
    * Physical byte length presented to IFile.Reader.
    *
-   * This can differ from getSize() when the map output is streamed from local byte cache:
-   * getSize() is the logical/raw accounting size, while getReaderLength() is the actual
+   * This can differ from getSizeForMergeAccounting() when the map output is streamed from local byte cache:
+   * getSizeForMergeAccounting() is the logical/raw accounting size, while getReaderLength() is the actual
    * bounded stream length consumed by IFile.Reader.
    */
   public long getReaderLength() {
@@ -186,9 +186,9 @@ public abstract class MapOutput implements ShuffleInput {
         return 0;
       }
       
-      if (o1.getSize() < o2.getSize()) {
+      if (o1.getSizeForMergeAccounting() < o2.getSizeForMergeAccounting()) {
         return -1;
-      } else if (o1.getSize() > o2.getSize()) {
+      } else if (o1.getSizeForMergeAccounting() > o2.getSizeForMergeAccounting()) {
         return 1;
       }
       
@@ -214,8 +214,9 @@ public abstract class MapOutput implements ShuffleInput {
     }
 
     @Override
-    public long getSize() {
-      return outputPath.getLength();
+    public long getSizeForMergeAccounting() {
+      throw new UnsupportedOperationException(
+          "DiskDirectMapOutput does not support getSizeForMergeAccounting()");
     }
 
     @Override
@@ -263,8 +264,9 @@ public abstract class MapOutput implements ShuffleInput {
     }
 
     @Override
-    public long getSize() {
-      return outputPath.getLength();
+    public long getSizeForMergeAccounting() {
+      throw new UnsupportedOperationException(
+          "DiskMapOutput does not support getSizeForMergeAccounting()");
     }
 
     @Override
@@ -314,7 +316,7 @@ public abstract class MapOutput implements ShuffleInput {
     }
 
     @Override
-    public long getSize() {
+    public long getSizeForMergeAccounting() {
       return byteArray.length;
     }
 
@@ -393,7 +395,7 @@ public abstract class MapOutput implements ShuffleInput {
     }
 
     @Override
-    public long getSize() {
+    public long getSizeForMergeAccounting() {
       return size;
     }
 
