@@ -64,8 +64,8 @@ public class DiskFetchedInput extends FetchedInput {
   }
 
   @Override
-  public Type getType() {
-    return Type.DISK;
+  public ShuffleClient.Type getType() {
+    return ShuffleClient.Type.DISK;
   }
 
   @Override

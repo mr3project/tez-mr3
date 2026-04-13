@@ -39,6 +39,7 @@ import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.serializer.SerializationContext;
+import org.apache.tez.runtime.library.common.shuffle.ShuffleClient;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterDataInputBuffer;
@@ -1044,8 +1045,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   }
 
   private IFile.KeyValueReaderDataInputBuffer createMapOutputReader(MapOutput mapOutput) throws IOException {
-    assert mapOutput.getType() == MapOutput.Type.MEMORY || mapOutput.getType() == MapOutput.Type.LOCAL_BYTE_CACHE;
-    if (mapOutput.getType() == MapOutput.Type.LOCAL_BYTE_CACHE) {
+    assert mapOutput.getType() == ShuffleClient.Type.MEMORY || mapOutput.getType() == ShuffleClient.Type.LOCAL_BYTE_CACHE;
+    if (mapOutput.getType() == ShuffleClient.Type.LOCAL_BYTE_CACHE) {
       java.io.InputStream inputStream = mapOutput.getInputStream();
       final long size = mapOutput.getSize();
       return new IFile.Reader(

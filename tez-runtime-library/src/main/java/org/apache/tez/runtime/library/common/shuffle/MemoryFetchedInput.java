@@ -40,8 +40,8 @@ public class MemoryFetchedInput extends FetchedInput {
   }
 
   @Override
-  public Type getType() {
-    return Type.MEMORY;
+  public ShuffleClient.Type getType() {
+    return ShuffleClient.Type.MEMORY;
   }
 
   @Override

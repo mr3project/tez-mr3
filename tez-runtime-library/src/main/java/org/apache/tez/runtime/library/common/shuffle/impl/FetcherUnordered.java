@@ -64,7 +64,6 @@ import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.ShuffleHeade
 import org.apache.tez.runtime.library.common.sort.impl.TezIndexRecord;
 import org.apache.tez.runtime.library.common.sort.impl.TezSpillRecord;
 import org.apache.tez.runtime.library.exceptions.FetcherReadTimeoutException;
-import org.apache.tez.runtime.library.common.shuffle.FetchedInput.Type;
 
 /**
  * Responsible for fetching inputs served by the ShuffleHandler for a single host.
@@ -719,7 +718,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
           fetchedInput = shuffleManager.getInputManager().allocate(
               decompressedLength, compressedLength, srcAttemptId, false);
         }
-        if (fetchedInput.getType() == Type.WAIT) {
+        if (fetchedInput.getType() == ShuffleClient.Type.WAIT) {
           if (isDebugEnabled) {
             LOG.debug("Waiting for memory to be freed: {}, {}, {}",
                 fetchedInput.getInputAttemptIdentifier(), decompressedLength, compressedLength);
@@ -735,12 +734,12 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
               + fetchedInput.getType());
         }
 
-        if (fetchedInput.getType() == Type.MEMORY) {
+        if (fetchedInput.getType() == ShuffleClient.Type.MEMORY) {
           ShuffleUtils.shuffleToMemory(((MemoryFetchedInput) fetchedInput).getBytes(),
               input, (int) decompressedLength, (int) compressedLength, codec,
               fetcherConfig.ifileReadAhead, fetcherConfig.ifileReadAheadLength, LOG,
               fetchedInput.getInputAttemptIdentifier(), taskContext, true);
-        } else if (fetchedInput.getType() == Type.DISK) {
+        } else if (fetchedInput.getType() == ShuffleClient.Type.DISK) {
           ShuffleUtils.shuffleToDisk(((DiskFetchedInput) fetchedInput).getOutputStream(),
               (host + ":" + port), input, compressedLength, decompressedLength, LOG,
               fetchedInput.getInputAttemptIdentifier(),

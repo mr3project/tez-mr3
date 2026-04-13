@@ -27,14 +27,6 @@ import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 
 public abstract class FetchedInput implements ShuffleInput {
   
-  public static enum Type {
-    WAIT,
-    MEMORY,
-    DISK,
-    DISK_DIRECT,
-    LOCAL_BYTE_CACHE
-  }
-
   // 1. PENDING --> COMMITTED --> FREED (never used)
   // 2. PENDING --> ABORTED (never used)
   protected static enum State {
@@ -56,7 +48,7 @@ public abstract class FetchedInput implements ShuffleInput {
     this.state = (byte) State.PENDING.ordinal();
   }
 
-  public abstract Type getType();
+  public abstract ShuffleClient.Type getType();
 
   protected boolean isState(State state) {
     return this.state == (byte) state.ordinal();
@@ -175,8 +167,8 @@ public abstract class FetchedInput implements ShuffleInput {
       super(inputAttemptIdentifier, null);
     }
 
-    public Type getType() {
-      return Type.WAIT;
+    public ShuffleClient.Type getType() {
+      return ShuffleClient.Type.WAIT;
     }
 
     @Override

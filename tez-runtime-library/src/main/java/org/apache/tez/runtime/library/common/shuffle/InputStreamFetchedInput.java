@@ -44,8 +44,8 @@ public class InputStreamFetchedInput extends FetchedInput {
   }
 
   @Override
-  public Type getType() {
-    return Type.LOCAL_BYTE_CACHE;
+  public ShuffleClient.Type getType() {
+    return ShuffleClient.Type.LOCAL_BYTE_CACHE;
   }
 
   @Override

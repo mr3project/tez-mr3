@@ -23,6 +23,7 @@ import java.io.OutputStream;
 import java.util.Comparator;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.tez.runtime.library.common.shuffle.ShuffleClient;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleInput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,14 +37,6 @@ import org.apache.tez.runtime.library.common.task.local.output.TezTaskOutputFile
 public abstract class MapOutput implements ShuffleInput {
   private static final Logger LOG = LoggerFactory.getLogger(MapOutput.class);
   private static AtomicInteger ID = new AtomicInteger(0);
-  
-  public enum Type {
-    WAIT,
-    MEMORY,
-    DISK,
-    DISK_DIRECT,
-    LOCAL_BYTE_CACHE
-  }
 
   private final int id;
   private InputAttemptIdentifier attemptIdentifier;
@@ -146,7 +139,7 @@ public abstract class MapOutput implements ShuffleInput {
     return this.attemptIdentifier;
   }
 
-  public abstract Type getType();
+  public abstract ShuffleClient.Type getType();
 
   public long getSize() {
     return -1;
@@ -216,8 +209,8 @@ public abstract class MapOutput implements ShuffleInput {
     }
 
     @Override
-    public Type getType() {
-      return Type.DISK_DIRECT;
+    public ShuffleClient.Type getType() {
+      return ShuffleClient.Type.DISK_DIRECT;
     }
   }
 
@@ -265,8 +258,8 @@ public abstract class MapOutput implements ShuffleInput {
     }
 
     @Override
-    public Type getType() {
-      return Type.DISK;
+    public ShuffleClient.Type getType() {
+      return ShuffleClient.Type.DISK;
     }
   }
 
@@ -311,8 +304,8 @@ public abstract class MapOutput implements ShuffleInput {
     }
 
     @Override
-    public Type getType() {
-      return Type.MEMORY;
+    public ShuffleClient.Type getType() {
+      return ShuffleClient.Type.MEMORY;
     }
   }
 
@@ -332,8 +325,8 @@ public abstract class MapOutput implements ShuffleInput {
     }
 
     @Override
-    public Type getType() {
-      return Type.WAIT;
+    public ShuffleClient.Type getType() {
+      return ShuffleClient.Type.WAIT;
     }
   }
 
@@ -382,8 +375,8 @@ public abstract class MapOutput implements ShuffleInput {
     }
 
     @Override
-    public Type getType() {
-      return Type.LOCAL_BYTE_CACHE;
+    public ShuffleClient.Type getType() {
+      return ShuffleClient.Type.LOCAL_BYTE_CACHE;
     }
   }
 }

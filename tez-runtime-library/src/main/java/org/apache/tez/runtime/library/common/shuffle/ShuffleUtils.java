@@ -575,11 +575,10 @@ public class ShuffleUtils {
      * @param millis
      * @param bytesCompressed
      * @param bytesDecompressed
-     * @param outputType
      * @param srcAttemptIdentifier
      */
     public void logIndividualFetchComplete(long millis, long bytesCompressed,
-        long bytesDecompressed, String outputType, InputAttemptIdentifier srcAttemptIdentifier) {
+        long bytesDecompressed, ShuffleClient.Type type, InputAttemptIdentifier srcAttemptIdentifier) {
 
       // Unlike in Tez, we do not use fast math to avoid creating ThreadLocal formatters.
 
@@ -593,7 +592,7 @@ public class ShuffleUtils {
         StringBuilder sb = new StringBuilder("Completed fetch for attempt: ");
         toShortString(srcAttemptIdentifier, sb);
         sb.append(" to ");
-        sb.append(outputType);
+        sb.append(type.toString());
         sb.append(", csize=");
         sb.append(bytesCompressed);
         sb.append(", dsize=");

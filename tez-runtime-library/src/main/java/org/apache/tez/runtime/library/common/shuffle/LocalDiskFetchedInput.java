@@ -49,8 +49,8 @@ public class LocalDiskFetchedInput extends FetchedInput {
   }
 
   @Override
-  public Type getType() {
-    return Type.DISK_DIRECT;
+  public ShuffleClient.Type getType() {
+    return ShuffleClient.Type.DISK_DIRECT;
   }
 
   @Override

@@ -23,6 +23,7 @@ import java.io.IOException;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
+import org.apache.tez.runtime.library.common.shuffle.ShuffleClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -33,7 +34,6 @@ import org.apache.tez.runtime.library.common.shuffle.impl.ShuffleManager;
 import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.InMemoryReader;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.apache.tez.runtime.library.common.shuffle.FetchedInput;
-import org.apache.tez.runtime.library.common.shuffle.FetchedInput.Type;
 import org.apache.tez.runtime.library.common.shuffle.MemoryFetchedInput;
 
 public class UnorderedKVReader extends KeyValueReaderEdge {
@@ -166,7 +166,7 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
 
   private IFile.KeyValueReaderBytesWritable openIFileReader(FetchedInput fetchedInput)
       throws IOException {
-    if (fetchedInput.getType() == Type.MEMORY) {
+    if (fetchedInput.getType() == ShuffleClient.Type.MEMORY) {
       MemoryFetchedInput mfi = (MemoryFetchedInput) fetchedInput;
       return new InMemoryReader(null, mfi.getInputAttemptIdentifier(),
           mfi.getBytes(), 0, (int) mfi.getSize(), 0);

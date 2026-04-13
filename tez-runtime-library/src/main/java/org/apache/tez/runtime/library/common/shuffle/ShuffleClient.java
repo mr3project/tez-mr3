@@ -31,7 +31,6 @@ import org.apache.tez.runtime.api.events.InputReadErrorEvent;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
-import org.apache.tez.runtime.library.common.TezRuntimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,6 +58,14 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
     WRONG_REDUCE
   }
   private final static String SHUFFLE_ERR_GRP_NAME = "Shuffle Errors";
+
+  public enum Type {
+    WAIT,
+    MEMORY,
+    DISK,
+    DISK_DIRECT,
+    LOCAL_BYTE_CACHE
+  }
 
   public static class ShuffleErrorCounterGroup {
     public final TezCounter ioErrs;
@@ -484,19 +491,28 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
       long bytesCompressed,
       long bytesDecompressed,
       long copyDuration,
-      String outputType, boolean isOutputDisk, boolean isOutputDiskDirect, boolean isOutputByteCache) {
+      ShuffleClient.Type outputType) {
     fetchStatsLogger.logIndividualFetchComplete(copyDuration, bytesCompressed, bytesDecompressed,
       outputType, srcAttemptIdentifier);
 
     shuffleNumInputsCounter.increment(1);
     shuffleBytesCounter.increment(bytesCompressed);
     shuffleBytesDecompressedCounter.increment(bytesDecompressed);
-    if (isOutputDisk) {
-      shuffleBytesDiskCounter.increment(bytesCompressed);
-    } else if (isOutputDiskDirect) {
-      shuffleBytesDiskDirectCounter.increment(bytesCompressed);
-    } else {
-      shuffleBytesMemoryCounter.increment(bytesCompressed);
+
+    switch (outputType) {
+      case DISK:
+        shuffleBytesDiskCounter.increment(bytesCompressed);
+        break;
+      case DISK_DIRECT:
+        shuffleBytesDiskDirectCounter.increment(bytesCompressed);
+        break;
+      case MEMORY:
+        shuffleBytesMemoryCounter.increment(bytesCompressed);
+        break;
+      case LOCAL_BYTE_CACHE:
+        shuffleBytesLocalByteCache.increment(bytesCompressed);
+        break;
+      default:
     }
   }
 

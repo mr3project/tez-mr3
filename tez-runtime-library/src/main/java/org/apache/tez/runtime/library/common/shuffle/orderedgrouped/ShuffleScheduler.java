@@ -18,24 +18,18 @@
 package org.apache.tez.runtime.library.common.shuffle.orderedgrouped;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.google.common.collect.Lists;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.tez.common.counters.TaskCounter;
 import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.dag.api.TezUncheckedException;
-import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.InputContext;
-import org.apache.tez.runtime.api.events.InputReadErrorEvent;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
-import org.apache.tez.runtime.library.common.TezRuntimeUtils;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleClient;
-import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.MapOutput.Type;
 
 public class ShuffleScheduler extends ShuffleClient<MapOutput> {
 
@@ -223,11 +217,7 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
 
     if (updateStats) {
       Type type = output.getType();
-      updateCounters(srcAttemptIdentifier, bytesCompressed, bytesDecompressed, copyDuration,
-          type.toString(),
-          type == Type.DISK,
-          type == Type.DISK_DIRECT,
-          type == Type.LOCAL_BYTE_CACHE);
+      updateCounters(srcAttemptIdentifier, bytesCompressed, bytesDecompressed, copyDuration, type);
       totalBytesShuffledTillNow.addAndGet(bytesCompressed);
       logProgress();
     }

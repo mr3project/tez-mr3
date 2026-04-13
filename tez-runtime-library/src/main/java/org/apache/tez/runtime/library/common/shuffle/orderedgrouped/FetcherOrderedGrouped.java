@@ -49,7 +49,6 @@ import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleServer.PathPartition;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.shuffle.api.ShuffleHandlerError;
-import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.MapOutput.Type;
 import org.apache.tez.runtime.library.common.sort.impl.TezIndexRecord;
 import org.apache.tez.runtime.library.common.sort.impl.TezSpillRecord;
 import org.apache.tez.runtime.library.exceptions.FetcherReadTimeoutException;
@@ -570,7 +569,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         }
 
         // Check if we can shuffle *now* ...
-        if (mapOutput.getType() == Type.WAIT) {
+        if (mapOutput.getType() == ShuffleClient.Type.WAIT) {
           LOG.info("{}: MergerManager returned Status.WAIT...", logIdentifier);
           // Not an error but wait to process data.
           return EMPTY_ATTEMPT_ID_ARRAY;
@@ -583,12 +582,12 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
               decompressedLength + " len: " + compressedLength + " to " + mapOutput.getType());
         }
 
-        if (mapOutput.getType() == Type.MEMORY) {
+        if (mapOutput.getType() == ShuffleClient.Type.MEMORY) {
           ShuffleUtils.shuffleToMemory(mapOutput.getMemory(), input, (int) decompressedLength,
               (int) compressedLength, codec, fetcherConfig.ifileReadAhead,
               fetcherConfig.ifileReadAheadLength, LOG,
               mapOutput.getAttemptIdentifier(), taskContext, true);
-        } else if (mapOutput.getType() == Type.DISK) {
+        } else if (mapOutput.getType() == ShuffleClient.Type.DISK) {
           ShuffleUtils.shuffleToDisk(mapOutput.getDisk(), host,
               input, compressedLength, decompressedLength, LOG, mapOutput.getAttemptIdentifier(),
               fetcherConfig.ifileReadAhead, fetcherConfig.ifileReadAheadLength,

@@ -35,7 +35,6 @@ import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.shuffle.FetchedInput;
-import org.apache.tez.runtime.library.common.shuffle.FetchedInput.Type;
 import org.apache.tez.runtime.library.common.shuffle.FetchedInputAllocator;
 import org.apache.tez.runtime.library.common.shuffle.MemoryFetchedInput;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleClient;
@@ -280,11 +279,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
 
     if (updateStats) {
       Type type = fetchedInput.getType();
-      updateCounters(srcAttemptIdentifier, bytesCompressed, bytesDecompressed, copyDuration,
-          type.toString(),
-          type == Type.DISK,
-          type == Type.DISK_DIRECT,
-          type == Type.LOCAL_BYTE_CACHE);
+      updateCounters(srcAttemptIdentifier, bytesCompressed, bytesDecompressed, copyDuration, type);
       long totalBytes = totalBytesShuffledTillNow.addAndGet(bytesCompressed);
       logProgress(totalBytes);
     }
@@ -479,8 +474,8 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
     }
 
     @Override
-    public Type getType() {
-      return Type.MEMORY;
+    public ShuffleClient.Type getType() {
+      return ShuffleClient.Type.MEMORY;
     }
 
     @Override
