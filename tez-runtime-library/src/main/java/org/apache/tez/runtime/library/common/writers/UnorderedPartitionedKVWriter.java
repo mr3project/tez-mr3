@@ -379,10 +379,12 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     lastBufferSize = lastBufferSize - (lastBufferSize % INT_SIZE);
   }
 
+  // called exactly once before the first call of write()
   @Override
   public void setDefaultLengths(int defaultKeyLen, int defaultValLen) {
     this.defaultKeyLen = defaultKeyLen;
     this.defaultValLen = defaultValLen;
+    // TODO: if skipBuffers is true, call writer.setDefaultLengths(defaultKeyLen, defaultValLen)
   }
 
   @Override
@@ -390,7 +392,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     // TODO
   }
 
-  // TODO: optimize
+  // TODO: optimize, if this method is actually called
   @Override
   public void write(BytesWritable key, Iterable<BytesWritable> values) throws IOException {
     Iterator<BytesWritable> it = values.iterator();

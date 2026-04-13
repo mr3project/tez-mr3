@@ -398,14 +398,14 @@ public class PipelinedSorter extends ExternalSorter {
     }
   }
 
+  // called exactly once before the first call of write()
   public void setDefaultLengths(int defaultKeyLen, int defaultValLen) {
     this.defaultKeyLen = defaultKeyLen;
     this.defaultValLen = defaultValLen;
   }
 
   @Override
-  public void write(BytesWritable key, BytesWritable value)
-      throws IOException {
+  public void write(BytesWritable key, BytesWritable value) throws IOException {
     collect(key, value, partitioner.getPartition(key, value, partitions));
   }
 
