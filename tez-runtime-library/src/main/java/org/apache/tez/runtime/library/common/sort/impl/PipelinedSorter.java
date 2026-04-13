@@ -404,8 +404,16 @@ public class PipelinedSorter extends ExternalSorter {
     this.defaultValLen = defaultValLen;
   }
 
+  private void updateLengthStats(int keyLen, int valueLen) {
+    maxKeyLen = Math.max(maxKeyLen, keyLen);
+    minKeyLen = Math.min(minKeyLen, keyLen);
+    maxValLen = Math.max(maxValLen, valueLen);
+    minValLen = Math.min(minValLen, valueLen);
+  }
+
   @Override
   public void write(BytesWritable key, BytesWritable value) throws IOException {
+    updateLengthStats(key.getLength(), value.getLength());
     collect(key, value, partitioner.getPartition(key, value, partitions));
   }
 

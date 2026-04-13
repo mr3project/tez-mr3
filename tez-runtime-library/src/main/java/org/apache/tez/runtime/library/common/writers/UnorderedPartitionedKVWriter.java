@@ -387,6 +387,13 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     // TODO: if skipBuffers is true, call writer.setDefaultLengths(defaultKeyLen, defaultValLen)
   }
 
+  private void updateLengthStats(int keyLen, int valueLen) {
+    maxKeyLen = Math.max(maxKeyLen, keyLen);
+    minKeyLen = Math.min(minKeyLen, keyLen);
+    maxValLen = Math.max(maxValLen, valueLen);
+    minValLen = Math.min(minValLen, valueLen);
+  }
+
   @Override
   public void closeWriter() {
     // TODO
@@ -415,13 +422,16 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       throw new IOException("Exception during spill", new IOException(spillException));
     }
     if (skipBuffers) {
-      // special case, where we have only one partition and pipelining is disabled.
+      // Special case, where we have only one partition and pipelining is disabled.
       // The reason outputRecordsCounter isn't updated here:
       // For skipBuffers case, IFile writer has the reference to outputRecordsCounter and
       // during its close method call, it will update the outputRecordsCounter.
+      //
+      // No need to call updateLengthStats() because we already send key/value to writer.
       writer.appendNoRle(key, value);
     } else {
       int partition = partitioner.getPartition(key, value, numPartitions);
+      updateLengthStats(key.getLength(), value.getLength());
       write(key, value, partition);
     }
   }
