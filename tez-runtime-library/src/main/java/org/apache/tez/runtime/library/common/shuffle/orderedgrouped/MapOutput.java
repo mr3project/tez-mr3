@@ -143,13 +143,24 @@ public abstract class MapOutput implements ShuffleInput {
 
   public abstract ShuffleClient.Type getType();
 
+  /**
+   * Logical size of this map output as used by MergeManager for in-memory merge accounting,
+   * merge candidate ordering, and output buffer sizing decisions.
+   *
+   * For MEMORY/DISK map outputs this usually matches physical bytes.
+   * For LOCAL_BYTE_CACHE it represents the logical/raw footprint used by merge accounting.
+   */
   public long getSize() {
     return -1;
   }
 
-  // Physical bytes that back this map output stream for IFile.Reader.
-  // This is the compressed segment length for streamed local fetch,
-  // and equals getSize() for regular in-memory map outputs.
+  /**
+   * Physical byte length presented to IFile.Reader.
+   *
+   * This can differ from getSize() when the map output is streamed from local byte cache:
+   * getSize() is the logical/raw accounting size, while getReaderLength() is the actual
+   * bounded stream length consumed by IFile.Reader.
+   */
   public long getReaderLength() {
     return -1;
   }
