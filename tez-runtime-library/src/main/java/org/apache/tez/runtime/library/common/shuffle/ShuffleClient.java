@@ -181,6 +181,7 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
   private final TezCounter shuffleBytesDiskCounter;
   private final TezCounter shuffleBytesDiskDirectCounter;
   private final TezCounter shuffleBytesMemoryCounter;
+  private final TezCounter shuffleBytesLocalByteCache;
 
   private final ShuffleErrorCounterGroup shuffleErrorCounterGroup;
 
@@ -223,6 +224,7 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
     this.shuffleBytesDiskCounter = counters.findCounter(TaskCounter.SHUFFLE_BYTES_DISK);
     this.shuffleBytesDiskDirectCounter = counters.findCounter(TaskCounter.SHUFFLE_BYTES_DISK_DIRECT);
     this.shuffleBytesMemoryCounter = counters.findCounter(TaskCounter.SHUFFLE_BYTES_MEMORY);
+    this.shuffleBytesLocalByteCache = counters.findCounter(TaskCounter.SHUFFLE_BYTES_LOCAL_BYTE_CACHE);
 
     TezCounter ioErrsCounter = counters.findCounter(SHUFFLE_ERR_GRP_NAME, ShuffleErrors.IO_ERROR.toString());
     TezCounter wrongLengthErrsCounter = counters.findCounter(SHUFFLE_ERR_GRP_NAME, ShuffleErrors.WRONG_LENGTH.toString());
@@ -482,7 +484,7 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
       long bytesCompressed,
       long bytesDecompressed,
       long copyDuration,
-      String outputType, boolean isOutputDisk, boolean isOutputDiskDirect) {
+      String outputType, boolean isOutputDisk, boolean isOutputDiskDirect, boolean isOutputByteCache) {
     fetchStatsLogger.logIndividualFetchComplete(copyDuration, bytesCompressed, bytesDecompressed,
       outputType, srcAttemptIdentifier);
 

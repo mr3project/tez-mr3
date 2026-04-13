@@ -279,10 +279,12 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
     }
 
     if (updateStats) {
+      Type type = fetchedInput.getType();
       updateCounters(srcAttemptIdentifier, bytesCompressed, bytesDecompressed, copyDuration,
-          fetchedInput.getType().toString(),
-          fetchedInput.getType() == Type.DISK,
-          fetchedInput.getType() == Type.DISK_DIRECT);
+          type.toString(),
+          type == Type.DISK,
+          type == Type.DISK_DIRECT,
+          type == Type.LOCAL_BYTE_CACHE);
       long totalBytes = totalBytesShuffledTillNow.addAndGet(bytesCompressed);
       logProgress(totalBytes);
     }

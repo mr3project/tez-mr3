@@ -222,10 +222,12 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
     }
 
     if (updateStats) {
+      Type type = output.getType();
       updateCounters(srcAttemptIdentifier, bytesCompressed, bytesDecompressed, copyDuration,
-          output.getType().toString(),
-          output.getType() == Type.DISK,
-          output.getType() == Type.DISK_DIRECT);
+          type.toString(),
+          type == Type.DISK,
+          type == Type.DISK_DIRECT,
+          type == Type.LOCAL_BYTE_CACHE);
       totalBytesShuffledTillNow.addAndGet(bytesCompressed);
       logProgress();
     }
