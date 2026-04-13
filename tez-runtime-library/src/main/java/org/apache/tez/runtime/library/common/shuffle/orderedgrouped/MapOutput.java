@@ -151,7 +151,7 @@ public abstract class MapOutput implements ShuffleInput {
   // This is the compressed segment length for streamed local fetch,
   // and equals getSize() for regular in-memory map outputs.
   public long getReaderLength() {
-    return getSize();
+    return -1;
   }
 
   public long getUsedMemoryForMergeManager() {
@@ -208,6 +208,11 @@ public abstract class MapOutput implements ShuffleInput {
     }
 
     @Override
+    public long getReaderLength() {
+      return outputPath.getLength();
+    }
+
+    @Override
     public void commit() throws IOException {
       callback.closeOnDiskFile(outputPath);
     }
@@ -248,6 +253,11 @@ public abstract class MapOutput implements ShuffleInput {
 
     @Override
     public long getSize() {
+      return outputPath.getLength();
+    }
+
+    @Override
+    public long getReaderLength() {
       return outputPath.getLength();
     }
 
@@ -298,6 +308,11 @@ public abstract class MapOutput implements ShuffleInput {
     }
 
     @Override
+    public long getReaderLength() {
+      return byteArray.length;
+    }
+
+    @Override
     public long getUsedMemoryForMergeManager() {
       return usedMemoryForMergeManger;
     }
@@ -336,6 +351,11 @@ public abstract class MapOutput implements ShuffleInput {
     @Override
     public ShuffleClient.Type getType() {
       return ShuffleClient.Type.WAIT;
+    }
+
+    @Override
+    public long getReaderLength() {
+      return 0L;
     }
   }
 
