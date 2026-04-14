@@ -28,6 +28,7 @@ public abstract class KeyValueWriterEdge implements WriterEdge {
   // Invariant:
   //   1. setDefaultLengths() is called exactly once before the first call of write().
   //   2. closeWriter() is called only after the last call of write().
+  //   3. setDefaultLengths()/write()/closeWriter() are called from the same thread (thus never concurrently).
 
   public abstract void setDefaultLengths(int defaultKeyLen, int defaultValLen);
 
