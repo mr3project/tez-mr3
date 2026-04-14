@@ -404,7 +404,9 @@ public class PipelinedSorter extends ExternalSorter {
   }
 
   synchronized public void closeWriter() {
-    LOG.info("Closing up PipelinedSorter KeyValueWriterEdge for {}", outputContext.getDestinationVertexName());
+    LOG.info("Closing up PipelinedSorter KeyValueWriterEdge for {}: key={}/{}/{}, val={}/{}/{}",
+        outputContext.getDestinationVertexName(),
+        defaultKeyLen, maxKeyLen, minKeyLen, defaultValLen, maxValLen, minValLen);
   }
 
   private void updateLengthStats(int keyLen, int valueLen) {

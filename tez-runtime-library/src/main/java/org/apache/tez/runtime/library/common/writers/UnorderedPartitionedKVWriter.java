@@ -396,7 +396,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
   @Override
   public void closeWriter() {
-    // TODO
+    LOG.info("Closing up Unordered KeyValueWriterEdge for {}: key={}/{}/{}, val={}/{}/{}",
+      destNameTrimmed,
+      defaultKeyLen, maxKeyLen, minKeyLen, defaultValLen, maxValLen, minValLen);
   }
 
   // TODO: optimize, if this method is actually called
