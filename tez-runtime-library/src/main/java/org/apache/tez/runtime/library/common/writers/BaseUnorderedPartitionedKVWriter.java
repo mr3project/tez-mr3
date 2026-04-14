@@ -27,8 +27,6 @@ import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.sort.impl.TezSpillRecord;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.RawLocalFileSystem;
@@ -47,8 +45,6 @@ import org.apache.tez.runtime.library.utils.CodecUtils;
 @SuppressWarnings("rawtypes")
 public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
 
-  private static final Logger LOG = LoggerFactory.getLogger(BaseUnorderedPartitionedKVWriter.class);
-  
   protected final OutputContext outputContext;
   protected final Configuration conf;
 
@@ -174,17 +170,6 @@ public abstract class BaseUnorderedPartitionedKVWriter extends KeyValuesWriterEd
 
     this.outputFileHandler = TezRuntimeUtils.instantiateTaskOutputManager(
         this.conf, outputContext, this.compositeFetch);
-  }
-
-  @Override
-  public abstract void write(BytesWritable key, BytesWritable value) throws IOException;
-
-  @Override
-  public void write(BytesWritable key, Iterable<BytesWritable> values) throws IOException {
-    Iterator<BytesWritable> it = values.iterator();
-    while (it.hasNext()) {
-      write(key, it.next());
-    }
   }
 
   public abstract List<Event> close() throws IOException, InterruptedException;

@@ -141,6 +141,9 @@ public class PipelinedSorter extends ExternalSorter {
   // track buffer overflow recursively in all buffers
   private int bufferOverflowRecursion = 0;
 
+  private int maxKeyLen = -1;
+  private int maxValLen = -1;
+
   public PipelinedSorter(OutputContext outputContext, Configuration conf, int numOutputs,
       long initialMemoryAvailable) throws IOException {
     super(outputContext, conf, numOutputs, initialMemoryAvailable);
@@ -337,7 +340,6 @@ public class PipelinedSorter extends ExternalSorter {
     return bit;
   }
 
-  // inside collect() synchronized
   private void sort() throws IOException {
     SortSpan newSpan = span.next();
 
@@ -391,9 +393,25 @@ public class PipelinedSorter extends ExternalSorter {
     }
   }
 
+  synchronized public void closeWriter() {
+    LOG.info("Closing up PipelinedSorter KeyValueWriterEdge for {}: maxKeyLen={}, maxValLen={}",
+        outputContext.getDestinationVertexName(), maxKeyLen, maxValLen);
+  }
+
+  // Invariants on setDefaultLengths()/write()/closeWriter()/flush()/close():
+  //  - setDefaultLengths()/write()/closeWriter() are called from the same thread and never called concurrently.
+  //  - closeWriter() is the last call.
+  //  - OrderedPartitionedKVOutput.close() is called after closeWriter() is called,
+  //    so flush()/close() are called only after closeWriter() is called.
+  //
+  // Hence, it is safe to skip guarding collect() with synchronized:
+  //  - closeWriter(), called after all collect() calls, is guarded with synchronized.
+  //  - flush()/close() are guided with synchronized.
+
   @Override
-  public void write(BytesWritable key, BytesWritable value)
-      throws IOException {
+  public void write(BytesWritable key, BytesWritable value) throws IOException {
+    maxKeyLen = Math.max(maxKeyLen, key.getLength());
+    maxValLen = Math.max(maxValLen, value.getLength());
     collect(key, value, partitioner.getPartition(key, value, partitions));
   }
 
@@ -411,7 +429,7 @@ public class PipelinedSorter extends ExternalSorter {
    * When this method returns, kvindex must refer to sufficient unused
    * storage to store one METADATA.
    */
-  synchronized void collect(BytesWritable key, BytesWritable value, final int partition) throws IOException {
+  private void collect(BytesWritable key, BytesWritable value, final int partition) throws IOException {
     if (partition < 0 || partition >= partitions) {
       throw new IOException("Illegal partition for " + key + " (" +
           partition + ")");
@@ -481,7 +499,6 @@ public class PipelinedSorter extends ExternalSorter {
 
   // it is guaranteed that when spillSingleRecord is called, there is
   // no merger spans queued in executor.
-  // inside collect() synchronized
   private void spillSingleRecord(final BytesWritable key, final BytesWritable value,
           int partition) throws IOException {
     final TezSpillRecord spillRec = new TezSpillRecord(partitions);
@@ -557,7 +574,6 @@ public class PipelinedSorter extends ExternalSorter {
     }
   }
 
-  // inside collect() synchronized, or in the final flush()
   private boolean spill(boolean ignoreEmptySpills) throws IOException {
     try {
       boolean ret = merger.ready();
@@ -743,7 +759,7 @@ public class PipelinedSorter extends ExternalSorter {
   }
 
   @Override
-  public void flush() throws IOException {
+  synchronized public void flush() throws IOException {
     final String uniqueIdentifier = outputContext.getUniqueIdentifier();
 
     /**
@@ -1005,7 +1021,7 @@ public class PipelinedSorter extends ExternalSorter {
    * @return events to be returned by the edge.
    * @throws IOException parent can throw this.
    */
-  public final List<Event> close() throws IOException {
+  synchronized public final List<Event> close() throws IOException {
     super.close();
     return finalEvents;
   }

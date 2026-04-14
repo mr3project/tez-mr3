@@ -114,7 +114,6 @@ public class UnorderedKVOutput extends AbstractLogicalOutput implements LogicalO
   public synchronized List<Event> close() throws Exception {
     List<Event> returnEvents = null;
     if (isStarted.get()) {
-      //TODO: Do we need to support sending payloads via events?
       returnEvents = kvWriter.close();
       kvWriter = null;
     } else {
@@ -122,9 +121,8 @@ public class UnorderedKVOutput extends AbstractLogicalOutput implements LogicalO
           ": Attempting to close output {} of type {} before it was started. Generating empty events",
           getContext().getDestinationVertexName(), this.getClass().getSimpleName());
       returnEvents = new LinkedList<Event>();
-      ShuffleUtils
-          .generateEventsForNonStartedOutput(returnEvents, getNumPhysicalOutputs(), getContext(),
-              false, false, TezCommonUtils.newBestCompressionDeflater());
+      ShuffleUtils.generateEventsForNonStartedOutput(returnEvents, getNumPhysicalOutputs(), getContext(),
+          false, false, TezCommonUtils.newBestCompressionDeflater());
     }
 
     return returnEvents;

@@ -24,6 +24,13 @@ import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.api.WriterEdge;
 
 public abstract class KeyValueWriterEdge implements WriterEdge {
+
+  // Invariant:
+  //   1. closeWriter() must be called and is called only after the last call of write().
+  //   2. write()/closeWriter() are called from the same thread (thus never concurrently).
+
+  public abstract void closeWriter();
+
   /**
    * Writes a key/value pair.
    * 

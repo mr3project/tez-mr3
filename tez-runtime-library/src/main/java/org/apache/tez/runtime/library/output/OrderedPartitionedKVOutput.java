@@ -124,6 +124,11 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput implements
     Preconditions.checkState(isStarted.get(), "Cannot get writer before starting the Output");
     return new KeyValuesWriterEdge() {
       @Override
+      public void closeWriter() {
+        sorter.closeWriter();
+      }
+
+      @Override
       public void write(BytesWritable key, BytesWritable value) throws IOException {
         sorter.write(key, value);
       }

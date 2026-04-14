@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
@@ -168,6 +169,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
   // uncompressed size for each partition
   private volatile long spilledSize = 0;
+
+  private int maxKeyLen = 0;
+  private int maxValLen = 0;
 
   static final ThreadLocal<Deflater> deflater = new ThreadLocal<Deflater>() {
     @Override
@@ -372,6 +376,21 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   }
 
   @Override
+  public void closeWriter() {
+    LOG.info("Closing up Unordered KeyValueWriterEdge for {}: maxKeyLen={}, maxValLen={}",
+      destNameTrimmed, maxKeyLen, maxValLen);
+  }
+
+  // TODO: optimize, if this method is actually called
+  @Override
+  public void write(BytesWritable key, Iterable<BytesWritable> values) throws IOException {
+    Iterator<BytesWritable> it = values.iterator();
+    while (it.hasNext()) {
+      write(key, it.next());
+    }
+  }
+
+  @Override
   public void write(BytesWritable key, BytesWritable value) throws IOException {
     // Skipping checks for key-value types.
     // IFile takes care of these, but should be removed from there as well.
@@ -385,13 +404,17 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       throw new IOException("Exception during spill", new IOException(spillException));
     }
     if (skipBuffers) {
-      // special case, where we have only one partition and pipelining is disabled.
+      // Special case, where we have only one partition and pipelining is disabled.
       // The reason outputRecordsCounter isn't updated here:
       // For skipBuffers case, IFile writer has the reference to outputRecordsCounter and
       // during its close method call, it will update the outputRecordsCounter.
+      //
+      // No need to update maxKeyLen/maxValLen because we already send key/value to writer.
       writer.appendNoRle(key, value);
     } else {
       int partition = partitioner.getPartition(key, value, numPartitions);
+      maxKeyLen = Math.max(maxKeyLen, key.getLength());
+      maxValLen = Math.max(maxValLen, value.getLength());
       write(key, value, partition);
     }
   }
