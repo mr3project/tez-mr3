@@ -18,6 +18,7 @@
 
 package org.apache.tez.runtime.library.output;
 
+import java.io.IOException;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -26,6 +27,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.io.BytesWritable;
+import org.apache.tez.common.Preconditions;
 import org.apache.tez.runtime.library.api.LogicalOutputEdge;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
@@ -54,6 +56,7 @@ public class UnorderedKVOutput extends AbstractLogicalOutput implements LogicalO
   private static final Logger LOG = LoggerFactory.getLogger(UnorderedKVOutput.class);
 
   UnorderedPartitionedKVWriter kvWriter;
+  private KeyValuesWriterEdge writer;
   
   private Configuration conf;
   
@@ -91,9 +94,6 @@ public class UnorderedKVOutput extends AbstractLogicalOutput implements LogicalO
   public synchronized void start() throws Exception {
     if (!isStarted.get()) {
       memoryUpdateCallbackHandler.validateUpdateReceived();
-      //This would have just a single partition
-      this.kvWriter = new UnorderedPartitionedKVWriter(getContext(), conf, 1,
-          memoryUpdateCallbackHandler.getMemoryAssigned());
       isStarted.set(true);
       LOG.info(getContext().getDestinationVertexName() + " started. MemoryAssigned="
           + memoryUpdateCallbackHandler.getMemoryAssigned());
@@ -102,7 +102,57 @@ public class UnorderedKVOutput extends AbstractLogicalOutput implements LogicalO
 
   @Override
   public synchronized KeyValuesWriterEdge getWriter() throws Exception {
-    return kvWriter;
+    Preconditions.checkState(isStarted.get(), "Cannot get writer before starting the Output");
+    if (writer == null) {
+      writer = new KeyValuesWriterEdge() {
+        private int defaultKeyLen = -1;
+        private int defaultValLen = -1;
+        private boolean closeWriterCalled = false;
+
+        private UnorderedPartitionedKVWriter getOrCreateKVWriter() throws IOException {
+          if (kvWriter == null) {
+            // This output always has a single partition.
+            kvWriter = new UnorderedPartitionedKVWriter(getContext(), conf, 1,
+                memoryUpdateCallbackHandler.getMemoryAssigned());
+            if (defaultKeyLen >= 0 && defaultValLen >= 0) {
+              kvWriter.setDefaultLengths(defaultKeyLen, defaultValLen);
+            }
+            if (closeWriterCalled) {
+              kvWriter.closeWriter();
+            }
+          }
+          return kvWriter;
+        }
+
+        @Override
+        public void setDefaultLengths(int defaultKeyLen, int defaultValLen) {
+          this.defaultKeyLen = defaultKeyLen;
+          this.defaultValLen = defaultValLen;
+          if (kvWriter != null) {
+            kvWriter.setDefaultLengths(defaultKeyLen, defaultValLen);
+          }
+        }
+
+        @Override
+        public void closeWriter() {
+          closeWriterCalled = true;
+          if (kvWriter != null) {
+            kvWriter.closeWriter();
+          }
+        }
+
+        @Override
+        public void write(BytesWritable key, BytesWritable value) throws IOException {
+          getOrCreateKVWriter().write(key, value);
+        }
+
+        @Override
+        public void write(BytesWritable key, Iterable<BytesWritable> values) throws IOException {
+          getOrCreateKVWriter().write(key, values);
+        }
+      };
+    }
+    return writer;
   }
 
   @Override
@@ -113,9 +163,16 @@ public class UnorderedKVOutput extends AbstractLogicalOutput implements LogicalO
   @Override
   public synchronized List<Event> close() throws Exception {
     List<Event> returnEvents = null;
-    if (isStarted.get()) {
+    if (isStarted.get() && kvWriter != null) {
       returnEvents = kvWriter.close();
       kvWriter = null;
+      writer = null;
+    } else if (isStarted.get()) {
+      LOG.debug("{}: Output {} started but no records were written. Generating empty events",
+          getContext().getDestinationVertexName(), this.getClass().getSimpleName());
+      returnEvents = new LinkedList<Event>();
+      ShuffleUtils.generateEventsForNonStartedOutput(returnEvents, getNumPhysicalOutputs(), getContext(),
+          false, false, TezCommonUtils.newBestCompressionDeflater());
     } else {
       LOG.warn(getContext().getDestinationVertexName() +
           ": Attempting to close output {} of type {} before it was started. Generating empty events",

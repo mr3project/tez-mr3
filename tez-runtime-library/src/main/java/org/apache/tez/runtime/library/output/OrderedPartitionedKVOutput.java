@@ -60,6 +60,7 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput implements
   private static final Logger LOG = LoggerFactory.getLogger(OrderedPartitionedKVOutput.class);
 
   protected PipelinedSorter sorter;
+  private KeyValuesWriterEdge writer;
   protected Configuration conf;
   private RawLocalFileSystem localFs;
   protected MemoryUpdateCallbackHandler memoryUpdateCallbackHandler;
@@ -112,9 +113,6 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput implements
       // We do not use TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT.
       isFinalMergeEnabled = !this.isPipelinedShuffle;
 
-      sorter = new PipelinedSorter(getContext(), conf, getNumPhysicalOutputs(),
-          memoryUpdateCallbackHandler.getMemoryAssigned());
-
       isStarted.set(true);
     }
   }
@@ -122,27 +120,55 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput implements
   @Override
   public synchronized KeyValuesWriterEdge getWriter() throws IOException {
     Preconditions.checkState(isStarted.get(), "Cannot get writer before starting the Output");
-    return new KeyValuesWriterEdge() {
-      @Override
-      public void setDefaultLengths(int defaultKeyLen, int defaultValLen) {
-        sorter.setDefaultLengths(defaultKeyLen, defaultValLen);
-      }
+    if (writer == null) {
+      writer = new KeyValuesWriterEdge() {
+        private int defaultKeyLen = -1;
+        private int defaultValLen = -1;
+        private boolean closeWriterCalled = false;
 
-      @Override
-      public void closeWriter() {
-        sorter.closeWriter();
-      }
+        private PipelinedSorter getOrCreateSorter() throws IOException {
+          if (sorter == null) {
+            sorter = new PipelinedSorter(getContext(), conf, getNumPhysicalOutputs(),
+                memoryUpdateCallbackHandler.getMemoryAssigned());
+            if (defaultKeyLen >= 0 && defaultValLen >= 0) {
+              sorter.setDefaultLengths(defaultKeyLen, defaultValLen);
+            }
+            if (closeWriterCalled) {
+              sorter.closeWriter();
+            }
+          }
+          return sorter;
+        }
 
-      @Override
-      public void write(BytesWritable key, BytesWritable value) throws IOException {
-        sorter.write(key, value);
-      }
+        @Override
+        public void setDefaultLengths(int defaultKeyLen, int defaultValLen) {
+          this.defaultKeyLen = defaultKeyLen;
+          this.defaultValLen = defaultValLen;
+          if (sorter != null) {
+            sorter.setDefaultLengths(defaultKeyLen, defaultValLen);
+          }
+        }
 
-      @Override
-      public void write(BytesWritable key, Iterable<BytesWritable> values) throws IOException {
-        sorter.write(key, values);
-      }
-    };
+        @Override
+        public void closeWriter() {
+          closeWriterCalled = true;
+          if (sorter != null) {
+            sorter.closeWriter();
+          }
+        }
+
+        @Override
+        public void write(BytesWritable key, BytesWritable value) throws IOException {
+          getOrCreateSorter().write(key, value);
+        }
+
+        @Override
+        public void write(BytesWritable key, Iterable<BytesWritable> values) throws IOException {
+          getOrCreateSorter().write(key, values);
+        }
+      };
+    }
+    return writer;
   }
 
   @Override
@@ -158,6 +184,11 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput implements
       returnEvents.addAll(sorter.close());
       returnEvents.addAll(generateEvents());
       sorter = null;
+      writer = null;
+    } else if (isStarted.get()) {
+      LOG.debug("{}: Output {} started but no records were written. Generating empty events",
+          getContext().getDestinationVertexName(), this.getClass().getSimpleName());
+      returnEvents = generateEmptyEvents();
     } else {
       LOG.warn(getContext().getDestinationVertexName() +
           ": Attempting to close output {} of type {} before it was started. Generating empty events",
