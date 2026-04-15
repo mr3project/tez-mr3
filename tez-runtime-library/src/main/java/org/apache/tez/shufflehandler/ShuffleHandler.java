@@ -17,7 +17,6 @@ package org.apache.tez.shufflehandler;
 import org.apache.hadoop.io.DataInputByteBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.ReadaheadPool;
-import org.apache.hadoop.io.Text;
 import org.apache.hadoop.util.DiskChecker;
 
 import static io.netty.buffer.Unpooled.wrappedBuffer;
@@ -62,6 +61,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.tez.runtime.api.ConcurrentByteCache;
 import org.apache.tez.runtime.api.IndexPathCache;
+import org.apache.tez.runtime.api.TezOffsetRecord;
 import org.apache.tez.runtime.library.common.security.SecureShuffleUtils;
 import org.apache.tez.runtime.library.common.shuffle.api.ShuffleHandlerError;
 import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.ShuffleHeader;
@@ -1015,6 +1015,7 @@ public class ShuffleHandler {
 
       Path dataPath = mapOutputInfo.getMapOutputFilePath();   // dataPath can be null
       TezSpillRecord spillRecord = new TezSpillRecord(mapOutputInfo.getSpillRecord());
+      Map<Integer, TezOffsetRecord> offsetRecordMap = mapOutputInfo.getOffsetRecordMap();
       MultiByteArrayOutputStream byteArrayOutput = concurrentByteCache.get(mapId);
 
       if (isLogDebugEnabled) {
@@ -1023,9 +1024,10 @@ public class ShuffleHandler {
 
       MapOutputInfo outputInfo;
       if (reduceRange.first == reduceRange.last) {
-        outputInfo = new MapOutputInfo(dataPath, spillRecord.getIndex(reduceRange.first), reduceRange, byteArrayOutput);
+        outputInfo = new MapOutputInfo(
+            dataPath, spillRecord.getIndex(reduceRange.first), reduceRange, byteArrayOutput, offsetRecordMap);
       } else {
-        outputInfo = new MapOutputInfo(dataPath, spillRecord, reduceRange, byteArrayOutput);
+        outputInfo = new MapOutputInfo(dataPath, spillRecord, reduceRange, byteArrayOutput, offsetRecordMap);
       }
       return outputInfo;
     }
@@ -1057,14 +1059,11 @@ public class ShuffleHandler {
         if (mapOutputInfoMap.size() < mapOutputMetaInfoCacheSize) {
           mapOutputInfoMap.put(mapId, outputInfo);
         }
-        int lengthInitial = Text.encode(mapId).limit();
         for (int reduce = reduceRange.getFirst(); reduce <= reduceRange.getLast(); reduce++) {
           TezIndexRecord indexRecord = outputInfo.getIndex(reduce);
-
-          // contentLength += (new ShuffleHeader(mapId, indexRecord.getPartLength(), indexRecord.getRawLength(), reduce)).writeLength();
-          int length = lengthInitial;
-          length += 4 + 8 + 8 + 4;  // encoding of mapIdLength, compressedLength, uncompressedLength, forReduce
-          contentLength += length;
+          TezOffsetRecord offsetRecord = outputInfo.getTezOffsetRecord(reduce);
+          contentLength += new ShuffleHeader(
+              mapId, indexRecord.getPartLength(), indexRecord.getRawLength(), reduce, offsetRecord).writeLength();
 
           contentLength += indexRecord.getPartLength();
         }
@@ -1094,23 +1093,29 @@ public class ShuffleHandler {
       private TezIndexRecord indexRecord;
       private final Range reduceRange;
       private final MultiByteArrayOutputStream byteArrayOutput;
+      @Nullable
+      private final Map<Integer, TezOffsetRecord> offsetRecordMap;
 
       MapOutputInfo(@Nullable Path mapOutputFileName,
                     TezIndexRecord indexRecord, Range reduceRange,
-                    @Nullable MultiByteArrayOutputStream byteArrayOutput) {
+                    @Nullable MultiByteArrayOutputStream byteArrayOutput,
+                    @Nullable Map<Integer, TezOffsetRecord> offsetRecordMap) {
         this.mapOutputFileName = mapOutputFileName;
         this.indexRecord = indexRecord;
         this.reduceRange = reduceRange;
         this.byteArrayOutput = byteArrayOutput;
+        this.offsetRecordMap = offsetRecordMap;
       }
 
       MapOutputInfo(@Nullable Path mapOutputFileName,
                     TezSpillRecord spillRecord, Range reduceRange,
-                    @Nullable MultiByteArrayOutputStream byteArrayOutput) {
+                    @Nullable MultiByteArrayOutputStream byteArrayOutput,
+                    @Nullable Map<Integer, TezOffsetRecord> offsetRecordMap) {
         this.mapOutputFileName = mapOutputFileName;
         this.spillRecord = spillRecord;
         this.reduceRange = reduceRange;
         this.byteArrayOutput = byteArrayOutput;
+        this.offsetRecordMap = offsetRecordMap;
       }
 
       TezIndexRecord getIndex(int index) {
@@ -1122,6 +1127,14 @@ public class ShuffleHandler {
         } else {
           return indexRecord;
         }
+      }
+
+      @Nullable
+      TezOffsetRecord getTezOffsetRecord(int index) {
+        if (offsetRecordMap == null) {
+          return null;
+        }
+        return offsetRecordMap.get(index);
       }
 
       public void finish() {
@@ -1190,7 +1203,9 @@ public class ShuffleHandler {
           lastIndex = index;
         }
 
-        ShuffleHeader header = new ShuffleHeader(mapId, index.getPartLength(), index.getRawLength(), reduce);
+        TezOffsetRecord offsetRecord = outputInfo.getTezOffsetRecord(reduce);
+        ShuffleHeader header = new ShuffleHeader(
+            mapId, index.getPartLength(), index.getRawLength(), reduce, offsetRecord);
         dob.reset();
         header.write(dob);
         // Free the memory needed to store the spill and index records

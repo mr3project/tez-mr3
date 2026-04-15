@@ -25,6 +25,7 @@ import java.nio.ByteBuffer;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
+import org.apache.tez.runtime.api.TezOffsetRecord;
 
 /**
  * Shuffle Header information that is sent by the TaskTracker and 
@@ -48,6 +49,7 @@ public class ShuffleHeader implements Writable {
   long uncompressedLength;
   long compressedLength;
   int forReduce;
+  TezOffsetRecord tezOffsetRecord;
 
   private boolean compositeFetch;
 
@@ -63,10 +65,16 @@ public class ShuffleHeader implements Writable {
   // ShuffleHeader created used by MR3 ShuffleHandler (but not by Hadoop shuffle service)
   public ShuffleHeader(String mapId, long compressedLength,
       long uncompressedLength, int forReduce) {
+    this(mapId, compressedLength, uncompressedLength, forReduce, null);
+  }
+
+  public ShuffleHeader(String mapId, long compressedLength,
+      long uncompressedLength, int forReduce, TezOffsetRecord tezOffsetRecord) {
     this.mapId = mapId;
     this.compressedLength = compressedLength;
     this.uncompressedLength = uncompressedLength;
     this.forReduce = forReduce;
+    this.tezOffsetRecord = tezOffsetRecord;
   }
   
   public String getMapId() {
@@ -85,6 +93,10 @@ public class ShuffleHeader implements Writable {
     return compressedLength;
   }
 
+  public TezOffsetRecord getTezOffsetRecord() {
+    return tezOffsetRecord;
+  }
+
   public void readFields(DataInput in) throws IOException {
     if (compositeFetch) {   // ShuffleHeader created by MR3 ShuffleHandler
       int length = in.readInt();  // Cf. WritableUtils.readStringSafely() calls readVInt()
@@ -99,6 +111,16 @@ public class ShuffleHeader implements Writable {
       compressedLength = in.readLong();
       uncompressedLength = in.readLong();
       forReduce = in.readInt();
+      int maxKeyLen = in.readInt();
+      int maxValLen = in.readInt();
+      int firstKeyOffset = in.readInt();
+      int firstValOffset = in.readInt();
+      int eofPos = in.readInt();
+      if (maxKeyLen >= 0) {
+        tezOffsetRecord = new TezOffsetRecord(maxKeyLen, maxValLen, firstKeyOffset, firstValOffset, eofPos);
+      } else {
+        tezOffsetRecord = null;
+      }
     } else {  // ShuffleHeader created by Hadoop shuffle service
       mapId = WritableUtils.readStringSafely(in, MAX_ID_LENGTH);
       compressedLength = WritableUtils.readVLong(in);
@@ -112,6 +134,7 @@ public class ShuffleHeader implements Writable {
   public int writeLength() throws IOException {
     int length = Text.encode(mapId).limit();
     length += 4 + 8 + 8 + 4;  // encoding of mapIdLength, compressedLength, uncompressedLength, forReduce
+    length += 5 * 4;  // encoding of TezOffsetRecord
     return length;
   }
 
@@ -127,5 +150,18 @@ public class ShuffleHeader implements Writable {
     out.writeLong(compressedLength);
     out.writeLong(uncompressedLength);
     out.writeInt(forReduce);
+    if (tezOffsetRecord != null) {
+      out.writeInt(tezOffsetRecord.getMaxKeyLen());
+      out.writeInt(tezOffsetRecord.getMaxValLen());
+      out.writeInt(tezOffsetRecord.getFirstKeyOffset());
+      out.writeInt(tezOffsetRecord.getFirstValOffset());
+      out.writeInt(tezOffsetRecord.getEofPos());
+    } else {
+      out.writeInt(-1);
+      out.writeInt(-1);
+      out.writeInt(-1);
+      out.writeInt(-1);
+      out.writeInt(-1);
+    }
   }
 }
