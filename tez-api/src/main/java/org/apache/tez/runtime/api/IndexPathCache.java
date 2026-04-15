@@ -1,6 +1,8 @@
 package org.apache.tez.runtime.api;
 
 import java.nio.ByteBuffer;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -23,12 +25,28 @@ public class IndexPathCache {
     private final ByteBuffer spillRecord;
     @Nullable
     private final TezOffsetRecord offsetRecord;
+    @Nullable
+    private final Map<Integer, TezOffsetRecord> offsetRecordMap;
 
     public MapOutputInfo(@Nullable Path mapOutputFilePath, ByteBuffer spillRecord,
                          @Nullable TezOffsetRecord offsetRecord) {
+      this(mapOutputFilePath, spillRecord, offsetRecord, null);
+    }
+
+    public MapOutputInfo(@Nullable Path mapOutputFilePath, ByteBuffer spillRecord,
+                         @Nullable Map<Integer, TezOffsetRecord> offsetRecordMap) {
+      this(mapOutputFilePath, spillRecord, null, offsetRecordMap);
+    }
+
+    private MapOutputInfo(@Nullable Path mapOutputFilePath, ByteBuffer spillRecord,
+                         @Nullable TezOffsetRecord offsetRecord,
+                         @Nullable Map<Integer, TezOffsetRecord> offsetRecordMap) {
       this.mapOutputFilePath = mapOutputFilePath;
       this.spillRecord = spillRecord;
       this.offsetRecord = offsetRecord;
+      this.offsetRecordMap = offsetRecordMap == null
+          ? null
+          : Collections.unmodifiableMap(new HashMap<>(offsetRecordMap));
     }
 
     public Path getMapOutputFilePath() {
@@ -43,6 +61,11 @@ public class IndexPathCache {
     public TezOffsetRecord getOffsetRecord() {
       return offsetRecord;
     }
+
+    @Nullable
+    public Map<Integer, TezOffsetRecord> getOffsetRecordMap() {
+      return offsetRecordMap;
+    }
   }
 
   private final ConcurrentHashMap<String, MapOutputInfo> cache;
@@ -54,6 +77,11 @@ public class IndexPathCache {
   public void add(String mapId, @Nullable Path mapOutputFilePath, ByteBuffer spillRecord,
                   @Nullable TezOffsetRecord offsetRecord) {
     cache.put(mapId, new MapOutputInfo(mapOutputFilePath, spillRecord, offsetRecord));
+  }
+
+  public void add(String mapId, @Nullable Path mapOutputFilePath, ByteBuffer spillRecord,
+                  @Nullable Map<Integer, TezOffsetRecord> offsetRecordMap) {
+    cache.put(mapId, new MapOutputInfo(mapOutputFilePath, spillRecord, offsetRecordMap));
   }
 
   /**

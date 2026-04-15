@@ -29,6 +29,7 @@ import java.util.AbstractMap;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.Deflater;
 
@@ -696,13 +697,13 @@ public class ShuffleUtils {
       @Nullable Path outputFilePath,
       TezSpillRecord spillRecord,
       @Nullable MultiByteArrayOutputStream byteArrayOutput,
-      @Nullable TezOffsetRecord offsetRecord) {
+      @Nullable Map<Integer, TezOffsetRecord> offsetRecordMap) {
     assert !(outputFilePath != null && byteArrayOutput != null);
     String pathComponent = ShuffleUtils.getUniqueIdentifierSpillId(outputContext, spillId);
     String mapId = ShuffleUtils.expandPathComponent(outputContext, true, pathComponent);
 
     IndexPathCache indexPathCache = outputContext.getIndexPathCache();
-    indexPathCache.add(mapId, outputFilePath, spillRecord.getByteBuffer(), offsetRecord);
+    indexPathCache.add(mapId, outputFilePath, spillRecord.getByteBuffer(), offsetRecordMap);
 
     if (byteArrayOutput != null) {
       ConcurrentByteCache concurrentByteCache = outputContext.getConcurrentByteCache();
