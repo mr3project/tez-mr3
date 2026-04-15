@@ -508,6 +508,10 @@ public class IFile {
       decompressedBytesWritten += length;
     }
 
+    protected long getDecompressedBytesWritten() {
+      return decompressedBytesWritten;
+    }
+
     protected void bufferWriteInt(int val) throws IOException {
       final int len = 4;
       final int remaining = writeBufferLength - writeOffset;
@@ -616,7 +620,7 @@ public class IFile {
     }
 
     public void appendNoRleTez(DataInputBuffer key, DataInputBuffer value) throws IOException {
-      int recordStartOffset = (int) decompressedBytesWritten;
+      int recordStartOffset = (int) getDecompressedBytesWritten();
       int keyLength = key.getLength() - key.getPosition();
       int valueLength = value.getLength() - value.getPosition();
 
@@ -756,7 +760,7 @@ public class IFile {
     }
 
     public void appendNoRleTez(BytesWritable key, BytesWritable value) throws IOException {
-      int recordStartOffset = (int) decompressedBytesWritten;
+      int recordStartOffset = (int) getDecompressedBytesWritten();
       int keyLength = key.getLength();
       int valueLength = value.getLength();
 
