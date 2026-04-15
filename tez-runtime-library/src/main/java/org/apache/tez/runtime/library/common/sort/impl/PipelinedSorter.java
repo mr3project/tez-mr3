@@ -26,8 +26,10 @@ import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.concurrent.*;
 import java.util.zip.Deflater;
@@ -54,6 +56,7 @@ import org.apache.hadoop.util.IndexedSortable;
 import org.apache.hadoop.util.IndexedSorter;
 import org.apache.tez.common.TezCommonUtils;
 import org.apache.tez.runtime.api.OutputContext;
+import org.apache.tez.runtime.api.TezOffsetRecord;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.serializer.SerializationContext;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
@@ -511,6 +514,12 @@ public class PipelinedSorter extends ExternalSorter {
 
     try {
       LOG.info("{}: Spilling single record to {}", outputContext.getDestinationVertexName(), outputFilePath.toString());
+
+      // writer = WriterBytesWritable, so RLE encoding is not used
+      final boolean isRleEnabled = false;
+      final Map<Integer, TezOffsetRecord> spillOffsetRecordMap =
+          (compositeFetch && !isRleEnabled) ? new HashMap<>() : null;
+
       for (int i = 0; i < partitions; ++i) {
         if (isThreadInterrupted()) {
           return;
@@ -541,6 +550,9 @@ public class PipelinedSorter extends ExternalSorter {
             writer.close();
             rawLength = writer.getRawLength();
             partLength = writer.getCompressedLength();
+            if (spillOffsetRecordMap != null && i == partition) {
+              spillOffsetRecordMap.put(i, writer.getTezOffsetRecord());
+            }
           }
           adjustSpillCounters(rawLength, partLength);
           // record offsets
@@ -560,7 +572,8 @@ public class PipelinedSorter extends ExternalSorter {
         spillFileIndexPaths.put(numSpills, indexFilename);
         spillRec.writeToFile(indexFilename, localFs, localFsSpillFilePerms);
       } else {
-        ShuffleUtils.writeSpillInfoToIndexPathCacheAndByteCache(outputContext, numSpills, outputFilePath, spillRec, null);
+        ShuffleUtils.writeSpillInfoToIndexPathCacheAndByteCache(
+            outputContext, numSpills, outputFilePath, spillRec, null, spillOffsetRecordMap);
       }
 
       //TODO: honor cache limits
@@ -611,9 +624,14 @@ public class PipelinedSorter extends ExternalSorter {
       }
     }
 
+    final boolean isRleEnabled = merger.needsRLE();
+    final Map<Integer, TezOffsetRecord> spillOffsetRecordMap =
+        (compositeFetch && !isRleEnabled) ? new HashMap<>() : null;
+
     FSDataOutputStream fsOutput = null;
     Compressor compressorExternal = null;
     long sumPartLength = 0L;
+
     try {
       if (byteArrayOutput == null) {
         fsOutput = localFs.create(spillFileName, true, 4096);
@@ -635,7 +653,6 @@ public class PipelinedSorter extends ExternalSorter {
         long segmentStart = fsOutput.getPos();
         WriterDataInputBuffer writer = null;
         boolean hasNext = kvIter.hasNext();
-        boolean isRleEnabled = merger.needsRLE();
         if (hasNext || !sendEmptyPartitionDetails) {
           if (codec != null && compressorExternal == null) {
             compressorExternal = CodecUtils.getCompressor(codec);
@@ -673,6 +690,9 @@ public class PipelinedSorter extends ExternalSorter {
         // record offsets
         final TezIndexRecord rec = new TezIndexRecord(segmentStart, rawLength, partLength);
         spillRec.putIndex(rec, i);
+        if (spillOffsetRecordMap != null && rec.hasData()) {
+          spillOffsetRecordMap.put(i, writer.getTezOffsetRecord());
+        }
         if (!isFinalMergeEnabled && reportPartitionStats()) {
           partitionStats[i] += rawLength;
         }
@@ -694,7 +714,7 @@ public class PipelinedSorter extends ExternalSorter {
     } else {
       Path outputFilePath = byteArrayOutput == null ? spillFileName : null;
       ShuffleUtils.writeSpillInfoToIndexPathCacheAndByteCache(
-          outputContext, numSpills, outputFilePath, spillRec, byteArrayOutput);
+          outputContext, numSpills, outputFilePath, spillRec, byteArrayOutput, spillOffsetRecordMap);
     }
     if (isDebugEnabled) {
       LOG.debug("{}: Finished spill {}", outputContext.getDestinationVertexName(), numSpills);
@@ -927,6 +947,9 @@ public class PipelinedSorter extends ExternalSorter {
       }
 
       final TezSpillRecord spillRec = new TezSpillRecord(partitions);
+      final boolean isFinalMergeRleEnabled = merger.needsRLE();
+      Map<Integer, TezOffsetRecord> offsetRecordMap =
+          (compositeFetch && !isFinalMergeRleEnabled) ? new HashMap<>() : null;
       long finalOutputSize = 0;
       try {
         for (int parts = 0; parts < partitions; parts++) {
@@ -957,8 +980,9 @@ public class PipelinedSorter extends ExternalSorter {
           long segmentStart = finalOut.getPos();
           long rawLength = 0;
           long partLength = 0;
+          WriterDataInputBuffer writer = null;
           if (shouldWrite) {
-            WriterDataInputBuffer writer = new WriterDataInputBuffer(
+            writer = new WriterDataInputBuffer(
                 finalOut,
                 codec, spilledRecordsCounter, null, merger.needsRLE(),
                 maxKeyLen, maxValLen,
@@ -978,6 +1002,9 @@ public class PipelinedSorter extends ExternalSorter {
           // record offsets
           final TezIndexRecord rec = new TezIndexRecord(segmentStart, rawLength, partLength);
           spillRec.putIndex(rec, parts);
+          if (offsetRecordMap != null && rec.hasData()) {
+            offsetRecordMap.put(parts, writer.getTezOffsetRecord());
+          }
           if (reportPartitionStats()) {
             partitionStats[parts] += rawLength;
           }
@@ -1001,7 +1028,7 @@ public class PipelinedSorter extends ExternalSorter {
       } else {
         Path outputFilePath = byteArrayOutput == null ? finalOutputFile : null;
         ShuffleUtils.writeToIndexPathCacheAndByteCache(outputContext,
-            outputFilePath, spillRec, byteArrayOutput);
+            outputFilePath, spillRec, byteArrayOutput, offsetRecordMap);
       }
 
       for (int i = 0; i < numSpills; i++) {

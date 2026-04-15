@@ -28,8 +28,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -67,6 +69,7 @@ import org.apache.tez.runtime.api.ExecutorServiceUserGroupInformation;
 import org.apache.tez.runtime.api.MultiByteArrayOutputStream;
 import org.apache.tez.runtime.api.TaskFailureType;
 import org.apache.tez.runtime.api.OutputContext;
+import org.apache.tez.runtime.api.TezOffsetRecord;
 import org.apache.tez.runtime.api.events.CompositeDataMovementEvent;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration.ReportPartitionStats;
@@ -669,6 +672,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         }
       }
 
+      final boolean isRleEnabled = false;
+      final Map<Integer, TezOffsetRecord> spillOffsetRecordMap =
+        (compositeFetch && !isRleEnabled) ? new HashMap<>() : null;
+
       FSDataOutputStream fsOutput = null;
       long compressedLength = 0;
       TezSpillRecord spillRecord = new TezSpillRecord(numPartitions);
@@ -726,6 +733,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
               TezIndexRecord indexRecord = new TezIndexRecord(segmentStart, writer.getRawLength(),
                   writer.getCompressedLength());
               spillRecord.putIndex(indexRecord, i);
+              if (spillOffsetRecordMap != null && indexRecord.hasData()) {
+                spillOffsetRecordMap.put(i, writer.getTezOffsetRecord());
+              }
               writer = null;
             }
           } finally {
@@ -748,7 +758,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       spillResult = new SpillResult(compressedLength, this.filledBuffers, canUseBuffers);
 
       // spillPathDetails.spillIndex can be -1 if spillIndex was not used in pathComponent
-      handleSpillIndex(spillPathDetails, spillRecord, byteArrayOutput);
+      handleSpillIndex(spillPathDetails, spillRecord, byteArrayOutput, spillOffsetRecordMap);
       if (isDebugEnabled) {
         LOG.debug("{}: Finished spill {}", destNameTrimmed, spillPathDetails.spillIndex);
       }
@@ -892,7 +902,12 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
             sr.writeToFile(finalIndexPath, localFs, localFsSpillFilePerms);
             fileOutputBytesCounter.increment(compLen + indexFileSizeEstimate);
           } else {
-            ShuffleUtils.writeToIndexPathCacheAndByteCache(outputContext, finalOutPath, sr, null);
+            Map<Integer, TezOffsetRecord> offsetRecordMap = null;
+            if (compositeFetch) {
+              offsetRecordMap = new HashMap<>();
+              offsetRecordMap.put(0, writer.getTezOffsetRecord());
+            }
+            ShuffleUtils.writeToIndexPathCacheAndByteCache(outputContext, finalOutPath, sr, null, offsetRecordMap);
             fileOutputBytesCounter.increment(compLen);
           }
         }
@@ -1364,7 +1379,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     } else {
       Path outputPath = byteArrayOutput == null ? finalOutPath : null;
       ShuffleUtils.writeToIndexPathCacheAndByteCache(outputContext,
-          outputPath, finalSpillRecord, byteArrayOutput);
+          outputPath, finalSpillRecord, byteArrayOutput, null);
     }
     LOG.info("{}: Finished final spill after merging: {} spills", destNameTrimmed, numSpills.get());
   }
@@ -1434,6 +1449,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       if (isPipelinedShuffle) {
         emptyPartitions = new BitSet(numPartitions);
       }
+      final boolean isRleEnabled = false;
+      Map<Integer, TezOffsetRecord> spillOffsetRecordMap =
+          (compositeFetch && !isRleEnabled) ? new HashMap<>() : null;
       for (int i = 0; i < numPartitions; i++) {
         final long recordStart = out.getPos();
         if (i == partition) {
@@ -1463,6 +1481,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
             TezIndexRecord indexRecord = new TezIndexRecord(recordStart, writer.getRawLength(),
                 writer.getCompressedLength());
             spillRecord.putIndex(indexRecord, i);
+            if (spillOffsetRecordMap != null && indexRecord.hasData()) {
+              spillOffsetRecordMap.put(i, writer.getTezOffsetRecord());
+            }
             outSize = writer.getCompressedLength();
             writer = null;
           } finally {
@@ -1478,7 +1499,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       }
 
       // spillPathDetails.spillIndex is never -1
-      handleSpillIndex(spillPathDetails, spillRecord, null);
+      handleSpillIndex(spillPathDetails, spillRecord, null, spillOffsetRecordMap);
 
       if (isPipelinedShuffle) {
         // This output file is directly served to downstream tasks, so increment fileOutputBytesCounter.
@@ -1502,7 +1523,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
   private void handleSpillIndex(
       SpillPathDetails spillPathDetails, TezSpillRecord spillRecord,
-      @Nullable MultiByteArrayOutputStream byteArrayOutput) throws IOException {
+      @Nullable MultiByteArrayOutputStream byteArrayOutput,
+      @Nullable Map<Integer, TezOffsetRecord> offsetRecordMap) throws IOException {
     if (spillPathDetails.indexComputed) {
       if (spillPathDetails.indexFilePath != null) {
         // write the index record
@@ -1515,10 +1537,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         // must check if spillPathDetails.spillIndex == -1
         if (spillPathDetails.spillIndex < 0) {
           ShuffleUtils.writeToIndexPathCacheAndByteCache(outputContext,
-              outputFilePath, spillRecord, byteArrayOutput);
+              outputFilePath, spillRecord, byteArrayOutput, null);
         } else {
           ShuffleUtils.writeSpillInfoToIndexPathCacheAndByteCache(outputContext,
-              spillPathDetails.spillIndex, outputFilePath, spillRecord, byteArrayOutput);
+              spillPathDetails.spillIndex, outputFilePath, spillRecord, byteArrayOutput, offsetRecordMap);
         }
       }
     } else {
