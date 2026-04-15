@@ -51,6 +51,7 @@ import org.apache.tez.runtime.library.common.task.local.output.TezTaskOutputFile
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -285,11 +286,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     boolean allowMemToMemMerge = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_ENABLE_MEMTOMEM,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_ENABLE_MEMTOMEM_DEFAULT);
-    // Mem-to-mem merge uses a bounded output buffer sized from input segment sizes.
-    // In tez composite fetch mode, records may be encoded in compact non-RLE form and merged
-    // output can expand depending on chosen writer mode / key distribution, causing buffer overflow.
-    // Disable mem-to-mem merge for composite fetch to avoid EOFException from bounded writer output.
-    if (allowMemToMemMerge && !compositeFetch) {
+    if (allowMemToMemMerge) {
       this.memToMemMerger = new IntermediateMemoryToMemoryMerger(this, memToMemMergeOutputsThreshold);
     } else {
       this.memToMemMerger = null;
@@ -715,6 +712,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       MapOutput mergedMapOutputs = null;
 
       long mergeOutputSize = 0l;
+      List<Long> selectedSegmentSizes = new ArrayList<>();
       //Lock manager so that fetcher threads can not change the mem size
       synchronized (manager) {
 
@@ -736,7 +734,9 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
                   + ", memoryLimit=" + memoryLimit);
             }
           } else {
-            mergeOutputSize += mo.getSizeForMergeMemoryAccounting();
+            long moSize = mo.getSizeForMergeMemoryAccounting();
+            mergeOutputSize += moSize;
+            selectedSegmentSizes.add(moSize);
             IFile.KeyValueReaderDataInputBuffer reader = createMapOutputReader(mo);
             inMemorySegments.add(new Segment(reader,
                 (mo.isPrimaryMapOutput() ? mergedMapOutputsCounter : null)));
@@ -792,9 +792,29 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
             new Path(inputContext.getUniqueIdentifier()),
             SerializationContext.getKeyComparator(),
             progressable, false, null, null, null, true, inputContext);
-      TezMerger.writeFile(rIter, writer, progressable,
-          TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT, compositeFetch);
-      writer.close();
+      try {
+        TezMerger.writeFile(rIter, writer, progressable,
+            TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT, compositeFetch);
+        writer.close();
+      } catch (EOFException eof) {
+        LOG.error("{}: MemToMemMerger bounded-buffer overflow. compositeFetch={}, writerIsRle={}, "
+                + "mergeOutputSize={}, outputBufferLength={}, selectedSegmentCount={}, selectedSegmentSizes={}, "
+                + "memoryLimit={}, usedMemory={}",
+            inputContext.getSourceVertexName(), compositeFetch, writer.isRleEnabled(),
+            mergeOutputSize, mergedMapOutputs.getMemory().length, selectedSegmentSizes.size(), selectedSegmentSizes,
+            memoryLimit, getUsedMemory(), eof);
+        throw eof;
+      } catch (IOException ioe) {
+        if (ioe.getMessage() != null && ioe.getMessage().contains("Reach the limit of the buffer")) {
+          LOG.error("{}: MemToMemMerger bounded-buffer overflow (IOException). compositeFetch={}, writerIsRle={}, "
+                  + "mergeOutputSize={}, outputBufferLength={}, selectedSegmentCount={}, selectedSegmentSizes={}, "
+                  + "memoryLimit={}, usedMemory={}",
+              inputContext.getSourceVertexName(), compositeFetch, writer.isRleEnabled(),
+              mergeOutputSize, mergedMapOutputs.getMemory().length, selectedSegmentSizes.size(), selectedSegmentSizes,
+              memoryLimit, getUsedMemory(), ioe);
+        }
+        throw ioe;
+      }
       if (!writer.isRleEnabled()) {
         mergedMapOutputs.setTezOffsetRecord(((InMemoryWriter) writer).getTezOffsetRecord());
       }
