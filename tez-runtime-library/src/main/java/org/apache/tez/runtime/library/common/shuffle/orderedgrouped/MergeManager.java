@@ -162,6 +162,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   private final boolean useFreeMemoryFetchedInput;
   private final long freeMemoryThreshold;   // minimum size of free memory for useFreeMemoryFetchedInput
   private final long freeMemoryLimit;       // free memory that can be assigned to this LogicalInput
+  private final boolean compositeFetch;
 
   /**
    * Construct the MergeManager. Must call start before it becomes usable.
@@ -185,13 +186,13 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     this.spilledRecordsCounter = spilledRecordsCounter;
     this.mergedMapOutputsCounter = mergedMapOutputsCounter;
 
-    boolean compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
+    this.compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
     this.mapOutputFile = new TezTaskOutputFiles(conf,
         inputContext.getUniqueIdentifier(),
         inputContext.getDagIdentifier(),
         inputContext.getExecutionContext().getEnvContainerId(),
         inputContext.getTaskVertexIndex(),
-        compositeFetch);
+        this.compositeFetch);
 
     this.localFS = localFS;
     this.rfs = ((LocalFileSystem)localFS).getRaw();
