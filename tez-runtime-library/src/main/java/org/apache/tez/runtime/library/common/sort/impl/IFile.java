@@ -311,7 +311,7 @@ public class IFile {
     protected FSDataOutputStream rawOut;
     private final TezCounter writtenRecordsCounter;
     private final TezCounter serializedUncompressedBytes;
-    private long start;
+    private final long start;
 
     protected final boolean isRleEnabled;
 
@@ -563,8 +563,12 @@ public class IFile {
 
     @Nullable
     public TezOffsetRecord getTezOffsetRecord() {
-      assert eofPos >= 0;   // must be called after close()
-      return new TezOffsetRecord(maxKeyLen, maxValLen, firstKeyOffset, firstValOffset, eofPos);
+      if (isRleEnabled) {
+        return null;
+      } else {
+        assert eofPos >= 0;   // must be called after close()
+        return new TezOffsetRecord(maxKeyLen, maxValLen, firstKeyOffset, firstValOffset, eofPos);
+      }
     }
   }
 
@@ -610,6 +614,7 @@ public class IFile {
     }
 
     public void appendNoRle(DataInputBuffer key, DataInputBuffer value) throws IOException {
+      assert !isRleEnabled;
       int keyLength = key.getLength() - key.getPosition();
       int valueLength = value.getLength() - value.getPosition();
 
@@ -619,6 +624,7 @@ public class IFile {
     }
 
     public void appendNoRleTez(DataInputBuffer key, DataInputBuffer value) throws IOException {
+      assert !isRleEnabled;
       int keyLength = key.getLength() - key.getPosition();
       int valueLength = value.getLength() - value.getPosition();
 
@@ -653,6 +659,7 @@ public class IFile {
     }
 
     public void appendRle(DataInputBuffer key, DataInputBuffer value) throws IOException {
+      assert isRleEnabled;
       int keyLength = key.getLength() - key.getPosition();
       int valueLength = value.getLength() - value.getPosition();
 
