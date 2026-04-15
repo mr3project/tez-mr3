@@ -23,6 +23,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.tez.runtime.api.TezOffsetRecord;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 
 public abstract class FetchedInput implements ShuffleInput {
@@ -37,6 +38,7 @@ public abstract class FetchedInput implements ShuffleInput {
 
   private final InputAttemptIdentifier inputAttemptIdentifier;
   private final FetchedInputCallback callback;
+  private TezOffsetRecord tezOffsetRecord;
   private final int id;
   private byte state;
 
@@ -83,6 +85,14 @@ public abstract class FetchedInput implements ShuffleInput {
 
   public InputAttemptIdentifier getInputAttemptIdentifier() {
     return this.inputAttemptIdentifier;
+  }
+
+  public TezOffsetRecord getTezOffsetRecord() {
+    return tezOffsetRecord;
+  }
+
+  public void setTezOffsetRecord(TezOffsetRecord tezOffsetRecord) {
+    this.tezOffsetRecord = tezOffsetRecord;
   }
 
   /**

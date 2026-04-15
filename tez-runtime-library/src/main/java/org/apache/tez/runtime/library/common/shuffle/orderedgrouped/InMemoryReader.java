@@ -25,6 +25,7 @@ import java.io.IOException;
 
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DataInputBuffer;
+import org.apache.tez.runtime.api.TezOffsetRecord;
 import org.apache.tez.common.io.NonSyncByteArrayInputStream;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
@@ -154,11 +155,19 @@ public class InMemoryReader implements IFile.KeyValueReader {
   private final int length;
   private final ByteArrayDataInput memDataIn;
   private final boolean isRleEnabled;
+  private final TezOffsetRecord tezOffsetRecord;
+  private final boolean useTezOffsetRecordForNoRle;
 
   private final int usedMemoryForMergeManager;
 
   public InMemoryReader(MergeManager merger, InputAttemptIdentifier taskAttemptId,
                         byte[] data, int start, int length, int usedMemoryForMergeManager) {
+    this(merger, taskAttemptId, data, start, length, usedMemoryForMergeManager, null);
+  }
+
+  public InMemoryReader(MergeManager merger, InputAttemptIdentifier taskAttemptId,
+                        byte[] data, int start, int length, int usedMemoryForMergeManager,
+                        TezOffsetRecord tezOffsetRecord) {
     this.merger = merger;
     this.taskAttemptId = taskAttemptId;
 
@@ -177,6 +186,8 @@ public class InMemoryReader implements IFile.KeyValueReader {
     int dataLength = length - IFile.getHeaderLength();
     this.memDataIn = new ByteArrayDataInput(buffer, dataStart, dataLength);
     this.isRleEnabled = (flag & IFile.FLAG_RLE_ENABLED) != 0;
+    this.tezOffsetRecord = tezOffsetRecord;
+    this.useTezOffsetRecordForNoRle = !isRleEnabled && tezOffsetRecord != null;
 
     this.usedMemoryForMergeManager = usedMemoryForMergeManager;
   }
@@ -208,9 +219,34 @@ public class InMemoryReader implements IFile.KeyValueReader {
   }
 
   private void readKeyValueLengthNoRle(DataInput dIn) throws IOException {
-    currentKeyLength = dIn.readInt();
-    currentValueLength = dIn.readInt();
-    bytesRead += Integer.BYTES + Integer.BYTES;
+    if (useTezOffsetRecordForNoRle) {
+      int recordOffset = (int) bytesRead;
+
+      if (recordOffset == tezOffsetRecord.getEofPos()) {
+        currentKeyLength = dIn.readInt();
+        currentValueLength = dIn.readInt();
+        bytesRead += Integer.BYTES + Integer.BYTES;
+        return;
+      }
+
+      if (recordOffset < tezOffsetRecord.getFirstKeyOffset()) {
+        currentKeyLength = tezOffsetRecord.getMaxKeyLen();
+      } else {
+        currentKeyLength = dIn.readInt();
+        bytesRead += Integer.BYTES;
+      }
+
+      if (recordOffset < tezOffsetRecord.getFirstValOffset()) {
+        currentValueLength = tezOffsetRecord.getMaxValLen();
+      } else {
+        currentValueLength = dIn.readInt();
+        bytesRead += Integer.BYTES;
+      }
+    } else {
+      currentKeyLength = dIn.readInt();
+      currentValueLength = dIn.readInt();
+      bytesRead += Integer.BYTES + Integer.BYTES;
+    }
   }
 
   private void readKeyValueLengthRle(DataInput dIn) throws IOException {

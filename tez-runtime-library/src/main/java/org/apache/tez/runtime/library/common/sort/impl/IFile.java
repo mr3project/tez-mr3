@@ -837,6 +837,8 @@ public class IFile {
     private DataInputStream dataIn;
     private final long fileLength;
     private final boolean isRleEnabled;
+    private final TezOffsetRecord tezOffsetRecord;
+    private final boolean useTezOffsetRecordForNoRle;
 
     private int currentKeyLength;
     private int currentValueLength;
@@ -863,9 +865,19 @@ public class IFile {
         TezCounter readsCounter, TezCounter bytesReadCounter,
         boolean readAhead, int readAheadLength,
         DecompressorPool taskContext) throws IOException {
+      this(in, length, codec, readsCounter, bytesReadCounter,
+          readAhead, readAheadLength, taskContext, null);
+    }
+
+    public Reader(InputStream in, long length,
+                  CompressionCodec codec,
+                  TezCounter readsCounter, TezCounter bytesReadCounter,
+                  boolean readAhead, int readAheadLength,
+                  DecompressorPool taskContext,
+                  TezOffsetRecord tezOffsetRecord) throws IOException {
       this(in, length - HEADER.length, codec,
           readsCounter, bytesReadCounter, readAhead, readAheadLength,
-          taskContext, readHeaderFlag(in));
+          taskContext, readHeaderFlag(in), tezOffsetRecord);
       assert in != null;
       if (bytesReadCounter != null) {
         bytesReadCounter.increment(IFile.HEADER.length);
@@ -886,7 +898,8 @@ public class IFile {
                   CompressionCodec codec,
                   TezCounter readsCounter, TezCounter bytesReadCounter,
                   boolean readAhead, int readAheadLength,
-                  DecompressorPool taskContext, byte headerFlag) throws IOException {
+                  DecompressorPool taskContext, byte headerFlag,
+                  TezOffsetRecord tezOffsetRecord) throws IOException {
       assert in != null;
       boolean isCompressed = (headerFlag & FLAG_COMPRESSED) != 0;
       boolean isRleEnabled = (headerFlag & FLAG_RLE_ENABLED) != 0;
@@ -915,6 +928,8 @@ public class IFile {
       this.dataIn = new DataInputStream(this.in);
       this.fileLength = length;
       this.isRleEnabled = isRleEnabled;
+      this.tezOffsetRecord = tezOffsetRecord;
+      this.useTezOffsetRecordForNoRle = !isRleEnabled && tezOffsetRecord != null;
     }
 
     /**
@@ -1071,10 +1086,43 @@ public class IFile {
     }
 
     private void readKeyValueLengthNoRle(DataInput dIn) throws IOException {
-      currentKeyLength = dIn.readInt();
-      currentValueLength = dIn.readInt();
+      if (useTezOffsetRecordForNoRle) {
+        readKeyValueLengthNoRleWithTezOffsetRecord(dIn);
+      } else {
+        currentKeyLength = dIn.readInt();
+        currentValueLength = dIn.readInt();
+        bytesRead += INT_SIZE + INT_SIZE;
+      }
       originalKeyLength = currentKeyLength;
-      bytesRead += INT_SIZE + INT_SIZE;
+    }
+
+    private void readKeyValueLengthNoRleWithTezOffsetRecord(DataInput dIn) throws IOException {
+      int recordOffset = (int) bytesRead;
+
+      if (recordOffset == tezOffsetRecord.getEofPos()) {
+        currentKeyLength = dIn.readInt();
+        currentValueLength = dIn.readInt();
+        bytesRead += INT_SIZE + INT_SIZE;
+        return;
+      }
+
+      int firstKeyOffset = tezOffsetRecord.getFirstKeyOffset();
+      int firstValOffset = tezOffsetRecord.getFirstValOffset();
+      int maxKeyLen = tezOffsetRecord.getMaxKeyLen();
+      int maxValLen = tezOffsetRecord.getMaxValLen();
+
+      if (recordOffset < firstKeyOffset) {
+        currentKeyLength = maxKeyLen;
+      } else {
+        currentKeyLength = dIn.readInt();
+        bytesRead += INT_SIZE;
+      }
+      if (recordOffset < firstValOffset) {
+        currentValueLength = maxValLen;
+      } else {
+        currentValueLength = dIn.readInt();
+        bytesRead += INT_SIZE;
+      }
     }
 
     private void readKeyValueLengthRle(DataInput dIn) throws IOException {
