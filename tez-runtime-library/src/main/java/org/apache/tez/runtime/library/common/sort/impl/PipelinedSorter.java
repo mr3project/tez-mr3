@@ -518,10 +518,7 @@ public class PipelinedSorter extends ExternalSorter {
     try {
       LOG.info("{}: Spilling single record to {}", outputContext.getDestinationVertexName(), outputFilePath.toString());
 
-      // writer = WriterBytesWritable, so RLE encoding is not used
-      final boolean isRleEnabled = false;
-      final Map<Integer, TezOffsetRecord> spillOffsetRecordMap =
-          (compositeFetch && !isRleEnabled) ? new HashMap<>() : null;
+      final boolean isRleEnabled = true;
 
       for (int i = 0; i < partitions; ++i) {
         if (isThreadInterrupted()) {
@@ -533,18 +530,14 @@ public class PipelinedSorter extends ExternalSorter {
           if (!sendEmptyPartitionDetails || (i == partition)) {
             writer = new WriterBytesWritable(out,
                 codec, spilledRecordsCounter, null,
-                false,
+                isRleEnabled,
                 key.getLength(), value.getLength(),
                 writeBuffer, null);
           }
           // we need not check for combiner since its a single record
           if (i == partition) {
             final long recordStart = out.getPos();
-            if (compositeFetch) {
-              writer.appendNoRleTez(key, value);
-            } else {
-              writer.appendNoRle(key, value);
-            }
+            writer.appendRle(key, value);
             outputRecordsCounter.increment(1);
             outputRecordBytesCounter.increment(out.getPos() - recordStart);
           }
@@ -554,9 +547,6 @@ public class PipelinedSorter extends ExternalSorter {
             writer.close();
             rawLength = writer.getRawLength();
             partLength = writer.getCompressedLength();
-            if (spillOffsetRecordMap != null && i == partition) {
-              spillOffsetRecordMap.put(i, writer.getTezOffsetRecord());
-            }
           }
           adjustSpillCounters(rawLength, partLength);
           // record offsets
@@ -577,11 +567,11 @@ public class PipelinedSorter extends ExternalSorter {
         spillRec.writeToFile(indexFilename, localFs, localFsSpillFilePerms);
       } else {
         ShuffleUtils.writeSpillInfoToIndexPathCacheAndByteCache(
-            outputContext, numSpills, outputFilePath, spillRec, null, spillOffsetRecordMap);
+            outputContext, numSpills, outputFilePath, spillRec, null, null);
       }
 
       //TODO: honor cache limits
-      spillInfoList.add(new SpillInfo(spillRec, outputFilePath, indexFilename, null, spillOffsetRecordMap));
+      spillInfoList.add(new SpillInfo(spillRec, outputFilePath, indexFilename, null, null));
       ++numSpills;
 
       if (isPipelinedShuffle) {
