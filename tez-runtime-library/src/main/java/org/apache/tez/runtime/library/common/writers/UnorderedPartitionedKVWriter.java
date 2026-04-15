@@ -899,7 +899,12 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
             sr.writeToFile(finalIndexPath, localFs, localFsSpillFilePerms);
             fileOutputBytesCounter.increment(compLen + indexFileSizeEstimate);
           } else {
-            ShuffleUtils.writeToIndexPathCacheAndByteCache(outputContext, finalOutPath, sr, null, writer.getTezOffsetRecord());
+            Map<Integer, TezOffsetRecord> offsetRecordMap = null;
+            if (compositeFetch) {
+              offsetRecordMap = new HashMap<>();
+              offsetRecordMap.put(0, writer.getTezOffsetRecord());
+            }
+            ShuffleUtils.writeToIndexPathCacheAndByteCache(outputContext, finalOutPath, sr, null, offsetRecordMap);
             fileOutputBytesCounter.increment(compLen);
           }
         }

@@ -1,8 +1,6 @@
 package org.apache.tez.runtime.api;
 
 import java.nio.ByteBuffer;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -24,19 +22,13 @@ public class IndexPathCache {
     private final Path mapOutputFilePath;   // null if data is not written directly to local disk
     private final ByteBuffer spillRecord;
     @Nullable
-    private final TezOffsetRecord offsetRecord;
-    @Nullable
     private final Map<Integer, TezOffsetRecord> offsetRecordMap;
 
     public MapOutputInfo(@Nullable Path mapOutputFilePath, ByteBuffer spillRecord,
-                         @Nullable TezOffsetRecord offsetRecord,
                          @Nullable Map<Integer, TezOffsetRecord> offsetRecordMap) {
       this.mapOutputFilePath = mapOutputFilePath;
       this.spillRecord = spillRecord;
-      this.offsetRecord = offsetRecord;
-      this.offsetRecordMap = offsetRecordMap == null
-          ? null
-          : Collections.unmodifiableMap(new HashMap<>(offsetRecordMap));
+      this.offsetRecordMap = offsetRecordMap;
     }
 
     public Path getMapOutputFilePath() {
@@ -45,11 +37,6 @@ public class IndexPathCache {
 
     public ByteBuffer getSpillRecord() {
       return spillRecord;
-    }
-
-    @Nullable
-    public TezOffsetRecord getOffsetRecord() {
-      return offsetRecord;
     }
 
     @Nullable
@@ -65,13 +52,8 @@ public class IndexPathCache {
   }
 
   public void add(String mapId, @Nullable Path mapOutputFilePath, ByteBuffer spillRecord,
-                  @Nullable TezOffsetRecord offsetRecord) {
-    cache.put(mapId, new MapOutputInfo(mapOutputFilePath, spillRecord, offsetRecord, null));
-  }
-
-  public void add(String mapId, @Nullable Path mapOutputFilePath, ByteBuffer spillRecord,
                   @Nullable Map<Integer, TezOffsetRecord> offsetRecordMap) {
-    cache.put(mapId, new MapOutputInfo(mapOutputFilePath, spillRecord, null, offsetRecordMap));
+    cache.put(mapId, new MapOutputInfo(mapOutputFilePath, spillRecord, offsetRecordMap));
   }
 
   /**

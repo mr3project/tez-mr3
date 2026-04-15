@@ -673,13 +673,13 @@ public class ShuffleUtils {
       @Nullable Path outputFilePath,
       TezSpillRecord spillRecord,
       @Nullable MultiByteArrayOutputStream byteArrayOutput,
-      @Nullable TezOffsetRecord offsetRecord) {
+      @Nullable Map<Integer, TezOffsetRecord> offsetRecordMap) {
     assert !(outputFilePath != null && byteArrayOutput != null);
     String pathComponent = outputContext.getUniqueIdentifier();
     String mapId = ShuffleUtils.expandPathComponent(outputContext, true, pathComponent);
 
     IndexPathCache indexPathCache = outputContext.getIndexPathCache();
-    indexPathCache.add(mapId, outputFilePath, spillRecord.getByteBuffer(), offsetRecord);
+    indexPathCache.add(mapId, outputFilePath, spillRecord.getByteBuffer(), offsetRecordMap);
 
     if (byteArrayOutput != null) {
       ConcurrentByteCache concurrentByteCache = outputContext.getConcurrentByteCache();
