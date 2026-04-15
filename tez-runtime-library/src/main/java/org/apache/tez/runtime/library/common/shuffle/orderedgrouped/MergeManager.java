@@ -285,7 +285,11 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     boolean allowMemToMemMerge = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_ENABLE_MEMTOMEM,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_ENABLE_MEMTOMEM_DEFAULT);
-    if (allowMemToMemMerge) {
+    // Mem-to-mem merge uses a bounded output buffer sized from input segment sizes.
+    // In tez composite fetch mode, records may be encoded in compact non-RLE form and merged
+    // output can expand depending on chosen writer mode / key distribution, causing buffer overflow.
+    // Disable mem-to-mem merge for composite fetch to avoid EOFException from bounded writer output.
+    if (allowMemToMemMerge && !compositeFetch) {
       this.memToMemMerger = new IntermediateMemoryToMemoryMerger(this, memToMemMergeOutputsThreshold);
     } else {
       this.memToMemMerger = null;
