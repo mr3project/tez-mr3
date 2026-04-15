@@ -158,6 +158,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
   private final boolean isRleEnabled;
 
   private final TezOffsetRecord tezOffsetRecord;
+  private boolean usedLegacyLengthFallbackForCurrentRecord = false;
 
   private final int usedMemoryForMergeManager;
 
@@ -216,6 +217,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
   }
 
   private void readKeyValueLengthNoRle(DataInput dIn) throws IOException {
+    usedLegacyLengthFallbackForCurrentRecord = false;
     if (tezOffsetRecord != null) {
       int startPos = memDataIn.getPosition();
       long startBytesRead = bytesRead;
@@ -254,6 +256,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
         currentKeyLength = dIn.readInt();
         currentValueLength = dIn.readInt();
         bytesRead += Integer.BYTES + Integer.BYTES;
+        usedLegacyLengthFallbackForCurrentRecord = true;
       }
     } else {
       currentKeyLength = dIn.readInt();
@@ -311,7 +314,9 @@ public class InMemoryReader implements IFile.KeyValueReader {
     if (payloadLength > available) {
       throw new IOException("Rec# " + recNo + ": Corrupt " + payloadName + " length " + payloadLength
           + " exceeds remaining bytes " + available
+          + ", memPos=" + memDataIn.getPosition()
           + ", bytesRead=" + bytesRead
+          + ", usedLegacyLengthFallbackForCurrentRecord=" + usedLegacyLengthFallbackForCurrentRecord
           + ", tezOffsetRecord=" + tezOffsetRecord);
     }
   }
