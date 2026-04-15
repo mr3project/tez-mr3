@@ -44,6 +44,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
 
     public byte[] getData() { return buf; }
     public int getPosition() { return pos; }
+    public void setPosition(int position) { this.pos = position; }
 
     @Override
     public void readFully(byte[] b) throws IOException {
@@ -216,6 +217,8 @@ public class InMemoryReader implements IFile.KeyValueReader {
 
   private void readKeyValueLengthNoRle(DataInput dIn) throws IOException {
     if (tezOffsetRecord != null) {
+      int startPos = memDataIn.getPosition();
+      long startBytesRead = bytesRead;
       int recordOffset = (int) bytesRead;
 
       if (recordOffset == tezOffsetRecord.getEofPos()) {
@@ -237,6 +240,20 @@ public class InMemoryReader implements IFile.KeyValueReader {
       } else {
         currentValueLength = dIn.readInt();
         bytesRead += Integer.BYTES;
+      }
+
+      // Best-effort fallback for streams encoded with explicit <keyLen, valLen, ...>
+      // when TezOffsetRecord is missing/mismatched for this payload.
+      // This keeps reader behavior robust instead of failing with arraycopy bounds errors.
+      int available = memDataIn.available();
+      if (currentKeyLength < 0 || currentValueLength < 0
+          || (currentKeyLength == 0 && currentValueLength == 0)
+          || ((long) currentKeyLength + (long) currentValueLength > available)) {
+        memDataIn.setPosition(startPos);
+        bytesRead = startBytesRead;
+        currentKeyLength = dIn.readInt();
+        currentValueLength = dIn.readInt();
+        bytesRead += Integer.BYTES + Integer.BYTES;
       }
     } else {
       currentKeyLength = dIn.readInt();
