@@ -54,6 +54,7 @@ import org.apache.hadoop.util.IndexedSortable;
 import org.apache.hadoop.util.IndexedSorter;
 import org.apache.tez.common.TezCommonUtils;
 import org.apache.tez.runtime.api.OutputContext;
+import org.apache.tez.runtime.api.TezOffsetRecord;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.serializer.SerializationContext;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
@@ -511,6 +512,7 @@ public class PipelinedSorter extends ExternalSorter {
 
     try {
       LOG.info("{}: Spilling single record to {}", outputContext.getDestinationVertexName(), outputFilePath.toString());
+      TezOffsetRecord spillOffsetRecord = null;
       for (int i = 0; i < partitions; ++i) {
         if (isThreadInterrupted()) {
           return;
@@ -541,6 +543,9 @@ public class PipelinedSorter extends ExternalSorter {
             writer.close();
             rawLength = writer.getRawLength();
             partLength = writer.getCompressedLength();
+            if (compositeFetch && i == partition) {
+              spillOffsetRecord = writer.getTezOffsetRecord();
+            }
           }
           adjustSpillCounters(rawLength, partLength);
           // record offsets
@@ -560,7 +565,8 @@ public class PipelinedSorter extends ExternalSorter {
         spillFileIndexPaths.put(numSpills, indexFilename);
         spillRec.writeToFile(indexFilename, localFs, localFsSpillFilePerms);
       } else {
-        ShuffleUtils.writeSpillInfoToIndexPathCacheAndByteCache(outputContext, numSpills, outputFilePath, spillRec, null, null);
+        ShuffleUtils.writeSpillInfoToIndexPathCacheAndByteCache(
+            outputContext, numSpills, outputFilePath, spillRec, null, spillOffsetRecord);
       }
 
       //TODO: honor cache limits
@@ -626,6 +632,8 @@ public class PipelinedSorter extends ExternalSorter {
         LOG.debug("Spilling to {} (use in-memory buffers = {})", spillFileName.toString(), canUseBuffers);
       }
 
+      TezOffsetRecord spillOffsetRecord = null;
+      boolean multipleOffsetRecords = false;
       for (int i = 0; i < partitions; ++i) {
         if (isThreadInterrupted()) {
           return false;
@@ -673,6 +681,15 @@ public class PipelinedSorter extends ExternalSorter {
         // record offsets
         final TezIndexRecord rec = new TezIndexRecord(segmentStart, rawLength, partLength);
         spillRec.putIndex(rec, i);
+        if (!multipleOffsetRecords && compositeFetch && !isRleEnabled && rec.hasData()) {
+          TezOffsetRecord currentOffsetRecord = writer.getTezOffsetRecord();
+          if (spillOffsetRecord == null) {
+            spillOffsetRecord = currentOffsetRecord;
+          } else {
+            multipleOffsetRecords = true;
+            spillOffsetRecord = null;
+          }
+        }
         if (!isFinalMergeEnabled && reportPartitionStats()) {
           partitionStats[i] += rawLength;
         }
@@ -694,7 +711,7 @@ public class PipelinedSorter extends ExternalSorter {
     } else {
       Path outputFilePath = byteArrayOutput == null ? spillFileName : null;
       ShuffleUtils.writeSpillInfoToIndexPathCacheAndByteCache(
-          outputContext, numSpills, outputFilePath, spillRec, byteArrayOutput, null);
+          outputContext, numSpills, outputFilePath, spillRec, byteArrayOutput, spillOffsetRecord);
     }
     if (isDebugEnabled) {
       LOG.debug("{}: Finished spill {}", outputContext.getDestinationVertexName(), numSpills);

@@ -67,6 +67,7 @@ import org.apache.tez.runtime.api.ExecutorServiceUserGroupInformation;
 import org.apache.tez.runtime.api.MultiByteArrayOutputStream;
 import org.apache.tez.runtime.api.TaskFailureType;
 import org.apache.tez.runtime.api.OutputContext;
+import org.apache.tez.runtime.api.TezOffsetRecord;
 import org.apache.tez.runtime.api.events.CompositeDataMovementEvent;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration.ReportPartitionStats;
@@ -691,6 +692,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         DataInputBuffer val = new DataInputBuffer();
         byte[] writeBuffer = IFile.allocateWriteBuffer();
 
+        TezOffsetRecord spillOffsetRecord = null;
+        boolean multipleOffsetRecords = false;
         for (int i = 0; i < numPartitions; i++) {
           WriterDataInputBuffer writer = null;
           try {
@@ -726,6 +729,15 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
               TezIndexRecord indexRecord = new TezIndexRecord(segmentStart, writer.getRawLength(),
                   writer.getCompressedLength());
               spillRecord.putIndex(indexRecord, i);
+              if (!multipleOffsetRecords && compositeFetch && !writer.isRleEnabled() && indexRecord.hasData()) {
+                TezOffsetRecord currentOffsetRecord = writer.getTezOffsetRecord();
+                if (spillOffsetRecord == null) {
+                  spillOffsetRecord = currentOffsetRecord;
+                } else {
+                  multipleOffsetRecords = true;
+                  spillOffsetRecord = null;
+                }
+              }
               writer = null;
             }
           } finally {
@@ -748,7 +760,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       spillResult = new SpillResult(compressedLength, this.filledBuffers, canUseBuffers);
 
       // spillPathDetails.spillIndex can be -1 if spillIndex was not used in pathComponent
-      handleSpillIndex(spillPathDetails, spillRecord, byteArrayOutput);
+      handleSpillIndex(spillPathDetails, spillRecord, byteArrayOutput, spillOffsetRecord);
       if (isDebugEnabled) {
         LOG.debug("{}: Finished spill {}", destNameTrimmed, spillPathDetails.spillIndex);
       }
@@ -1434,6 +1446,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       if (isPipelinedShuffle) {
         emptyPartitions = new BitSet(numPartitions);
       }
+      TezOffsetRecord spillOffsetRecord = null;
+      boolean multipleOffsetRecords = false;
       for (int i = 0; i < numPartitions; i++) {
         final long recordStart = out.getPos();
         if (i == partition) {
@@ -1463,6 +1477,15 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
             TezIndexRecord indexRecord = new TezIndexRecord(recordStart, writer.getRawLength(),
                 writer.getCompressedLength());
             spillRecord.putIndex(indexRecord, i);
+            if (!multipleOffsetRecords && compositeFetch && indexRecord.hasData()) {
+              TezOffsetRecord currentOffsetRecord = writer.getTezOffsetRecord();
+              if (spillOffsetRecord == null) {
+                spillOffsetRecord = currentOffsetRecord;
+              } else {
+                multipleOffsetRecords = true;
+                spillOffsetRecord = null;
+              }
+            }
             outSize = writer.getCompressedLength();
             writer = null;
           } finally {
@@ -1478,7 +1501,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       }
 
       // spillPathDetails.spillIndex is never -1
-      handleSpillIndex(spillPathDetails, spillRecord, null);
+      handleSpillIndex(spillPathDetails, spillRecord, null, spillOffsetRecord);
 
       if (isPipelinedShuffle) {
         // This output file is directly served to downstream tasks, so increment fileOutputBytesCounter.
@@ -1502,7 +1525,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
   private void handleSpillIndex(
       SpillPathDetails spillPathDetails, TezSpillRecord spillRecord,
-      @Nullable MultiByteArrayOutputStream byteArrayOutput) throws IOException {
+      @Nullable MultiByteArrayOutputStream byteArrayOutput,
+      @Nullable TezOffsetRecord offsetRecord) throws IOException {
     if (spillPathDetails.indexComputed) {
       if (spillPathDetails.indexFilePath != null) {
         // write the index record
@@ -1515,10 +1539,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         // must check if spillPathDetails.spillIndex == -1
         if (spillPathDetails.spillIndex < 0) {
           ShuffleUtils.writeToIndexPathCacheAndByteCache(outputContext,
-              outputFilePath, spillRecord, byteArrayOutput, null);
+              outputFilePath, spillRecord, byteArrayOutput, offsetRecord);
         } else {
           ShuffleUtils.writeSpillInfoToIndexPathCacheAndByteCache(outputContext,
-              spillPathDetails.spillIndex, outputFilePath, spillRecord, byteArrayOutput, null);
+              spillPathDetails.spillIndex, outputFilePath, spillRecord, byteArrayOutput, offsetRecord);
         }
       }
     } else {
