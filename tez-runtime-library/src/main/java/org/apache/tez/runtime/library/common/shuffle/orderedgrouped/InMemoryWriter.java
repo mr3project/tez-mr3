@@ -47,7 +47,8 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
   private DataInputBuffer prevKey = null;
   private final DataOutputBuffer previous = new DataOutputBuffer();
 
-  // TODO: InMemoryWriter is used only in MergeManager.IntermediateMemoryToMemoryMerger with isRleEnabled = true.
+  // InMemoryWriter is used in MergeManager.IntermediateMemoryToMemoryMerger.
+  // isRleEnabled depends on shuffle mode (RLE for legacy shuffle, non-RLE for tez composite fetch).
 
   // InMemoryWriter does not use another byte[] buffer, unlike IFile.Writer
   public InMemoryWriter(byte[] array, boolean isRleEnabled, int maxKeyLen, int maxValLen) throws IOException {

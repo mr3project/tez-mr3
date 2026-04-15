@@ -765,7 +765,10 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
       int noInMemorySegments = inMemorySegments.size();
 
-      IFile.WriterAppendDataInputBuffer writer = new InMemoryWriter(mergedMapOutputs.getMemory(), true, -1, -1);
+      // For tez composite fetch, prefer non-RLE writer path so merged output size does not
+      // expand relative to compact non-RLE inputs and overflow the bounded in-memory buffer.
+      IFile.WriterAppendDataInputBuffer writer =
+          new InMemoryWriter(mergedMapOutputs.getMemory(), !compositeFetch, -1, -1);
 
       if (isDebugEnabled) {
         LOG.debug("{}: Initiating Memory-to-Memory merge with {} segments of total-size: {}",
