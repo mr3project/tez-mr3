@@ -723,7 +723,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
           // Adding manager.getUsedMemory() is okay because
           // the guard is about whether we can safely charge the new merged buffer under the budget.
           if ((mergeOutputSize + mo.getSizeForMergeMemoryAccounting() + manager.getUsedMemory()) > memoryLimit) {
-            //Search for smaller segments that can fit into existing mem
+            // Search for smaller segments that can fit into existing mem
             if (isDebugEnabled) {
               LOG.debug("Size is greater than usedMemory. "
                   + "mergeOutputSize=" + mergeOutputSize
@@ -744,7 +744,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
           }
         }
 
-        //Add any unused MapOutput back
+        // Add any unused MapOutput back
         inMemoryMapOutputs.addAll(inputs);
 
         //Exit early, if 0 or 1 segment is available
@@ -779,8 +779,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       // Nothing will be materialized to disk because the sort factor is being
       // set to the number of in memory segments.
       // TODO Is this doing any combination ?
-      TezRawKeyValueIterator rIter =
-        TezMerger.merge(conf, rfs, null, inMemorySegments,
+      TezRawKeyValueIterator rIter = TezMerger.merge(conf, rfs, null, inMemorySegments,
             inMemorySegments.size(), 0,
             new Path(inputContext.getUniqueIdentifier()),
             SerializationContext.getKeyComparator(),

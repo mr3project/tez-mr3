@@ -18,8 +18,7 @@
 package org.apache.tez.runtime.api;
 
 /**
- * Metadata needed to decode non-RLE Tez IFile records with variable
- * length-prefix transitions.
+ * Metadata needed to decode non-RLE Tez IFile records with variable length-prefix transitions.
  */
 public class TezOffsetRecord {
   private final int maxKeyLen;

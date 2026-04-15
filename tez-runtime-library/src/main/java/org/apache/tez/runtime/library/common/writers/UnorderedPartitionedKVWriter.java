@@ -265,7 +265,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       } else {
         finalOutPath = outputFileHandler.getOutputFileForWrite();
         writer = new IFile.WriterBytesWritable(rfs, finalOutPath,
-            codec, outputRecordsCounter, outputRecordBytesCounter, -1, -1, writeBuffer);
+            codec, outputRecordsCounter, outputRecordBytesCounter, false, -1, -1, writeBuffer);
         ensureSpillFilePermissions(finalOutPath, rfs, rfsSpillFilePerms);
       }
     } else {
@@ -1474,6 +1474,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           WriterBytesWritable writer = null;
           try {
             writer = new IFile.WriterBytesWritable(out, codec, null, null,
+                false,
                 key.getLength(), value.getLength(),
                 IFile.allocateWriteBufferSingle(), null);
             if (compositeFetch) {

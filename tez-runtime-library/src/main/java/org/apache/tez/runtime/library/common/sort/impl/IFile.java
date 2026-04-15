@@ -113,10 +113,15 @@ public class IFile {
     void close() throws IOException;
   }
 
-  // WriterBytesWritable does not use RLE encoding
   public interface WriterAppendBytesWritable {
+    boolean isRleEnabled();
+
     void appendNoRle(BytesWritable key, BytesWritable value) throws IOException;
     void appendNoRleTez(BytesWritable key, BytesWritable value) throws IOException;
+
+    // if key != IFile.REPEAT_KEY, perform key comparison to check whether 'key' is a new key or not
+    void appendRle(BytesWritable key, BytesWritable value) throws IOException;
+
     void close() throws IOException;
   }
 
@@ -176,7 +181,7 @@ public class IFile {
         TezCounter serializedBytesCounter, int cacheSize, int maxKeyLen, int maxValLen,
         byte[] writeBuffer) throws IOException {
       super(new FSDataOutputStream(createBoundedBuffer(cacheSize), null), null,
-          writesCounter, serializedBytesCounter, maxKeyLen, maxValLen, writeBuffer, null);
+          writesCounter, serializedBytesCounter, false, maxKeyLen, maxValLen, writeBuffer, null);
       this.fs = fs;
       this.cacheStream = (BoundedByteArrayOutputStream) this.rawOut.getWrappedStream();
       this.taskOutput = taskOutput;
@@ -731,16 +736,23 @@ public class IFile {
   }
 
   public static class WriterBytesWritable extends Writer implements WriterAppendBytesWritable {
+    private final DataOutputBuffer previous = new DataOutputBuffer();
+    private boolean prevSameKey = false;
 
-    // WriterBytesWritable.append() does not support RLE encoding, so isRleEnabled is set to false.
+    private long rleWritten = 0;      //number of RLE markers written
+    private long totalKeySaving = 0;  //number of keys saved due to multi KV writes + RLE
+
+    private static final int RLE_MARKER_SIZE = INT_SIZE;
+    private static final int V_END_MARKER_SIZE = INT_SIZE;
 
     public WriterBytesWritable(FileSystem fs, Path file,
         CompressionCodec codec,
         TezCounter writesCounter,
         TezCounter serializedBytesCounter,
+        boolean isRleEnabled,
         int maxKeyLen, int maxValLen,
         byte[] writeBuffer) throws IOException {
-      this(fs.create(file), codec, writesCounter, serializedBytesCounter,
+      this(fs.create(file), codec, writesCounter, serializedBytesCounter, isRleEnabled,
           maxKeyLen, maxValLen,
           writeBuffer, null);
       ownOutputStream = true;
@@ -748,15 +760,21 @@ public class IFile {
 
     public WriterBytesWritable(FSDataOutputStream outputStream,
         CompressionCodec codec, TezCounter writesCounter, TezCounter serializedBytesCounter,
+        boolean isRleEnabled,
         int maxKeyLen, int maxValLen,
         byte[] writeBuffer, @Nullable Compressor compressorExternal)
         throws IOException {
-      super(outputStream, codec, writesCounter, serializedBytesCounter, false,
+      super(outputStream, codec, writesCounter, serializedBytesCounter, isRleEnabled,
           maxKeyLen, maxValLen,
           writeBuffer, compressorExternal);
     }
 
+    public boolean isRleEnabled() {
+      return isRleEnabled;
+    }
+
     public void appendNoRle(BytesWritable key, BytesWritable value) throws IOException {
+      assert !isRleEnabled;
       int keyLength = key.getLength();
       int valueLength = value.getLength();
 
@@ -765,6 +783,7 @@ public class IFile {
     }
 
     public void appendNoRleTez(BytesWritable key, BytesWritable value) throws IOException {
+      assert !isRleEnabled;
       int recordStartOffset = (int) getDecompressedBytesWritten();
       int keyLength = key.getLength();
       int valueLength = value.getLength();
@@ -796,6 +815,70 @@ public class IFile {
       incrementDecompressedBytesWritten(lengthBytes + keyLength + valueLength);
       numSerializedBytesWritten += keyLength + valueLength;
       ++numRecordsWritten;
+    }
+
+    public void appendRle(BytesWritable key, BytesWritable value) throws IOException {
+      assert isRleEnabled;
+      int keyLength = key.getLength();
+      int valueLength = value.getLength();
+
+      boolean sameKey = keyLength != 0 && compareEqual(previous, key);
+      if (!sameKey) {
+        writeValueMarker();
+        super.writeKVPair(key.getBytes(), 0, keyLength, value.getBytes(), 0, valueLength);
+        copyKeyToPrevious(key);
+        prevSameKey = false;
+      } else {
+        if (!prevSameKey) {
+          bufferWriteInt(RLE_MARKER);
+          incrementDecompressedBytesWritten(RLE_MARKER_SIZE);
+          rleWritten++;
+        }
+        super.writeValue(value.getBytes(), 0, valueLength);
+        totalKeySaving++;
+        prevSameKey = true;
+      }
+      ++numRecordsWritten;
+    }
+
+    private void copyKeyToPrevious(BytesWritable key) throws IOException {
+      previous.reset();
+      previous.write(key.getBytes(), 0, key.getLength());
+    }
+
+    private static boolean compareEqual(DataOutputBuffer previous, BytesWritable key) {
+      int keyLength = key.getLength();
+      if (previous.getLength() != keyLength) {
+        return false;
+      }
+      byte[] previousBytes = previous.getData();
+      byte[] keyBytes = key.getBytes();
+      for (int i = 0; i < keyLength; i++) {
+        if (previousBytes[i] != keyBytes[i]) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    private void writeValueMarker() throws IOException {
+      if (prevSameKey) {
+        bufferWriteInt(V_END_MARKER);
+        incrementDecompressedBytesWritten(V_END_MARKER_SIZE);
+      }
+    }
+
+    @Override
+    protected void onClose() throws IOException {
+      super.onClose();
+      if (isRleEnabled) {
+        writeValueMarker();
+      }
+      if (isDebugEnabled) {
+        LOG.debug("WriterBytesWritable rleEnabled=" + isRleEnabled
+            + "; Savings(due to multi-kv/rle)=" + totalKeySaving
+            + "; number of RLEs written=" + rleWritten);
+      }
     }
   }
 
