@@ -533,6 +533,7 @@ public class PipelinedSorter extends ExternalSorter {
           if (!sendEmptyPartitionDetails || (i == partition)) {
             writer = new WriterBytesWritable(out,
                 codec, spilledRecordsCounter, null,
+                false,
                 key.getLength(), value.getLength(),
                 writeBuffer, null);
           }
