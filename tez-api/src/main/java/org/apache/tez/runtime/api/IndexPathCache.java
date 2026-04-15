@@ -29,16 +29,6 @@ public class IndexPathCache {
     private final Map<Integer, TezOffsetRecord> offsetRecordMap;
 
     public MapOutputInfo(@Nullable Path mapOutputFilePath, ByteBuffer spillRecord,
-                         @Nullable TezOffsetRecord offsetRecord) {
-      this(mapOutputFilePath, spillRecord, offsetRecord, null);
-    }
-
-    public MapOutputInfo(@Nullable Path mapOutputFilePath, ByteBuffer spillRecord,
-                         @Nullable Map<Integer, TezOffsetRecord> offsetRecordMap) {
-      this(mapOutputFilePath, spillRecord, null, offsetRecordMap);
-    }
-
-    private MapOutputInfo(@Nullable Path mapOutputFilePath, ByteBuffer spillRecord,
                          @Nullable TezOffsetRecord offsetRecord,
                          @Nullable Map<Integer, TezOffsetRecord> offsetRecordMap) {
       this.mapOutputFilePath = mapOutputFilePath;
@@ -76,12 +66,12 @@ public class IndexPathCache {
 
   public void add(String mapId, @Nullable Path mapOutputFilePath, ByteBuffer spillRecord,
                   @Nullable TezOffsetRecord offsetRecord) {
-    cache.put(mapId, new MapOutputInfo(mapOutputFilePath, spillRecord, offsetRecord));
+    cache.put(mapId, new MapOutputInfo(mapOutputFilePath, spillRecord, offsetRecord, null));
   }
 
   public void add(String mapId, @Nullable Path mapOutputFilePath, ByteBuffer spillRecord,
                   @Nullable Map<Integer, TezOffsetRecord> offsetRecordMap) {
-    cache.put(mapId, new MapOutputInfo(mapOutputFilePath, spillRecord, offsetRecordMap));
+    cache.put(mapId, new MapOutputInfo(mapOutputFilePath, spillRecord, null, offsetRecordMap));
   }
 
   /**
