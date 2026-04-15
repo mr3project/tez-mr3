@@ -897,17 +897,21 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           TezIndexRecord rec = new TezIndexRecord(0, rawLen, compLen);
           TezSpillRecord sr = new TezSpillRecord(1);
           sr.putIndex(rec, 0);
+
           if (writeSpillRecord) {
             finalIndexPath = outputFileHandler.getOutputIndexFileForWrite(indexFileSizeEstimate);
             sr.writeToFile(finalIndexPath, localFs, localFsSpillFilePerms);
             fileOutputBytesCounter.increment(compLen + indexFileSizeEstimate);
           } else {
-            Map<Integer, TezOffsetRecord> offsetRecordMap = null;
-            if (compositeFetch) {
-              offsetRecordMap = new HashMap<>();
-              offsetRecordMap.put(0, writer.getTezOffsetRecord());
+            final boolean isRleEnabled = false;   // because we use WriterBytesWritable which does not support RLE
+            final Map<Integer, TezOffsetRecord> spillOffsetRecordMap =
+              (compositeFetch && !isRleEnabled) ? new HashMap<>() : null;
+            if (spillOffsetRecordMap != null && rec.hasData()) {
+              spillOffsetRecordMap.put(0, writer.getTezOffsetRecord());
             }
-            ShuffleUtils.writeToIndexPathCacheAndByteCache(outputContext, finalOutPath, sr, null, offsetRecordMap);
+
+            ShuffleUtils.writeToIndexPathCacheAndByteCache(
+                outputContext, finalOutPath, sr, null, spillOffsetRecordMap);
             fileOutputBytesCounter.increment(compLen);
           }
         }
@@ -1195,6 +1199,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     finalOutPath = spillPathDetails.outputFilePath;
 
     TezSpillRecord finalSpillRecord = new TezSpillRecord(numPartitions);
+    final boolean isFinalMergeRleEnabled = false;   // we do not use RLE encoding below
+    final Map<Integer, TezOffsetRecord> spillOffsetRecordMap =
+        (compositeFetch && !isFinalMergeRleEnabled) ? new HashMap<>() : null;
 
     DataInputBuffer keyBuffer = new DataInputBuffer();
     DataInputBuffer valBuffer = new DataInputBuffer();
@@ -1349,6 +1356,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           finalOutSize += writer.getCompressedLength();
           TezIndexRecord indexRecord = new TezIndexRecord(segmentStart, writer.getRawLength(),
               writer.getCompressedLength());
+          if (spillOffsetRecordMap != null && indexRecord.hasData()) {
+            spillOffsetRecordMap.put(i, writer.getTezOffsetRecord());
+          }
           writer = null;
           finalSpillRecord.putIndex(indexRecord, i);
         } finally {
@@ -1379,7 +1389,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     } else {
       Path outputPath = byteArrayOutput == null ? finalOutPath : null;
       ShuffleUtils.writeToIndexPathCacheAndByteCache(outputContext,
-          outputPath, finalSpillRecord, byteArrayOutput, null);
+          outputPath, finalSpillRecord, byteArrayOutput, spillOffsetRecordMap);
     }
     LOG.info("{}: Finished final spill after merging: {} spills", destNameTrimmed, numSpills.get());
   }

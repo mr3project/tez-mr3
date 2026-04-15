@@ -129,13 +129,16 @@ public class PipelinedSorter extends ExternalSorter {
     final Path spillFilePath;
     final Path spillIndexPath;
     final MultiByteArrayOutputStream spillOutput;
+    final Map<Integer, TezOffsetRecord> spillOffsetRecordMap;
 
     SpillInfo(TezSpillRecord spillRecord, Path spillFilePath, Path spillIndexPath,
-        MultiByteArrayOutputStream spillOutput) {
+        MultiByteArrayOutputStream spillOutput,
+        Map<Integer, TezOffsetRecord> spillOffsetRecordMap) {
       this.spillRecord = spillRecord;
       this.spillFilePath = spillFilePath;
       this.spillIndexPath = spillIndexPath;
       this.spillOutput = spillOutput;
+      this.spillOffsetRecordMap = spillOffsetRecordMap;
     }
   }
 
@@ -577,7 +580,7 @@ public class PipelinedSorter extends ExternalSorter {
       }
 
       //TODO: honor cache limits
-      spillInfoList.add(new SpillInfo(spillRec, outputFilePath, indexFilename, null));
+      spillInfoList.add(new SpillInfo(spillRec, outputFilePath, indexFilename, null, spillOffsetRecordMap));
       ++numSpills;
 
       if (isPipelinedShuffle) {
@@ -721,7 +724,7 @@ public class PipelinedSorter extends ExternalSorter {
     }
 
     // TODO: honor cache limits
-    spillInfoList.add(new SpillInfo(spillRec, spillFileName, indexFilename, byteArrayOutput));
+    spillInfoList.add(new SpillInfo(spillRec, spillFileName, indexFilename, byteArrayOutput, spillOffsetRecordMap));
     ++numSpills;
 
     if (!isFinalMergeEnabled) {
@@ -773,8 +776,10 @@ public class PipelinedSorter extends ExternalSorter {
       remaining -= skipped;
     }
 
+    TezOffsetRecord offsetRecord = spillInfo.spillOffsetRecordMap != null
+        ? spillInfo.spillOffsetRecordMap.get(partitionNumber) : null;
     IFile.KeyValueReaderDataInputBuffer reader = new IFile.Reader(input, indexRecord.getPartLength(),
-        codec, null, null, ifileReadAhead, ifileReadAheadLength, outputContext);
+        codec, null, null, ifileReadAhead, ifileReadAheadLength, outputContext, offsetRecord);
     // This spill output (byteArrayOutput) can be consumed for multiple partitions during the final merge.
     // Keep it alive across partition segments and clean once all partitions are merged in cleanSpillOutputBuffers().
     return new TezMerger.IntermediateMemorySegment(reader, byteArrayOutput, false);

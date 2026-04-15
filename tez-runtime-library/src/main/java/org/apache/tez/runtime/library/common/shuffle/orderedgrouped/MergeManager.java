@@ -1056,7 +1056,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       final long readerLength = mapOutput.getReaderLength();
       return new IFile.Reader(
           inputStream, readerLength, codec,
-          null, null, ifileReadAhead, ifileReadAheadLength, inputContext) {
+          null, null, ifileReadAhead, ifileReadAheadLength, inputContext, mapOutput.getTezOffsetRecord()) {
         @Override
         public void close() throws IOException {
           try {
@@ -1070,7 +1070,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     byte[] data = mapOutput.getMemory();
     return new InMemoryReader(
         MergeManager.this, mapOutput.getAttemptIdentifier(), data, 0, data.length,
-        (int) mapOutput.getUsedMemoryForMergeManager());
+        (int) mapOutput.getUsedMemoryForMergeManager(), mapOutput.getTezOffsetRecord());
   }
 
   static class RawKVIteratorReader implements IFile.KeyValueReaderDataInputBuffer {

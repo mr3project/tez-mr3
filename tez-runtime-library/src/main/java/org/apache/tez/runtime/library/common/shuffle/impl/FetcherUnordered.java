@@ -59,6 +59,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.tez.dag.api.TezUncheckedException;
+import org.apache.tez.runtime.api.TezOffsetRecord;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.ShuffleHeader;  // TODO: relocate
 import org.apache.tez.runtime.library.common.sort.impl.TezIndexRecord;
@@ -597,13 +598,16 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     final long decompressedLength;
     final long compressedLength;
     final int forReduce;
+    final TezOffsetRecord tezOffsetRecord;
 
-    MapOutputStat(InputAttemptIdentifier srcAttemptId, long decompressedLength, long compressedLength, int forReduce) {
+    MapOutputStat(InputAttemptIdentifier srcAttemptId, long decompressedLength, long compressedLength, int forReduce,
+                  TezOffsetRecord tezOffsetRecord) {
       assert srcAttemptId != null;
       this.srcAttemptId = srcAttemptId;
       this.decompressedLength = decompressedLength;
       this.compressedLength = compressedLength;
       this.forReduce = forReduce;
+      this.tezOffsetRecord = tezOffsetRecord;
     }
 
     @Override
@@ -669,7 +673,8 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
           }
 
           mapOutputStat = new MapOutputStat(srcAttemptId,
-              header.getUncompressedLength(), header.getCompressedLength(), header.getPartition());
+              header.getUncompressedLength(), header.getCompressedLength(), header.getPartition(),
+              header.getTezOffsetRecord());
           mapOutputStats.add(mapOutputStat);
           responsePartition = header.getPartition();
         } catch (IllegalArgumentException e) {
@@ -717,6 +722,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         {
           fetchedInput = shuffleManager.getInputManager().allocate(
               decompressedLength, compressedLength, srcAttemptId, false);
+          fetchedInput.setTezOffsetRecord(mapOutputStat.tezOffsetRecord);
         }
         if (fetchedInput.getType() == ShuffleClient.Type.WAIT) {
           if (isDebugEnabled) {

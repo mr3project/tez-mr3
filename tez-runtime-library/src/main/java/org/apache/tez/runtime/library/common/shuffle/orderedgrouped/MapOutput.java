@@ -31,6 +31,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.FileChunk;
+import org.apache.tez.runtime.api.TezOffsetRecord;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.task.local.output.TezTaskOutputFiles;
 
@@ -40,6 +41,7 @@ public abstract class MapOutput implements ShuffleInput {
 
   private final int id;
   private InputAttemptIdentifier attemptIdentifier;
+  private TezOffsetRecord tezOffsetRecord;
 
   private final boolean primaryMapOutput;
   protected final FetchedInputAllocatorOrderedGrouped callback;
@@ -139,6 +141,14 @@ public abstract class MapOutput implements ShuffleInput {
 
   public InputAttemptIdentifier getAttemptIdentifier() {
     return this.attemptIdentifier;
+  }
+
+  public TezOffsetRecord getTezOffsetRecord() {
+    return tezOffsetRecord;
+  }
+
+  public void setTezOffsetRecord(TezOffsetRecord tezOffsetRecord) {
+    this.tezOffsetRecord = tezOffsetRecord;
   }
 
   public abstract ShuffleClient.Type getType();
