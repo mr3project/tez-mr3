@@ -538,12 +538,17 @@ public class PipelinedSorter extends ExternalSorter {
           if (!sendEmptyPartitionDetails || (i == partition)) {
             writer = new WriterBytesWritable(out,
                 codec, spilledRecordsCounter, null,
+                key.getLength(), value.getLength(),
                 writeBuffer, null);
           }
           // we need not check for combiner since its a single record
           if (i == partition) {
             final long recordStart = out.getPos();
-            writer.appendNoRle(key, value);
+            if (compositeFetch) {
+              writer.appendNoRleTez(key, value);
+            } else {
+              writer.appendNoRle(key, value);
+            }
             outputRecordsCounter.increment(1);
             outputRecordBytesCounter.increment(out.getPos() - recordStart);
           }
@@ -655,6 +660,7 @@ public class PipelinedSorter extends ExternalSorter {
           writer = new WriterDataInputBuffer(
               fsOutput,
               codec, spilledRecordsCounter, null, isRleEnabled,
+              maxKeyLen, maxValLen,
               writeBuffer, compressorExternal);
         }
         if (isRleEnabled) {
@@ -663,7 +669,11 @@ public class PipelinedSorter extends ExternalSorter {
           }
         } else {
           while (kvIter.next()) {
-            writer.appendNoRle(kvIter.getKey(), kvIter.getValue());
+            if (compositeFetch) {
+              writer.appendNoRleTez(kvIter.getKey(), kvIter.getValue());
+            } else {
+              writer.appendNoRle(kvIter.getKey(), kvIter.getValue());
+            }
           }
         }
 
@@ -968,9 +978,11 @@ public class PipelinedSorter extends ExternalSorter {
             WriterDataInputBuffer writer = new WriterDataInputBuffer(
                 finalOut,
                 codec, spilledRecordsCounter, null, merger.needsRLE(),
+                maxKeyLen, maxValLen,
                 writeBuffer, null);
             TezMerger.writeFile(kvIter, writer, progressable,
-                TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
+                TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT,
+                compositeFetch);
 
             //close
             writer.close();

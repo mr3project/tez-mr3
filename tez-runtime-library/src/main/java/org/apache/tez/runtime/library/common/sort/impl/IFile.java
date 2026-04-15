@@ -104,6 +104,7 @@ public class IFile {
 
     // call when isRleEnabled is not statically known
     void appendNoRle(DataInputBuffer key, DataInputBuffer value) throws IOException;
+    void appendNoRleTez(DataInputBuffer key, DataInputBuffer value) throws IOException;
 
     // if key != IFile.REPEAT_KEY, perform key comparison to check whether 'key' is a new key or not
     void appendRle(DataInputBuffer key, DataInputBuffer value) throws IOException;
@@ -114,6 +115,7 @@ public class IFile {
   // WriterBytesWritable does not use RLE encoding
   public interface WriterAppendBytesWritable {
     void appendNoRle(BytesWritable key, BytesWritable value) throws IOException;
+    void appendNoRleTez(BytesWritable key, BytesWritable value) throws IOException;
     void close() throws IOException;
   }
 
@@ -171,8 +173,15 @@ public class IFile {
     public FileBackedInMemIFileWriter(FileSystem fs, TezTaskOutput taskOutput,
         CompressionCodec codec, TezCounter writesCounter,
         TezCounter serializedBytesCounter, int cacheSize, byte[] writeBuffer) throws IOException {
+      this(fs, taskOutput, codec, writesCounter, serializedBytesCounter, cacheSize, -1, -1, writeBuffer);
+    }
+
+    public FileBackedInMemIFileWriter(FileSystem fs, TezTaskOutput taskOutput,
+        CompressionCodec codec, TezCounter writesCounter,
+        TezCounter serializedBytesCounter, int cacheSize, int maxKeyLen, int maxValLen,
+        byte[] writeBuffer) throws IOException {
       super(new FSDataOutputStream(createBoundedBuffer(cacheSize), null), null,
-          writesCounter, serializedBytesCounter, writeBuffer, null);
+          writesCounter, serializedBytesCounter, maxKeyLen, maxValLen, writeBuffer, null);
       this.fs = fs;
       this.cacheStream = (BoundedByteArrayOutputStream) this.rawOut.getWrappedStream();
       this.taskOutput = taskOutput;
@@ -335,11 +344,17 @@ public class IFile {
     private long numSerializedBytesWritten = 0;
 
     private final AtomicBoolean closed = new AtomicBoolean(false);
+    protected int maxKeyLen;
+    protected int maxValLen;
+    protected boolean keyLenTransitioned = false;
+    protected boolean valLenTransitioned = false;
+    protected final boolean exactMaxLensKnownAtInit;
 
     protected Writer(FSDataOutputStream outputStream,
                      CompressionCodec codec,
                      TezCounter writesCounter, TezCounter serializedBytesCounter,
                      boolean isRleEnabled,
+                     int maxKeyLen, int maxValLen,
                      byte[] writeBuffer,
                      @Nullable Compressor compressorExternal) throws IOException {
       this.rawOut = outputStream;
@@ -348,6 +363,9 @@ public class IFile {
       this.start = this.rawOut.getPos();
 
       this.isRleEnabled = isRleEnabled;
+      this.maxKeyLen = maxKeyLen;
+      this.maxValLen = maxValLen;
+      this.exactMaxLensKnownAtInit = (maxKeyLen >= 0 && maxValLen >= 0);
 
       this.writeBuffer = writeBuffer;
       this.writeBufferLength = writeBuffer.length;
@@ -478,10 +496,20 @@ public class IFile {
     }
 
     protected void onClose() throws IOException {
+      if (maxKeyLen < 0) {
+        maxKeyLen = 0;
+      }
+      if (maxValLen < 0) {
+        maxValLen = 0;
+      }
     }
 
     protected void incrementDecompressedBytesWritten(long length) {
       decompressedBytesWritten += length;
+    }
+
+    protected void incrementSerializedBytesWritten(long length) {
+      numSerializedBytesWritten += length;
     }
 
     protected void bufferWriteInt(int val) throws IOException {
@@ -549,8 +577,10 @@ public class IFile {
                                  TezCounter writesCounter,
                                  TezCounter serializedBytesCounter,
                                  boolean isRleEnabled,
+                                 int maxKeyLen, int maxValLen,
                                  byte[] writeBuffer) throws IOException {
       this(fs.create(file), codec, writesCounter, serializedBytesCounter, isRleEnabled,
+          maxKeyLen, maxValLen,
           writeBuffer, null);
       this.ownOutputStream = true;
     }
@@ -560,9 +590,11 @@ public class IFile {
                                  TezCounter writesCounter,
                                  TezCounter serializedBytesCounter,
                                  boolean isRleEnabled,
+                                 int maxKeyLen, int maxValLen,
                                  byte[] writeBuffer, @Nullable Compressor compressorExternal)
         throws IOException {
       super(outputStream, codec, writesCounter, serializedBytesCounter, isRleEnabled,
+          maxKeyLen, maxValLen,
           writeBuffer, compressorExternal);
     }
 
@@ -576,6 +608,50 @@ public class IFile {
 
       super.writeKVPair(key.getData(), key.getPosition(), keyLength,
           value.getData(), value.getPosition(), valueLength);
+      prevKey = key;
+      incrementRecordsWritten();
+    }
+
+    public void appendNoRleTez(DataInputBuffer key, DataInputBuffer value) throws IOException {
+      int keyLength = key.getLength() - key.getPosition();
+      int valueLength = value.getLength() - value.getPosition();
+
+      if (maxKeyLen < 0) {
+        maxKeyLen = keyLength;
+      } else {
+        maxKeyLen = Math.max(maxKeyLen, keyLength);
+      }
+      if (maxValLen < 0) {
+        maxValLen = valueLength;
+      } else {
+        maxValLen = Math.max(maxValLen, valueLength);
+      }
+
+      int lengthBytes = 0;
+      if (!exactMaxLensKnownAtInit) {
+        bufferWriteInt(keyLength);
+        bufferWriteInt(valueLength);
+        lengthBytes += (2 * INT_SIZE);
+      } else {
+        if (!keyLenTransitioned && keyLength != maxKeyLen) {
+          keyLenTransitioned = true;
+        }
+        if (!valLenTransitioned && valueLength != maxValLen) {
+          valLenTransitioned = true;
+        }
+        if (keyLenTransitioned) {
+          bufferWriteInt(keyLength);
+          lengthBytes += INT_SIZE;
+        }
+        if (valLenTransitioned) {
+          bufferWriteInt(valueLength);
+          lengthBytes += INT_SIZE;
+        }
+      }
+      bufferWriteBytes(key.getData(), key.getPosition(), keyLength);
+      bufferWriteBytes(value.getData(), value.getPosition(), valueLength);
+      incrementDecompressedBytesWritten(lengthBytes + keyLength + valueLength);
+      incrementSerializedBytesWritten(keyLength + valueLength);
       prevKey = key;
       incrementRecordsWritten();
     }
@@ -658,17 +734,21 @@ public class IFile {
         CompressionCodec codec,
         TezCounter writesCounter,
         TezCounter serializedBytesCounter,
+        int maxKeyLen, int maxValLen,
         byte[] writeBuffer) throws IOException {
       this(fs.create(file), codec, writesCounter, serializedBytesCounter,
+          maxKeyLen, maxValLen,
           writeBuffer, null);
       ownOutputStream = true;
     }
 
     public WriterBytesWritable(FSDataOutputStream outputStream,
         CompressionCodec codec, TezCounter writesCounter, TezCounter serializedBytesCounter,
+        int maxKeyLen, int maxValLen,
         byte[] writeBuffer, @Nullable Compressor compressorExternal)
         throws IOException {
       super(outputStream, codec, writesCounter, serializedBytesCounter, false,
+          maxKeyLen, maxValLen,
           writeBuffer, compressorExternal);
     }
 
@@ -677,6 +757,49 @@ public class IFile {
       int valueLength = value.getLength();
 
       writeKVPair(key.getBytes(), 0, keyLength, value.getBytes(), 0, valueLength);
+      incrementRecordsWritten();
+    }
+
+    public void appendNoRleTez(BytesWritable key, BytesWritable value) throws IOException {
+      int keyLength = key.getLength();
+      int valueLength = value.getLength();
+
+      if (maxKeyLen < 0) {
+        maxKeyLen = keyLength;
+      } else {
+        maxKeyLen = Math.max(maxKeyLen, keyLength);
+      }
+      if (maxValLen < 0) {
+        maxValLen = valueLength;
+      } else {
+        maxValLen = Math.max(maxValLen, valueLength);
+      }
+
+      int lengthBytes = 0;
+      if (!exactMaxLensKnownAtInit) {
+        bufferWriteInt(keyLength);
+        bufferWriteInt(valueLength);
+        lengthBytes += (2 * INT_SIZE);
+      } else {
+        if (!keyLenTransitioned && keyLength != maxKeyLen) {
+          keyLenTransitioned = true;
+        }
+        if (!valLenTransitioned && valueLength != maxValLen) {
+          valLenTransitioned = true;
+        }
+        if (keyLenTransitioned) {
+          bufferWriteInt(keyLength);
+          lengthBytes += INT_SIZE;
+        }
+        if (valLenTransitioned) {
+          bufferWriteInt(valueLength);
+          lengthBytes += INT_SIZE;
+        }
+      }
+      bufferWriteBytes(key.getBytes(), 0, keyLength);
+      bufferWriteBytes(value.getBytes(), 0, valueLength);
+      incrementDecompressedBytesWritten(lengthBytes + keyLength + valueLength);
+      incrementSerializedBytesWritten(keyLength + valueLength);
       incrementRecordsWritten();
     }
   }
