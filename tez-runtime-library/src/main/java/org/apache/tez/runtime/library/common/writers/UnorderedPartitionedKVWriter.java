@@ -413,7 +413,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       // during its close method call, it will update the outputRecordsCounter.
       //
       // No need to update maxKeyLen/maxValLen because we already send key/value to writer.
-      if (compositeFetch) {
+      // For useCachedStream (DME-eligible) path, keep legacy non-RLE encoding because
+      // DME payload does not include TezOffsetRecord metadata.
+      if (compositeFetch && !useCachedStream) {
         writer.appendNoRleTez(key, value);
       } else {
         writer.appendNoRle(key, value);
@@ -905,7 +907,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           } else {
             final boolean isRleEnabled = false;   // because we use WriterBytesWritable which does not support RLE
             final Map<Integer, TezOffsetRecord> spillOffsetRecordMap =
-              (compositeFetch && !isRleEnabled) ? new HashMap<>() : null;
+              (compositeFetch && !useCachedStream && !isRleEnabled) ? new HashMap<>() : null;
             if (spillOffsetRecordMap != null && rec.hasData()) {
               spillOffsetRecordMap.put(0, writer.getTezOffsetRecord());
             }
@@ -1261,7 +1263,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
                 continue;
               }
               IFile.Reader reader = null;
-              if (!spillCompressed) {
+              TezOffsetRecord spillOffsetRecord =
+                  spillInfo.offsetRecordMap != null ? spillInfo.offsetRecordMap.get(i) : null;
+              if (!spillCompressed && !compositeFetch) {
                 long rawDataLength = indexRecord.getRawLength()
                     - IFile.getHeaderLength() - IFile.getEOFMarkerLength();
                 Preconditions.checkState(rawDataLength >= 0,
@@ -1309,12 +1313,13 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
                   }
                 }
               } else {
+                CompressionCodec spillCodecForReader = spillCompressed ? codec : null;
                 if (spillInfo.byteArrayOutput == null) {
                   FSDataInputStream in = rfs.open(spillInfo.outPath);
                   in.seek(indexRecord.getStartOffset());
-                  reader = new IFile.Reader(in, indexRecord.getPartLength(), codec, null,
+                  reader = new IFile.Reader(in, indexRecord.getPartLength(), spillCodecForReader, null,
                       additionalSpillBytesReadCounter, ifileReadAhead, ifileReadAheadLength,
-                      outputContext);
+                      outputContext, spillOffsetRecord);
                 } else {
                   InputStream input = spillInfo.byteArrayOutput.createInputStream();
                   long remaining = indexRecord.getStartOffset();
@@ -1327,8 +1332,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
                     }
                     remaining -= skipped;
                   }
-                  reader = new IFile.Reader(input, indexRecord.getPartLength(), codec, null, null,
-                      ifileReadAhead, ifileReadAheadLength, outputContext);
+                  reader = new IFile.Reader(input, indexRecord.getPartLength(), spillCodecForReader, null, null,
+                      ifileReadAhead, ifileReadAheadLength, outputContext, spillOffsetRecord);
                 }
                 // reader.close() may not be called if the following while{} block throws IOException.
                 // In this case, reader.decompressor is not returned to the pool.
@@ -1556,7 +1561,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     } else {
       // add to cache
       Path spillPath = (byteArrayOutput == null) ? spillPathDetails.outputFilePath : null;
-      SpillInfo spillInfo = new SpillInfo(spillRecord, spillPath, byteArrayOutput);
+      SpillInfo spillInfo = new SpillInfo(spillRecord, spillPath, byteArrayOutput, offsetRecordMap);
       spillInfoList.add(spillInfo);
       numAdditionalSpillsCounter.increment(1);
     }
@@ -1808,13 +1813,16 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     @Nullable final Path outPath;
     // Optional memory-backed spill representation for merge-time reads.
     @Nullable final MultiByteArrayOutputStream byteArrayOutput;
+    @Nullable final Map<Integer, TezOffsetRecord> offsetRecordMap;
 
     SpillInfo(TezSpillRecord spillRecord, @Nullable Path outPath,
-        @Nullable MultiByteArrayOutputStream byteArrayOutput) {
+        @Nullable MultiByteArrayOutputStream byteArrayOutput,
+        @Nullable Map<Integer, TezOffsetRecord> offsetRecordMap) {
       assert (outPath == null) != (byteArrayOutput == null);
       this.spillRecord = spillRecord;
       this.outPath = outPath;
       this.byteArrayOutput = byteArrayOutput;
+      this.offsetRecordMap = offsetRecordMap;
     }
   }
 
