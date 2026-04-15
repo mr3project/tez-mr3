@@ -84,13 +84,9 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
 
       if (maxKeyLen < 0) {
         maxKeyLen = keyLength;
-      } else {
-        maxKeyLen = Math.max(maxKeyLen, keyLength);
       }
       if (maxValLen < 0) {
         maxValLen = valueLength;
-      } else {
-        maxValLen = Math.max(maxValLen, valueLength);
       }
       if (!exactMaxLensKnownAtInit) {
         out.writeInt(keyLength);

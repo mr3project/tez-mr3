@@ -496,10 +496,8 @@ public class IFile {
     }
 
     protected void onClose() throws IOException {
-      if (maxKeyLen < 0) {
+      if (numRecordsWritten == 0) {
         maxKeyLen = 0;
-      }
-      if (maxValLen < 0) {
         maxValLen = 0;
       }
     }
@@ -618,13 +616,9 @@ public class IFile {
 
       if (maxKeyLen < 0) {
         maxKeyLen = keyLength;
-      } else {
-        maxKeyLen = Math.max(maxKeyLen, keyLength);
       }
       if (maxValLen < 0) {
         maxValLen = valueLength;
-      } else {
-        maxValLen = Math.max(maxValLen, valueLength);
       }
 
       int lengthBytes = 0;
@@ -766,13 +760,9 @@ public class IFile {
 
       if (maxKeyLen < 0) {
         maxKeyLen = keyLength;
-      } else {
-        maxKeyLen = Math.max(maxKeyLen, keyLength);
       }
       if (maxValLen < 0) {
         maxValLen = valueLength;
-      } else {
-        maxValLen = Math.max(maxValLen, valueLength);
       }
 
       int lengthBytes = 0;
