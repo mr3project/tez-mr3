@@ -413,7 +413,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       // during its close method call, it will update the outputRecordsCounter.
       //
       // No need to update maxKeyLen/maxValLen because we already send key/value to writer.
-      // For useCachedStream (DME-eligible) path, keep legacy non-RLE encoding because
+      // For useCachedStream (DME-eligible) path, call appendNoRle() because
       // DME payload does not include TezOffsetRecord metadata.
       if (compositeFetch && !useCachedStream) {
         writer.appendNoRleTez(key, value);

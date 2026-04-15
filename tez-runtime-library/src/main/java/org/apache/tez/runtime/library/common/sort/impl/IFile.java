@@ -271,6 +271,11 @@ public class IFile {
       super.writeValue(data, offset, length);
     }
 
+    @Override
+    public void appendNoRleTez(BytesWritable key, BytesWritable value) throws IOException {
+      assert false;
+    }
+
     /**
      * Check if data was flushed to disk.
      *
