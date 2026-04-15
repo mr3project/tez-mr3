@@ -43,7 +43,6 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
   private int maxValLen;
   private boolean keyLenTransitioned = false;
   private boolean valLenTransitioned = false;
-  private final boolean exactMaxLensKnownAtInit;
 
   private DataInputBuffer prevKey = null;
   private final DataOutputBuffer previous = new DataOutputBuffer();
@@ -55,7 +54,6 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
     this.isRleEnabled = isRleEnabled;
     this.maxKeyLen = maxKeyLen;
     this.maxValLen = maxValLen;
-    this.exactMaxLensKnownAtInit = (maxKeyLen >= 0 && maxValLen >= 0);
     this.out.write(IFile.HEADER, 0, IFile.HEADER.length - 1);
     byte flag = 0;
     if (isRleEnabled) {
@@ -82,28 +80,21 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
       int keyLength = key.getLength() - key.getPosition();
       int valueLength = value.getLength() - value.getPosition();
 
-      if (maxKeyLen < 0) {
+      if (maxKeyLen < 0 || maxValLen < 0) {
         maxKeyLen = keyLength;
-      }
-      if (maxValLen < 0) {
         maxValLen = valueLength;
       }
-      if (!exactMaxLensKnownAtInit) {
+      if (!keyLenTransitioned && keyLength != maxKeyLen) {
+        keyLenTransitioned = true;
+      }
+      if (!valLenTransitioned && valueLength != maxValLen) {
+        valLenTransitioned = true;
+      }
+      if (keyLenTransitioned) {
         out.writeInt(keyLength);
+      }
+      if (valLenTransitioned) {
         out.writeInt(valueLength);
-      } else {
-        if (!keyLenTransitioned && keyLength != maxKeyLen) {
-          keyLenTransitioned = true;
-        }
-        if (!valLenTransitioned && valueLength != maxValLen) {
-          valLenTransitioned = true;
-        }
-        if (keyLenTransitioned) {
-          out.writeInt(keyLength);
-        }
-        if (valLenTransitioned) {
-          out.writeInt(valueLength);
-        }
       }
       out.write(key.getData(), key.getPosition(), keyLength);
       out.write(value.getData(), value.getPosition(), valueLength);

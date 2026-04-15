@@ -348,7 +348,6 @@ public class IFile {
     protected int maxValLen;
     protected boolean keyLenTransitioned = false;
     protected boolean valLenTransitioned = false;
-    protected final boolean exactMaxLensKnownAtInit;
 
     protected Writer(FSDataOutputStream outputStream,
                      CompressionCodec codec,
@@ -365,7 +364,6 @@ public class IFile {
       this.isRleEnabled = isRleEnabled;
       this.maxKeyLen = maxKeyLen;
       this.maxValLen = maxValLen;
-      this.exactMaxLensKnownAtInit = (maxKeyLen >= 0 && maxValLen >= 0);
 
       this.writeBuffer = writeBuffer;
       this.writeBufferLength = writeBuffer.length;
@@ -614,33 +612,25 @@ public class IFile {
       int keyLength = key.getLength() - key.getPosition();
       int valueLength = value.getLength() - value.getPosition();
 
-      if (maxKeyLen < 0) {
+      if (maxKeyLen < 0 || maxValLen < 0) {
         maxKeyLen = keyLength;
-      }
-      if (maxValLen < 0) {
         maxValLen = valueLength;
       }
 
       int lengthBytes = 0;
-      if (!exactMaxLensKnownAtInit) {
+      if (!keyLenTransitioned && keyLength != maxKeyLen) {
+        keyLenTransitioned = true;
+      }
+      if (!valLenTransitioned && valueLength != maxValLen) {
+        valLenTransitioned = true;
+      }
+      if (keyLenTransitioned) {
         bufferWriteInt(keyLength);
+        lengthBytes += INT_SIZE;
+      }
+      if (valLenTransitioned) {
         bufferWriteInt(valueLength);
-        lengthBytes += (2 * INT_SIZE);
-      } else {
-        if (!keyLenTransitioned && keyLength != maxKeyLen) {
-          keyLenTransitioned = true;
-        }
-        if (!valLenTransitioned && valueLength != maxValLen) {
-          valLenTransitioned = true;
-        }
-        if (keyLenTransitioned) {
-          bufferWriteInt(keyLength);
-          lengthBytes += INT_SIZE;
-        }
-        if (valLenTransitioned) {
-          bufferWriteInt(valueLength);
-          lengthBytes += INT_SIZE;
-        }
+        lengthBytes += INT_SIZE;
       }
       bufferWriteBytes(key.getData(), key.getPosition(), keyLength);
       bufferWriteBytes(value.getData(), value.getPosition(), valueLength);
@@ -758,33 +748,25 @@ public class IFile {
       int keyLength = key.getLength();
       int valueLength = value.getLength();
 
-      if (maxKeyLen < 0) {
+      if (maxKeyLen < 0 || maxValLen < 0) {
         maxKeyLen = keyLength;
-      }
-      if (maxValLen < 0) {
         maxValLen = valueLength;
       }
 
       int lengthBytes = 0;
-      if (!exactMaxLensKnownAtInit) {
+      if (!keyLenTransitioned && keyLength != maxKeyLen) {
+        keyLenTransitioned = true;
+      }
+      if (!valLenTransitioned && valueLength != maxValLen) {
+        valLenTransitioned = true;
+      }
+      if (keyLenTransitioned) {
         bufferWriteInt(keyLength);
+        lengthBytes += INT_SIZE;
+      }
+      if (valLenTransitioned) {
         bufferWriteInt(valueLength);
-        lengthBytes += (2 * INT_SIZE);
-      } else {
-        if (!keyLenTransitioned && keyLength != maxKeyLen) {
-          keyLenTransitioned = true;
-        }
-        if (!valLenTransitioned && valueLength != maxValLen) {
-          valLenTransitioned = true;
-        }
-        if (keyLenTransitioned) {
-          bufferWriteInt(keyLength);
-          lengthBytes += INT_SIZE;
-        }
-        if (valLenTransitioned) {
-          bufferWriteInt(valueLength);
-          lengthBytes += INT_SIZE;
-        }
+        lengthBytes += INT_SIZE;
       }
       bufferWriteBytes(key.getBytes(), 0, keyLength);
       bufferWriteBytes(value.getBytes(), 0, valueLength);
