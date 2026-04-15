@@ -1132,7 +1132,6 @@ public class PipelinedSorter extends ExternalSorter {
     final RawComparator comparator;
 
     private int index = 0;
-    private long eq = 0;
     private boolean reinit = false;
     private int capacity;
 
@@ -1200,9 +1199,6 @@ public class PipelinedSorter extends ExternalSorter {
       final int jlen   = kvmeta.get(kvj + VALSTART) - jstart;
 
       if (ilen == 0 || jlen == 0) {
-        if (ilen == jlen) {
-          eq++;
-        }
         return ilen - jlen;
       }
 
@@ -1211,7 +1207,6 @@ public class PipelinedSorter extends ExternalSorter {
 
       // sort by key
       final int cmp = comparator.compare(buf, off + istart, ilen, buf, off + jstart, jlen);
-      if (cmp == 0) eq++;
       return cmp;
     }
 
@@ -1302,10 +1297,6 @@ public class PipelinedSorter extends ExternalSorter {
             needle.getPosition(), (needle.getLength() - needle.getPosition()));
       }
       return cmp;
-    }
-    
-    public long getEq() {
-      return eq;
     }
     
     @Override
@@ -1556,8 +1547,6 @@ public class PipelinedSorter extends ExternalSorter {
 
     private int gallop = 0;
     private SpanIterator horse;
-    private long total = 0;
-    private long eq = 0;
     
     public SpanMerger() {
       // SpanIterators are comparable
@@ -1587,10 +1576,6 @@ public class PipelinedSorter extends ExternalSorter {
         if (heap.isEmpty()) {
           return false;
         }
-        for (SpanIterator sp: heap) {
-          total += sp.span.length();
-          eq += sp.span.getEq();
-        }
         if (isDebugEnabled) {
           StringBuilder sb = new StringBuilder();
           for (SpanIterator sp: heap) {
@@ -1601,9 +1586,9 @@ public class PipelinedSorter extends ExternalSorter {
         }
         return true;
       } catch(ExecutionException e) {
-        LOG.error("Heap size={}, total={}, eq={}, partition={}, gallop={}, totalItr={},"
+        LOG.error("Heap size={}, partition={}, gallop={}, totalItr={},"
                 + " futures.size={}, destVertexName={}",
-            heap.size(), total, eq, partition, gallop, numSpanItr, futures.size(),
+            heap.size(), partition, gallop, numSpanItr, futures.size(),
             outputContext.getDestinationVertexName(), e);
         throw new IOException(e);
       }
@@ -1626,7 +1611,7 @@ public class PipelinedSorter extends ExternalSorter {
     }
     
     public boolean needsRLE() {
-      return (eq > 0.1 * total);
+      return true;
     }
 
     @SuppressWarnings("unused")
