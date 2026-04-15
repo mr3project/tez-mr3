@@ -31,6 +31,7 @@ import org.apache.hadoop.io.BoundedByteArrayOutputStream;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.api.DecompressorPool;
 import org.apache.tez.runtime.api.TaskContext;
+import org.apache.tez.runtime.api.TezOffsetRecord;
 import org.apache.tez.runtime.api.TezTaskOutput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -344,6 +345,9 @@ public class IFile {
     protected int maxValLen;
     protected boolean keyLenTransitioned = false;
     protected boolean valLenTransitioned = false;
+    protected int firstKeyOffset = -1;
+    protected int firstValOffset = -1;
+    protected int eofPos = -1;
 
     protected Writer(FSDataOutputStream outputStream,
                      CompressionCodec codec,
@@ -415,6 +419,14 @@ public class IFile {
       }
 
       onClose();
+
+      eofPos = (int) decompressedBytesWritten;
+      if (firstKeyOffset < 0) {
+        firstKeyOffset = eofPos;
+      }
+      if (firstValOffset < 0) {
+        firstValOffset = eofPos;
+      }
 
       // Write EOF_MARKER for key/value length
       long combined = ((long) EOF_MARKER << 32) | (EOF_MARKER & 0xFFFFFFFFL);
@@ -543,6 +555,14 @@ public class IFile {
     public long getCompressedLength() {
       return compressedBytesWritten;
     }
+
+    @Nullable
+    public TezOffsetRecord getTezOffsetRecord() {
+      if (eofPos < 0) {
+        return null;
+      }
+      return new TezOffsetRecord(maxKeyLen, maxValLen, firstKeyOffset, firstValOffset, eofPos);
+    }
   }
 
   public static class WriterDataInputBuffer extends Writer implements WriterAppendDataInputBuffer {
@@ -596,6 +616,7 @@ public class IFile {
     }
 
     public void appendNoRleTez(DataInputBuffer key, DataInputBuffer value) throws IOException {
+      int recordStartOffset = (int) decompressedBytesWritten;
       int keyLength = key.getLength() - key.getPosition();
       int valueLength = value.getLength() - value.getPosition();
 
@@ -607,9 +628,11 @@ public class IFile {
       int lengthBytes = 0;
       if (!keyLenTransitioned && keyLength != maxKeyLen) {
         keyLenTransitioned = true;
+        firstKeyOffset = recordStartOffset;
       }
       if (!valLenTransitioned && valueLength != maxValLen) {
         valLenTransitioned = true;
+        firstValOffset = recordStartOffset;
       }
       if (keyLenTransitioned) {
         bufferWriteInt(keyLength);
@@ -663,6 +686,7 @@ public class IFile {
 
     @Override
     protected void onClose() throws IOException {
+      super.onClose();
       if (isRleEnabled) {
         writeValueMarker();
       }
@@ -732,6 +756,7 @@ public class IFile {
     }
 
     public void appendNoRleTez(BytesWritable key, BytesWritable value) throws IOException {
+      int recordStartOffset = (int) decompressedBytesWritten;
       int keyLength = key.getLength();
       int valueLength = value.getLength();
 
@@ -743,9 +768,11 @@ public class IFile {
       int lengthBytes = 0;
       if (!keyLenTransitioned && keyLength != maxKeyLen) {
         keyLenTransitioned = true;
+        firstKeyOffset = recordStartOffset;
       }
       if (!valLenTransitioned && valueLength != maxValLen) {
         valLenTransitioned = true;
+        firstValOffset = recordStartOffset;
       }
       if (keyLenTransitioned) {
         bufferWriteInt(keyLength);

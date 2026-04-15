@@ -21,10 +21,14 @@ public class IndexPathCache {
   public static class MapOutputInfo {
     private final Path mapOutputFilePath;   // null if data is not written directly to local disk
     private final ByteBuffer spillRecord;
+    @Nullable
+    private final TezOffsetRecord offsetRecord;
 
-    public MapOutputInfo(@Nullable Path mapOutputFilePath, ByteBuffer spillRecord) {
+    public MapOutputInfo(@Nullable Path mapOutputFilePath, ByteBuffer spillRecord,
+                         @Nullable TezOffsetRecord offsetRecord) {
       this.mapOutputFilePath = mapOutputFilePath;
       this.spillRecord = spillRecord;
+      this.offsetRecord = offsetRecord;
     }
 
     public Path getMapOutputFilePath() {
@@ -34,6 +38,11 @@ public class IndexPathCache {
     public ByteBuffer getSpillRecord() {
       return spillRecord;
     }
+
+    @Nullable
+    public TezOffsetRecord getOffsetRecord() {
+      return offsetRecord;
+    }
   }
 
   private final ConcurrentHashMap<String, MapOutputInfo> cache;
@@ -42,8 +51,9 @@ public class IndexPathCache {
     this.cache = new ConcurrentHashMap<>();
   }
 
-  public void add(String mapId, @Nullable Path mapOutputFilePath, ByteBuffer spillRecord) {
-    cache.put(mapId, new MapOutputInfo(mapOutputFilePath, spillRecord));
+  public void add(String mapId, @Nullable Path mapOutputFilePath, ByteBuffer spillRecord,
+                  @Nullable TezOffsetRecord offsetRecord) {
+    cache.put(mapId, new MapOutputInfo(mapOutputFilePath, spillRecord, offsetRecord));
   }
 
   /**

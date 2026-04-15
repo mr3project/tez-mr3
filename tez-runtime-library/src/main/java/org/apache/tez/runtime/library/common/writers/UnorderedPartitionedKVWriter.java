@@ -892,7 +892,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
             sr.writeToFile(finalIndexPath, localFs, localFsSpillFilePerms);
             fileOutputBytesCounter.increment(compLen + indexFileSizeEstimate);
           } else {
-            ShuffleUtils.writeToIndexPathCacheAndByteCache(outputContext, finalOutPath, sr, null);
+            ShuffleUtils.writeToIndexPathCacheAndByteCache(outputContext, finalOutPath, sr, null, writer.getTezOffsetRecord());
             fileOutputBytesCounter.increment(compLen);
           }
         }
@@ -1364,7 +1364,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     } else {
       Path outputPath = byteArrayOutput == null ? finalOutPath : null;
       ShuffleUtils.writeToIndexPathCacheAndByteCache(outputContext,
-          outputPath, finalSpillRecord, byteArrayOutput);
+          outputPath, finalSpillRecord, byteArrayOutput, null);
     }
     LOG.info("{}: Finished final spill after merging: {} spills", destNameTrimmed, numSpills.get());
   }
@@ -1515,10 +1515,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         // must check if spillPathDetails.spillIndex == -1
         if (spillPathDetails.spillIndex < 0) {
           ShuffleUtils.writeToIndexPathCacheAndByteCache(outputContext,
-              outputFilePath, spillRecord, byteArrayOutput);
+              outputFilePath, spillRecord, byteArrayOutput, null);
         } else {
           ShuffleUtils.writeSpillInfoToIndexPathCacheAndByteCache(outputContext,
-              spillPathDetails.spillIndex, outputFilePath, spillRecord, byteArrayOutput);
+              spillPathDetails.spillIndex, outputFilePath, spillRecord, byteArrayOutput, null);
         }
       }
     } else {
