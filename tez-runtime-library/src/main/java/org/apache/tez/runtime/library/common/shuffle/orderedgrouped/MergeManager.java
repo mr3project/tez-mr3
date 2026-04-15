@@ -791,6 +791,9 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       TezMerger.writeFile(rIter, writer, progressable,
           TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT, compositeFetch);
       writer.close();
+      if (!writer.isRleEnabled()) {
+        mergedMapOutputs.setTezOffsetRecord(((InMemoryWriter) writer).getTezOffsetRecord());
+      }
 
       if (isDebugEnabled) {
         LOG.debug("{} Memory-to-Memory merge of the {} files in-memory complete with mergeOutputSize={}",

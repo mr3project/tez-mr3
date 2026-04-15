@@ -24,6 +24,7 @@ import org.apache.hadoop.io.BoundedByteArrayOutputStream;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.tez.common.io.NonSyncDataOutputStream;
+import org.apache.tez.runtime.api.TezOffsetRecord;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.apache.tez.runtime.library.common.sort.impl.IFileOutputStream;
 import org.apache.tez.runtime.library.utils.BufferUtils;
@@ -43,6 +44,11 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
   private int maxValLen;
   private boolean keyLenTransitioned = false;
   private boolean valLenTransitioned = false;
+  private int firstKeyOffset = -1;
+  private int firstValOffset = -1;
+  private int eofPos = -1;
+  private int decompressedBytesWritten = 0;
+  private long numRecordsWritten = 0;
 
   private DataInputBuffer prevKey = null;
   private final DataOutputBuffer previous = new DataOutputBuffer();
@@ -77,11 +83,14 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
       out.writeLong(combined);
       out.write(key.getData(), key.getPosition(), keyLength);
       out.write(value.getData(), value.getPosition(), valueLength);
+      decompressedBytesWritten += Long.BYTES + keyLength + valueLength;
+      ++numRecordsWritten;
   }
 
   public void appendNoRleTez(DataInputBuffer key, DataInputBuffer value) throws IOException {
       int keyLength = key.getLength() - key.getPosition();
       int valueLength = value.getLength() - value.getPosition();
+      int recordStartOffset = decompressedBytesWritten;
 
       if (maxKeyLen < 0 || maxValLen < 0) {
         maxKeyLen = keyLength;
@@ -89,18 +98,25 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
       }
       if (!keyLenTransitioned && keyLength != maxKeyLen) {
         keyLenTransitioned = true;
+        firstKeyOffset = recordStartOffset;
       }
       if (!valLenTransitioned && valueLength != maxValLen) {
         valLenTransitioned = true;
+        firstValOffset = recordStartOffset;
       }
+      int lengthBytes = 0;
       if (keyLenTransitioned) {
         out.writeInt(keyLength);
+        lengthBytes += Integer.BYTES;
       }
       if (valLenTransitioned) {
         out.writeInt(valueLength);
+        lengthBytes += Integer.BYTES;
       }
       out.write(key.getData(), key.getPosition(), keyLength);
       out.write(value.getData(), value.getPosition(), valueLength);
+      decompressedBytesWritten += lengthBytes + keyLength + valueLength;
+      ++numRecordsWritten;
   }
 
   public void appendRle(DataInputBuffer key, DataInputBuffer value) throws IOException {
@@ -117,36 +133,54 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
       // Write V_END_MARKER if needed (if previous was a REPEAT_KEY)
       if (prevKey == IFile.REPEAT_KEY) {
         out.writeInt(IFile.V_END_MARKER);
+        decompressedBytesWritten += Integer.BYTES;
       }
 
       long combined = ((long) keyLength << 32) | (valueLength & 0xFFFFFFFFL);
       out.writeLong(combined);
       out.write(key.getData(), key.getPosition(), keyLength);
       out.write(value.getData(), value.getPosition(), valueLength);
+      decompressedBytesWritten += Long.BYTES + keyLength + valueLength;
       BufferUtils.copy(key, previous);
     } else {
       // Repeated key
       if (prevKey != IFile.REPEAT_KEY) {
         // First repeated key, write RLE marker
         out.writeInt(IFile.RLE_MARKER);
+        decompressedBytesWritten += Integer.BYTES;
       }
 
       // Write just the value length and value
       out.writeInt(valueLength);
       out.write(value.getData(), value.getPosition(), valueLength);
+      decompressedBytesWritten += Integer.BYTES + valueLength;
     }
 
     prevKey = sameKey ? IFile.REPEAT_KEY : key;
+    ++numRecordsWritten;
   }
 
   public void close() throws IOException {
       if (isRleEnabled) {
           closeRle();
+      } else {
+          if (numRecordsWritten == 0) {
+            maxKeyLen = 0;
+            maxValLen = 0;
+          }
+          eofPos = decompressedBytesWritten;
+          if (firstKeyOffset < 0) {
+            firstKeyOffset = eofPos;
+          }
+          if (firstValOffset < 0) {
+            firstValOffset = eofPos;
+          }
       }
 
       // Write EOF_MARKER for key/value length
       long combined = ((long) IFile.EOF_MARKER << 32) | (IFile.EOF_MARKER & 0xFFFFFFFFL);
       out.writeLong(combined);
+      decompressedBytesWritten += Long.BYTES;
 
       out.close();
       out = null;
@@ -156,6 +190,14 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
       // Write V_END_MARKER if needed
       if (prevKey == IFile.REPEAT_KEY) {
           out.writeInt(IFile.V_END_MARKER);
+          decompressedBytesWritten += Integer.BYTES;
       }
+  }
+
+  public TezOffsetRecord getTezOffsetRecord() {
+      if (isRleEnabled) {
+          return null;
+      }
+      return new TezOffsetRecord(maxKeyLen, maxValLen, firstKeyOffset, firstValOffset, eofPos);
   }
 }
