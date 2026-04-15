@@ -271,6 +271,24 @@ public class IFile {
       super.writeValue(data, offset, length);
     }
 
+    @Override
+    public void appendNoRleTez(BytesWritable key, BytesWritable value) throws IOException {
+      if (!bufferFull) {
+        int keyLength = key.getLength();
+        int valueLength = value.getLength();
+
+        // Conservative accounting for the in-memory bounded stream.
+        // The non-RLE tez format can omit one/both length fields depending on transitions,
+        // but this upper bound avoids under-accounting and prevents buffer overrun.
+        totalSize += INT_SIZE + keyLength + INT_SIZE + valueLength;
+
+        if (shouldWriteToDisk()) {
+          resetToFileBasedWriter();
+        }
+      }
+      super.appendNoRleTez(key, value);
+    }
+
     /**
      * Check if data was flushed to disk.
      *
