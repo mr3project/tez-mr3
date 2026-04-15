@@ -1024,8 +1024,9 @@ public class ShuffleHandler {
 
       MapOutputInfo outputInfo;
       if (reduceRange.first == reduceRange.last) {
+        TezOffsetRecord offsetRecord = offsetRecordMap != null ? offsetRecordMap.get(reduceRange.first) : null;
         outputInfo = new MapOutputInfo(
-            dataPath, spillRecord.getIndex(reduceRange.first), reduceRange, byteArrayOutput, offsetRecordMap);
+            dataPath, spillRecord.getIndex(reduceRange.first), reduceRange, byteArrayOutput, offsetRecord);
       } else {
         outputInfo = new MapOutputInfo(dataPath, spillRecord, reduceRange, byteArrayOutput, offsetRecordMap);
       }
@@ -1094,17 +1095,20 @@ public class ShuffleHandler {
       private final Range reduceRange;
       private final MultiByteArrayOutputStream byteArrayOutput;
       @Nullable
+      private final TezOffsetRecord offsetRecord;
+      @Nullable
       private final Map<Integer, TezOffsetRecord> offsetRecordMap;
 
       MapOutputInfo(@Nullable Path mapOutputFileName,
                     TezIndexRecord indexRecord, Range reduceRange,
                     @Nullable MultiByteArrayOutputStream byteArrayOutput,
-                    @Nullable Map<Integer, TezOffsetRecord> offsetRecordMap) {
+                    @Nullable TezOffsetRecord offsetRecord) {
         this.mapOutputFileName = mapOutputFileName;
         this.indexRecord = indexRecord;
         this.reduceRange = reduceRange;
         this.byteArrayOutput = byteArrayOutput;
-        this.offsetRecordMap = offsetRecordMap;
+        this.offsetRecord = offsetRecord;
+        this.offsetRecordMap = null;
       }
 
       MapOutputInfo(@Nullable Path mapOutputFileName,
@@ -1115,6 +1119,7 @@ public class ShuffleHandler {
         this.spillRecord = spillRecord;
         this.reduceRange = reduceRange;
         this.byteArrayOutput = byteArrayOutput;
+        this.offsetRecord = null;
         this.offsetRecordMap = offsetRecordMap;
       }
 
@@ -1131,6 +1136,9 @@ public class ShuffleHandler {
 
       @Nullable
       TezOffsetRecord getTezOffsetRecord(int index) {
+        if (offsetRecord != null) {
+          return offsetRecord;
+        }
         if (offsetRecordMap == null) {
           return null;
         }
