@@ -718,25 +718,21 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         MapOutput lastAddedMapOutput = null;
         while (it.hasNext() && !Thread.currentThread().isInterrupted()) {
           MapOutput mo = it.next();
-          // Size the merged output buffer using physical reader length.
-          // For LOCAL_BYTE_CACHE inputs, getSizeForMergeMemoryAccounting() may be larger than reader length.
-          final long moReaderLength = mo.getReaderLength();
-          if (moReaderLength < 0) {
-            throw new IOException("Invalid readerLength=" + moReaderLength + " for mapOutput=" + mo);
-          }
+          // We have to use mo.getSizeForMergeMemoryAccounting(), not mo.getUsedMemoryForMergeManager(), because
+          // we will create a buffer big enough to hold the sum of the actual sizes of all selected inputs.
           // Adding manager.getUsedMemory() is okay because
           // the guard is about whether we can safely charge the new merged buffer under the budget.
-          if ((mergeOutputSize + moReaderLength + manager.getUsedMemory()) > memoryLimit) {
+          if ((mergeOutputSize + mo.getSizeForMergeMemoryAccounting() + manager.getUsedMemory()) > memoryLimit) {
             //Search for smaller segments that can fit into existing mem
             if (isDebugEnabled) {
               LOG.debug("Size is greater than usedMemory. "
                   + "mergeOutputSize=" + mergeOutputSize
-                  + ", moReaderLength=" + moReaderLength
+                  + ", moSize=" + mo.getSizeForMergeMemoryAccounting()
                   + ", usedMemory=" + manager.getUsedMemory()
                   + ", memoryLimit=" + memoryLimit);
             }
           } else {
-            mergeOutputSize += moReaderLength;
+            mergeOutputSize += mo.getSizeForMergeMemoryAccounting();
             IFile.KeyValueReaderDataInputBuffer reader = createMapOutputReader(mo);
             inMemorySegments.add(new Segment(reader,
                 (mo.isPrimaryMapOutput() ? mergedMapOutputsCounter : null)));
