@@ -30,11 +30,14 @@ import org.apache.tez.common.io.NonSyncByteArrayInputStream;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader.KeyState;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * <code>IFile.InMemoryReader</code> to read map-outputs present in-memory.
  */
 public class InMemoryReader implements IFile.KeyValueReader {
+  private static final Logger LOG = LoggerFactory.getLogger(InMemoryReader.class);
 
   private static class ByteArrayDataInput extends NonSyncByteArrayInputStream implements DataInput {
 
@@ -44,7 +47,6 @@ public class InMemoryReader implements IFile.KeyValueReader {
 
     public byte[] getData() { return buf; }
     public int getPosition() { return pos; }
-    public void setPosition(int position) { this.pos = position; }
 
     @Override
     public void readFully(byte[] b) throws IOException {
@@ -158,7 +160,6 @@ public class InMemoryReader implements IFile.KeyValueReader {
   private final boolean isRleEnabled;
 
   private final TezOffsetRecord tezOffsetRecord;
-  private boolean usedLegacyLengthFallbackForCurrentRecord = false;
 
   private final int usedMemoryForMergeManager;
 
@@ -217,10 +218,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
   }
 
   private void readKeyValueLengthNoRle(DataInput dIn) throws IOException {
-    usedLegacyLengthFallbackForCurrentRecord = false;
     if (tezOffsetRecord != null) {
-      int startPos = memDataIn.getPosition();
-      long startBytesRead = bytesRead;
       int recordOffset = (int) bytesRead;
 
       if (recordOffset == tezOffsetRecord.getEofPos()) {
@@ -243,25 +241,34 @@ public class InMemoryReader implements IFile.KeyValueReader {
         currentValueLength = dIn.readInt();
         bytesRead += Integer.BYTES;
       }
-
-      // Best-effort fallback for streams encoded with explicit <keyLen, valLen, ...>
-      // when TezOffsetRecord is missing/mismatched for this payload.
-      // This keeps reader behavior robust instead of failing with arraycopy bounds errors.
-      int available = memDataIn.available();
-      if (currentKeyLength < 0 || currentValueLength < 0
-          || (currentKeyLength == 0 && currentValueLength == 0)
-          || ((long) currentKeyLength + (long) currentValueLength > available)) {
-        memDataIn.setPosition(startPos);
-        bytesRead = startBytesRead;
-        currentKeyLength = dIn.readInt();
-        currentValueLength = dIn.readInt();
-        bytesRead += Integer.BYTES + Integer.BYTES;
-        usedLegacyLengthFallbackForCurrentRecord = true;
-      }
+      validateDecodedLengthsFromTezOffsetRecord(recordOffset);
     } else {
       currentKeyLength = dIn.readInt();
       currentValueLength = dIn.readInt();
       bytesRead += Integer.BYTES + Integer.BYTES;
+    }
+  }
+
+  private void validateDecodedLengthsFromTezOffsetRecord(int recordOffset) throws IOException {
+    int available = memDataIn.available();
+    if (currentKeyLength < 0 || currentValueLength < 0
+        || (currentKeyLength == 0 && currentValueLength == 0)
+        || ((long) currentKeyLength + (long) currentValueLength > available)) {
+      String message = "Rec# " + recNo + ": TezOffsetRecord decode mismatch. "
+          + "recordOffset=" + recordOffset
+          + ", keyLen=" + currentKeyLength
+          + ", valLen=" + currentValueLength
+          + ", available=" + available
+          + ", memPos=" + memDataIn.getPosition()
+          + ", bytesRead=" + bytesRead
+          + ", firstKeyOffset=" + tezOffsetRecord.getFirstKeyOffset()
+          + ", firstValOffset=" + tezOffsetRecord.getFirstValOffset()
+          + ", eofPos=" + tezOffsetRecord.getEofPos()
+          + ", maxKeyLen=" + tezOffsetRecord.getMaxKeyLen()
+          + ", maxValLen=" + tezOffsetRecord.getMaxValLen()
+          + ", tezOffsetRecord=" + tezOffsetRecord;
+      LOG.error(message);
+      throw new IOException(message);
     }
   }
 
@@ -316,7 +323,6 @@ public class InMemoryReader implements IFile.KeyValueReader {
           + " exceeds remaining bytes " + available
           + ", memPos=" + memDataIn.getPosition()
           + ", bytesRead=" + bytesRead
-          + ", usedLegacyLengthFallbackForCurrentRecord=" + usedLegacyLengthFallbackForCurrentRecord
           + ", tezOffsetRecord=" + tezOffsetRecord);
     }
   }
