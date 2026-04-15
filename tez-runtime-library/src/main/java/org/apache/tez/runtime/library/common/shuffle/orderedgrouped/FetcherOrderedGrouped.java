@@ -39,6 +39,7 @@ import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.FetcherConfigCommon;
 import org.apache.tez.runtime.api.TaskContext;
+import org.apache.tez.runtime.api.TezOffsetRecord;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.shuffle.FetchResult;
@@ -68,13 +69,15 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     final long decompressedLength;
     final long compressedLength;
     final int forReduce;
+    final TezOffsetRecord tezOffsetRecord;
 
     MapOutputStat(InputAttemptIdentifier srcAttemptId, long decompressedLength, long compressedLength,
-        int forReduce) {
+        int forReduce, TezOffsetRecord tezOffsetRecord) {
       this.srcAttemptId = srcAttemptId;
       this.decompressedLength = decompressedLength;
       this.compressedLength = compressedLength;
       this.forReduce = forReduce;
+      this.tezOffsetRecord = tezOffsetRecord;
     }
 
     @Override
@@ -504,7 +507,8 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
               pathToAttemptMap.get(new PathPartition(header.mapId, header.forReduce)),
               header.uncompressedLength,
               header.compressedLength,
-              header.forReduce);
+              header.forReduce,
+              header.getTezOffsetRecord());
           mapOutputStats.add(mapOutputStat);
         } catch (IllegalArgumentException e) {
           if (!stopped) {
@@ -554,6 +558,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         compressedLength = mapOutputStat.compressedLength;
         try {
           mapOutput = allocator.reserve(srcAttemptId, decompressedLength, compressedLength, fetcherIdentifier);
+          mapOutput.setTezOffsetRecord(mapOutputStat.tezOffsetRecord);
         } catch (IOException e) {
           if (!stopped) {
             // Kill the reduce attempt

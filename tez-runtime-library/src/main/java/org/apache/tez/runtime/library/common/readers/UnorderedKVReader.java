@@ -169,11 +169,11 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
     if (fetchedInput.getType() == ShuffleClient.Type.MEMORY) {
       MemoryFetchedInput mfi = (MemoryFetchedInput) fetchedInput;
       return new InMemoryReader(null, mfi.getInputAttemptIdentifier(),
-          mfi.getBytes(), 0, (int) mfi.getSize(), 0);
+          mfi.getBytes(), 0, (int) mfi.getSize(), 0, mfi.getTezOffsetRecord());
     } else {
       return new IFile.Reader(fetchedInput.getInputStream(),
           fetchedInput.getSize(), codec, null, null,
-          ifileReadAhead, ifileReadAheadLength, context);
+          ifileReadAhead, ifileReadAheadLength, context, fetchedInput.getTezOffsetRecord());
     }
   }
 }
