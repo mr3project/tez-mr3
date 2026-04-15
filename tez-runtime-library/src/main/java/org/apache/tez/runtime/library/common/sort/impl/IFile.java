@@ -172,12 +172,6 @@ public class IFile {
      */
     public FileBackedInMemIFileWriter(FileSystem fs, TezTaskOutput taskOutput,
         CompressionCodec codec, TezCounter writesCounter,
-        TezCounter serializedBytesCounter, int cacheSize, byte[] writeBuffer) throws IOException {
-      this(fs, taskOutput, codec, writesCounter, serializedBytesCounter, cacheSize, -1, -1, writeBuffer);
-    }
-
-    public FileBackedInMemIFileWriter(FileSystem fs, TezTaskOutput taskOutput,
-        CompressionCodec codec, TezCounter writesCounter,
         TezCounter serializedBytesCounter, int cacheSize, int maxKeyLen, int maxValLen,
         byte[] writeBuffer) throws IOException {
       super(new FSDataOutputStream(createBoundedBuffer(cacheSize), null), null,
@@ -604,7 +598,6 @@ public class IFile {
 
       super.writeKVPair(key.getData(), key.getPosition(), keyLength,
           value.getData(), value.getPosition(), valueLength);
-      prevKey = key;
       incrementRecordsWritten();
     }
 
@@ -636,7 +629,6 @@ public class IFile {
       bufferWriteBytes(value.getData(), value.getPosition(), valueLength);
       incrementDecompressedBytesWritten(lengthBytes + keyLength + valueLength);
       incrementSerializedBytesWritten(keyLength + valueLength);
-      prevKey = key;
       incrementRecordsWritten();
     }
 
