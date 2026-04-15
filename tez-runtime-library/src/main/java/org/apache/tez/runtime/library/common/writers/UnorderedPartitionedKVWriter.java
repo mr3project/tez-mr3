@@ -413,7 +413,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       // during its close method call, it will update the outputRecordsCounter.
       //
       // No need to update maxKeyLen/maxValLen because we already send key/value to writer.
-      if (compositeFetch) {
+      // For useCachedStream (DME-eligible) path, keep legacy non-RLE encoding because
+      // DME payload does not include TezOffsetRecord metadata required by compact tez encoding.
+      if (compositeFetch && !useCachedStream) {
         writer.appendNoRleTez(key, value);
       } else {
         writer.appendNoRle(key, value);
@@ -802,13 +804,6 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   }
 
   private boolean canSendDataOverDME() throws IOException {
-    // DataMovementEvent payloads do not currently carry TezOffsetRecord metadata.
-    // For non-RLE tez compact IFile encoding, readers require TezOffsetRecord to decode lengths.
-    // Disable DME for this path so data is fetched through shuffle headers (which include offsets).
-    if (compositeFetch) {
-      return false;
-    }
-
     if (this.useCachedStream   // == dataViaEventsEnabled && (numPartitions == 1) && !pipelinedShuffle
         && this.finalOutPath == null) {
 
@@ -912,7 +907,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           } else {
             final boolean isRleEnabled = false;   // because we use WriterBytesWritable which does not support RLE
             final Map<Integer, TezOffsetRecord> spillOffsetRecordMap =
-              (compositeFetch && !isRleEnabled) ? new HashMap<>() : null;
+              (compositeFetch && !useCachedStream && !isRleEnabled) ? new HashMap<>() : null;
             if (spillOffsetRecordMap != null && rec.hasData()) {
               spillOffsetRecordMap.put(0, writer.getTezOffsetRecord());
             }
