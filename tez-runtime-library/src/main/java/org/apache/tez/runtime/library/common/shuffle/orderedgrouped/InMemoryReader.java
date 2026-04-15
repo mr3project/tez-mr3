@@ -283,7 +283,20 @@ public class InMemoryReader implements IFile.KeyValueReader {
       throw new IOException("Rec# " + recNo + ": Negative value-length: " +
           currentValueLength);
     }
+    if (currentKeyLength == 0 && currentValueLength == 0) {
+      throw new IOException("Rec# " + recNo + ": Empty key/value record is not allowed");
+    }
     return true;
+  }
+
+  private void validatePayloadAvailable(int payloadLength, String payloadName) throws IOException {
+    int available = memDataIn.available();
+    if (payloadLength > available) {
+      throw new IOException("Rec# " + recNo + ": Corrupt " + payloadName + " length " + payloadLength
+          + " exceeds remaining bytes " + available
+          + ", bytesRead=" + bytesRead
+          + ", tezOffsetRecord=" + tezOffsetRecord);
+    }
   }
 
   private boolean positionToNextRecordRle(DataInput dIn) throws IOException {
@@ -333,6 +346,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
     if (!positionToNextRecordNoRle(memDataIn)) {
       return KeyState.NO_KEY;
     }
+    validatePayloadAvailable(currentKeyLength, "key");
     int pos = memDataIn.getPosition();
     byte[] data = memDataIn.getData();
     key.reset(data, pos, currentKeyLength);
@@ -387,6 +401,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
     if (!positionToNextRecordNoRle(memDataIn)) {
       return KeyState.NO_KEY;
     }
+    validatePayloadAvailable(currentKeyLength, "key");
 
     int pos = memDataIn.getPosition();
     byte[] data = memDataIn.getData();
@@ -431,6 +446,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
   @Override
   public void nextRawValue(DataInputBuffer value) throws IOException {
     try {
+      validatePayloadAvailable(currentValueLength, "value");
       int pos = memDataIn.getPosition();
       byte[] data = memDataIn.getData();
       value.reset(data, pos, currentValueLength);
@@ -453,6 +469,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
 
   public void nextRawValue(BytesWritable value) throws IOException {
     try {
+      validatePayloadAvailable(currentValueLength, "value");
       int pos = memDataIn.getPosition();
       byte[] data = memDataIn.getData();
       // directly copy to the byte[] array of value after resizing if necessary

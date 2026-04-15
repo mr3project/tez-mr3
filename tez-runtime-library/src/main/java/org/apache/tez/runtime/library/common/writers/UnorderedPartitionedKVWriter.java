@@ -802,6 +802,13 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   }
 
   private boolean canSendDataOverDME() throws IOException {
+    // DataMovementEvent payloads do not currently carry TezOffsetRecord metadata.
+    // For non-RLE tez compact IFile encoding, readers require TezOffsetRecord to decode lengths.
+    // Disable DME for this path so data is fetched through shuffle headers (which include offsets).
+    if (compositeFetch) {
+      return false;
+    }
+
     if (this.useCachedStream   // == dataViaEventsEnabled && (numPartitions == 1) && !pipelinedShuffle
         && this.finalOutPath == null) {
 
