@@ -694,7 +694,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         DataInputBuffer val = new DataInputBuffer();
         byte[] writeBuffer = IFile.allocateWriteBuffer();
 
-        Map<Integer, TezOffsetRecord> spillOffsetRecordMap = compositeFetch ? new HashMap<>() : null;
+        final boolean isRleEnabled = false;
+        Map<Integer, TezOffsetRecord> spillOffsetRecordMap =
+            (compositeFetch && !isRleEnabled) ? new HashMap<>() : null;
         for (int i = 0; i < numPartitions; i++) {
           WriterDataInputBuffer writer = null;
           try {
@@ -730,7 +732,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
               TezIndexRecord indexRecord = new TezIndexRecord(segmentStart, writer.getRawLength(),
                   writer.getCompressedLength());
               spillRecord.putIndex(indexRecord, i);
-              if (spillOffsetRecordMap != null && !writer.isRleEnabled() && indexRecord.hasData()) {
+              if (spillOffsetRecordMap != null && indexRecord.hasData()) {
                 spillOffsetRecordMap.put(i, writer.getTezOffsetRecord());
               }
               writer = null;
@@ -1446,7 +1448,9 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       if (isPipelinedShuffle) {
         emptyPartitions = new BitSet(numPartitions);
       }
-      Map<Integer, TezOffsetRecord> spillOffsetRecordMap = compositeFetch ? new HashMap<>() : null;
+      final boolean isRleEnabled = false;
+      Map<Integer, TezOffsetRecord> spillOffsetRecordMap =
+          (compositeFetch && !isRleEnabled) ? new HashMap<>() : null;
       for (int i = 0; i < numPartitions; i++) {
         final long recordStart = out.getPos();
         if (i == partition) {

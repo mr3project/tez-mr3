@@ -635,7 +635,9 @@ public class PipelinedSorter extends ExternalSorter {
         LOG.debug("Spilling to {} (use in-memory buffers = {})", spillFileName.toString(), canUseBuffers);
       }
 
-      Map<Integer, TezOffsetRecord> spillOffsetRecordMap = compositeFetch ? new HashMap<>() : null;
+      final boolean isRleEnabled = merger.needsRLE();
+      Map<Integer, TezOffsetRecord> spillOffsetRecordMap =
+          (compositeFetch && !isRleEnabled) ? new HashMap<>() : null;
       for (int i = 0; i < partitions; ++i) {
         if (isThreadInterrupted()) {
           return false;
@@ -645,7 +647,6 @@ public class PipelinedSorter extends ExternalSorter {
         long segmentStart = fsOutput.getPos();
         WriterDataInputBuffer writer = null;
         boolean hasNext = kvIter.hasNext();
-        boolean isRleEnabled = merger.needsRLE();
         if (hasNext || !sendEmptyPartitionDetails) {
           if (codec != null && compressorExternal == null) {
             compressorExternal = CodecUtils.getCompressor(codec);
@@ -940,7 +941,9 @@ public class PipelinedSorter extends ExternalSorter {
       }
 
       final TezSpillRecord spillRec = new TezSpillRecord(partitions);
-      Map<Integer, TezOffsetRecord> offsetRecordMap = compositeFetch ? new HashMap<>() : null;
+      final boolean isFinalMergeRleEnabled = merger.needsRLE();
+      Map<Integer, TezOffsetRecord> offsetRecordMap =
+          (compositeFetch && !isFinalMergeRleEnabled) ? new HashMap<>() : null;
       long finalOutputSize = 0;
       try {
         for (int parts = 0; parts < partitions; parts++) {
@@ -993,7 +996,7 @@ public class PipelinedSorter extends ExternalSorter {
           // record offsets
           final TezIndexRecord rec = new TezIndexRecord(segmentStart, rawLength, partLength);
           spillRec.putIndex(rec, parts);
-          if (offsetRecordMap != null && !merger.needsRLE() && rec.hasData()) {
+          if (offsetRecordMap != null && rec.hasData()) {
             offsetRecordMap.put(parts, writer.getTezOffsetRecord());
           }
           if (reportPartitionStats()) {
