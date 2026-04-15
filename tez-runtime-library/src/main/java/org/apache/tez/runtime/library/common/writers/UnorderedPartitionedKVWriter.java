@@ -257,12 +257,12 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       if (this.useCachedStream) {   // i.e., if dataViaEventsEnabled == true
         writer = new IFile.FileBackedInMemIFileWriter(rfs,
             outputFileHandler, codec, outputRecordsCounter,
-            outputRecordBytesCounter, dataViaEventsMaxSize,
+            outputRecordBytesCounter, dataViaEventsMaxSize, -1, -1,
             writeBuffer);
       } else {
         finalOutPath = outputFileHandler.getOutputFileForWrite();
         writer = new IFile.WriterBytesWritable(rfs, finalOutPath,
-            codec, outputRecordsCounter, outputRecordBytesCounter, writeBuffer);
+            codec, outputRecordsCounter, outputRecordBytesCounter, -1, -1, writeBuffer);
         ensureSpillFilePermissions(finalOutPath, rfs, rfsSpillFilePerms);
       }
     } else {
@@ -410,7 +410,11 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       // during its close method call, it will update the outputRecordsCounter.
       //
       // No need to update maxKeyLen/maxValLen because we already send key/value to writer.
-      writer.appendNoRle(key, value);
+      if (compositeFetch) {
+        writer.appendNoRleTez(key, value);
+      } else {
+        writer.appendNoRle(key, value);
+      }
     } else {
       int partition = partitioner.getPartition(key, value, numPartitions);
       maxKeyLen = Math.max(maxKeyLen, key.getLength());
@@ -704,6 +708,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
                 // all Writer instances share the same FSDataOutputStream out
                 writer = new WriterDataInputBuffer(
                     fsOutput, codec, null, null, false,
+                    maxKeyLen, maxValLen,
                     writeBuffer, compressorExternal);
               }
               numRecords += writePartition(buffer.partitionHeads[i], buffer, writer, key, val);
@@ -762,7 +767,11 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       keyBuffer.reset(wrappedBuffer.buffer, pos + META_SIZE, keyLength);
       valBuffer.reset(wrappedBuffer.buffer, pos + META_SIZE + keyLength, valLength);
 
-      writer.appendNoRle(keyBuffer, valBuffer);
+      if (compositeFetch) {
+        writer.appendNoRleTez(keyBuffer, valBuffer);
+      } else {
+        writer.appendNoRle(keyBuffer, valBuffer);
+      }
       numRecords++;
       pos = wrappedBuffer.metaBuffer.get(metaIndex + INDEX_NEXT);
     }
@@ -1208,6 +1217,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         // inside close()
         writer = new WriterDataInputBuffer(
             out, codec, null, null, false,
+            maxKeyLen, maxValLen,
             writeBuffer, null);
         try {
           for (WrappedBuffer buffer : filledBuffers) {
@@ -1308,7 +1318,11 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
                   while (reader.readRawKey(keyBufferIFile) != IFile.Reader.KeyState.NO_KEY) {
                     // TODO Inefficient for large records, since the entire record will be read into memory.
                     reader.nextRawValue(valBufferIFile);
-                    writer.appendNoRle(keyBufferIFile, valBufferIFile);
+                    if (compositeFetch) {
+                      writer.appendNoRleTez(keyBufferIFile, valBufferIFile);
+                    } else {
+                      writer.appendNoRle(keyBufferIFile, valBufferIFile);
+                    }
                   }
                 } finally {
                   reader.close();
@@ -1427,8 +1441,13 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           WriterBytesWritable writer = null;
           try {
             writer = new IFile.WriterBytesWritable(out, codec, null, null,
+                key.getLength(), value.getLength(),
                 IFile.allocateWriteBufferSingle(), null);
-            writer.appendNoRle(key, value);
+            if (compositeFetch) {
+              writer.appendNoRleTez(key, value);
+            } else {
+              writer.appendNoRle(key, value);
+            }
             outputLargeRecordsCounter.increment(1);
             numRecordsPerPartition[i]++;
             if (reportPartitionStats()) {

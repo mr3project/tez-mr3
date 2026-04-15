@@ -39,15 +39,23 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
 
   private DataOutputStream out;
   private final boolean isRleEnabled;
+  private int maxKeyLen;
+  private int maxValLen;
+  private boolean keyLenTransitioned = false;
+  private boolean valLenTransitioned = false;
 
   private DataInputBuffer prevKey = null;
   private final DataOutputBuffer previous = new DataOutputBuffer();
 
+  // TODO: InMemoryWriter is used only in MergeManager.IntermediateMemoryToMemoryMerger with isRleEnabled = true.
+
   // InMemoryWriter does not use another byte[] buffer, unlike IFile.Writer
-  public InMemoryWriter(byte[] array, boolean isRleEnabled) throws IOException {
+  public InMemoryWriter(byte[] array, boolean isRleEnabled, int maxKeyLen, int maxValLen) throws IOException {
     BoundedByteArrayOutputStream arrayStream = new InMemoryBoundedByteArrayOutputStream(array);
     this.out = new NonSyncDataOutputStream(new IFileOutputStream(arrayStream));
     this.isRleEnabled = isRleEnabled;
+    this.maxKeyLen = maxKeyLen;
+    this.maxValLen = maxValLen;
     this.out.write(IFile.HEADER, 0, IFile.HEADER.length - 1);
     byte flag = 0;
     if (isRleEnabled) {
@@ -66,6 +74,30 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
 
       long combined = ((long) keyLength << 32) | (valueLength & 0xFFFFFFFFL);
       out.writeLong(combined);
+      out.write(key.getData(), key.getPosition(), keyLength);
+      out.write(value.getData(), value.getPosition(), valueLength);
+  }
+
+  public void appendNoRleTez(DataInputBuffer key, DataInputBuffer value) throws IOException {
+      int keyLength = key.getLength() - key.getPosition();
+      int valueLength = value.getLength() - value.getPosition();
+
+      if (maxKeyLen < 0 || maxValLen < 0) {
+        maxKeyLen = keyLength;
+        maxValLen = valueLength;
+      }
+      if (!keyLenTransitioned && keyLength != maxKeyLen) {
+        keyLenTransitioned = true;
+      }
+      if (!valLenTransitioned && valueLength != maxValLen) {
+        valLenTransitioned = true;
+      }
+      if (keyLenTransitioned) {
+        out.writeInt(keyLength);
+      }
+      if (valLenTransitioned) {
+        out.writeInt(valueLength);
+      }
       out.write(key.getData(), key.getPosition(), keyLength);
       out.write(value.getData(), value.getPosition(), valueLength);
   }

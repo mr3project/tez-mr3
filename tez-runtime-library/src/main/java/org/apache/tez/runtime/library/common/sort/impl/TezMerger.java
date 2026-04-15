@@ -81,6 +81,12 @@ public class TezMerger {
   public static void writeFile(TezRawKeyValueIterator records, IFile.WriterAppendDataInputBuffer writer,
       Progressable progressable, long recordsBeforeProgress)
       throws IOException, InterruptedException {
+    writeFile(records, writer, progressable, recordsBeforeProgress, false);
+  }
+
+  public static void writeFile(TezRawKeyValueIterator records, IFile.WriterAppendDataInputBuffer writer,
+      Progressable progressable, long recordsBeforeProgress, boolean compositeFetch)
+      throws IOException, InterruptedException {
     boolean isRleEnabled = writer.isRleEnabled();
 
     long recordCtr = 0;
@@ -93,7 +99,11 @@ public class TezMerger {
       }
     } else {
       while (records.next()) {
-        writer.appendNoRle(records.getKey(), records.getValue());
+        if (compositeFetch) {
+          writer.appendNoRleTez(records.getKey(), records.getValue());
+        } else {
+          writer.appendNoRle(records.getKey(), records.getValue());
+        }
         if (((recordCtr++) % recordsBeforeProgress) == 0) { checkProgress(progressable); }
       }
     }
@@ -574,10 +584,10 @@ public class TezMerger {
             byteArrayOutput = new MultiByteArrayOutputStream(fs, outputFile);
             FSDataOutputStream outputStream = new FSDataOutputStream(byteArrayOutput, null);
             writer = new WriterDataInputBuffer(outputStream, codec, writesCounter, null,
-                checkForSameKeys, writeBuffer, null);
+                checkForSameKeys, -1, -1, writeBuffer, null);
           } else {
             writer = new WriterDataInputBuffer(fs, outputFile, codec, writesCounter, null,
-                checkForSameKeys, writeBuffer);
+                checkForSameKeys, -1, -1, writeBuffer);
           }
 
           writeFile(this, writer, reporter, recordsBeforeProgress);
