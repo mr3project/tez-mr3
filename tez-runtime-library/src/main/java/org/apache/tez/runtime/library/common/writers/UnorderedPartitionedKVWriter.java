@@ -125,6 +125,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   private final boolean dataViaEventsEnabled;
   private final int dataViaEventsMaxSize;
   private final boolean useCachedStream;
+  // Temporary experiment switch: force legacy non-RLE IFile layout for unordered path.
+  private final boolean forceLegacyNoRleLayout = true;
 
   private final boolean writeSpillRecord;
   private final boolean spillCompressed;
@@ -413,13 +415,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       // during its close method call, it will update the outputRecordsCounter.
       //
       // No need to update maxKeyLen/maxValLen because we already send key/value to writer.
-      // For useCachedStream (DME-eligible) path, call appendNoRle() because
-      // DME payload does not include TezOffsetRecord metadata.
-      if (compositeFetch && !useCachedStream) {
-        writer.appendNoRleTez(key, value);
-      } else {
-        writer.appendNoRle(key, value);
-      }
+      writer.appendNoRle(key, value);
     } else {
       int partition = partitioner.getPartition(key, value, numPartitions);
       maxKeyLen = Math.max(maxKeyLen, key.getLength());
@@ -676,7 +672,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
       final boolean isRleEnabled = false;
       final Map<Integer, TezOffsetRecord> spillOffsetRecordMap =
-        (compositeFetch && !isRleEnabled) ? new HashMap<>() : null;
+          (compositeFetch && !isRleEnabled && !forceLegacyNoRleLayout) ? new HashMap<>() : null;
 
       FSDataOutputStream fsOutput = null;
       long compressedLength = 0;
@@ -779,11 +775,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       keyBuffer.reset(wrappedBuffer.buffer, pos + META_SIZE, keyLength);
       valBuffer.reset(wrappedBuffer.buffer, pos + META_SIZE + keyLength, valLength);
 
-      if (compositeFetch) {
-        writer.appendNoRleTez(keyBuffer, valBuffer);
-      } else {
-        writer.appendNoRle(keyBuffer, valBuffer);
-      }
+      writer.appendNoRle(keyBuffer, valBuffer);
       numRecords++;
       pos = wrappedBuffer.metaBuffer.get(metaIndex + INDEX_NEXT);
     }
@@ -907,7 +899,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           } else {
             final boolean isRleEnabled = false;   // because we use WriterBytesWritable which does not support RLE
             final Map<Integer, TezOffsetRecord> spillOffsetRecordMap =
-              (compositeFetch && !useCachedStream && !isRleEnabled) ? new HashMap<>() : null;
+              (compositeFetch && !useCachedStream && !isRleEnabled && !forceLegacyNoRleLayout) ? new HashMap<>() : null;
             if (spillOffsetRecordMap != null && rec.hasData()) {
               spillOffsetRecordMap.put(0, writer.getTezOffsetRecord());
             }
@@ -1203,7 +1195,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
     TezSpillRecord finalSpillRecord = new TezSpillRecord(numPartitions);
     final boolean isFinalMergeRleEnabled = false;   // we do not use RLE encoding below
     final Map<Integer, TezOffsetRecord> spillOffsetRecordMap =
-        (compositeFetch && !isFinalMergeRleEnabled) ? new HashMap<>() : null;
+        (compositeFetch && !isFinalMergeRleEnabled && !forceLegacyNoRleLayout) ? new HashMap<>() : null;
 
     DataInputBuffer keyBuffer = new DataInputBuffer();
     DataInputBuffer valBuffer = new DataInputBuffer();
@@ -1345,11 +1337,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
                   while (reader.readRawKey(keyBufferIFile) != IFile.Reader.KeyState.NO_KEY) {
                     // TODO Inefficient for large records, since the entire record will be read into memory.
                     reader.nextRawValue(valBufferIFile);
-                    if (compositeFetch) {
-                      writer.appendNoRleTez(keyBufferIFile, valBufferIFile);
-                    } else {
-                      writer.appendNoRle(keyBufferIFile, valBufferIFile);
-                    }
+                    writer.appendNoRle(keyBufferIFile, valBufferIFile);
                   }
                 } finally {
                   reader.close();
@@ -1466,7 +1454,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       }
       final boolean isRleEnabled = false;
       Map<Integer, TezOffsetRecord> spillOffsetRecordMap =
-          (compositeFetch && !isRleEnabled) ? new HashMap<>() : null;
+          (compositeFetch && !isRleEnabled && !forceLegacyNoRleLayout) ? new HashMap<>() : null;
       for (int i = 0; i < numPartitions; i++) {
         final long recordStart = out.getPos();
         if (i == partition) {
@@ -1477,11 +1465,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
                 false,
                 key.getLength(), value.getLength(),
                 IFile.allocateWriteBufferSingle(), null);
-            if (compositeFetch) {
-              writer.appendNoRleTez(key, value);
-            } else {
-              writer.appendNoRle(key, value);
-            }
+            writer.appendNoRle(key, value);
             outputLargeRecordsCounter.increment(1);
             numRecordsPerPartition[i]++;
             if (reportPartitionStats()) {
