@@ -26,7 +26,6 @@ import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -520,8 +519,7 @@ public class PipelinedSorter extends ExternalSorter {
 
       // writer = WriterBytesWritable, so RLE encoding is not used
       final boolean isRleEnabled = false;
-      final Map<Integer, TezOffsetRecord> spillOffsetRecordMap =
-          (compositeFetch && !isRleEnabled) ? new HashMap<>() : null;
+      final Map<Integer, TezOffsetRecord> spillOffsetRecordMap = null;
 
       for (int i = 0; i < partitions; ++i) {
         if (isThreadInterrupted()) {
@@ -540,11 +538,7 @@ public class PipelinedSorter extends ExternalSorter {
           // we need not check for combiner since its a single record
           if (i == partition) {
             final long recordStart = out.getPos();
-            if (compositeFetch) {
-              writer.appendNoRleTez(key, value);
-            } else {
-              writer.appendNoRle(key, value);
-            }
+            writer.appendNoRle(key, value);
             outputRecordsCounter.increment(1);
             outputRecordBytesCounter.increment(out.getPos() - recordStart);
           }
@@ -629,8 +623,7 @@ public class PipelinedSorter extends ExternalSorter {
     }
 
     final boolean isRleEnabled = merger.needsRLE();
-    final Map<Integer, TezOffsetRecord> spillOffsetRecordMap =
-        (compositeFetch && !isRleEnabled) ? new HashMap<>() : null;
+    final Map<Integer, TezOffsetRecord> spillOffsetRecordMap = null;
 
     FSDataOutputStream fsOutput = null;
     Compressor compressorExternal = null;
@@ -673,11 +666,7 @@ public class PipelinedSorter extends ExternalSorter {
           }
         } else {
           while (kvIter.next()) {
-            if (compositeFetch) {
-              writer.appendNoRleTez(kvIter.getKey(), kvIter.getValue());
-            } else {
-              writer.appendNoRle(kvIter.getKey(), kvIter.getValue());
-            }
+            writer.appendNoRle(kvIter.getKey(), kvIter.getValue());
           }
         }
 
@@ -954,8 +943,7 @@ public class PipelinedSorter extends ExternalSorter {
 
       final TezSpillRecord spillRec = new TezSpillRecord(partitions);
       final boolean isFinalMergeRleEnabled = merger.needsRLE();
-      Map<Integer, TezOffsetRecord> offsetRecordMap =
-          (compositeFetch && !isFinalMergeRleEnabled) ? new HashMap<>() : null;
+      Map<Integer, TezOffsetRecord> offsetRecordMap = null;
       long finalOutputSize = 0;
       try {
         for (int parts = 0; parts < partitions; parts++) {
@@ -995,7 +983,7 @@ public class PipelinedSorter extends ExternalSorter {
                 writeBuffer, null);
             TezMerger.writeFile(kvIter, writer, progressable,
                 TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT,
-                compositeFetch);
+                compositeFetch, true);
 
             //close
             writer.close();
