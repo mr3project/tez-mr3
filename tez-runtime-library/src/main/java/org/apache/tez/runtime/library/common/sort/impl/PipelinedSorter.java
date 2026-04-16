@@ -26,10 +26,8 @@ import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.concurrent.*;
 import java.util.zip.Deflater;
@@ -56,7 +54,6 @@ import org.apache.hadoop.util.IndexedSortable;
 import org.apache.hadoop.util.IndexedSorter;
 import org.apache.tez.common.TezCommonUtils;
 import org.apache.tez.runtime.api.OutputContext;
-import org.apache.tez.runtime.api.TezOffsetRecord;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.serializer.SerializationContext;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
@@ -129,16 +126,13 @@ public class PipelinedSorter extends ExternalSorter {
     final Path spillFilePath;
     final Path spillIndexPath;
     final MultiByteArrayOutputStream spillOutput;
-    final Map<Integer, TezOffsetRecord> spillOffsetRecordMap;
 
     SpillInfo(TezSpillRecord spillRecord, Path spillFilePath, Path spillIndexPath,
-        MultiByteArrayOutputStream spillOutput,
-        Map<Integer, TezOffsetRecord> spillOffsetRecordMap) {
+        MultiByteArrayOutputStream spillOutput) {
       this.spillRecord = spillRecord;
       this.spillFilePath = spillFilePath;
       this.spillIndexPath = spillIndexPath;
       this.spillOutput = spillOutput;
-      this.spillOffsetRecordMap = spillOffsetRecordMap;
     }
   }
 
@@ -519,10 +513,6 @@ public class PipelinedSorter extends ExternalSorter {
       LOG.info("{}: Spilling single record to {}", outputContext.getDestinationVertexName(), outputFilePath.toString());
 
       // writer = WriterBytesWritable, so RLE encoding is not used
-      final boolean isRleEnabled = false;
-      final Map<Integer, TezOffsetRecord> spillOffsetRecordMap =
-          (compositeFetch && !isRleEnabled) ? new HashMap<>() : null;
-
       for (int i = 0; i < partitions; ++i) {
         if (isThreadInterrupted()) {
           return;
@@ -540,11 +530,7 @@ public class PipelinedSorter extends ExternalSorter {
           // we need not check for combiner since its a single record
           if (i == partition) {
             final long recordStart = out.getPos();
-            if (compositeFetch) {
-              writer.appendNoRleTez(key, value);
-            } else {
-              writer.appendNoRle(key, value);
-            }
+            writer.appendNoRle(key, value);
             outputRecordsCounter.increment(1);
             outputRecordBytesCounter.increment(out.getPos() - recordStart);
           }
@@ -554,9 +540,6 @@ public class PipelinedSorter extends ExternalSorter {
             writer.close();
             rawLength = writer.getRawLength();
             partLength = writer.getCompressedLength();
-            if (spillOffsetRecordMap != null && i == partition) {
-              spillOffsetRecordMap.put(i, writer.getTezOffsetRecord());
-            }
           }
           adjustSpillCounters(rawLength, partLength);
           // record offsets
@@ -577,11 +560,11 @@ public class PipelinedSorter extends ExternalSorter {
         spillRec.writeToFile(indexFilename, localFs, localFsSpillFilePerms);
       } else {
         ShuffleUtils.writeSpillInfoToIndexPathCacheAndByteCache(
-            outputContext, numSpills, outputFilePath, spillRec, null, spillOffsetRecordMap);
+            outputContext, numSpills, outputFilePath, spillRec, null, null);
       }
 
       //TODO: honor cache limits
-      spillInfoList.add(new SpillInfo(spillRec, outputFilePath, indexFilename, null, spillOffsetRecordMap));
+      spillInfoList.add(new SpillInfo(spillRec, outputFilePath, indexFilename, null));
       ++numSpills;
 
       if (isPipelinedShuffle) {
@@ -629,8 +612,6 @@ public class PipelinedSorter extends ExternalSorter {
     }
 
     final boolean isRleEnabled = merger.needsRLE();
-    final Map<Integer, TezOffsetRecord> spillOffsetRecordMap =
-        (compositeFetch && !isRleEnabled) ? new HashMap<>() : null;
 
     FSDataOutputStream fsOutput = null;
     Compressor compressorExternal = null;
@@ -673,11 +654,7 @@ public class PipelinedSorter extends ExternalSorter {
           }
         } else {
           while (kvIter.next()) {
-            if (compositeFetch) {
-              writer.appendNoRleTez(kvIter.getKey(), kvIter.getValue());
-            } else {
-              writer.appendNoRle(kvIter.getKey(), kvIter.getValue());
-            }
+            writer.appendNoRle(kvIter.getKey(), kvIter.getValue());
           }
         }
 
@@ -694,9 +671,6 @@ public class PipelinedSorter extends ExternalSorter {
         // record offsets
         final TezIndexRecord rec = new TezIndexRecord(segmentStart, rawLength, partLength);
         spillRec.putIndex(rec, i);
-        if (spillOffsetRecordMap != null && rec.hasData()) {
-          spillOffsetRecordMap.put(i, writer.getTezOffsetRecord());
-        }
         if (!isFinalMergeEnabled && reportPartitionStats()) {
           partitionStats[i] += rawLength;
         }
@@ -718,14 +692,14 @@ public class PipelinedSorter extends ExternalSorter {
     } else {
       Path outputFilePath = byteArrayOutput == null ? spillFileName : null;
       ShuffleUtils.writeSpillInfoToIndexPathCacheAndByteCache(
-          outputContext, numSpills, outputFilePath, spillRec, byteArrayOutput, spillOffsetRecordMap);
+          outputContext, numSpills, outputFilePath, spillRec, byteArrayOutput, null);
     }
     if (isDebugEnabled) {
       LOG.debug("{}: Finished spill {}", outputContext.getDestinationVertexName(), numSpills);
     }
 
     // TODO: honor cache limits
-    spillInfoList.add(new SpillInfo(spillRec, spillFileName, indexFilename, byteArrayOutput, spillOffsetRecordMap));
+    spillInfoList.add(new SpillInfo(spillRec, spillFileName, indexFilename, byteArrayOutput));
     ++numSpills;
 
     if (!isFinalMergeEnabled) {
@@ -777,10 +751,8 @@ public class PipelinedSorter extends ExternalSorter {
       remaining -= skipped;
     }
 
-    TezOffsetRecord offsetRecord = spillInfo.spillOffsetRecordMap != null
-        ? spillInfo.spillOffsetRecordMap.get(partitionNumber) : null;
     IFile.KeyValueReaderDataInputBuffer reader = new IFile.Reader(input, indexRecord.getPartLength(),
-        codec, null, null, ifileReadAhead, ifileReadAheadLength, outputContext, offsetRecord);
+        codec, null, null, ifileReadAhead, ifileReadAheadLength, outputContext, null);
     // This spill output (byteArrayOutput) can be consumed for multiple partitions during the final merge.
     // Keep it alive across partition segments and clean once all partitions are merged in cleanSpillOutputBuffers().
     return new TezMerger.IntermediateMemorySegment(reader, byteArrayOutput, false);
@@ -954,8 +926,6 @@ public class PipelinedSorter extends ExternalSorter {
 
       final TezSpillRecord spillRec = new TezSpillRecord(partitions);
       final boolean isFinalMergeRleEnabled = merger.needsRLE();
-      Map<Integer, TezOffsetRecord> offsetRecordMap =
-          (compositeFetch && !isFinalMergeRleEnabled) ? new HashMap<>() : null;
       long finalOutputSize = 0;
       try {
         for (int parts = 0; parts < partitions; parts++) {
@@ -981,7 +951,7 @@ public class PipelinedSorter extends ExternalSorter {
               new Path(uniqueIdentifier),
               SerializationContext.getKeyComparator(),
               progressable, sortSegments, null, spilledRecordsCounter,
-              additionalSpillBytesReadCounter, merger.needsRLE(), outputContext);
+              additionalSpillBytesReadCounter, isFinalMergeRleEnabled, outputContext);
           // write merged output to disk
           long segmentStart = finalOut.getPos();
           long rawLength = 0;
@@ -990,12 +960,11 @@ public class PipelinedSorter extends ExternalSorter {
           if (shouldWrite) {
             writer = new WriterDataInputBuffer(
                 finalOut,
-                codec, spilledRecordsCounter, null, merger.needsRLE(),
+                codec, spilledRecordsCounter, null, isFinalMergeRleEnabled,
                 maxKeyLen, maxValLen,
                 writeBuffer, null);
             TezMerger.writeFile(kvIter, writer, progressable,
-                TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT,
-                compositeFetch);
+                TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
 
             //close
             writer.close();
@@ -1008,9 +977,6 @@ public class PipelinedSorter extends ExternalSorter {
           // record offsets
           final TezIndexRecord rec = new TezIndexRecord(segmentStart, rawLength, partLength);
           spillRec.putIndex(rec, parts);
-          if (offsetRecordMap != null && rec.hasData()) {
-            offsetRecordMap.put(parts, writer.getTezOffsetRecord());
-          }
           if (reportPartitionStats()) {
             partitionStats[parts] += rawLength;
           }
@@ -1034,7 +1000,7 @@ public class PipelinedSorter extends ExternalSorter {
       } else {
         Path outputFilePath = byteArrayOutput == null ? finalOutputFile : null;
         ShuffleUtils.writeToIndexPathCacheAndByteCache(outputContext,
-            outputFilePath, spillRec, byteArrayOutput, offsetRecordMap);
+            outputFilePath, spillRec, byteArrayOutput, null);
       }
 
       for (int i = 0; i < numSpills; i++) {
