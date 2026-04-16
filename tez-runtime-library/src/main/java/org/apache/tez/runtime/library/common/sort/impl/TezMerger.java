@@ -81,12 +81,6 @@ public class TezMerger {
   public static void writeFile(TezRawKeyValueIterator records, IFile.WriterAppendDataInputBuffer writer,
       Progressable progressable, long recordsBeforeProgress)
       throws IOException, InterruptedException {
-    writeFile(records, writer, progressable, recordsBeforeProgress, false);
-  }
-
-  public static void writeFile(TezRawKeyValueIterator records, IFile.WriterAppendDataInputBuffer writer,
-      Progressable progressable, long recordsBeforeProgress, boolean compositeFetch)
-      throws IOException, InterruptedException {
     boolean isRleEnabled = writer.isRleEnabled();
 
     long recordCtr = 0;
@@ -99,11 +93,7 @@ public class TezMerger {
       }
     } else {
       while (records.next()) {
-        if (compositeFetch) {
-          writer.appendNoRleTez(records.getKey(), records.getValue());
-        } else {
-          writer.appendNoRle(records.getKey(), records.getValue());
-        }
+        writer.appendNoRle(records.getKey(), records.getValue());
         if (((recordCtr++) % recordsBeforeProgress) == 0) { checkProgress(progressable); }
       }
     }

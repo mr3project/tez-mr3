@@ -785,7 +785,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
             SerializationContext.getKeyComparator(),
             progressable, false, null, null, null, true, inputContext);
       TezMerger.writeFile(rIter, writer, progressable,
-          TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT, compositeFetch);
+          TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
       writer.close();
 
       if (isDebugEnabled) {
@@ -874,7 +874,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         // what will be written to disk.
 
         TezMerger.writeFile(rIter, writer, progressable,
-            TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT, compositeFetch);
+            TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
         writer.close();
         additionalSpillBytesWritten.increment(writer.getCompressedLength());
         writer = null;
@@ -993,7 +993,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         // TODO Maybe differentiate between data written because of Merges and
         // the finalMerge (i.e. final mem available may be different from initial merge mem)
         TezMerger.writeFile(iter, writer, progressable,
-            TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT, compositeFetch);
+            TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
         writer.close();
         additionalSpillBytesWritten.increment(writer.getCompressedLength());
       } catch (IOException e) {
@@ -1055,7 +1055,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       final long readerLength = mapOutput.getReaderLength();
       return new IFile.Reader(
           inputStream, readerLength, codec,
-          null, null, ifileReadAhead, ifileReadAheadLength, inputContext, mapOutput.getTezOffsetRecord()) {
+          null, null, ifileReadAhead, ifileReadAheadLength, inputContext, null) {
         @Override
         public void close() throws IOException {
           try {
@@ -1069,7 +1069,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     byte[] data = mapOutput.getMemory();
     return new InMemoryReader(
         MergeManager.this, mapOutput.getAttemptIdentifier(), data, 0, data.length,
-        (int) mapOutput.getUsedMemoryForMergeManager(), mapOutput.getTezOffsetRecord());
+        (int) mapOutput.getUsedMemoryForMergeManager(), null);
   }
 
   static class RawKVIteratorReader implements IFile.KeyValueReaderDataInputBuffer {
@@ -1151,7 +1151,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
             true, -1, -1, writeBuffer);
         try {
           TezMerger.writeFile(rIter, writer, progressable,
-              TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT, compositeFetch);
+              TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
         } catch (IOException e) {
           if (null != outputPath) {
             try {
