@@ -523,8 +523,8 @@ public class PipelinedSorter extends ExternalSorter {
           if (!sendEmptyPartitionDetails || (i == partition)) {
             writer = new WriterBytesWritable(out,
                 codec, spilledRecordsCounter, null,
-                false,
-                key.getLength(), value.getLength(),
+                false, false,
+                -1, -1,
                 writeBuffer, null);
           }
           // we need not check for combiner since its a single record
@@ -644,8 +644,8 @@ public class PipelinedSorter extends ExternalSorter {
           }
           writer = new WriterDataInputBuffer(
               fsOutput,
-              codec, spilledRecordsCounter, null, isRleEnabled,
-              maxKeyLen, maxValLen,
+              codec, spilledRecordsCounter, null, false, isRleEnabled,
+              -1, -1,
               writeBuffer, compressorExternal);
         }
         if (isRleEnabled) {
@@ -960,8 +960,8 @@ public class PipelinedSorter extends ExternalSorter {
           if (shouldWrite) {
             writer = new WriterDataInputBuffer(
                 finalOut,
-                codec, spilledRecordsCounter, null, isFinalMergeRleEnabled,
-                maxKeyLen, maxValLen,
+                codec, spilledRecordsCounter, null, false, isFinalMergeRleEnabled,
+                -1, -1,
                 writeBuffer, null);
             TezMerger.writeFile(kvIter, writer, progressable,
                 TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);

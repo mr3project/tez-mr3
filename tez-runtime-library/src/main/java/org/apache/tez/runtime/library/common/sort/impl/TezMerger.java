@@ -574,10 +574,10 @@ public class TezMerger {
             byteArrayOutput = new MultiByteArrayOutputStream(fs, outputFile);
             FSDataOutputStream outputStream = new FSDataOutputStream(byteArrayOutput, null);
             writer = new WriterDataInputBuffer(outputStream, codec, writesCounter, null,
-                checkForSameKeys, -1, -1, writeBuffer, null);
+                false, checkForSameKeys, -1, -1, writeBuffer, null);
           } else {
             writer = new WriterDataInputBuffer(fs, outputFile, codec, writesCounter, null,
-                checkForSameKeys, -1, -1, writeBuffer);
+                false, checkForSameKeys, -1, -1, writeBuffer);
           }
 
           writeFile(this, writer, reporter, recordsBeforeProgress);

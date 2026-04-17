@@ -265,7 +265,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       } else {
         finalOutPath = outputFileHandler.getOutputFileForWrite();
         writer = new IFile.WriterBytesWritable(rfs, finalOutPath,
-            codec, outputRecordsCounter, outputRecordBytesCounter, false, -1, -1, writeBuffer);
+            codec, outputRecordsCounter, outputRecordBytesCounter, compositeFetch, false, -1, -1,
+            writeBuffer);
         ensureSpillFilePermissions(finalOutPath, rfs, rfsSpillFilePerms);
       }
     } else {
@@ -716,8 +717,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
                 }
                 // all Writer instances share the same FSDataOutputStream out
                 writer = new WriterDataInputBuffer(
-                    fsOutput, codec, null, null, false,
-                    maxKeyLen, maxValLen,
+                    fsOutput, codec, null, null, compositeFetch, false,
+                    -1, -1,
                     writeBuffer, compressorExternal);
               }
               numRecords += writePartition(buffer.partitionHeads[i], buffer, writer, key, val);
@@ -1240,8 +1241,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         }
         // inside close()
         writer = new WriterDataInputBuffer(
-            out, codec, null, null, false,
-            maxKeyLen, maxValLen,
+            out, codec, null, null, compositeFetch, false,
+            -1, -1,
             writeBuffer, null);
         try {
           for (WrappedBuffer buffer : filledBuffers) {
@@ -1474,8 +1475,8 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           WriterBytesWritable writer = null;
           try {
             writer = new IFile.WriterBytesWritable(out, codec, null, null,
-                false,
-                key.getLength(), value.getLength(),
+                compositeFetch, false,
+                -1, -1,
                 IFile.allocateWriteBufferSingle(), null);
             if (compositeFetch) {
               writer.appendNoRleTez(key, value);
