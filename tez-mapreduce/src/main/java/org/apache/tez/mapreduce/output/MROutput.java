@@ -474,12 +474,7 @@ public class MROutput extends AbstractLogicalOutput {
       throws IOException, InterruptedException {
 
     if (useNewApi) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("using new api for output committer");
-      }
-
-      this.committer = newOutputFormat.getOutputCommitter(
-          newApiTaskAttemptContext);
+      this.committer = newOutputFormat.getOutputCommitter(newApiTaskAttemptContext);
     } else {
       this.committer = job.getOutputCommitter();
     }
@@ -614,5 +609,4 @@ public class MROutput extends AbstractLogicalOutput {
       committer.abortTask(oldApiTaskAttemptContext);
     }
   }
-
 }
