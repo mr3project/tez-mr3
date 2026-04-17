@@ -18,7 +18,6 @@
 
 package org.apache.tez.runtime.library.common.shuffle.orderedgrouped;
 
-import java.io.DataInput;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -36,7 +35,7 @@ import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader.KeyState;
  */
 public class InMemoryReader implements IFile.KeyValueReader {
 
-  private static class ByteArrayDataInput extends NonSyncByteArrayInputStream implements DataInput {
+  private static class ByteArrayDataInput extends NonSyncByteArrayInputStream {
 
     public ByteArrayDataInput(byte buf[], int offset, int length) {
       super(buf, offset, length);
@@ -45,52 +44,10 @@ public class InMemoryReader implements IFile.KeyValueReader {
     public byte[] getData() { return buf; }
     public int getPosition() { return pos; }
 
-    @Override
-    public void readFully(byte[] b) throws IOException {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public void readFully(byte[] b, int off, int len) throws IOException {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public int skipBytes(int n) throws IOException {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public boolean readBoolean() throws IOException {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public byte readByte() throws IOException {
+    public byte readByte() {
       return (byte)read();
     }
 
-    @Override
-    public int readUnsignedByte() throws IOException {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public short readShort() throws IOException {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public int readUnsignedShort() throws IOException {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public char readChar() throws IOException {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
     public int readInt() {
       if (pos + 4 > count) {
         throw new RuntimeException("Not enough bytes to read an int");
@@ -103,7 +60,6 @@ public class InMemoryReader implements IFile.KeyValueReader {
       return value;
     }
 
-    @Override
     public long readLong() {
       if (pos + 8 > count) {
         throw new RuntimeException("Not enough bytes to read a long");
@@ -118,26 +74,6 @@ public class InMemoryReader implements IFile.KeyValueReader {
                    (buf[pos + 7] & 0xFF);
       pos += 8;
       return value;
-    }
-
-    @Override
-    public float readFloat() throws IOException {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public double readDouble() throws IOException {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public String readLine() throws IOException {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public String readUTF() throws IOException {
-      throw new UnsupportedOperationException();
     }
   }
 
@@ -214,13 +150,13 @@ public class InMemoryReader implements IFile.KeyValueReader {
     }
   }
 
-  private void readKeyValueLengthNoRle(DataInput dIn) throws IOException {
+  private void readKeyValueLengthNoRle() {
     if (tezOffsetRecord != null) {
       int recordOffset = (int) bytesRead;
 
       if (recordOffset == tezOffsetRecord.getEofPos()) {
-        currentKeyLength = dIn.readInt();
-        currentValueLength = dIn.readInt();
+        currentKeyLength = memDataIn.readInt();
+        currentValueLength = memDataIn.readInt();
         bytesRead += Integer.BYTES + Integer.BYTES;
         return;
       }
@@ -228,26 +164,26 @@ public class InMemoryReader implements IFile.KeyValueReader {
       if (recordOffset < tezOffsetRecord.getFirstKeyOffset()) {
         currentKeyLength = tezOffsetRecord.getMaxKeyLen();
       } else {
-        currentKeyLength = dIn.readInt();
+        currentKeyLength = memDataIn.readInt();
         bytesRead += Integer.BYTES;
       }
 
       if (recordOffset < tezOffsetRecord.getFirstValOffset()) {
         currentValueLength = tezOffsetRecord.getMaxValLen();
       } else {
-        currentValueLength = dIn.readInt();
+        currentValueLength = memDataIn.readInt();
         bytesRead += Integer.BYTES;
       }
     } else {
-      currentKeyLength = dIn.readInt();
-      currentValueLength = dIn.readInt();
+      currentKeyLength = memDataIn.readInt();
+      currentValueLength = memDataIn.readInt();
       bytesRead += Integer.BYTES + Integer.BYTES;
     }
   }
 
-  private void readKeyValueLengthRle(DataInput dIn) throws IOException {
-    currentKeyLength = dIn.readInt();
-    currentValueLength = dIn.readInt();
+  private void readKeyValueLengthRle() {
+    currentKeyLength = memDataIn.readInt();
+    currentValueLength = memDataIn.readInt();
     if (currentKeyLength != IFile.RLE_MARKER) {
       originalKeyLength = currentKeyLength;
       originalKeyPos = memDataIn.getPosition();
@@ -255,20 +191,20 @@ public class InMemoryReader implements IFile.KeyValueReader {
     bytesRead += Integer.BYTES + Integer.BYTES;
   }
 
-  private void readValueLengthRle(DataInput dIn) throws IOException {
-    currentValueLength = dIn.readInt();
+  private void readValueLengthRle() {
+    currentValueLength = memDataIn.readInt();
     bytesRead += Integer.BYTES;
     if (currentValueLength == IFile.V_END_MARKER) {
-      readKeyValueLengthRle(dIn);
+      readKeyValueLengthRle();
     }
   }
 
-  private boolean positionToNextRecordNoRle(DataInput dIn) throws IOException {
+  private boolean positionToNextRecordNoRle() throws IOException {
     if (eof) {
       throw new IOException(String.format("Reached EOF. Completed reading %d", bytesRead));
     }
     int prevKeyLength = currentKeyLength;
-    readKeyValueLengthNoRle(dIn);
+    readKeyValueLengthNoRle();
 
     if (currentKeyLength == IFile.EOF_MARKER && currentValueLength == IFile.EOF_MARKER) {
       eof = true;
@@ -286,16 +222,16 @@ public class InMemoryReader implements IFile.KeyValueReader {
     return true;
   }
 
-  private boolean positionToNextRecordRle(DataInput dIn) throws IOException {
+  private boolean positionToNextRecordRle() throws IOException {
     if (eof) {
       throw new IOException(String.format("Reached EOF. Completed reading %d", bytesRead));
     }
     int prevKeyLength = currentKeyLength;
 
     if (prevKeyLength == IFile.RLE_MARKER) {
-      readValueLengthRle(dIn);
+      readValueLengthRle();
     } else {
-      readKeyValueLengthRle(dIn);
+      readKeyValueLengthRle();
     }
 
     if (currentKeyLength == IFile.EOF_MARKER && currentValueLength == IFile.EOF_MARKER) {
@@ -330,7 +266,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
   }
 
   private KeyState readRawKeyNoRle(DataInputBuffer key) throws IOException {
-    if (!positionToNextRecordNoRle(memDataIn)) {
+    if (!positionToNextRecordNoRle()) {
       return KeyState.NO_KEY;
     }
     int pos = memDataIn.getPosition();
@@ -347,7 +283,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
   }
 
   private KeyState readRawKeyRle(DataInputBuffer key) throws IOException {
-    if (!positionToNextRecordRle(memDataIn)) {
+    if (!positionToNextRecordRle()) {
       return KeyState.NO_KEY;
     }
     // Setup the key
@@ -384,7 +320,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
   }
 
   private KeyState readRawKeyNoRle(BytesWritable key) throws IOException {
-    if (!positionToNextRecordNoRle(memDataIn)) {
+    if (!positionToNextRecordNoRle()) {
       return KeyState.NO_KEY;
     }
 
@@ -405,7 +341,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
   }
 
   private KeyState readRawKeyRle(BytesWritable key) throws IOException {
-    if (!positionToNextRecordRle(memDataIn)) {
+    if (!positionToNextRecordRle()) {
       return KeyState.NO_KEY;
     }
     if (currentKeyLength == IFile.RLE_MARKER) {
