@@ -248,13 +248,6 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     this.outputContext = outputContext;
     this.conf = conf;
 
-    try {
-      this.localFs = (RawLocalFileSystem) FileSystem.getLocal(conf).getRaw();
-      this.localFsSpillFilePerms = TezSpillRecord.SPILL_FILE_PERMS.equals(
-          TezSpillRecord.SPILL_FILE_PERMS.applyUMask(FsPermission.getUMask(this.localFs.getConf())));
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
     this.numPartitions = numOutputs;
 
     outputRecordsCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_RECORDS);
@@ -315,6 +308,18 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     this.trackMaxKeyValLen = compositeFetch && !useCachedStream;
 
     this.writeSpillRecord = !this.compositeFetch;
+    if (this.writeSpillRecord) {
+      try {
+        this.localFs = (RawLocalFileSystem) FileSystem.getLocal(conf).getRaw();
+        this.localFsSpillFilePerms = TezSpillRecord.SPILL_FILE_PERMS.equals(
+            TezSpillRecord.SPILL_FILE_PERMS.applyUMask(FsPermission.getUMask(this.localFs.getConf())));
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    } else {
+      this.localFs = null;
+      this.localFsSpillFilePerms = false;
+    }
 
     if (availableMemoryBytes == 0) {
       Preconditions.checkArgument(((numPartitions == 1) && !isPipelinedShuffle),
@@ -436,6 +441,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
   }
 
   private static final int ALLOC_OVERHEAD = 64;
+
   private void computeNumBuffersAndSize() {
     int bufferLimit = Integer.MAX_VALUE;
 
@@ -936,7 +942,10 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       }
     }
 
-    // write != null iff. numPartitions == 1 && !pipelinedShuffle
+    // NOTE: useCachedStream does not guarantee DME-only transfer. If payload exceeds
+    // dataViaEventsMaxSize (or spilled file is chosen), this returns false and we fall back to
+    // file-backed shuffle payload handling.
+    // writer != null iff. numPartitions == 1 && !pipelinedShuffle
     return (writer != null) && dataViaEventsEnabled
             && (writer.getCompressedLength() <= dataViaEventsMaxSize);
   }
@@ -1021,6 +1030,8 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
             sr.writeToFile(finalIndexPath, localFs, localFsSpillFilePerms);
             fileOutputBytesCounter.increment(compLen + indexFileSizeEstimate);
           } else {
+            // localFs is not needed when writeSpillRecord == false; even in DME fallback we use
+            // output-context index/path cache instead of writing a local spill index file.
             final boolean isRleEnabled = false;   // because we use WriterBytesWritable which does not support RLE
             final Map<Integer, TezOffsetRecord> spillOffsetRecordMap =
               (compositeFetch && !useCachedStream && !isRleEnabled) ? new HashMap<>() : null;
