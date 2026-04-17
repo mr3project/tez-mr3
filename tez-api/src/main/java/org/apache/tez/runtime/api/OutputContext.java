@@ -18,6 +18,7 @@
 
 package org.apache.tez.runtime.api;
 
+import java.util.concurrent.ExecutorService;
 
 /**
  * Context handle for the Output to initialize itself.
@@ -40,4 +41,6 @@ public interface OutputContext extends TaskContext {
   public int getOutputIndex();
 
   public String getDAGID();
+
+  public ExecutorService getSorterThreadPool();
 }
