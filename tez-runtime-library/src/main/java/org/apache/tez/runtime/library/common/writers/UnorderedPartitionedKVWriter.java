@@ -53,6 +53,7 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DataInputBuffer;
@@ -63,24 +64,30 @@ import org.apache.hadoop.io.compress.Compressor;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.tez.common.TezCommonUtils;
 import org.apache.tez.common.TezUtilsInternal;
+import org.apache.tez.common.counters.TaskCounter;
 import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.ExecutorServiceUserGroupInformation;
 import org.apache.tez.runtime.api.MultiByteArrayOutputStream;
 import org.apache.tez.runtime.api.TaskFailureType;
 import org.apache.tez.runtime.api.OutputContext;
+import org.apache.tez.runtime.api.TezTaskOutput;
 import org.apache.tez.runtime.api.TezOffsetRecord;
+import org.apache.tez.runtime.library.api.KeyValuesWriterEdge;
+import org.apache.tez.runtime.library.api.Partitioner;
 import org.apache.tez.runtime.api.events.CompositeDataMovementEvent;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration.ReportPartitionStats;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.Constants;
+import org.apache.tez.runtime.library.common.TezRuntimeUtils;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.apache.tez.runtime.library.common.sort.impl.IFileInputStream;
 import org.apache.tez.runtime.library.common.sort.impl.TezIndexRecord;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterBytesWritable;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterDataInputBuffer;
 import org.apache.tez.runtime.library.common.sort.impl.TezSpillRecord;
+import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.shuffle.impl.ShuffleUserPayloads;
 import org.apache.tez.runtime.library.shuffle.impl.ShuffleUserPayloads.DataMovementEventPayloadProto;
@@ -101,7 +108,7 @@ import javax.annotation.Nullable;
 
 import static org.apache.tez.runtime.library.common.sort.impl.TezSpillRecord.ensureSpillFilePermissions;
 
-public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWriter {
+public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
 
   private static final Logger LOG = LoggerFactory.getLogger(UnorderedPartitionedKVWriter.class);
   private static final boolean isDebugEnabled = LOG.isDebugEnabled();
@@ -121,6 +128,39 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   private final String destNameTrimmed;
 
   private final boolean isPipelinedShuffle;   // isFinalMergeEnabled == !isPipelinedShuffle
+
+  private final OutputContext outputContext;
+  private final Configuration conf;
+
+  private final RawLocalFileSystem localFs;
+  private final boolean localFsSpillFilePerms;
+
+  private final int numPartitions;
+
+  private final Partitioner partitioner;
+  private final CompressionCodec codec;
+
+  private final String auxiliaryService;
+  private final boolean compositeFetch;
+  private final TezTaskOutput outputFileHandler;
+
+  private final boolean ifileReadAhead;
+  private final int ifileReadAheadLength;
+
+  private final TezCounter outputRecordsCounter;
+  private final TezCounter outputLargeRecordsCounter;
+  private final TezCounter outputRecordBytesCounter;
+  private final TezCounter outputBytesWithOverheadCounter;
+
+  private final TezCounter fileOutputBytesCounter;
+  private final TezCounter fileOutputBytesMemoryCounter;
+
+  private final TezCounter spilledRecordsCounter;
+  private final TezCounter additionalSpillBytesWrittenCounter;
+  private final TezCounter additionalSpillBytesReadCounter;
+  private final TezCounter numAdditionalSpillsCounter;
+
+  private final TezCounter shuffleDataViaEventSize;
 
   private final boolean dataViaEventsEnabled;
   private final int dataViaEventsMaxSize;
@@ -205,7 +245,62 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
   public UnorderedPartitionedKVWriter(OutputContext outputContext, Configuration conf,
       int numOutputs, long availableMemoryBytes) throws IOException {
-    super(outputContext, conf, numOutputs);
+    this.outputContext = outputContext;
+    this.conf = conf;
+
+    try {
+      this.localFs = (RawLocalFileSystem) FileSystem.getLocal(conf).getRaw();
+      this.localFsSpillFilePerms = TezSpillRecord.SPILL_FILE_PERMS.equals(
+          TezSpillRecord.SPILL_FILE_PERMS.applyUMask(FsPermission.getUMask(this.localFs.getConf())));
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    this.numPartitions = numOutputs;
+
+    outputRecordsCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_RECORDS);
+    outputLargeRecordsCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_LARGE_RECORDS);
+    outputRecordBytesCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_BYTES);
+    outputBytesWithOverheadCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_BYTES_WITH_OVERHEAD);
+
+    fileOutputBytesCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_BYTES_DISK);
+    fileOutputBytesMemoryCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_BYTES_MEMORY);
+
+    spilledRecordsCounter = outputContext.getCounters().findCounter(TaskCounter.SPILLED_RECORDS);
+    additionalSpillBytesWrittenCounter = outputContext.getCounters().findCounter(TaskCounter.SPILL_BYTES_DISK);
+    additionalSpillBytesReadCounter = outputContext.getCounters().findCounter(TaskCounter.SPILL_BYTES_READ_ADDITIONAL);
+    numAdditionalSpillsCounter = outputContext.getCounters().findCounter(TaskCounter.SPILL_COUNT_ADDITIONAL);
+
+    shuffleDataViaEventSize = outputContext.getCounters().findCounter(TaskCounter.SHUFFLE_DATA_BYTES_VIA_EVENT);
+
+    try {
+      Configuration codecConf = ShuffleServer.getCodecConf(outputContext.peekShuffleServer(), conf);
+      this.codec = CodecUtils.getCodec(codecConf);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+
+    this.ifileReadAhead = this.conf.getBoolean(
+        TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD,
+        TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_DEFAULT);
+    if (this.ifileReadAhead) {
+      this.ifileReadAheadLength = conf.getInt(
+          TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_BYTES,
+          TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_BYTES_DEFAULT);
+    } else {
+      this.ifileReadAheadLength = 0;
+    }
+
+    try {
+      this.partitioner = TezRuntimeUtils.instantiatePartitioner(this.conf);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+
+    this.auxiliaryService = ShuffleUtils.getTezShuffleHandlerServiceId(conf);
+    this.compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
+
+    this.outputFileHandler = TezRuntimeUtils.instantiateTaskOutputManager(
+        this.conf, outputContext, this.compositeFetch);
 
     Preconditions.checkArgument(availableMemoryBytes >= 0, "availableMemory should be >= 0 bytes");
 
