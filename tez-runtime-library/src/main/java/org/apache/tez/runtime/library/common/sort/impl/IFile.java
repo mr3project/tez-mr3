@@ -599,12 +599,10 @@ public class IFile {
                                  CompressionCodec codec,
                                  TezCounter writesCounter,
                                  TezCounter serializedBytesCounter,
-                                 boolean useMaxKeyValLen,
                                  boolean isRleEnabled,
-                                 int maxKeyLen, int maxValLen,
                                  byte[] writeBuffer) throws IOException {
-      this(fs.create(file), codec, writesCounter, serializedBytesCounter, useMaxKeyValLen, isRleEnabled,
-          maxKeyLen, maxValLen,
+      this(fs.create(file), codec, writesCounter, serializedBytesCounter,
+          false, isRleEnabled, -1, -1,
           writeBuffer, null);
       this.ownOutputStream = true;
     }
