@@ -108,5 +108,4 @@ public abstract class OutputCommitter {
   public final OutputCommitterContext getContext() {
     return this.committerContext;
   }
-
 }

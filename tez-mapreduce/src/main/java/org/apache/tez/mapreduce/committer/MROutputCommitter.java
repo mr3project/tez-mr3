@@ -18,6 +18,7 @@
 
 package org.apache.tez.mapreduce.committer;
 
+import org.apache.hadoop.conf.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.mapred.FileOutputCommitter;
@@ -64,18 +65,21 @@ public class MROutputCommitter extends OutputCommitter {
 
   @Override
   public void initialize() throws IOException {
-    UserPayload userPayload = getContext().getOutputUserPayload();
-    if (!userPayload.hasPayload()) {
-      jobConf = new JobConf();
-    } else {
-      jobConf = new JobConf(
-          TezUtils.createConfFromUserPayload(userPayload));
+    jobConf = new JobConf();
+    com.datamonad.mr3.DAGAPI.ConfigurationProto commonJobConf = getContext().getCommonJobConf();
+    if (commonJobConf != null) {
+      for (com.datamonad.mr3.DAGAPI.KeyValueProto kv : commonJobConf.getConfKeyValuesList()) {
+        jobConf.set(kv.getKey(), kv.getValue());
+      }
     }
-    
+    UserPayload diffUserPayload = getContext().getOutputUserPayload();
+    if (diffUserPayload.hasPayload()) {
+      jobConf.addResource(TezUtils.createConfFromUserPayload(diffUserPayload));
+    }
+
     // Read all credentials into the credentials instance stored in JobConf.
     jobConf.getCredentials().mergeAll(UserGroupInformation.getCurrentUser().getCredentials());
-    jobConf.setInt(MRJobConfig.APPLICATION_ATTEMPT_ID,
-        getContext().getDAGAttemptNumber());
+    jobConf.setInt(MRJobConfig.APPLICATION_ATTEMPT_ID, getContext().getDAGAttemptNumber());
     jobConf.set(MRJobConfig.JOB_COMMITTER_UUID, getContext().getDAGID());   // getDAGID() of MR3 returns a string unique to (DAG, attempt number)
     jobConf.setInt(MRJobConfig.VERTEX_ID, getContext().getVertexIndex());
     committer = getOutputCommitter(getContext());
@@ -129,11 +133,9 @@ public class MROutputCommitter extends OutputCommitter {
               TaskType.MAP : TaskType.REDUCE)),
           0, context.getDAGAttemptNumber());
 
-      TaskAttemptContext taskContext = new TaskAttemptContextImpl(jobConf,
-          taskAttemptID);
+      TaskAttemptContext taskContext = new TaskAttemptContextImpl(jobConf, taskAttemptID);
       try {
-        OutputFormat outputFormat = ReflectionUtils.newInstance(taskContext
-            .getOutputFormatClass(), jobConf);
+        OutputFormat outputFormat = ReflectionUtils.newInstance(taskContext.getOutputFormatClass(), jobConf);
         committer = outputFormat.getOutputCommitter(taskContext);
       } catch (Exception e) {
         throw new TezUncheckedException(e);
@@ -149,10 +151,8 @@ public class MROutputCommitter extends OutputCommitter {
   }
 
   // FIXME we are using ApplicationId as DAG id
-  private JobContext getJobContextFromVertexContext(OutputCommitterContext context)
-      throws IOException {
-    JobID jobId = TypeConverter.fromYarn(
-        context.getApplicationId());
+  private JobContext getJobContextFromVertexContext(OutputCommitterContext context) {
+    JobID jobId = TypeConverter.fromYarn(context.getApplicationId());
     return new MRJobContextImpl(jobConf, jobId);
   }
 

@@ -18,6 +18,7 @@
 
 package org.apache.tez.runtime.api;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.tez.dag.api.UserPayload;
 
@@ -78,4 +79,6 @@ public interface OutputCommitterContext {
 
   public String getDAGID();
 
+  // may return null
+  com.datamonad.mr3.DAGAPI.ConfigurationProto getCommonJobConf();
 }
