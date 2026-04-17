@@ -105,7 +105,6 @@ public class PipelinedSorter extends ExternalSorter {
   private int bufferIndex = -1;
 
   private SortSpan span;
-  // Merger
   private final SpanMerger merger;
   private final ExecutorService sortmaster;
 
@@ -223,13 +222,7 @@ public class PipelinedSorter extends ExternalSorter {
 
     this.span = new SortSpan(buffers.get(bufferIndex), 1024 * 1024, 16, this.comparator);
     this.merger = new SpanMerger(); // SpanIterators are comparable
-    final int sortThreads = this.conf.getInt(
-        TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_SORT_THREADS,
-        TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_SORT_THREADS_DEFAULT);
-    this.sortmaster = Executors.newFixedThreadPool(sortThreads,
-        new ThreadFactoryBuilder().setDaemon(true)
-        .setNameFormat("Sorter {" + outputContext.getDestinationVertexName() + "} #%d")
-        .build());
+    this.sortmaster = outputContext.getSorterThreadPool();
 
     this.deflater = TezCommonUtils.newBestCompressionDeflater();
 
@@ -716,9 +709,6 @@ public class PipelinedSorter extends ExternalSorter {
       if (cleanup) {
         cleanup();
       }
-      sortmaster.shutdownNow();
-      LOG.info("{}: Thread interrupted, cleaned up stale data, sorter threads shutdown={}, terminated={}",
-          outputContext.getDestinationVertexName(), sortmaster.isShutdown(), sortmaster.isTerminated());
       return true;
     }
     return false;
@@ -787,7 +777,6 @@ public class PipelinedSorter extends ExternalSorter {
       // so for flush()->spill() we want to force spill so that
       // we can send pipeline shuffle event with last event true.
       spill(false);
-      sortmaster.shutdown();
 
       if (useSoftReference) {
         for (ByteBuffer buffer: buffers) {
