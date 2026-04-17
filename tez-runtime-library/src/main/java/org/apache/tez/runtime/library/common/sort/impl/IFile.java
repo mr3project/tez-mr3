@@ -178,10 +178,11 @@ public class IFile {
      */
     public FileBackedInMemIFileWriter(FileSystem fs, TezTaskOutput taskOutput,
         CompressionCodec codec, TezCounter writesCounter,
-        TezCounter serializedBytesCounter, int cacheSize, int maxKeyLen, int maxValLen,
+        TezCounter serializedBytesCounter, int cacheSize,
         byte[] writeBuffer) throws IOException {
       super(new FSDataOutputStream(createBoundedBuffer(cacheSize), null), null,
-          writesCounter, serializedBytesCounter, false, maxKeyLen, maxValLen, writeBuffer, null);
+          writesCounter, serializedBytesCounter, false, false, -1, -1,
+          writeBuffer, null);
       this.fs = fs;
       this.cacheStream = (BoundedByteArrayOutputStream) this.rawOut.getWrappedStream();
       this.taskOutput = taskOutput;
@@ -318,6 +319,7 @@ public class IFile {
     private final TezCounter serializedUncompressedBytes;
     private final long start;
 
+    protected final boolean useMaxKeyValLen;
     protected final boolean isRleEnabled;
 
     // We use writeBuffer[] to reduce the number of writes to 'out' and thus
@@ -362,6 +364,7 @@ public class IFile {
     protected Writer(FSDataOutputStream outputStream,
                      CompressionCodec codec,
                      TezCounter writesCounter, TezCounter serializedBytesCounter,
+                     boolean useMaxKeyValLen,
                      boolean isRleEnabled,
                      int maxKeyLen, int maxValLen,
                      byte[] writeBuffer,
@@ -371,9 +374,12 @@ public class IFile {
       this.serializedUncompressedBytes = serializedBytesCounter;
       this.start = this.rawOut.getPos();
 
+      this.useMaxKeyValLen = useMaxKeyValLen;
       this.isRleEnabled = isRleEnabled;
       this.maxKeyLen = maxKeyLen;
       this.maxValLen = maxValLen;
+      assert !(useMaxKeyValLen && isRleEnabled);
+      assert !(!useMaxKeyValLen) || (maxKeyLen == -1 && maxValLen == -1);
 
       this.writeBuffer = writeBuffer;
       this.writeBufferLength = writeBuffer.length;
@@ -429,14 +435,6 @@ public class IFile {
       }
 
       onClose();
-
-      eofPos = (int) decompressedBytesWritten;
-      if (firstKeyOffset < 0) {
-        firstKeyOffset = eofPos;
-      }
-      if (firstValOffset < 0) {
-        firstValOffset = eofPos;
-      }
 
       // Write EOF_MARKER for key/value length
       long combined = ((long) EOF_MARKER << 32) | (EOF_MARKER & 0xFFFFFFFFL);
@@ -504,9 +502,18 @@ public class IFile {
     }
 
     protected void onClose() throws IOException {
-      if (numRecordsWritten == 0) {
-        maxKeyLen = 0;
-        maxValLen = 0;
+      if (useMaxKeyValLen) {
+        if (numRecordsWritten == 0) {
+          maxKeyLen = 0;
+          maxValLen = 0;
+        }
+        eofPos = (int) decompressedBytesWritten;
+        if (firstKeyOffset < 0) {
+          firstKeyOffset = eofPos;
+        }
+        if (firstValOffset < 0) {
+          firstValOffset = eofPos;
+        }
       }
     }
 
@@ -568,7 +575,7 @@ public class IFile {
 
     @Nullable
     public TezOffsetRecord getTezOffsetRecord() {
-      if (isRleEnabled) {
+      if (!useMaxKeyValLen) {
         return null;
       } else {
         assert eofPos >= 0;   // must be called after close()
@@ -592,10 +599,11 @@ public class IFile {
                                  CompressionCodec codec,
                                  TezCounter writesCounter,
                                  TezCounter serializedBytesCounter,
+                                 boolean useMaxKeyValLen,
                                  boolean isRleEnabled,
                                  int maxKeyLen, int maxValLen,
                                  byte[] writeBuffer) throws IOException {
-      this(fs.create(file), codec, writesCounter, serializedBytesCounter, isRleEnabled,
+      this(fs.create(file), codec, writesCounter, serializedBytesCounter, useMaxKeyValLen, isRleEnabled,
           maxKeyLen, maxValLen,
           writeBuffer, null);
       this.ownOutputStream = true;
@@ -605,11 +613,12 @@ public class IFile {
                                  CompressionCodec codec,
                                  TezCounter writesCounter,
                                  TezCounter serializedBytesCounter,
+                                 boolean useMaxKeyValLen,
                                  boolean isRleEnabled,
                                  int maxKeyLen, int maxValLen,
                                  byte[] writeBuffer, @Nullable Compressor compressorExternal)
         throws IOException {
-      super(outputStream, codec, writesCounter, serializedBytesCounter, isRleEnabled,
+      super(outputStream, codec, writesCounter, serializedBytesCounter, useMaxKeyValLen, isRleEnabled,
           maxKeyLen, maxValLen,
           writeBuffer, compressorExternal);
     }
@@ -619,7 +628,7 @@ public class IFile {
     }
 
     public void appendNoRle(DataInputBuffer key, DataInputBuffer value) throws IOException {
-      assert !isRleEnabled;
+      assert !isRleEnabled && !useMaxKeyValLen;
       int keyLength = key.getLength() - key.getPosition();
       int valueLength = value.getLength() - value.getPosition();
 
@@ -629,7 +638,7 @@ public class IFile {
     }
 
     public void appendNoRleTez(DataInputBuffer key, DataInputBuffer value) throws IOException {
-      assert !isRleEnabled;
+      assert !isRleEnabled && useMaxKeyValLen;
       int keyLength = key.getLength() - key.getPosition();
       int valueLength = value.getLength() - value.getPosition();
 
@@ -664,7 +673,7 @@ public class IFile {
     }
 
     public void appendRle(DataInputBuffer key, DataInputBuffer value) throws IOException {
-      assert isRleEnabled;
+      assert isRleEnabled && !useMaxKeyValLen;
       int keyLength = key.getLength() - key.getPosition();
       int valueLength = value.getLength() - value.getPosition();
 
@@ -749,10 +758,11 @@ public class IFile {
         CompressionCodec codec,
         TezCounter writesCounter,
         TezCounter serializedBytesCounter,
+        boolean useMaxKeyValLen,
         boolean isRleEnabled,
         int maxKeyLen, int maxValLen,
         byte[] writeBuffer) throws IOException {
-      this(fs.create(file), codec, writesCounter, serializedBytesCounter, isRleEnabled,
+      this(fs.create(file), codec, writesCounter, serializedBytesCounter, useMaxKeyValLen, isRleEnabled,
           maxKeyLen, maxValLen,
           writeBuffer, null);
       ownOutputStream = true;
@@ -760,11 +770,12 @@ public class IFile {
 
     public WriterBytesWritable(FSDataOutputStream outputStream,
         CompressionCodec codec, TezCounter writesCounter, TezCounter serializedBytesCounter,
+        boolean useMaxKeyValLen,
         boolean isRleEnabled,
         int maxKeyLen, int maxValLen,
         byte[] writeBuffer, @Nullable Compressor compressorExternal)
         throws IOException {
-      super(outputStream, codec, writesCounter, serializedBytesCounter, isRleEnabled,
+      super(outputStream, codec, writesCounter, serializedBytesCounter, useMaxKeyValLen, isRleEnabled,
           maxKeyLen, maxValLen,
           writeBuffer, compressorExternal);
     }
@@ -775,6 +786,7 @@ public class IFile {
 
     public void appendNoRle(BytesWritable key, BytesWritable value) throws IOException {
       assert !isRleEnabled;
+      assert !useMaxKeyValLen;
       int keyLength = key.getLength();
       int valueLength = value.getLength();
 
@@ -784,6 +796,7 @@ public class IFile {
 
     public void appendNoRleTez(BytesWritable key, BytesWritable value) throws IOException {
       assert !isRleEnabled;
+      assert useMaxKeyValLen;
       int recordStartOffset = (int) getDecompressedBytesWritten();
       int keyLength = key.getLength();
       int valueLength = value.getLength();
@@ -819,6 +832,7 @@ public class IFile {
 
     public void appendRle(BytesWritable key, BytesWritable value) throws IOException {
       assert isRleEnabled;
+      assert !useMaxKeyValLen;
       int keyLength = key.getLength();
       int valueLength = value.getLength();
 

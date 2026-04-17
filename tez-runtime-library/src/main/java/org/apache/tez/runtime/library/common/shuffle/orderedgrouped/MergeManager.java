@@ -857,7 +857,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       long outFileLen = 0;
       try {
         writer = new WriterDataInputBuffer(rfs, outputPath, codec,
-            null, null, true, -1, -1, writeBuffer);
+            null, null, false, true, -1, -1, writeBuffer);
 
         TezRawKeyValueIterator rIter = null;
         LOG.info("Initiating in-memory merge with {} segments", noInMemorySegments);
@@ -981,7 +981,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       outputPath = outputPath.suffix(Constants.MERGED_OUTPUT_PREFIX + mergeFileSequenceId.getAndIncrement());
 
       WriterDataInputBuffer writer = new WriterDataInputBuffer(rfs, outputPath, codec, null,
-          null, true, -1, -1, writeBuffer);
+          null, false, true, -1, -1, writeBuffer);
       tmpDir = new Path(inputContext.getUniqueIdentifier());
       try {
         TezRawKeyValueIterator iter = TezMerger.merge(conf, rfs,
@@ -1148,7 +1148,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
             additionalSpillBytesRead, true, inputContext);
         final byte[] writeBuffer = IFile.allocateWriteBuffer();
         final WriterDataInputBuffer writer = new WriterDataInputBuffer(fs, outputPath, codec, null, null,
-            true, -1, -1, writeBuffer);
+            false, true, -1, -1, writeBuffer);
         try {
           TezMerger.writeFile(rIter, writer, progressable,
               TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);

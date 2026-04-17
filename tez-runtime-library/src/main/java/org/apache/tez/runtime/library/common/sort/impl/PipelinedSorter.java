@@ -141,9 +141,6 @@ public class PipelinedSorter extends ExternalSorter {
   // track buffer overflow recursively in all buffers
   private int bufferOverflowRecursion = 0;
 
-  private int maxKeyLen = -1;
-  private int maxValLen = -1;
-
   public PipelinedSorter(OutputContext outputContext, Configuration conf, int numOutputs,
       long initialMemoryAvailable) throws IOException {
     super(outputContext, conf, numOutputs, initialMemoryAvailable);
@@ -394,8 +391,8 @@ public class PipelinedSorter extends ExternalSorter {
   }
 
   synchronized public void closeWriter() {
-    LOG.info("Closing up PipelinedSorter KeyValueWriterEdge for {}: maxKeyLen={}, maxValLen={}",
-        outputContext.getDestinationVertexName(), maxKeyLen, maxValLen);
+    LOG.info("Closing up PipelinedSorter KeyValueWriterEdge for {}",
+        outputContext.getDestinationVertexName());
   }
 
   // Invariants on setDefaultLengths()/write()/closeWriter()/flush()/close():
@@ -410,8 +407,6 @@ public class PipelinedSorter extends ExternalSorter {
 
   @Override
   public void write(BytesWritable key, BytesWritable value) throws IOException {
-    maxKeyLen = Math.max(maxKeyLen, key.getLength());
-    maxValLen = Math.max(maxValLen, value.getLength());
     collect(key, value, partitioner.getPartition(key, value, partitions));
   }
 
@@ -523,8 +518,8 @@ public class PipelinedSorter extends ExternalSorter {
           if (!sendEmptyPartitionDetails || (i == partition)) {
             writer = new WriterBytesWritable(out,
                 codec, spilledRecordsCounter, null,
-                false,
-                key.getLength(), value.getLength(),
+                false, false,
+                -1, -1,
                 writeBuffer, null);
           }
           // we need not check for combiner since its a single record
@@ -644,8 +639,8 @@ public class PipelinedSorter extends ExternalSorter {
           }
           writer = new WriterDataInputBuffer(
               fsOutput,
-              codec, spilledRecordsCounter, null, isRleEnabled,
-              maxKeyLen, maxValLen,
+              codec, spilledRecordsCounter, null, false, isRleEnabled,
+              -1, -1,
               writeBuffer, compressorExternal);
         }
         if (isRleEnabled) {
@@ -960,8 +955,8 @@ public class PipelinedSorter extends ExternalSorter {
           if (shouldWrite) {
             writer = new WriterDataInputBuffer(
                 finalOut,
-                codec, spilledRecordsCounter, null, isFinalMergeRleEnabled,
-                maxKeyLen, maxValLen,
+                codec, spilledRecordsCounter, null, false, isFinalMergeRleEnabled,
+                -1, -1,
                 writeBuffer, null);
             TezMerger.writeFile(kvIter, writer, progressable,
                 TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
