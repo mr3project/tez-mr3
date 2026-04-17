@@ -172,9 +172,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
   // uncompressed size for each partition
   private volatile long spilledSize = 0;
-
-  private int maxKeyLen = 0;
-  private int maxValLen = 0;
+  // Tracked only when Tez offset metadata is required (compositeFetch and not DME cached-stream mode).
+  private final boolean trackMaxKeyValLen;
+  private int maxKeyLen = -1;
+  private int maxValLen = -1;
 
   static final ThreadLocal<Deflater> deflater = new ThreadLocal<Deflater>() {
     @Override
@@ -222,6 +223,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
        TezRuntimeConfiguration.TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_MAX_SIZE,
        TezRuntimeConfiguration.TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_MAX_SIZE_DEFAULT);
     this.useCachedStream = this.dataViaEventsEnabled && (numPartitions == 1) && !isPipelinedShuffle;
+    this.trackMaxKeyValLen = compositeFetch && !useCachedStream;
 
     this.writeSpillRecord = !this.compositeFetch;
 
@@ -381,8 +383,12 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
 
   @Override
   public void closeWriter() {
-    LOG.info("Closing up Unordered KeyValueWriterEdge for {}: maxKeyLen={}, maxValLen={}",
-      destNameTrimmed, maxKeyLen, maxValLen);
+    if (trackMaxKeyValLen) {
+      LOG.info("Closing up Unordered maxKey/ValLen for {}: maxKeyLen={}, maxValLen={}",
+          destNameTrimmed, maxKeyLen, maxValLen);
+    } else {
+      LOG.info("Closing up Unordered KeyValueWriterEdge for {}", destNameTrimmed);
+    }
   }
 
   // TODO: optimize, if this method is actually called
@@ -407,13 +413,18 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       // Already reported as a fatalError - report to the user code
       throw new IOException("Exception during spill", new IOException(spillException));
     }
+
+    if (trackMaxKeyValLen) {
+      maxKeyLen = Math.max(maxKeyLen, key.getLength());
+      maxValLen = Math.max(maxValLen, value.getLength());
+    }
+
     if (skipBuffers) {
       // Special case, where we have only one partition and pipelining is disabled.
       // The reason outputRecordsCounter isn't updated here:
       // For skipBuffers case, IFile writer has the reference to outputRecordsCounter and
       // during its close method call, it will update the outputRecordsCounter.
       //
-      // No need to update maxKeyLen/maxValLen because we already send key/value to writer.
       // For useCachedStream (DME-eligible) path, call appendNoRle() because
       // DME payload does not include TezOffsetRecord metadata.
       if (compositeFetch && !useCachedStream) {
@@ -423,8 +434,6 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       }
     } else {
       int partition = partitioner.getPartition(key, value, numPartitions);
-      maxKeyLen = Math.max(maxKeyLen, key.getLength());
-      maxValLen = Math.max(maxValLen, value.getLength());
       write(key, value, partition);
     }
   }
@@ -718,7 +727,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
                 // all Writer instances share the same FSDataOutputStream out
                 writer = new WriterDataInputBuffer(
                     fsOutput, codec, null, null, compositeFetch, false,
-                    -1, -1,
+                    maxKeyLen, maxValLen,
                     writeBuffer, compressorExternal);
               }
               numRecords += writePartition(buffer.partitionHeads[i], buffer, writer, key, val);
@@ -1242,7 +1251,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
         // inside close()
         writer = new WriterDataInputBuffer(
             out, codec, null, null, compositeFetch, false,
-            -1, -1,
+            maxKeyLen, maxValLen,
             writeBuffer, null);
         try {
           for (WrappedBuffer buffer : filledBuffers) {
@@ -1476,7 +1485,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           try {
             writer = new IFile.WriterBytesWritable(out, codec, null, null,
                 compositeFetch, false,
-                -1, -1,
+                maxKeyLen, maxValLen,
                 IFile.allocateWriteBufferSingle(), null);
             if (compositeFetch) {
               writer.appendNoRleTez(key, value);
