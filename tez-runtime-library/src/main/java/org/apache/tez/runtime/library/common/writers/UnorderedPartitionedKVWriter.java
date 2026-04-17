@@ -260,7 +260,7 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
       if (this.useCachedStream) {   // i.e., if dataViaEventsEnabled == true
         writer = new IFile.FileBackedInMemIFileWriter(rfs,
             outputFileHandler, codec, outputRecordsCounter,
-            outputRecordBytesCounter, dataViaEventsMaxSize, -1, -1,
+            outputRecordBytesCounter, dataViaEventsMaxSize, false, -1, -1,
             writeBuffer);
       } else {
         finalOutPath = outputFileHandler.getOutputFileForWrite();

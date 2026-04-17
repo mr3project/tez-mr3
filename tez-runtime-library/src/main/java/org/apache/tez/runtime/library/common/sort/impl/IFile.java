@@ -178,10 +178,12 @@ public class IFile {
      */
     public FileBackedInMemIFileWriter(FileSystem fs, TezTaskOutput taskOutput,
         CompressionCodec codec, TezCounter writesCounter,
-        TezCounter serializedBytesCounter, int cacheSize, int maxKeyLen, int maxValLen,
+        TezCounter serializedBytesCounter, int cacheSize, boolean useMaxKeyValLen,
+        int maxKeyLen, int maxValLen,
         byte[] writeBuffer) throws IOException {
       super(new FSDataOutputStream(createBoundedBuffer(cacheSize), null), null,
-          writesCounter, serializedBytesCounter, false, false, maxKeyLen, maxValLen, writeBuffer, null);
+          writesCounter, serializedBytesCounter, useMaxKeyValLen, false, maxKeyLen, maxValLen,
+          writeBuffer, null);
       this.fs = fs;
       this.cacheStream = (BoundedByteArrayOutputStream) this.rawOut.getWrappedStream();
       this.taskOutput = taskOutput;
