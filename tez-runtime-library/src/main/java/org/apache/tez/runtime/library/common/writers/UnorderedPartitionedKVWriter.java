@@ -290,12 +290,6 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       this.ifileReadAheadLength = 0;
     }
 
-    try {
-      this.partitioner = TezRuntimeUtils.instantiatePartitioner(this.conf);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-
     this.auxiliaryService = ShuffleUtils.getTezShuffleHandlerServiceId(conf);
     this.compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
 
@@ -322,14 +316,6 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
 
     this.writeSpillRecord = !this.compositeFetch;
 
-    if (isPipelinedShuffle) {
-      this.spillCompressed = codec != null;
-    } else {
-      this.spillCompressed = conf.getBoolean(
-          TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_NON_PIPELINED_SPILL_COMPRESS,
-          TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_NON_PIPELINED_SPILL_COMPRESS_DEFAULT) && codec != null;
-    }
-
     if (availableMemoryBytes == 0) {
       Preconditions.checkArgument(((numPartitions == 1) && !isPipelinedShuffle),
         "availableMemory can be set to 0 only when numPartitions=1 and pipeline shuffle disabled");
@@ -350,22 +336,48 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     this.rfsSpillFilePerms = TezSpillRecord.SPILL_FILE_PERMS.equals(
         TezSpillRecord.SPILL_FILE_PERMS.applyUMask(FsPermission.getUMask(this.rfs.getConf())));
 
+    if (this.useCachedStream) {
+      this.partitioner = null;
+      this.spillCompressed = false;
+      skipBuffers = true;
+      byte[] writeBuffer = IFile.allocateWriteBuffer();
+      writer = new IFile.FileBackedInMemIFileWriter(rfs,
+          outputFileHandler, codec, outputRecordsCounter,
+          outputRecordBytesCounter, dataViaEventsMaxSize,
+          writeBuffer);
+      baos = null;
+      numRecordsPerPartition = null;
+      reportPartitionStats = ReportPartitionStats.fromString(conf.get(
+          TezRuntimeConfiguration.TEZ_RUNTIME_REPORT_PARTITION_STATS,
+          TezRuntimeConfiguration.TEZ_RUNTIME_REPORT_PARTITION_STATS_DEFAULT));
+      sizePerPartition = (reportPartitionStats.isEnabled()) ? new long[numPartitions] : null;
+      indexFileSizeEstimate = numPartitions * Constants.MAP_OUTPUT_INDEX_RECORD_LENGTH;
+      return;
+    }
+
+    try {
+      this.partitioner = TezRuntimeUtils.instantiatePartitioner(this.conf);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+
+    if (isPipelinedShuffle) {
+      this.spillCompressed = codec != null;
+    } else {
+      this.spillCompressed = conf.getBoolean(
+          TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_NON_PIPELINED_SPILL_COMPRESS,
+          TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_NON_PIPELINED_SPILL_COMPRESS_DEFAULT) && codec != null;
+    }
+
     if (numPartitions == 1 && !isPipelinedShuffle) {
       // special case, where in only one partition is available.
       skipBuffers = true;
       byte[] writeBuffer = IFile.allocateWriteBuffer();
-      if (this.useCachedStream) {   // i.e., if dataViaEventsEnabled == true
-        writer = new IFile.FileBackedInMemIFileWriter(rfs,
-            outputFileHandler, codec, outputRecordsCounter,
-            outputRecordBytesCounter, dataViaEventsMaxSize,
-            writeBuffer);
-      } else {
-        finalOutPath = outputFileHandler.getOutputFileForWrite();
-        writer = new IFile.WriterBytesWritable(rfs, finalOutPath,
-            codec, outputRecordsCounter, outputRecordBytesCounter, compositeFetch, false, -1, -1,
-            writeBuffer);
-        ensureSpillFilePermissions(finalOutPath, rfs, rfsSpillFilePerms);
-      }
+      finalOutPath = outputFileHandler.getOutputFileForWrite();
+      writer = new IFile.WriterBytesWritable(rfs, finalOutPath,
+          codec, outputRecordsCounter, outputRecordBytesCounter, compositeFetch, false, -1, -1,
+          writeBuffer);
+      ensureSpillFilePermissions(finalOutPath, rfs, rfsSpillFilePerms);
     } else {
       skipBuffers = false;
       writer = null;
