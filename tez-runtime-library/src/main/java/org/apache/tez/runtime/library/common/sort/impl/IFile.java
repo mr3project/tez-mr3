@@ -1185,31 +1185,31 @@ public class IFile {
       return len;
     }
 
-    private void readValueLengthRle(DataInput dIn) throws IOException {
-      currentValueLength = dIn.readInt();
+    private void readValueLengthRle() throws IOException {
+      currentValueLength = dataIn.readInt();
       bytesRead += INT_SIZE;
       if (currentValueLength == V_END_MARKER) {
-        readKeyValueLengthRle(dIn);
+        readKeyValueLengthRle();
       }
     }
 
-    private void readKeyValueLengthNoRle(DataInput dIn) throws IOException {
+    private void readKeyValueLengthNoRle() throws IOException {
       if (tezOffsetRecord != null) {
-        readKeyValueLengthNoRleWithTezOffsetRecord(dIn);
+        readKeyValueLengthNoRleWithTezOffsetRecord();
       } else {
-        currentKeyLength = dIn.readInt();
-        currentValueLength = dIn.readInt();
+        currentKeyLength = dataIn.readInt();
+        currentValueLength = dataIn.readInt();
         bytesRead += INT_SIZE + INT_SIZE;
       }
       originalKeyLength = currentKeyLength;
     }
 
-    private void readKeyValueLengthNoRleWithTezOffsetRecord(DataInput dIn) throws IOException {
+    private void readKeyValueLengthNoRleWithTezOffsetRecord() throws IOException {
       int recordOffset = (int) bytesRead;
 
       if (recordOffset == tezOffsetRecord.getEofPos()) {
-        currentKeyLength = dIn.readInt();
-        currentValueLength = dIn.readInt();
+        currentKeyLength = dataIn.readInt();
+        currentValueLength = dataIn.readInt();
         bytesRead += INT_SIZE + INT_SIZE;
         return;
       }
@@ -1222,21 +1222,21 @@ public class IFile {
       if (recordOffset < firstKeyOffset) {
         currentKeyLength = maxKeyLen;
       } else {
-        currentKeyLength = dIn.readInt();
+        currentKeyLength = dataIn.readInt();
         bytesRead += INT_SIZE;
       }
       if (recordOffset < firstValOffset) {
         currentValueLength = maxValLen;
       } else {
-        currentValueLength = dIn.readInt();
+        currentValueLength = dataIn.readInt();
         bytesRead += INT_SIZE;
       }
     }
 
-    private void readKeyValueLengthRle(DataInput dIn) throws IOException {
-      currentKeyLength = dIn.readInt();
-      currentValueLength = dIn.readInt();
-      // long combined = dIn.readLong();
+    private void readKeyValueLengthRle() throws IOException {
+      currentKeyLength = dataIn.readInt();
+      currentValueLength = dataIn.readInt();
+      // long combined = dataIn.readLong();
       // currentKeyLength = (int) (combined >> 32);
       // currentValueLength = (int) combined;
 
@@ -1247,14 +1247,14 @@ public class IFile {
       bytesRead += INT_SIZE + INT_SIZE;
     }
 
-    private boolean positionToNextRecordNoRle(DataInput dIn) throws IOException {
+    private boolean positionToNextRecordNoRle() throws IOException {
       // Sanity check
       if (eof) {
         throw new IOException(String.format("Reached EOF. Completed reading %d", bytesRead));
       }
       int prevKeyLength = currentKeyLength;
 
-      readKeyValueLengthNoRle(dIn);
+      readKeyValueLengthNoRle();
 
       // Check for EOF
       if (currentKeyLength == EOF_MARKER && currentValueLength == EOF_MARKER) {
@@ -1274,7 +1274,7 @@ public class IFile {
       return true;
     }
 
-    private boolean positionToNextRecordRle(DataInput dIn) throws IOException {
+    private boolean positionToNextRecordRle() throws IOException {
       // Sanity check
       if (eof) {
         throw new IOException(String.format("Reached EOF. Completed reading %d", bytesRead));
@@ -1283,9 +1283,9 @@ public class IFile {
 
       if (prevKeyLength == RLE_MARKER) {
         // Same key as previous one. Just read value length alone
-        readValueLengthRle(dIn);
+        readValueLengthRle();
       } else {
-        readKeyValueLengthRle(dIn);
+        readKeyValueLengthRle();
       }
 
       // Check for EOF
@@ -1331,7 +1331,7 @@ public class IFile {
     }
 
     private KeyState readRawKeyNoRle(DataInputBuffer key) throws IOException {
-      if (!positionToNextRecordNoRle(dataIn)) {
+      if (!positionToNextRecordNoRle()) {
         return KeyState.NO_KEY;
       }
       if (keyBytes.length < currentKeyLength) {
@@ -1347,7 +1347,7 @@ public class IFile {
     }
 
     private KeyState readRawKeyRle(DataInputBuffer key) throws IOException {
-      if (!positionToNextRecordRle(dataIn)) {
+      if (!positionToNextRecordRle()) {
         return KeyState.NO_KEY;
       }
       if (currentKeyLength == RLE_MARKER) {
@@ -1376,7 +1376,7 @@ public class IFile {
     }
 
     private KeyState readRawKeyNoRle(BytesWritable key) throws IOException {
-      if (!positionToNextRecordNoRle(dataIn)) {
+      if (!positionToNextRecordNoRle()) {
         return KeyState.NO_KEY;
       }
       // directly copy to the byte[] array of key after resizing if necessary
@@ -1391,7 +1391,7 @@ public class IFile {
     }
 
     private KeyState readRawKeyRle(BytesWritable key) throws IOException {
-      if (!positionToNextRecordRle(dataIn)) {
+      if (!positionToNextRecordRle()) {
         return KeyState.NO_KEY;
       }
       if (currentKeyLength == RLE_MARKER) {
