@@ -31,9 +31,6 @@ import org.apache.hadoop.classification.InterfaceStability;
  * the current capacity. The hash function is the front of the md5 of the 
  * buffer. The sort order is the same as memcmp.
  *
- * Backing arrays are treated as immutable shared data. Methods that need to
- * change byte contents allocate a fresh array instead of mutating the
- * currently referenced backing array.
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -113,6 +110,15 @@ public class BytesWritable extends BinaryComparable
   }
 
   /**
+   * Get the raw backing array without normalizing offset.
+   *
+   * @return backing byte array
+   */
+  public byte[] getBytesRaw() {
+    return bytes;
+  }
+
+  /**
    * Get the data from the BytesWritable.
    * @deprecated Use {@link #getBytes()} instead.
    * @return data from the BytesWritable.
@@ -155,6 +161,26 @@ public class BytesWritable extends BinaryComparable
     }
     this.size = size;
   }
+
+  /**
+   * Ensure the backing storage can hold newSize bytes and update the logical
+   * size.
+   *
+   * bytes[] will be overwritten after adjusting the size.
+   *
+   * @param newSize desired logical size
+   */
+  public void expandIfNecessary(int newSize) {
+    assert offset == 0;
+    if (newSize <= bytes.length) {
+      // keep the current bytes[]
+      size = newSize;
+    } else {
+      // the current bytes[] cannot accommodate newSize bytes, so allocate a new byte array
+      bytes = new byte[newSize];
+      size = newSize;
+    }
+  }
   
   /**
    * Get the capacity, which is the maximum size that could handled without
@@ -195,14 +221,24 @@ public class BytesWritable extends BinaryComparable
   }
 
   /**
-   * Set the value to a copy of the given byte range
-   * @param newData the new values to copy in
+   * Set the value to the given byte range.
+   *
+   * The provided array becomes the backing store for this instance.
+   *
+   * @param newData the backing array
    * @param offset the offset in newData to start at
-   * @param length the number of bytes to copy
+   * @param length the number of bytes in the logical payload
    */
   public void set(byte[] newData, int offset, int length) {
+    if (newData == null) {
+      throw new IllegalArgumentException("newData must not be null");
+    }
+    if (offset < 0 || length < 0 || offset > newData.length - length) {
+      throw new IllegalArgumentException(
+          "Invalid offset/length for array. offset=" + offset
+              + ", length=" + length + ", arrayLength=" + newData.length);
+    }
     // Intentionally alias the provided array slice instead of copying.
-    // BytesWritable treats backing buffers as immutable shared data.
     this.bytes = newData;
     this.offset = offset;
     this.size = length;

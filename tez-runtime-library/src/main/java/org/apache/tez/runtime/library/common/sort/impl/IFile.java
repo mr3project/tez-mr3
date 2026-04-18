@@ -1379,13 +1379,12 @@ public class IFile {
       if (!positionToNextRecordNoRle()) {
         return KeyState.NO_KEY;
       }
-      byte[] keyData = new byte[currentKeyLength];
-      int i = readData(keyData, currentKeyLength);
+      key.expandIfNecessary(currentKeyLength);
+      int i = readData(key.getBytesRaw(), currentKeyLength);
 
       if (i != currentKeyLength) {
         throw new IOException(String.format(INCOMPLETE_READ, currentKeyLength, i));
       }
-      key.set(keyData, 0, currentKeyLength);
       bytesRead += currentKeyLength;
       return KeyState.NEW_KEY;
     }
@@ -1399,13 +1398,12 @@ public class IFile {
         // the previous key is already present in "key".
         return KeyState.SAME_KEY;
       }
-      byte[] keyData = new byte[currentKeyLength];
-      int i = readData(keyData, currentKeyLength);
+      key.expandIfNecessary(currentKeyLength);
+      int i = readData(key.getBytesRaw(), currentKeyLength);
 
       if (i != currentKeyLength) {
         throw new IOException(String.format(INCOMPLETE_READ, currentKeyLength, i));
       }
-      key.set(keyData, 0, currentKeyLength);
       bytesRead += currentKeyLength;
       return KeyState.NEW_KEY;
     }
@@ -1432,14 +1430,12 @@ public class IFile {
     }
 
     public void nextRawValue(BytesWritable value) throws IOException {
-      byte[] valueData = new byte[currentValueLength];
-      int i = readData(valueData, currentValueLength);
+      value.expandIfNecessary(currentValueLength);
+      int i = readData(value.getBytesRaw(), currentValueLength);
 
       if (i != currentValueLength) {
         throw new IOException(String.format(INCOMPLETE_READ, currentValueLength, i));
       }
-      value.set(valueData, 0, currentValueLength);
-
       // Record the bytes read
       bytesRead += currentValueLength;
 
