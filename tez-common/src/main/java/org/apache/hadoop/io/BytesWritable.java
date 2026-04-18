@@ -202,18 +202,24 @@ public class BytesWritable extends BinaryComparable
           "Invalid offset/length for array. offset=" + offset
               + ", length=" + length + ", arrayLength=" + newData.length);
     }
-    setSize(0);
-    setSize(length);
-    System.arraycopy(newData, offset, bytes, 0, size);
+    byte[] newBytes = new byte[length];
+    if (length != 0) {
+      System.arraycopy(newData, offset, newBytes, 0, length);
+    }
+    this.bytes = newBytes;
+    this.offset = 0;
+    this.size = length;
   }
 
   // inherit javadoc
   @Override
   public void readFields(DataInput in) throws IOException {
-    setSize(0); // clear the old data
-    setSize(in.readInt());
+    int newSize = in.readInt();
+    byte[] newBytes = new byte[newSize];
+    in.readFully(newBytes, 0, newSize);
+    this.bytes = newBytes;
     offset = 0;
-    in.readFully(bytes, 0, size);
+    this.size = newSize;
   }
   
   // inherit javadoc
@@ -287,9 +293,11 @@ public class BytesWritable extends BinaryComparable
    */
   private void normalize() {
     if (offset != 0) {
+      byte[] newBytes = new byte[bytes.length];
       if (size != 0) {
-        System.arraycopy(bytes, offset, bytes, 0, size);
+        System.arraycopy(bytes, offset, newBytes, 0, size);
       }
+      bytes = newBytes;
       offset = 0;
     }
   }
