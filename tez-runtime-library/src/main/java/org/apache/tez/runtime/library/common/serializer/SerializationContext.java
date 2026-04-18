@@ -106,7 +106,7 @@ public final class SerializationContext {
 
     @Override
     public void serialize(BytesWritable writable) throws IOException {
-      dataOut.write(writable.getBytes(), 0, writable.getLength());
+      dataOut.write(writable.getBytesRaw(), writable.getOffset(), writable.getLength());
     }
 
     @Override

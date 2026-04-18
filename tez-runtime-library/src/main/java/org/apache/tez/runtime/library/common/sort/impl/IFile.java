@@ -788,7 +788,8 @@ public class IFile {
       int keyLength = key.getLength();
       int valueLength = value.getLength();
 
-      writeKVPair(key.getBytes(), 0, keyLength, value.getBytes(), 0, valueLength);
+      writeKVPair(key.getBytesRaw(), key.getOffset(), keyLength,
+          value.getBytesRaw(), value.getOffset(), valueLength);
       ++numRecordsWritten;
     }
 
@@ -821,8 +822,8 @@ public class IFile {
         bufferWriteInt(valueLength);
         lengthBytes += INT_SIZE;
       }
-      bufferWriteBytes(key.getBytes(), 0, keyLength);
-      bufferWriteBytes(value.getBytes(), 0, valueLength);
+      bufferWriteBytes(key.getBytesRaw(), key.getOffset(), keyLength);
+      bufferWriteBytes(value.getBytesRaw(), value.getOffset(), valueLength);
       incrementDecompressedBytesWritten(lengthBytes + keyLength + valueLength);
       numSerializedBytesWritten += keyLength + valueLength;
       ++numRecordsWritten;
@@ -837,7 +838,8 @@ public class IFile {
       boolean sameKey = keyLength != 0 && compareEqual(previous, key);
       if (!sameKey) {
         writeValueMarker();
-        super.writeKVPair(key.getBytes(), 0, keyLength, value.getBytes(), 0, valueLength);
+        super.writeKVPair(key.getBytesRaw(), key.getOffset(), keyLength,
+            value.getBytesRaw(), value.getOffset(), valueLength);
         copyKeyToPrevious(key);
         prevSameKey = false;
       } else {
@@ -846,7 +848,7 @@ public class IFile {
           incrementDecompressedBytesWritten(RLE_MARKER_SIZE);
           rleWritten++;
         }
-        super.writeValue(value.getBytes(), 0, valueLength);
+        super.writeValue(value.getBytesRaw(), value.getOffset(), valueLength);
         totalKeySaving++;
         prevSameKey = true;
       }
@@ -855,7 +857,7 @@ public class IFile {
 
     private void copyKeyToPrevious(BytesWritable key) throws IOException {
       previous.reset();
-      previous.write(key.getBytes(), 0, key.getLength());
+      previous.write(key.getBytesRaw(), key.getOffset(), key.getLength());
     }
 
     private static boolean compareEqual(DataOutputBuffer previous, BytesWritable key) {
@@ -864,9 +866,10 @@ public class IFile {
         return false;
       }
       byte[] previousBytes = previous.getData();
-      byte[] keyBytes = key.getBytes();
+      byte[] keyBytes = key.getBytesRaw();
+      int keyOffset = key.getOffset();
       for (int i = 0; i < keyLength; i++) {
-        if (previousBytes[i] != keyBytes[i]) {
+        if (previousBytes[i] != keyBytes[keyOffset + i]) {
           return false;
         }
       }

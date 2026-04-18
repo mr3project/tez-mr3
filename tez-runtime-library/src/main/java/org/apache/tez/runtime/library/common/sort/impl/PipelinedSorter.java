@@ -434,9 +434,9 @@ public class PipelinedSorter extends ExternalSorter {
     int valstart = -1;
     int valend = -1;
     try {
-      span.out.write(key.getBytes(), 0, key.getLength());
+      span.out.write(key.getBytesRaw(), key.getOffset(), key.getLength());
       valstart = span.kvbuffer.position();      
-      span.out.write(value.getBytes(), 0, value.getLength());
+      span.out.write(value.getBytesRaw(), value.getOffset(), value.getLength());
       valend = span.kvbuffer.position();
     } catch (BufferOverflowException overflow) {
       // restore limit

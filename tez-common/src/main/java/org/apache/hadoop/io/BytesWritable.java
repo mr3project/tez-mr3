@@ -119,6 +119,15 @@ public class BytesWritable extends BinaryComparable
   }
 
   /**
+   * Get the current payload offset in the backing array.
+   *
+   * @return payload offset
+   */
+  public int getOffset() {
+    return offset;
+  }
+
+  /**
    * Get the data from the BytesWritable.
    * @deprecated Use {@link #getBytes()} instead.
    * @return data from the BytesWritable.
