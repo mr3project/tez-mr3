@@ -159,11 +159,6 @@ public class TezRuntimeConfiguration {
   public static final boolean TEZ_RUNTIME_PIPELINED_SORTER_LAZY_ALLOCATE_MEMORY_DEFAULT = false;
 
   @ConfigurationProperty(type = "integer")
-  public static final String TEZ_RUNTIME_PIPELINED_SORTER_SORT_THREADS =
-      TEZ_RUNTIME_PREFIX + "pipelined.sorter.sort.threads";
-  public static final int TEZ_RUNTIME_PIPELINED_SORTER_SORT_THREADS_DEFAULT = 2;
-
-  @ConfigurationProperty(type = "integer")
   public static final String TEZ_RUNTIME_UNORDERED_PARTITIONED_NON_PIPELINED_NUM_BUFFERS =
       TEZ_RUNTIME_PREFIX + "unordered.partitioned.non.pipelined.num.buffers";
   public static final int TEZ_RUNTIME_UNORDERED_PARTITIONED_NON_PIPELINED_NUM_BUFFERS_DEFAULT =

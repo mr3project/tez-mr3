@@ -706,6 +706,7 @@ public class PipelinedSorter extends ExternalSorter {
 
   private boolean isThreadInterrupted() throws IOException {
     if (Thread.currentThread().isInterrupted()) {
+      cancelActiveSortTasks();
       if (cleanup) {
         cleanup();
       }
@@ -1003,6 +1004,7 @@ public class PipelinedSorter extends ExternalSorter {
       cleanSpillOutputBuffers();
       spillInfoList.clear();
     } catch(InterruptedException ie) {
+      cancelActiveSortTasks();
       if (cleanup) {
         cleanup();
       }
@@ -1143,7 +1145,7 @@ public class PipelinedSorter extends ExternalSorter {
       kvmetalong.put(kvj + 1, l2);
     }
 
-    protected int compareKeys(final int kvi, final int kvj) {
+    int compareKeys(final int kvi, final int kvj) {
       final int istart = kvmeta.get(kvi + KEYSTART);
       final int jstart = kvmeta.get(kvj + KEYSTART);
       final int ilen   = kvmeta.get(kvi + VALSTART) - istart;
@@ -1494,6 +1496,10 @@ public class PipelinedSorter extends ExternalSorter {
     return merger.needsRLE();
   }
 
+  private void cancelActiveSortTasks() {
+    merger.cancelOutstandingSorts();
+  }
+
   private final class SpanMerger implements PartitionedRawKeyValueIterator {
     InputByteBuffer key = new InputByteBuffer();
     InputByteBuffer value = new InputByteBuffer();
@@ -1527,10 +1533,10 @@ public class PipelinedSorter extends ExternalSorter {
     public boolean ready() throws IOException, InterruptedException {
       int numSpanItr = futures.size();
       try {
-        SpanIterator iter = null;
-        while(!this.futures.isEmpty()) {
-          Future<SpanIterator> futureIter = this.futures.remove(0);
-          iter = futureIter.get();
+        while (!this.futures.isEmpty()) {
+          Future<SpanIterator> futureIter = this.futures.get(0);
+          SpanIterator iter = futureIter.get();
+          this.futures.remove(0);
           this.add(iter);
         }
 
@@ -1550,6 +1556,9 @@ public class PipelinedSorter extends ExternalSorter {
           LOG.debug("{}: Heap = {}", outputContext.getDestinationVertexName(), sb.toString());
         }
         return true;
+      } catch (InterruptedException e) {
+        cancelOutstandingSorts();
+        throw e;
       } catch(ExecutionException e) {
         LOG.error("Heap size={}, total={}, eq={}, partition={}, gallop={}, totalItr={},"
                 + " futures.size={}, destVertexName={}",
@@ -1557,6 +1566,13 @@ public class PipelinedSorter extends ExternalSorter {
             outputContext.getDestinationVertexName(), e);
         throw new IOException(e);
       }
+    }
+
+    public void cancelOutstandingSorts() {
+      for (Future<SpanIterator> future : futures) {
+        future.cancel(true);
+      }
+      futures.clear();
     }
 
     private SpanIterator pop() {
