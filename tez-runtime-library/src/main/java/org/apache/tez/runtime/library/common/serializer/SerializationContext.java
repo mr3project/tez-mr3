@@ -84,9 +84,7 @@ public final class SerializationContext {
 
       int pos = dataIn.getPosition();
       int length = dataIn.getLength() - pos;
-      // directly copy to the byte[] array of key after resizing if necessary
-      value.setSize(length);
-      System.arraycopy(dataIn.getData(), pos, value.getBytes(), 0, length);
+      value.set(dataIn.getData(), pos, length);
 
       return value;
     }
