@@ -52,7 +52,7 @@ public class BytesWritable extends BinaryComparable
    * @param bytes This array becomes the backing storage for the object.
    */
   public BytesWritable(byte[] bytes) {
-    this(bytes, bytes.length);
+    this(bytes, 0, bytes.length);
   }
 
   /**
@@ -63,7 +63,24 @@ public class BytesWritable extends BinaryComparable
    * @param length The number of bytes to use from array.
    */
   public BytesWritable(byte[] bytes, int length) {
-    this.offset = 0;
+    this(bytes, 0, length);
+  }
+
+  /**
+   * Create a BytesWritable using the byte array as the initial value,
+   * with an offset and length describing the logical payload.
+   *
+   * @param bytes This array becomes the backing storage for the object.
+   * @param offset The start of the logical payload in the backing array.
+   * @param length The number of bytes in the logical payload.
+   */
+  public BytesWritable(byte[] bytes, int offset, int length) {
+    if (offset < 0 || length < 0 || offset > bytes.length - length) {
+      throw new IllegalArgumentException(
+          "Invalid offset/length for array. offset=" + offset
+              + ", length=" + length + ", arrayLength=" + bytes.length);
+    }
+    this.offset = offset;
     this.bytes = bytes;
     this.size = length;
   }
@@ -87,6 +104,7 @@ public class BytesWritable extends BinaryComparable
    */
   @Override
   public byte[] getBytes() {
+    normalize();
     return bytes;
   }
 
@@ -125,6 +143,7 @@ public class BytesWritable extends BinaryComparable
    * @param size The new number of bytes
    */
   public void setSize(int size) {
+    normalize();
     if (size > getCapacity()) {
       // Avoid overflowing the int too early by casting to a long.
       long newSize = Math.min(Integer.MAX_VALUE, (3L * size) / 2L);
@@ -154,9 +173,12 @@ public class BytesWritable extends BinaryComparable
         size = new_cap;
       }
       if (size != 0) {
-        System.arraycopy(bytes, 0, new_data, 0, size);
+        System.arraycopy(bytes, offset, new_data, 0, size);
       }
       bytes = new_data;
+      offset = 0;
+    } else {
+      normalize();
     }
   }
 
@@ -165,7 +187,7 @@ public class BytesWritable extends BinaryComparable
    * @param newData the value to set this BytesWritable to.
    */
   public void set(BytesWritable newData) {
-    set(newData.bytes, 0, newData.size);
+    set(newData.bytes, newData.offset, newData.size);
   }
 
   /**
@@ -175,6 +197,11 @@ public class BytesWritable extends BinaryComparable
    * @param length the number of bytes to copy
    */
   public void set(byte[] newData, int offset, int length) {
+    if (offset < 0 || length < 0 || offset > newData.length - length) {
+      throw new IllegalArgumentException(
+          "Invalid offset/length for array. offset=" + offset
+              + ", length=" + length + ", arrayLength=" + newData.length);
+    }
     setSize(0);
     setSize(length);
     System.arraycopy(newData, offset, bytes, 0, size);
@@ -185,6 +212,7 @@ public class BytesWritable extends BinaryComparable
   public void readFields(DataInput in) throws IOException {
     setSize(0); // clear the old data
     setSize(in.readInt());
+    offset = 0;
     in.readFully(bytes, 0, size);
   }
   
@@ -192,7 +220,7 @@ public class BytesWritable extends BinaryComparable
   @Override
   public void write(DataOutput out) throws IOException {
     out.writeInt(size);
-    out.write(bytes, 0, size);
+    out.write(bytes, offset, size);
   }
   
   @Override
@@ -221,7 +249,7 @@ public class BytesWritable extends BinaryComparable
       if (idx != 0) {
         sb.append(' ');
       }
-      String num = Integer.toHexString(0xff & bytes[idx]);
+      String num = Integer.toHexString(0xff & bytes[offset + idx]);
       // if it is only one digit, add a leading 0.
       if (num.length() < 2) {
         sb.append('0');
@@ -250,6 +278,20 @@ public class BytesWritable extends BinaryComparable
   
   static {                                        // register this comparator
     WritableComparator.define(BytesWritable.class, new Comparator());
+  }
+
+  /**
+   * Normalize the payload so that offset is zero.
+   * This preserves compatibility for existing callers that assume data starts
+   * at bytes[0].
+   */
+  private void normalize() {
+    if (offset != 0) {
+      if (size != 0) {
+        System.arraycopy(bytes, offset, bytes, 0, size);
+      }
+      offset = 0;
+    }
   }
   
 }
