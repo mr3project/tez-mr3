@@ -84,9 +84,7 @@ public final class SerializationContext {
 
       int pos = dataIn.getPosition();
       int length = dataIn.getLength() - pos;
-      // directly copy to the byte[] array of key after resizing if necessary
-      value.setSize(length);
-      System.arraycopy(dataIn.getData(), pos, value.getBytes(), 0, length);
+      value.set(dataIn.getData(), pos, length);
 
       return value;
     }
@@ -108,7 +106,7 @@ public final class SerializationContext {
 
     @Override
     public void serialize(BytesWritable writable) throws IOException {
-      dataOut.write(writable.getBytes(), 0, writable.getLength());
+      dataOut.write(writable.getBytesRaw(), writable.getOffset(), writable.getLength());
     }
 
     @Override
