@@ -195,7 +195,11 @@ public class ValuesIterator {
 
     int pos = source.getPosition();
     int length = source.getLength() - pos;
-    target.set(source.getData(), pos, length);
+    // Must copy here: TezRawKeyValueIterator/DataInputBuffer reuses mutable
+    // backing buffers across records. Using setDirect() would alias that
+    // storage and can corrupt previously returned key/value objects.
+    target.expandIfNecessary(length);
+    System.arraycopy(source.getData(), pos, target.getBytesRaw(), 0, length);
 
     return target;
   }

@@ -84,7 +84,11 @@ public final class SerializationContext {
 
       int pos = dataIn.getPosition();
       int length = dataIn.getLength() - pos;
-      value.set(dataIn.getData(), pos, length);
+      // Must copy here: the DataInputBuffer instance can be reused by callers,
+      // so setDirect() would expose aliasing/lifetime issues to consumers of
+      // the deserialized BytesWritable instance.
+      value.expandIfNecessary(length);
+      System.arraycopy(dataIn.getData(), pos, value.getBytesRaw(), 0, length);
 
       return value;
     }

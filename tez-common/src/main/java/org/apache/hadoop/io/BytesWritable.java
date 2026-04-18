@@ -233,6 +233,9 @@ public class BytesWritable extends BinaryComparable
   /**
    * Set the value to directly reference the given byte range without copying.
    *
+   * WARNING: the caller is responsible for ensuring the referenced backing
+   * array is not modified/reused while this object is still in use.
+   *
    * @param newData the backing array
    * @param offset the offset in newData to start at
    * @param length the number of bytes in the logical payload
