@@ -293,7 +293,7 @@ public class BytesWritable extends BinaryComparable
    */
   private void normalize() {
     if (offset != 0) {
-      byte[] newBytes = new byte[bytes.length];
+      byte[] newBytes = new byte[size];
       if (size != 0) {
         System.arraycopy(bytes, offset, newBytes, 0, size);
       }
