@@ -30,6 +30,10 @@ import org.apache.hadoop.classification.InterfaceStability;
  * It is resizable and distinguishes between the size of the sequence and
  * the current capacity. The hash function is the front of the md5 of the 
  * buffer. The sort order is the same as memcmp.
+ *
+ * Backing arrays are treated as immutable shared data. Methods that need to
+ * change byte contents allocate a fresh array instead of mutating the
+ * currently referenced backing array.
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -197,17 +201,10 @@ public class BytesWritable extends BinaryComparable
    * @param length the number of bytes to copy
    */
   public void set(byte[] newData, int offset, int length) {
-    if (offset < 0 || length < 0 || offset > newData.length - length) {
-      throw new IllegalArgumentException(
-          "Invalid offset/length for array. offset=" + offset
-              + ", length=" + length + ", arrayLength=" + newData.length);
-    }
-    byte[] newBytes = new byte[length];
-    if (length != 0) {
-      System.arraycopy(newData, offset, newBytes, 0, length);
-    }
-    this.bytes = newBytes;
-    this.offset = 0;
+    // Intentionally alias the provided array slice instead of copying.
+    // BytesWritable treats backing buffers as immutable shared data.
+    this.bytes = newData;
+    this.offset = offset;
     this.size = length;
   }
 
