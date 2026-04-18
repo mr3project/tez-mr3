@@ -907,7 +907,6 @@ public class IFile {
   public interface KeyValueReaderBytesWritable extends KeyValueReaderBase {
     // Invariant: key already contains the previous key read from this stream.
     // On the first call, key can be any BytesWritable instance.
-    // Invariant after successful NEW_KEY reads: key payload starts at index 0.
     // The contents of key are mutable and overwritten on subsequent reads.
     Reader.KeyState readRawKey(BytesWritable key) throws IOException;
     // The contents of value are mutable and overwritten on subsequent reads.
