@@ -326,7 +326,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
 
     int pos = memDataIn.getPosition();
     byte[] data = memDataIn.getData();
-    key.set(data, pos, currentKeyLength);
+    key.setDirect(data, pos, currentKeyLength);
 
     // Position for the next value
     long skipped = memDataIn.skip(currentKeyLength);
@@ -348,7 +348,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
 
     int pos = memDataIn.getPosition();
     byte[] data = memDataIn.getData();
-    key.set(data, pos, currentKeyLength);
+    key.setDirect(data, pos, currentKeyLength);
 
     // Position for the next value
     long skipped = memDataIn.skip(currentKeyLength);
@@ -387,7 +387,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
     try {
       int pos = memDataIn.getPosition();
       byte[] data = memDataIn.getData();
-      value.set(data, pos, currentValueLength);
+      value.setDirect(data, pos, currentValueLength);
 
       // Position for the next record
       long skipped = memDataIn.skip(currentValueLength);

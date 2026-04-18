@@ -225,7 +225,8 @@ public class BytesWritable extends BinaryComparable
   /**
    * Set the value to the given byte range.
    *
-   * The provided array becomes the backing store for this instance.
+   * This method preserves the historical BytesWritable behavior: bytes in
+   * [offset, offset + length) are copied into this instance.
    *
    * @param newData the backing array
    * @param offset the offset in newData to start at
@@ -233,7 +234,20 @@ public class BytesWritable extends BinaryComparable
    */
   public void set(byte[] newData, int offset, int length) {
     assert !(offset < 0 || length < 0 || offset > newData.length - length);
-    // Intentionally alias the provided array slice instead of copying.
+    setSize(0);
+    setSize(length);
+    System.arraycopy(newData, offset, bytes, 0, size);
+  }
+
+  /**
+   * Set the value to directly reference the given byte range without copying.
+   *
+   * @param newData the backing array
+   * @param offset the offset in newData to start at
+   * @param length the number of bytes in the logical payload
+   */
+  public void setDirect(byte[] newData, int offset, int length) {
+    assert !(offset < 0 || length < 0 || offset > newData.length - length);
     this.bytes = newData;
     this.offset = offset;
     this.size = length;
@@ -242,12 +256,9 @@ public class BytesWritable extends BinaryComparable
   // inherit javadoc
   @Override
   public void readFields(DataInput in) throws IOException {
-    int newSize = in.readInt();
-    byte[] newBytes = new byte[newSize];
-    in.readFully(newBytes, 0, newSize);
-    this.bytes = newBytes;
-    offset = 0;
-    this.size = newSize;
+    setSize(0); // clear the old data
+    setSize(in.readInt());
+    in.readFully(bytes, 0, size);
   }
   
   // inherit javadoc
