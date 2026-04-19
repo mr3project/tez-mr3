@@ -18,9 +18,10 @@
 
 package org.apache.tez.runtime.library.api;
 
+import org.apache.tez.runtime.api.LogicalInput;
 import org.apache.tez.runtime.api.ReaderEdge;
 
 // LogicalInput via an Edge
-public interface LogicalInputEdge {
+public interface LogicalInputEdge extends LogicalInput {
   ReaderEdge getReader() throws Exception;
 }
