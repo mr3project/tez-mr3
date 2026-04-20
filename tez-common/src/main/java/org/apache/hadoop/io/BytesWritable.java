@@ -283,8 +283,11 @@ public class BytesWritable extends BinaryComparable
    */
   @Override
   public boolean equals(Object right_obj) {
-    if (right_obj instanceof BytesWritable)
-      return super.equals(right_obj);
+    if (right_obj instanceof BytesWritable) {
+      BytesWritable that = (BytesWritable)right_obj;
+      return org.apache.tez.util.FastByteComparisons.compareEqual(
+          this.bytes, this.offset, this.size, that.bytes, that.offset, that.size);
+    }
     return false;
   }
 
