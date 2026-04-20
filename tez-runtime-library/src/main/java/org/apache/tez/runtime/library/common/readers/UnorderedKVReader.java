@@ -99,11 +99,13 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
     }
   }
 
+  // The backing byte[] array of key is immutable, so the consumer may keep pointers to it.
   @Override
   public BytesWritable getCurrentKey() throws IOException {
     return key;
   }
 
+  // The backing byte[] array of value is immutable, so the consumer may keep pointers to it.
   @Override
   public BytesWritable getCurrentValue() throws IOException {
     return value;

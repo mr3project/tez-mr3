@@ -29,6 +29,8 @@ public abstract class KeyValueReaderEdge extends KeyValueReader implements Reade
    * Returns the current key
    * @return the current key
    */
+  // Invariant:
+  //   The backing byte[] array of BytesWritable is immutable, so the consumer may keep pointers to it.
   @Override
   public abstract BytesWritable getCurrentKey() throws IOException;
 
@@ -38,6 +40,8 @@ public abstract class KeyValueReaderEdge extends KeyValueReader implements Reade
    *
    * @throws IOException
    */
+  // Invariant:
+  //   The backing byte[] array of BytesWritable is immutable, so the consumer may keep pointers to it.
   @Override
   public abstract BytesWritable getCurrentValue() throws IOException;
 }

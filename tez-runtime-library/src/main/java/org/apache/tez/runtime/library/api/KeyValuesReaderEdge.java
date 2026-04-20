@@ -29,6 +29,8 @@ public abstract class KeyValuesReaderEdge extends KeyValuesReader implements Rea
    * Returns the current key
    * @return the current key
    */
+  // Invariant:
+  //   The backing byte[] array of BytesWritable is immutable, so the consumer may keep pointers to it.
   @Override
   public abstract BytesWritable getCurrentKey() throws IOException;
   
@@ -36,6 +38,8 @@ public abstract class KeyValuesReaderEdge extends KeyValuesReader implements Rea
    * Returns an Iterable view of the values associated with the current key
    * @return an Iterable view of the values associated with the current key
    */
+  // Invariant:
+  //   The backing byte[] array of BytesWritable is immutable, so the consumer may keep pointers to it.
   @Override
   public abstract Iterable<BytesWritable> getCurrentValues() throws IOException;
 }

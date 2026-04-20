@@ -174,23 +174,13 @@ public class BytesWritable extends BinaryComparable
     this.size = size;
   }
 
-  /**
-   * Ensure the backing storage can hold newSize bytes and update the logical
-   * size.
-   *
-   * bytes[] will be overwritten after adjusting the size.
-   *
-   * @param newSize desired logical size
-   */
-  public void expandIfNecessary(int newSize) {
-    assert this.offset == 0;
-    if (newSize > bytes.length) {
-      // the current bytes[] cannot accommodate newSize bytes, so allocate a new byte array
-      bytes = new byte[newSize];
-    }
+  public byte[] reinitialize(int newSize) {
+    bytes = new byte[newSize];
+    offset = 0;
     size = newSize;
+    return bytes;
   }
-  
+
   /**
    * Get the capacity, which is the maximum size that could handled without
    * resizing the backing storage.
