@@ -66,11 +66,19 @@ public class MRInputAMSplitGenerator extends InputInitializer {
 
   @Override
   public List<Event> initialize() throws Exception {
-    MRInputUserPayloadProto userPayloadProto = MRInputHelpers
-        .parseMRInputPayload(getContext().getInputUserPayload());
-    Configuration conf = TezUtils.createConfFromByteString(userPayloadProto
-        .getConfigurationBytes());
-    
+    Configuration conf;
+    MRInputUserPayloadProto userPayloadProto = MRInputHelpers.parseMRInputPayload(getContext().getInputUserPayload());
+    com.datamonad.mr3.DAGAPI.ConfigurationProto commonJobConf = getContext().getCommonJobConf();
+    if (commonJobConf != null) {
+      conf = new Configuration(false);
+      for (com.datamonad.mr3.DAGAPI.KeyValueProto kv : commonJobConf.getConfKeyValuesList()) {
+        conf.set(kv.getKey(), kv.getValue());
+      }
+      conf.addResource(TezUtils.createConfFromByteString(userPayloadProto.getConfigurationBytes()));
+    } else {
+      conf = TezUtils.createConfFromByteString(userPayloadProto.getConfigurationBytes());
+    }
+
     sendSerializedEvents = conf.getBoolean(
         MRJobConfig.MR_TEZ_INPUT_INITIALIZER_SERIALIZE_EVENT_PAYLOAD,
         MRJobConfig.MR_TEZ_INPUT_INITIALIZER_SERIALIZE_EVENT_PAYLOAD_DEFAULT);
