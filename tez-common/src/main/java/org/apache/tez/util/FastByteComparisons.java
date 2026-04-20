@@ -1,4 +1,4 @@
-package org.apache.tez.runtime.library.utils;
+package org.apache.tez.util;
 
 /**
  * Licensed to the Apache Software Foundation (ASF) under one

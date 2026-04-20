@@ -19,7 +19,7 @@ package org.apache.tez.runtime.library.common.comparator;
 
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.WritableComparator;
-import org.apache.tez.runtime.library.utils.FastByteComparisons;
+import org.apache.tez.util.FastByteComparisons;
 
 public final class TezBytesComparator extends WritableComparator implements ProxyComparator<BytesWritable> {
 

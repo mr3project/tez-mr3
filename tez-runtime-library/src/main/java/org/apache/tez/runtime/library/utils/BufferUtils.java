@@ -22,6 +22,7 @@ import java.io.IOException;
 
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
+import org.apache.tez.util.FastByteComparisons;
 
 public class BufferUtils {
 
