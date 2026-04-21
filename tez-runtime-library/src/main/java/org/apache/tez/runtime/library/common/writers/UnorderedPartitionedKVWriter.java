@@ -566,7 +566,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     currentBuffer.availableSize -= (META_SIZE + metaSkip);
     currentBuffer.nextPosition += META_SIZE;
 
-    baos.write(key.getBytes(), 0, key.getLength());
+    baos.write(key.getBytesRaw(), key.getOffset(), key.getLength());
 
     if (currentBuffer.full) {
       if (metaStart == 0) { // Started writing at the start of the buffer. Write Key to disk.
@@ -584,7 +584,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     }
 
     int valStart = currentBuffer.nextPosition;
-    baos.write(value.getBytes(), 0, value.getLength());
+    baos.write(value.getBytesRaw(), value.getOffset(), value.getLength());
 
     if (currentBuffer.full) {
       // Value too large for current buffer, or K-V too large for entire buffer.
@@ -1700,7 +1700,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     private final byte[] scratch = new byte[1];
 
     @Override
-    public void write(int v) throws IOException {
+    public void write(int v) {
       scratch[0] = (byte) v;
       write(scratch, 0, 1);
     }
