@@ -272,10 +272,31 @@ public class BytesWritable extends BinaryComparable
     out.writeInt(size);
     out.write(bytes, offset, size);
   }
-  
+
+  @Override
+  public int compareTo(BinaryComparable other) {
+    if (this == other) {
+      return 0;
+    }
+    if (other instanceof BytesWritable) {
+      BytesWritable that = (BytesWritable)other;
+      return org.apache.tez.util.FastByteComparisons.compareTo(
+          this.bytes, this.offset, this.size, that.bytes, that.offset, that.size);
+    } else {
+      return org.apache.tez.util.FastByteComparisons.compareTo(
+          this.bytes, this.offset, this.size, other.getBytes(), 0, other.getLength());
+    }
+  }
+
+  @Override
+  public int compareTo(byte[] other, int off, int len) {
+    return org.apache.tez.util.FastByteComparisons.compareTo(
+        this.bytes, this.offset, this.size, other, off, len);
+  }
+
   @Override
   public int hashCode() {
-    return super.hashCode();
+    return WritableComparator.hashBytes(bytes, offset, size);
   }
 
   /**
