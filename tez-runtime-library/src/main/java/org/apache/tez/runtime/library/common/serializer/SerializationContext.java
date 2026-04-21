@@ -32,8 +32,7 @@ import java.io.OutputStream;
  */
 public final class SerializationContext {
 
-  private SerializationContext() {
-  }
+  private SerializationContext() {}
 
   public static Class<BytesWritable> getKeyClass() {
     return BytesWritable.class;
@@ -43,77 +42,8 @@ public final class SerializationContext {
     return BytesWritable.class;
   }
 
-  public static TezBytesWritableSerializer getKeySerializer() {
-    return new TezBytesWritableSerializer();
-  }
-
-  public static TezBytesWritableDeserializer getKeyDeserializer() {
-    return new TezBytesWritableDeserializer();
-  }
-
-  public static TezBytesWritableSerializer getValueSerializer() {
-    return new TezBytesWritableSerializer();
-  }
-
-  public static TezBytesWritableDeserializer getValueDeserializer() {
-    return new TezBytesWritableDeserializer();
-  }
-
   public static TezBytesComparator getKeyComparator() {
     return new TezBytesComparator();
   }
 
-  public static class TezBytesWritableDeserializer implements Deserializer<BytesWritable> {
-
-    private DataInputBuffer dataIn;
-
-    public TezBytesWritableDeserializer() {
-    }
-
-    @Override
-    public void open(InputStream in) {
-      dataIn = (DataInputBuffer) in;
-    }
-
-    @Override
-    public BytesWritable deserialize(BytesWritable writable) throws IOException {
-      BytesWritable value = writable;
-      if (value == null) {
-        value = new BytesWritable();
-      }
-
-      int pos = dataIn.getPosition();
-      int length = dataIn.getLength() - pos;
-      // directly copy to the byte[] array of key after resizing if necessary
-      value.setSize(length);
-      System.arraycopy(dataIn.getData(), pos, value.getBytes(), 0, length);
-
-      return value;
-    }
-
-    @Override
-    public void close() throws IOException {
-      dataIn.close();
-    }
-  }
-
-  public static class TezBytesWritableSerializer implements Serializer<BytesWritable> {
-
-    private OutputStream dataOut;
-
-    @Override
-    public void open(OutputStream out) {
-      this.dataOut = out;
-    }
-
-    @Override
-    public void serialize(BytesWritable writable) throws IOException {
-      dataOut.write(writable.getBytes(), 0, writable.getLength());
-    }
-
-    @Override
-    public void close() throws IOException {
-      dataOut.close();
-    }
-  }
 }
