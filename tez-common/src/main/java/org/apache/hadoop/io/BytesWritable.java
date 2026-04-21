@@ -38,6 +38,7 @@ public class BytesWritable extends BinaryComparable
   private static final int LENGTH_BYTES = 4;
   private static final byte[] EMPTY_BYTES = {};
 
+  private int offset;
   private int size;
   private byte[] bytes;
   
@@ -51,7 +52,7 @@ public class BytesWritable extends BinaryComparable
    * @param bytes This array becomes the backing storage for the object.
    */
   public BytesWritable(byte[] bytes) {
-    this(bytes, bytes.length);
+    this(bytes, 0, bytes.length);
   }
 
   /**
@@ -62,7 +63,20 @@ public class BytesWritable extends BinaryComparable
    * @param length The number of bytes to use from array.
    */
   public BytesWritable(byte[] bytes, int length) {
+    this(bytes, 0, length);
+  }
+
+  /**
+   * Create a BytesWritable using the byte array as the initial value,
+   * with an offset and length describing the logical payload.
+   *
+   * @param bytes This array becomes the backing storage for the object.
+   * @param offset The start of the logical payload in the backing array.
+   * @param length The number of bytes in the logical payload.
+   */
+  public BytesWritable(byte[] bytes, int offset, int length) {
     this.bytes = bytes;
+    this.offset = offset;
     this.size = length;
   }
   
@@ -72,9 +86,10 @@ public class BytesWritable extends BinaryComparable
    *
    * @return copyBytes.
    */
+  // TODO: expand to direct copies from bytes[]
   public byte[] copyBytes() {
     byte[] result = new byte[size];
-    System.arraycopy(bytes, 0, result, 0, size);
+    System.arraycopy(bytes, offset, result, 0, size);
     return result;
   }
   
@@ -83,9 +98,37 @@ public class BytesWritable extends BinaryComparable
    * if you need the returned array to be precisely the length of the data.
    * @return The data is only valid between 0 and getLength() - 1.
    */
+  // The caller expects offset == 0.
+  // TODO: replace with getBytesRaw()
   @Override
   public byte[] getBytes() {
+    if (offset != 0) {
+      byte[] newBytes = new byte[size];
+      if (size != 0) {
+        System.arraycopy(bytes, offset, newBytes, 0, size);
+      }
+      bytes = newBytes;
+      offset = 0;
+    }
     return bytes;
+  }
+
+  /**
+   * Get the raw backing array without normalizing offset.
+   *
+   * @return backing byte array
+   */
+  public byte[] getBytesRaw() {
+    return bytes;
+  }
+
+  /**
+   * Get the current payload offset in the backing array.
+   *
+   * @return payload offset
+   */
+  public int getOffset() {
+    return offset;
   }
 
   /**
@@ -123,12 +166,29 @@ public class BytesWritable extends BinaryComparable
    * @param size The new number of bytes
    */
   public void setSize(int size) {
-    if (size > getCapacity()) {
+    if (size > bytes.length) {
       // Avoid overflowing the int too early by casting to a long.
       long newSize = Math.min(Integer.MAX_VALUE, (3L * size) / 2L);
       setCapacity((int) newSize);
     }
     this.size = size;
+  }
+
+  /**
+   * Ensure the backing storage can hold newSize bytes and update the logical
+   * size.
+   *
+   * bytes[] will be overwritten after adjusting the size.
+   *
+   * @param newSize desired logical size
+   */
+  public void expandIfNecessary(int newSize) {
+    assert this.offset == 0;
+    if (newSize > bytes.length) {
+      // the current bytes[] cannot accommodate newSize bytes, so allocate a new byte array
+      bytes = new byte[newSize];
+    }
+    size = newSize;
   }
   
   /**
@@ -146,13 +206,14 @@ public class BytesWritable extends BinaryComparable
    * @param new_cap The new capacity in bytes.
    */
   public void setCapacity(int new_cap) {
-    if (new_cap != getCapacity()) {
+    assert this.offset == 0;
+    if (new_cap != bytes.length) {
       byte[] new_data = new byte[new_cap];
       if (new_cap < size) {
         size = new_cap;
       }
       if (size != 0) {
-        System.arraycopy(bytes, 0, new_data, 0, size);
+        System.arraycopy(bytes, offset, new_data, 0, size);
       }
       bytes = new_data;
     }
@@ -163,7 +224,7 @@ public class BytesWritable extends BinaryComparable
    * @param newData the value to set this BytesWritable to.
    */
   public void set(BytesWritable newData) {
-    set(newData.bytes, 0, newData.size);
+    set(newData.bytes, newData.offset, newData.size);
   }
 
   /**
@@ -172,25 +233,44 @@ public class BytesWritable extends BinaryComparable
    * @param offset the offset in newData to start at
    * @param length the number of bytes to copy
    */
+  // TODO: expand to direct copies to bytes[]
   public void set(byte[] newData, int offset, int length) {
-    setSize(0);
-    setSize(length);
+    assert this.offset == 0;
+    setSize(0);       // TODO: remove this line (???)
+    setSize(length);  // sets this.size to length
     System.arraycopy(newData, offset, bytes, 0, size);
+  }
+
+  /**
+   * Set the value to directly reference the given byte range without copying.
+   *
+   * WARNING: the caller is responsible for ensuring the referenced backing
+   * array is not modified/reused while this object is still in use.
+   *
+   * @param newData the backing array
+   * @param offset the offset in newData to start at
+   * @param length the number of bytes in the logical payload
+   */
+  public void setDirect(byte[] newData, int offset, int length) {
+    this.bytes = newData;
+    this.offset = offset;
+    this.size = length;
   }
 
   // inherit javadoc
   @Override
   public void readFields(DataInput in) throws IOException {
-    setSize(0); // clear the old data
+    setSize(0); // clear the old data   // TODO: remove this line (???)
     setSize(in.readInt());
     in.readFully(bytes, 0, size);
+    offset = 0;
   }
   
   // inherit javadoc
   @Override
   public void write(DataOutput out) throws IOException {
     out.writeInt(size);
-    out.write(bytes, 0, size);
+    out.write(bytes, offset, size);
   }
   
   @Override
@@ -219,7 +299,7 @@ public class BytesWritable extends BinaryComparable
       if (idx != 0) {
         sb.append(' ');
       }
-      String num = Integer.toHexString(0xff & bytes[idx]);
+      String num = Integer.toHexString(0xff & bytes[offset + idx]);
       // if it is only one digit, add a leading 0.
       if (num.length() < 2) {
         sb.append('0');
@@ -249,5 +329,4 @@ public class BytesWritable extends BinaryComparable
   static {                                        // register this comparator
     WritableComparator.define(BytesWritable.class, new Comparator());
   }
-  
 }
