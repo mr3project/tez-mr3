@@ -195,9 +195,8 @@ public class ValuesIterator {
 
     int pos = source.getPosition();
     int length = source.getLength() - pos;
-    byte[] data = source.getData();
-    target.setSize(length);
-    System.arraycopy(data, pos, target.getBytes(), 0, length);
+    target.expandIfNecessary(length);
+    System.arraycopy(source.getData(), pos, target.getBytesRaw(), 0, length);
 
     return target;
   }
