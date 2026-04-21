@@ -66,18 +66,19 @@ public final class TezBytesComparator extends WritableComparator implements Prox
   @Override
   public int getProxy(BytesWritable key) {
     final int len = key.getLength();
-    final byte[] content = key.getBytes();
+    final byte[] content = key.getBytesRaw();
+    final int offset = key.getOffset();
 
     switch (len) {
       default:
-        return ((content[0] & 0xff) << 24)
-            | ((content[1] & 0xff) << 16)
-            | ((content[2] & 0xff) << 8);
+        return ((content[offset] & 0xff) << 24)
+            | ((content[offset + 1] & 0xff) << 16)
+            | ((content[offset + 2] & 0xff) << 8);
       case 2:
-        return ((content[0] & 0xff) << 24)
-            | ((content[1] & 0xff) << 16);
+        return ((content[offset] & 0xff) << 24)
+            | ((content[offset + 1] & 0xff) << 16);
       case 1:
-        return (content[0] & 0xff) << 24;
+        return (content[offset] & 0xff) << 24;
       case 0:
         return 0;
     }
