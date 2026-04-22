@@ -27,7 +27,6 @@ import com.google.common.collect.Maps;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.api.Event;
-import org.apache.tez.runtime.library.common.comparator.TezBytesComparator;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
@@ -85,7 +84,6 @@ public abstract class ExternalSorter {
   protected final long availableMemoryMb;
 
   protected final IndexedSorter sorter;
-  protected final TezBytesComparator comparator;
 
   protected final Partitioner partitioner;
 
@@ -170,7 +168,6 @@ public abstract class ExternalSorter {
     this.sorter = ReflectionUtils.newInstance(this.conf.getClass(
         TezRuntimeConfiguration.TEZ_RUNTIME_INTERNAL_SORTER_CLASS, QuickSort.class,
         IndexedSorter.class), this.conf);
-    this.comparator = SerializationContext.getKeyComparator();
 
     this.conf.setInt(TezRuntimeFrameworkConfigs.TEZ_RUNTIME_NUM_EXPECTED_PARTITIONS, this.partitions);
     this.partitioner = TezRuntimeUtils.instantiatePartitioner(this.conf);
@@ -179,7 +176,6 @@ public abstract class ExternalSorter {
     if (LOG.isDebugEnabled()) {
       LOG.debug("keyClass=" + SerializationContext.getKeyClass()
           + ", valueClass=" + SerializationContext.getValueClass()
-          + ", comparator=" + SerializationContext.getKeyComparator()
           + ", partitioner=" + conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_PARTITIONER_CLASS)
           + ", reportPartitionStats=" + reportPartitionStats);
     }

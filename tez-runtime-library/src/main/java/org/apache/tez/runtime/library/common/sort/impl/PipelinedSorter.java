@@ -49,7 +49,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.tez.common.io.NonSyncDataOutputStream;
 import org.apache.tez.runtime.api.Event;
-import org.apache.hadoop.io.RawComparator;
+import org.apache.tez.runtime.library.common.comparator.TezBytesComparator;
 import org.apache.hadoop.util.IndexedSortable;
 import org.apache.hadoop.util.IndexedSorter;
 import org.apache.tez.common.TezCommonUtils;
@@ -220,7 +220,7 @@ public class PipelinedSorter extends ExternalSorter {
       LOG.debug(sb.toString());
     }
 
-    this.span = new SortSpan(buffers.get(bufferIndex), 1024 * 1024, 16, this.comparator);
+    this.span = new SortSpan(buffers.get(bufferIndex), 1024 * 1024, 16);
     this.merger = new SpanMerger(); // SpanIterators are comparable
     this.sortmaster = outputContext.getSorterThreadPool();
 
@@ -356,7 +356,7 @@ public class PipelinedSorter extends ExternalSorter {
         }
       }
       Preconditions.checkArgument(buffers.get(bufferIndex) != null, "block should not be empty");
-      span = new SortSpan((ByteBuffer)buffers.get(bufferIndex).clear(), (1024*1024), perItem, this.comparator);
+      span = new SortSpan((ByteBuffer)buffers.get(bufferIndex).clear(), (1024*1024), perItem);
     } else {
       // queue up the sort
       SortTask task = new SortTask(span, sorter);
@@ -403,7 +403,7 @@ public class PipelinedSorter extends ExternalSorter {
     collect(key, value, partitioner.getPartition(key, value, partitions));
   }
 
-  // TODO: optimize by directly calling collect() and passing comparator.getProxy(key), if this method is actually called
+  // TODO: optimize by directly calling collect(), if this method is actually called
   @Override
   public void write(BytesWritable key, Iterable<BytesWritable> values) throws IOException {
     Iterator<BytesWritable> it = values.iterator();
@@ -458,7 +458,7 @@ public class PipelinedSorter extends ExternalSorter {
       bufferOverflowRecursion--;
     }
 
-    int prefix = comparator.getProxy(key);
+    int prefix = TezBytesComparator.getProxy(key);
     prefix = (partition << (32 - partitionBits)) | (prefix >>> partitionBits);
 
     /* maintain order as in PARTITION, KEYSTART, VALSTART, VALLEN */
@@ -934,7 +934,6 @@ public class PipelinedSorter extends ExternalSorter {
           TezRawKeyValueIterator kvIter = TezMerger.merge(conf, localFs,
               codec, segmentList, mergeFactor, 0,
               new Path(uniqueIdentifier),
-              SerializationContext.getKeyComparator(),
               progressable, sortSegments, null, spilledRecordsCounter,
               additionalSpillBytesReadCounter, isFinalMergeRleEnabled, outputContext);
           // write merged output to disk
@@ -1081,14 +1080,13 @@ public class PipelinedSorter extends ExternalSorter {
     final LongBuffer kvmetalong;
     final ByteBuffer kvbuffer;
     final NonSyncDataOutputStream out;
-    final RawComparator comparator;
 
     private int index = 0;
     private long eq = 0;
     private boolean reinit = false;
     private int capacity;
 
-    public SortSpan(ByteBuffer source, int maxItems, int perItem, RawComparator comparator) {
+    public SortSpan(ByteBuffer source, int maxItems, int perItem) {
       capacity = source.remaining();
       int metasize = METASIZE*maxItems;
       long dataSize = (long) maxItems * (long) perItem;
@@ -1112,7 +1110,6 @@ public class PipelinedSorter extends ExternalSorter {
       kvmetalong = orderedMetaBuffer.asLongBuffer();
       out = new NonSyncDataOutputStream(
               new BufferStreamWrapper(kvbuffer));
-      this.comparator = comparator;
     }
 
     public SpanIterator sort(IndexedSorter sorter) {
@@ -1162,7 +1159,7 @@ public class PipelinedSorter extends ExternalSorter {
       final int off = kvbuffer.arrayOffset();
 
       // sort by key
-      final int cmp = comparator.compare(buf, off + istart, ilen, buf, off + jstart, jlen);
+      final int cmp = TezBytesComparator.compare(buf, off + istart, ilen, buf, off + jstart, jlen);
       if (cmp == 0) eq++;
       return cmp;
     }
@@ -1190,7 +1187,7 @@ public class PipelinedSorter extends ExternalSorter {
           items = 1024*1024;
           perItem = 16;
         }
-        newSpan = new SortSpan(remaining, items, perItem, this.comparator);
+        newSpan = new SortSpan(remaining, items, perItem);
         newSpan.index = index+1;
         if (isDebugEnabled) {
           LOG.debug("{}, counter:{}",
@@ -1248,7 +1245,7 @@ public class PipelinedSorter extends ExternalSorter {
         valstart = kvmeta.get(this.offsetFor(index) + VALSTART);
         final byte[] buf = kvbuffer.array();
         final int off = kvbuffer.arrayOffset();
-        cmp = comparator.compare(buf,
+        cmp = TezBytesComparator.compare(buf,
             keystart + off , (valstart - keystart),
             needle.getData(),
             needle.getPosition(), (needle.getLength() - needle.getPosition()));

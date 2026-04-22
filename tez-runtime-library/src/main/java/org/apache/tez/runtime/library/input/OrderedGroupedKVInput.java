@@ -35,7 +35,6 @@ import org.apache.tez.runtime.library.api.KeyValuesReaderEdge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.io.RawComparator;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.counters.TaskCounter;
 import org.apache.tez.common.counters.TezCounter;
@@ -286,16 +285,15 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
   protected synchronized void createValuesIterator()
       throws IOException {
     // Not used by ReduceProcessor
-    RawComparator rawComparator = SerializationContext.getKeyComparator();
     Class<?> keyClass = SerializationContext.getKeyClass();
     Class<?> valClass = SerializationContext.getValueClass();
     if (LOG.isDebugEnabled()) {
-      LOG.debug("{}: creating ValuesIterator with comparator={}, keyClass={}, valClass={}",
-          getContext().getSourceVertexName(), rawComparator.getClass().getName(),
+      LOG.debug("{}: creating ValuesIterator with keyClass={}, valClass={}",
+          getContext().getSourceVertexName(),
           keyClass.getName(), valClass.getName());
     }
 
-    vIter = new ValuesIterator(rawIter, rawComparator, inputKeyCounter, inputValueCounter);
+    vIter = new ValuesIterator(rawIter, inputKeyCounter, inputValueCounter);
   }
 
   @SuppressWarnings("rawtypes")
