@@ -43,6 +43,7 @@ import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.runtime.api.MultiByteArrayOutputStream;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
+import org.apache.tez.runtime.library.common.comparator.TezBytesComparator;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader.KeyState;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterDataInputBuffer;
@@ -290,8 +291,6 @@ public class TezMerger {
     // Invariant: Segment.close() is called for all Segment objects
     List<Segment> segments = new ArrayList<Segment>();
     
-    final RawComparator comparator;
-
     final Progressable reporter;
     
     final DataInputBuffer key = new DataInputBuffer();
@@ -320,7 +319,6 @@ public class TezMerger {
         boolean checkForSameKeys) {
       this.conf = conf;
       this.fs = fs;
-      this.comparator = comparator;
       this.segments = segments;
       this.reporter = reporter;
       if (sortSegments) {
@@ -439,7 +437,7 @@ public class TezMerger {
       int s2 = 0;
       int l1 = nextKey.getLength();
       int l2 = buf2.getLength();
-      return comparator.compare(b1, s1, l1, b2, s2, l2);
+      return TezBytesComparator.compare(b1, s1, l1, b2, s2, l2);
     }
 
     protected boolean lessThan(Object a, Object b) {
@@ -450,7 +448,7 @@ public class TezMerger {
       int s2 = key2.getPosition();
       int l2 = key2.getLength();;
 
-      return comparator.compare(key1.getData(), s1, l1, key2.getData(), s2, l2) < 0;
+      return TezBytesComparator.compare(key1.getData(), s1, l1, key2.getData(), s2, l2) < 0;
     }
     
     TezRawKeyValueIterator merge(int factor, int inMem, Path tmpDir,

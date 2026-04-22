@@ -19,6 +19,7 @@ package org.apache.tez.runtime.library.common.serializer;
 
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DataInputBuffer;
+import org.apache.hadoop.io.RawComparator;
 import org.apache.hadoop.io.serializer.Deserializer;
 import org.apache.hadoop.io.serializer.Serializer;
 import org.apache.tez.runtime.library.common.comparator.TezBytesComparator;
@@ -31,6 +32,17 @@ import java.io.OutputStream;
  * Specialized serialization context for key = HiveKey (extending BytesWritable) / value = BytesWritable payloads.
  */
 public final class SerializationContext {
+  private static final RawComparator<BytesWritable> KEY_COMPARATOR = new RawComparator<BytesWritable>() {
+    @Override
+    public int compare(byte[] b1, int s1, int l1, byte[] b2, int s2, int l2) {
+      return TezBytesComparator.compare(b1, s1, l1, b2, s2, l2);
+    }
+
+    @Override
+    public int compare(BytesWritable o1, BytesWritable o2) {
+      return TezBytesComparator.compare(o1, o2);
+    }
+  };
 
   private SerializationContext() {}
 
@@ -42,8 +54,8 @@ public final class SerializationContext {
     return BytesWritable.class;
   }
 
-  public static TezBytesComparator getKeyComparator() {
-    return new TezBytesComparator();
+  public static RawComparator<BytesWritable> getKeyComparator() {
+    return KEY_COMPARATOR;
   }
 
 }

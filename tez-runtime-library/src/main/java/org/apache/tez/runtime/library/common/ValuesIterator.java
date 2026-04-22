@@ -26,6 +26,7 @@ import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.RawComparator;
 import org.apache.tez.common.counters.TezCounter;
+import org.apache.tez.runtime.library.common.comparator.TezBytesComparator;
 import org.apache.tez.runtime.library.common.sort.impl.TezRawKeyValueIterator;
 
 import org.apache.tez.common.Preconditions;
@@ -44,7 +45,6 @@ public class ValuesIterator {
   private BytesWritable nextKey;
   private BytesWritable value;          // current value
   private boolean more;                 // more in file
-  private final RawComparator<BytesWritable> comparator;
   private final TezCounter inputKeyCounter;
   private final TezCounter inputValueCounter;
   
@@ -59,7 +59,6 @@ public class ValuesIterator {
                         TezCounter inputKeyCounter,
                         TezCounter inputValueCounter) {
     this.in = in;
-    this.comparator = comparator;
     this.inputKeyCounter = inputKeyCounter;
     this.inputValueCounter = inputValueCounter;
   }
@@ -164,7 +163,7 @@ public class ValuesIterator {
       if (!in.isSameKey()) {
         nextKey = copyToWritable(nextKey, nextKeyBytes);
         // hasMoreValues = is it first key or is key the same?
-        hasMoreValues = (key == null) || (comparator.compare(key, nextKey) == 0);
+        hasMoreValues = (key == null) || (TezBytesComparator.compare(key, nextKey) == 0);
         if (key == null || !hasMoreValues) {
           // invariant: more=true & there are no more values in an existing key group
           // so this indicates start of new key group

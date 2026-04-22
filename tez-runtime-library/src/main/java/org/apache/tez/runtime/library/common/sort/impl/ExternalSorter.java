@@ -27,7 +27,7 @@ import com.google.common.collect.Maps;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.api.Event;
-import org.apache.tez.runtime.library.common.comparator.TezBytesComparator;
+import org.apache.hadoop.io.RawComparator;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
@@ -85,7 +85,7 @@ public abstract class ExternalSorter {
   protected final long availableMemoryMb;
 
   protected final IndexedSorter sorter;
-  protected final TezBytesComparator comparator;
+  protected final RawComparator<BytesWritable> comparator;
 
   protected final Partitioner partitioner;
 

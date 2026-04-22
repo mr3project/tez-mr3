@@ -31,10 +31,8 @@ import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.library.api.KeyValuesReaderEdge;
 import org.apache.tez.runtime.library.api.LogicalInputEdge;
 import org.apache.tez.runtime.library.common.comparator.TezBytesComparator;
-import org.apache.tez.runtime.library.common.serializer.SerializationContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.io.RawComparator;
 import org.apache.tez.runtime.api.Input;
 import org.apache.tez.runtime.api.MergedLogicalInput;
 import org.apache.tez.runtime.api.MergedInputContext;
@@ -75,7 +73,6 @@ public class OrderedGroupedMergedKVInput extends MergedLogicalInput implements L
   private static class OrderedGroupedMergedKeyValuesReader extends KeyValuesReaderEdge {
 
     private final PriorityQueue<KeyValuesReaderEdge> pQueue;
-    private final TezBytesComparator keyComparator;
     private final List<KeyValuesReaderEdge> finishedReaders;
     private final ValuesIterable currentValues;
     private KeyValuesReaderEdge nextKVReader;
@@ -83,9 +80,8 @@ public class OrderedGroupedMergedKVInput extends MergedLogicalInput implements L
 
     public OrderedGroupedMergedKeyValuesReader(List<Input> inputs, MergedInputContext context) 
         throws Exception {
-      keyComparator = SerializationContext.getKeyComparator();
       pQueue = new PriorityQueue<KeyValuesReaderEdge>(inputs.size(),
-          new KVReaderComparator(keyComparator));
+          new KVReaderComparator());
       finishedReaders = new ArrayList<KeyValuesReaderEdge>(inputs.size());
       for (Input input : inputs) {
         KeyValuesReaderEdge reader = (KeyValuesReaderEdge) input.getReader();
@@ -177,7 +173,7 @@ public class OrderedGroupedMergedKVInput extends MergedLogicalInput implements L
             nextKVReader = pQueue.poll();
             try {
               if (nextKVReader != null
-                  && keyComparator.compare(currentKey, nextKVReader.getCurrentKey()) == 0) {
+                  && TezBytesComparator.compare(currentKey, nextKVReader.getCurrentKey()) == 0) {
                 currentValuesIter = nextKVReader.getCurrentValues().iterator();
                 return true;
               } else { // key changed or no more data.
@@ -201,7 +197,7 @@ public class OrderedGroupedMergedKVInput extends MergedLogicalInput implements L
             finishedReaders.add(nextKVReader);
             nextKVReader = pQueue.poll();
           } while (nextKVReader != null
-              && keyComparator.compare(currentKey, nextKVReader.getCurrentKey()) == 0);
+              && TezBytesComparator.compare(currentKey, nextKVReader.getCurrentKey()) == 0);
           addToQueue(nextKVReader);
           currentValuesIter = null;
         }
@@ -225,16 +221,10 @@ public class OrderedGroupedMergedKVInput extends MergedLogicalInput implements L
     @SuppressWarnings({ "rawtypes", "unchecked" })
     private static class KVReaderComparator implements Comparator<KeyValuesReaderEdge> {
 
-      private final RawComparator keyComparator;
-
-      public KVReaderComparator(RawComparator keyComparator) {
-        this.keyComparator = keyComparator;
-      }
-
       @Override
       public int compare(KeyValuesReaderEdge o1, KeyValuesReaderEdge o2) {
         try {
-          return keyComparator.compare(o1.getCurrentKey(), o2.getCurrentKey());
+          return TezBytesComparator.compare(o1.getCurrentKey(), o2.getCurrentKey());
         } catch (IOException e) {
           LOG.error("Caught exception while comparing keys in shuffle input", e);
           throw new RuntimeException(e);
