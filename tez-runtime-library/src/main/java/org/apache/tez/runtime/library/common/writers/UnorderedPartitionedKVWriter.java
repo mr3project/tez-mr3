@@ -1389,7 +1389,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
                 // Skip empty partitions within a spill
                 continue;
               }
-              IFile.Reader reader = null;
+              IFile.KeyValueReaderDataInputBuffer reader = null;
               TezOffsetRecord spillOffsetRecord =
                   spillInfo.offsetRecordMap != null ? spillInfo.offsetRecordMap.get(i) : null;
               if (!spillCompressed && !compositeFetch) {
