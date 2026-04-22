@@ -35,7 +35,6 @@ import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
-import org.apache.hadoop.io.RawComparator;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.util.PriorityQueue;
 import org.apache.hadoop.util.Progressable;
@@ -66,7 +65,7 @@ public class TezMerger {
       CompressionCodec codec,
       List<Segment> segments,
       int mergeFactor, int inMemSegments, Path tmpDir,
-      RawComparator comparator, Progressable reporter,
+      Progressable reporter,
       boolean sortSegments,
       TezCounter readsCounter,
       TezCounter writesCounter,
@@ -74,7 +73,7 @@ public class TezMerger {
       boolean checkForSameKeys,
       DecompressorPool inputContext)
       throws IOException, InterruptedException {
-    return new MergeQueue(conf, fs, segments, comparator, reporter,
+    return new MergeQueue(conf, fs, segments, reporter,
         sortSegments, codec, checkForSameKeys).merge(mergeFactor, inMemSegments, tmpDir,
         readsCounter, writesCounter, bytesReadCounter, inputContext);
   }
@@ -314,7 +313,7 @@ public class TezMerger {
     DataOutputBuffer prevKey = new DataOutputBuffer();
 
     public MergeQueue(Configuration conf, FileSystem fs,
-        List<Segment> segments, RawComparator comparator,
+        List<Segment> segments,
         Progressable reporter, boolean sortSegments, CompressionCodec codec,
         boolean checkForSameKeys) {
       this.conf = conf;

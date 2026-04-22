@@ -934,7 +934,6 @@ public class PipelinedSorter extends ExternalSorter {
           TezRawKeyValueIterator kvIter = TezMerger.merge(conf, localFs,
               codec, segmentList, mergeFactor, 0,
               new Path(uniqueIdentifier),
-              SerializationContext.getKeyComparator(),
               progressable, sortSegments, null, spilledRecordsCounter,
               additionalSpillBytesReadCounter, isFinalMergeRleEnabled, outputContext);
           // write merged output to disk
