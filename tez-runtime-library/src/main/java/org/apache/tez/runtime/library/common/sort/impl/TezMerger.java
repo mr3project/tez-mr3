@@ -35,7 +35,6 @@ import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
-import org.apache.hadoop.io.RawComparator;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.util.PriorityQueue;
 import org.apache.hadoop.util.Progressable;
@@ -43,6 +42,7 @@ import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.runtime.api.MultiByteArrayOutputStream;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
+import org.apache.tez.runtime.library.common.comparator.TezBytesComparator;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader.KeyState;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterDataInputBuffer;
@@ -65,7 +65,7 @@ public class TezMerger {
       CompressionCodec codec,
       List<Segment> segments,
       int mergeFactor, int inMemSegments, Path tmpDir,
-      RawComparator comparator, Progressable reporter,
+      Progressable reporter,
       boolean sortSegments,
       TezCounter readsCounter,
       TezCounter writesCounter,
@@ -73,7 +73,7 @@ public class TezMerger {
       boolean checkForSameKeys,
       DecompressorPool inputContext)
       throws IOException, InterruptedException {
-    return new MergeQueue(conf, fs, segments, comparator, reporter,
+    return new MergeQueue(conf, fs, segments, reporter,
         sortSegments, codec, checkForSameKeys).merge(mergeFactor, inMemSegments, tmpDir,
         readsCounter, writesCounter, bytesReadCounter, inputContext);
   }
@@ -290,8 +290,6 @@ public class TezMerger {
     // Invariant: Segment.close() is called for all Segment objects
     List<Segment> segments = new ArrayList<Segment>();
     
-    final RawComparator comparator;
-
     final Progressable reporter;
     
     final DataInputBuffer key = new DataInputBuffer();
@@ -315,12 +313,11 @@ public class TezMerger {
     DataOutputBuffer prevKey = new DataOutputBuffer();
 
     public MergeQueue(Configuration conf, FileSystem fs,
-        List<Segment> segments, RawComparator comparator,
+        List<Segment> segments,
         Progressable reporter, boolean sortSegments, CompressionCodec codec,
         boolean checkForSameKeys) {
       this.conf = conf;
       this.fs = fs;
-      this.comparator = comparator;
       this.segments = segments;
       this.reporter = reporter;
       if (sortSegments) {
@@ -439,7 +436,7 @@ public class TezMerger {
       int s2 = 0;
       int l1 = nextKey.getLength();
       int l2 = buf2.getLength();
-      return comparator.compare(b1, s1, l1, b2, s2, l2);
+      return TezBytesComparator.compare(b1, s1, l1, b2, s2, l2);
     }
 
     protected boolean lessThan(Object a, Object b) {
@@ -450,7 +447,7 @@ public class TezMerger {
       int s2 = key2.getPosition();
       int l2 = key2.getLength();;
 
-      return comparator.compare(key1.getData(), s1, l1, key2.getData(), s2, l2) < 0;
+      return TezBytesComparator.compare(key1.getData(), s1, l1, key2.getData(), s2, l2) < 0;
     }
     
     TezRawKeyValueIterator merge(int factor, int inMem, Path tmpDir,

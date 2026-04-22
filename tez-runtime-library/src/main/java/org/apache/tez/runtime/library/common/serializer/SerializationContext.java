@@ -18,14 +18,6 @@
 package org.apache.tez.runtime.library.common.serializer;
 
 import org.apache.hadoop.io.BytesWritable;
-import org.apache.hadoop.io.DataInputBuffer;
-import org.apache.hadoop.io.serializer.Deserializer;
-import org.apache.hadoop.io.serializer.Serializer;
-import org.apache.tez.runtime.library.common.comparator.TezBytesComparator;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 
 /**
  * Specialized serialization context for key = HiveKey (extending BytesWritable) / value = BytesWritable payloads.
@@ -41,9 +33,4 @@ public final class SerializationContext {
   public static Class<BytesWritable> getValueClass() {
     return BytesWritable.class;
   }
-
-  public static TezBytesComparator getKeyComparator() {
-    return new TezBytesComparator();
-  }
-
 }

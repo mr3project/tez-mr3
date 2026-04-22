@@ -18,21 +18,18 @@
 package org.apache.tez.runtime.library.common.comparator;
 
 import org.apache.hadoop.io.BytesWritable;
-import org.apache.hadoop.io.WritableComparator;
 import org.apache.tez.util.FastByteComparisons;
 
-public final class TezBytesComparator extends WritableComparator implements ProxyComparator<BytesWritable> {
+public final class TezBytesComparator {
 
-  public TezBytesComparator() {
-    super(BytesWritable.class);
-  }
+  private TezBytesComparator() {}
 
   /**
    * Compare the buffers in serialized form.
    */
   // copy of FastByteComparisons.UnsafeComparer.compareTo()
-  @Override
-  public int compare(byte[] buffer1, int offset1, int length1, byte[] buffer2, int offset2, int length2) {
+  public static int compare(byte[] buffer1, int offset1, int length1,
+                            byte[] buffer2, int offset2, int length2) {
     assert !(buffer1 == buffer2 && offset1 == offset2);
 
     final int stride = 8;
@@ -63,8 +60,30 @@ public final class TezBytesComparator extends WritableComparator implements Prox
     return length1 - length2;
   }
 
-  @Override
-  public int getProxy(BytesWritable key) {
+  public static int compare(BytesWritable key1, BytesWritable key2) {
+    return compare(
+        key1.getBytesRaw(), key1.getOffset(), key1.getLength(),
+        key2.getBytesRaw(), key2.getOffset(), key2.getLength());
+  }
+
+  /**
+   * This comparator interface provides a fast-path for comparisons between keys.
+   *
+   * The implicit assumption is that integer returned from this function serves
+   * as a transitive comparison proxy for the comparator that this implements.
+   *
+   * But this does not serve as a measure of equality.
+   *
+   * getProxy(k1) < getProxy(k2) implies k1 < k2 (transitive between different keys for sorting requirements)
+   *
+   * getProxy(k1) == getProxy(k2) does not imply ordering, but requires actual key comparisons.
+   *
+   * This serves as a way to short-circuit the RawComparator speeds.
+   *
+   * @param key
+   * @return proxy
+   */
+  public static int getProxy(BytesWritable key) {
     final int len = key.getLength();
     final byte[] content = key.getBytesRaw();
     final int offset = key.getOffset();
