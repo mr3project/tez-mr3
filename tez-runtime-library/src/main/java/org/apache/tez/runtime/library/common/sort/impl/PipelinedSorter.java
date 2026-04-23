@@ -87,12 +87,6 @@ public final class PipelinedSorter {
   private static final Logger LOG = LoggerFactory.getLogger(PipelinedSorter.class);
   private static final boolean isDebugEnabled = LOG.isDebugEnabled();
 
-  private final Progressable progressable = new Progressable() {
-    @Override
-    public void progress() {
-    }
-  };
-
   private final OutputContext outputContext;
   private final Configuration conf;
   private final int partitions;
@@ -1072,7 +1066,7 @@ public final class PipelinedSorter {
           TezRawKeyValueIterator kvIter = TezMerger.merge(conf, localFs,
               codec, segmentList, mergeFactor, 0,
               new Path(uniqueIdentifier),
-              progressable, sortSegments, null, spilledRecordsCounter,
+              sortSegments, null, spilledRecordsCounter,
               additionalSpillBytesReadCounter, isFinalMergeRleEnabled, outputContext);
           // write merged output to disk
           long segmentStart = finalOut.getPos();
@@ -1085,7 +1079,7 @@ public final class PipelinedSorter {
                 codec, spilledRecordsCounter, null, false, isFinalMergeRleEnabled,
                 -1, -1,
                 writeBuffer, null);
-            TezMerger.writeFile(kvIter, writer, progressable,
+            TezMerger.writeFile(kvIter, writer,
                 TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
 
             //close
@@ -1336,7 +1330,7 @@ public final class PipelinedSorter {
 
     public SpanIterator sort(IndexedSorter sorter) {
       if (length() > 1) {
-        sorter.sort(this, 0, length(), progressable);
+        sorter.sort(this, 0, length());
       }
       if (isDebugEnabled) { LOG.debug("{}: done sorting span={}, length={}",
           outputContext.getDestinationVertexName(), index, length()); }

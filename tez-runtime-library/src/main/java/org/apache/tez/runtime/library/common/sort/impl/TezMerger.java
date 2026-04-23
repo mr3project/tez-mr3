@@ -37,7 +37,6 @@ import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.util.PriorityQueue;
-import org.apache.hadoop.util.Progressable;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.runtime.api.MultiByteArrayOutputStream;
@@ -65,7 +64,6 @@ public class TezMerger {
       CompressionCodec codec,
       List<Segment> segments,
       int mergeFactor, int inMemSegments, Path tmpDir,
-      Progressable reporter,
       boolean sortSegments,
       TezCounter readsCounter,
       TezCounter writesCounter,
@@ -73,13 +71,13 @@ public class TezMerger {
       boolean checkForSameKeys,
       DecompressorPool inputContext)
       throws IOException, InterruptedException {
-    return new MergeQueue(conf, fs, segments, reporter,
+    return new MergeQueue(conf, fs, segments,
         sortSegments, codec, checkForSameKeys).merge(mergeFactor, inMemSegments, tmpDir,
         readsCounter, writesCounter, bytesReadCounter, inputContext);
   }
 
   public static void writeFile(TezRawKeyValueIterator records, IFile.WriterAppendDataInputBuffer writer,
-      Progressable progressable, long recordsBeforeProgress)
+      long recordsBeforeProgress)
       throws IOException, InterruptedException {
     boolean isRleEnabled = writer.isRleEnabled();
 
@@ -89,18 +87,17 @@ public class TezMerger {
         // Even if records.isSameKey() is false, the two keys may be the same.
         DataInputBuffer key = records.isSameKey() ? IFile.REPEAT_KEY : records.getKey();
         writer.appendRle(key, records.getValue());
-        if (((recordCtr++) % recordsBeforeProgress) == 0) { checkProgress(progressable); }
+        if (((recordCtr++) % recordsBeforeProgress) == 0) { checkProgress(); }
       }
     } else {
       while (records.next()) {
         writer.appendNoRle(records.getKey(), records.getValue());
-        if (((recordCtr++) % recordsBeforeProgress) == 0) { checkProgress(progressable); }
+        if (((recordCtr++) % recordsBeforeProgress) == 0) { checkProgress(); }
       }
     }
   }
 
-  private static void checkProgress(Progressable progressable) throws InterruptedException {
-    progressable.progress();
+  private static void checkProgress() throws InterruptedException {
     if (Thread.currentThread().isInterrupted()) {
       throw new InterruptedException("Current thread=" + Thread.currentThread().getName() + " interrupted");
     }
@@ -290,8 +287,6 @@ public class TezMerger {
     // Invariant: Segment.close() is called for all Segment objects
     List<Segment> segments = new ArrayList<Segment>();
     
-    final Progressable reporter;
-    
     final DataInputBuffer key = new DataInputBuffer();
     final DataInputBuffer value = new DataInputBuffer();
     final DataInputBuffer nextKey = new DataInputBuffer();
@@ -314,12 +309,11 @@ public class TezMerger {
 
     public MergeQueue(Configuration conf, FileSystem fs,
         List<Segment> segments,
-        Progressable reporter, boolean sortSegments, CompressionCodec codec,
+        boolean sortSegments, CompressionCodec codec,
         boolean checkForSameKeys) {
       this.conf = conf;
       this.fs = fs;
       this.segments = segments;
-      this.reporter = reporter;
       if (sortSegments) {
         Collections.sort(segments, segmentComparator);
       }
@@ -577,7 +571,7 @@ public class TezMerger {
                 checkForSameKeys, writeBuffer);
           }
 
-          writeFile(this, writer, reporter, recordsBeforeProgress);
+          writeFile(this, writer, recordsBeforeProgress);
           writer.close();
           
           // we finished one single level merge; now clean up the priority queue
