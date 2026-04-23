@@ -62,10 +62,6 @@ import org.apache.tez.runtime.api.TezTaskOutput;
 import org.apache.tez.runtime.library.common.comparator.TezBytesComparator;
 import org.apache.tez.runtime.library.api.Partitioner;
 import org.apache.hadoop.util.IndexedSortable;
-import org.apache.hadoop.util.IndexedSorter;
-import org.apache.hadoop.util.Progressable;
-import org.apache.hadoop.util.QuickSort;
-import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.tez.common.TezCommonUtils;
 import org.apache.tez.runtime.api.OutputContext;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
@@ -101,7 +97,6 @@ public final class PipelinedSorter {
   private int numSpills;
   private final boolean cleanup;
   private final long availableMemoryMb;
-  private final IndexedSorter sorter;
   private final Partitioner partitioner;
   private final CompressionCodec codec;
   private final boolean ifileReadAhead;
@@ -222,10 +217,6 @@ public final class PipelinedSorter {
     }
     int assignedMb = (int) (initialMemoryAvailable >> 20);
     this.availableMemoryMb = assignedMb;
-
-    this.sorter = ReflectionUtils.newInstance(this.conf.getClass(
-        TezRuntimeConfiguration.TEZ_RUNTIME_INTERNAL_SORTER_CLASS, QuickSort.class,
-        IndexedSorter.class), this.conf);
 
     this.conf.setInt(TezRuntimeFrameworkConfigs.TEZ_RUNTIME_NUM_EXPECTED_PARTITIONS, this.partitions);
     this.partitioner = TezRuntimeUtils.instantiatePartitioner(this.conf);
@@ -471,7 +462,7 @@ public final class PipelinedSorter {
     if (newSpan == null) {
       //avoid sort/spill of empty span
       // sort in the same thread, do not wait for the thread pool
-      merger.add(span.sort(sorter));
+      merger.add(span.sort());
       boolean ret = spill(true);
       if (isPipelinedShuffle && ret) {
         sendPipelinedShuffleEvents();
@@ -494,7 +485,7 @@ public final class PipelinedSorter {
       span = new SortSpan((ByteBuffer)buffers.get(bufferIndex).clear(), (1024*1024), perItem);
     } else {
       // queue up the sort
-      SortTask task = new SortTask(span, sorter);
+      SortTask task = new SortTask(span);
       // LOG.debug("Submitting span={} for sort", span.toString());
       Future<SpanIterator> future = sortmaster.submit(task);
       merger.add(future);
@@ -900,7 +891,7 @@ public final class PipelinedSorter {
     try {
       if (isDebugEnabled) { LOG.debug(outputContext.getDestinationVertexName() + ": Starting flush of map output"); }
       span.end();
-      merger.add(span.sort(sorter));
+      merger.add(span.sort());
       // force a spill in flush()
       // case 1: we want to force because of following scenarios:
       // we have no keys written, and flush got called
@@ -1328,13 +1319,137 @@ public final class PipelinedSorter {
               new BufferStreamWrapper(kvbuffer));
     }
 
-    public SpanIterator sort(IndexedSorter sorter) {
+    public SpanIterator sort() {
       if (length() > 1) {
-        sorter.sort(this, 0, length());
+        sort(this, 0, length());
       }
       if (isDebugEnabled) { LOG.debug("{}: done sorting span={}, length={}",
           outputContext.getDestinationVertexName(), index, length()); }
       return new SpanIterator((SortSpan)this);
+    }
+
+    private void downHeap(final IndexedSortable s, final int b,
+        int i, final int N) {
+      for (int idx = i << 1; idx < N; idx = i << 1) {
+        if (idx + 1 < N && s.compare(b + idx, b + idx + 1) < 0) {
+          if (s.compare(b + i, b + idx + 1) < 0) {
+            s.swap(b + i, b + idx + 1);
+          } else return;
+          i = idx + 1;
+        } else if (s.compare(b + i, b + idx) < 0) {
+          s.swap(b + i, b + idx);
+          i = idx;
+        } else return;
+      }
+    }
+
+    private void heapSort(final IndexedSortable s, final int p, final int r) {
+      final int N = r - p;
+      // build heap w/ reverse comparator, then write in-place from end
+      final int t = Integer.highestOneBit(N);
+      for (int i = t; i > 1; i >>>= 1) {
+        for (int j = i >>> 1; j < i; ++j) {
+          downHeap(s, p-1, j, N + 1);
+        }
+      }
+      for (int i = r - 1; i > p; --i) {
+        s.swap(p, i);
+        downHeap(s, p - 1, 1, i - p + 1);
+      }
+    }
+
+    private void fix(IndexedSortable s, int p, int r) {
+      if (s.compare(p, r) > 0) {
+        s.swap(p, r);
+      }
+    }
+
+    /**
+     * Deepest recursion before giving up and doing a heapsort.
+     * Returns 2 * ceil(log(n)).
+     *
+     * @param x x.
+     * @return MaxDepth.
+     */
+    private int getMaxDepth(int x) {
+      if (x <= 0)
+        throw new IllegalArgumentException("Undefined for " + x);
+      return (32 - Integer.numberOfLeadingZeros(x - 1)) << 2;
+    }
+
+    /**
+     * Sort the given range of items using quick sort.
+     * {@inheritDoc} If the recursion depth falls below {@link #getMaxDepth},
+     * then switch to {@link HeapSort}.
+     */
+    private void sort(IndexedSortable s, int p, int r) {
+      sortInternal(s, p, r, getMaxDepth(r - p));
+    }
+
+    private void sortInternal(final IndexedSortable s, int p, int r, int depth) {
+      // from org/apache/hadoop/util/QuickSort.java
+      while (true) {
+      if (r-p < 13) {
+        for (int i = p; i < r; ++i) {
+          for (int j = i; j > p && s.compare(j-1, j) > 0; --j) {
+            s.swap(j, j-1);
+          }
+        }
+        return;
+      }
+      if (--depth < 0) {
+        // give up
+        heapSort(s, p, r);
+        return;
+      }
+
+      // select, move pivot into first position
+      fix(s, (p+r) >>> 1, p);
+      fix(s, (p+r) >>> 1, r - 1);
+      fix(s, p, r-1);
+
+      // Divide
+      int i = p;
+      int j = r;
+      int ll = p;
+      int rr = r;
+      int cr;
+      while(true) {
+        while (++i < j) {
+          if ((cr = s.compare(i, p)) > 0) break;
+          if (0 == cr && ++ll != i) {
+            s.swap(ll, i);
+          }
+        }
+        while (--j > i) {
+          if ((cr = s.compare(p, j)) > 0) break;
+          if (0 == cr && --rr != j) {
+            s.swap(rr, j);
+          }
+        }
+        if (i < j) s.swap(i, j);
+        else break;
+      }
+      j = i;
+      // swap pivot- and all eq values- into position
+      while (ll >= p) {
+        s.swap(ll--, --i);
+      }
+      while (rr < r) {
+        s.swap(rr++, j++);
+      }
+
+      // Conquer
+      // Recurse on smaller interval first to keep stack shallow
+      assert i != j;
+      if (i - p < r - j) {
+        sortInternal(s, p, i, depth);
+        p = j;
+      } else {
+        sortInternal(s, j, r, depth);
+        r = i;
+      }
+      }
     }
 
     int offsetFor(int i) {
@@ -1620,16 +1735,14 @@ public final class PipelinedSorter {
 
   private static class SortTask implements Callable<SpanIterator> {
     private final SortSpan sortable;
-    private final IndexedSorter sorter;
 
-    public SortTask(SortSpan sortable, IndexedSorter sorter) {
+    public SortTask(SortSpan sortable) {
         this.sortable = sortable;
-        this.sorter = sorter;
     }
 
     @Override
     public SpanIterator call() {
-      return sortable.sort(sorter);
+      return sortable.sort();
     }
   }
 
