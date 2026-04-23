@@ -61,7 +61,6 @@ import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.TezTaskOutput;
 import org.apache.tez.runtime.library.common.comparator.TezBytesComparator;
 import org.apache.tez.runtime.library.api.Partitioner;
-import org.apache.hadoop.util.IndexedSortable;
 import org.apache.tez.common.TezCommonUtils;
 import org.apache.tez.runtime.api.OutputContext;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
@@ -1282,7 +1281,7 @@ public final class PipelinedSorter {
     }
   }
 
-  private final class SortSpan implements IndexedSortable {
+  private final class SortSpan {
     final IntBuffer kvmeta;
     final LongBuffer kvmetalong;
     final ByteBuffer kvbuffer;
@@ -1449,15 +1448,15 @@ public final class PipelinedSorter {
       }
     }
 
-    int offsetFor(int i) {
+    private int offsetFor(int i) {
       return (i * NMETA);
     }
 
-    int longOffsetFor(int i) {
+    private int longOffsetFor(int i) {
       return i * (NMETA / 2);
     }
 
-    public void swap(final int mi, final int mj) {
+    private void swap(final int mi, final int mj) {
       final int kvi = longOffsetFor(mi);
       final int kvj = longOffsetFor(mj);
       final long l1 = kvmetalong.get(kvi);
@@ -1470,7 +1469,7 @@ public final class PipelinedSorter {
       kvmetalong.put(kvj + 1, l2);
     }
 
-    int compareKeys(final int kvi, final int kvj) {
+    private int compareKeys(final int kvi, final int kvj) {
       final int istart = kvmeta.get(kvi + KEYSTART);
       final int jstart = kvmeta.get(kvj + KEYSTART);
       final int ilen   = kvmeta.get(kvi + VALSTART) - istart;
@@ -1492,7 +1491,7 @@ public final class PipelinedSorter {
       return cmp;
     }
 
-    public int compare(final int mi, final int mj) {
+    private int compare(final int mi, final int mj) {
       final int kvi = offsetFor(mi);
       final int kvj = offsetFor(mj);
       final int kvip = kvmeta.get(kvi + PARTITION);
@@ -1504,7 +1503,7 @@ public final class PipelinedSorter {
       return compareKeys(kvi, kvj);
     }
 
-    public SortSpan next() {
+    private SortSpan next() {
       ByteBuffer remaining = end();
       if (remaining != null) {
         SortSpan newSpan = null;
@@ -1527,11 +1526,11 @@ public final class PipelinedSorter {
       return null;
     }
 
-    public int length() {
+    private int length() {
       return kvmeta.limit()/NMETA;
     }
 
-    public ByteBuffer end() {
+    private ByteBuffer end() {
       ByteBuffer remaining = kvbuffer.duplicate();
       remaining.position(kvbuffer.position());
       remaining = remaining.slice();
@@ -1560,7 +1559,7 @@ public final class PipelinedSorter {
       return remaining;
     }
 
-    public int compareInternal(final DataInputBuffer needle, final int needlePart, final int index) {
+    private int compareInternal(final DataInputBuffer needle, final int needlePart, final int index) {
       int cmp = 0;
       final int keystart;
       final int valstart;
@@ -1581,7 +1580,7 @@ public final class PipelinedSorter {
       return cmp;
     }
     
-    public long getEq() {
+    private long getEq() {
       return eq;
     }
     
