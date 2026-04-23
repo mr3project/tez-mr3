@@ -253,15 +253,10 @@ public class InMemoryReader implements IFile.KeyValueReader {
 
   @Override
   public KeyState readRawKey(DataInputBuffer key) throws IOException {
-    try {
-      if (isRleEnabled) {
-        return readRawKeyRle(key);
-      } else {
-        return readRawKeyNoRle(key);
-      }
-    } catch (IOException ioe) {
-      dumpOnError();
-      throw ioe;
+    if (isRleEnabled) {
+      return readRawKeyRle(key);
+    } else {
+      return readRawKeyNoRle(key);
     }
   }
 
@@ -307,15 +302,10 @@ public class InMemoryReader implements IFile.KeyValueReader {
   }
 
   public KeyState readRawKey(BytesWritable key) throws IOException {
-    try {
-      if (isRleEnabled) {
-        return readRawKeyRle(key);
-      } else {
-        return readRawKeyNoRle(key);
-      }
-    } catch (IOException ioe) {
-      dumpOnError();
-      throw ioe;
+    if (isRleEnabled) {
+      return readRawKeyRle(key);
+    } else {
+      return readRawKeyNoRle(key);
     }
   }
 
@@ -366,47 +356,37 @@ public class InMemoryReader implements IFile.KeyValueReader {
 
   @Override
   public void nextRawValue(DataInputBuffer value) throws IOException {
-    try {
-      int pos = memDataIn.getPosition();
-      byte[] data = memDataIn.getData();
-      value.reset(data, pos, currentValueLength);
+    int pos = memDataIn.getPosition();
+    byte[] data = memDataIn.getData();
+    value.reset(data, pos, currentValueLength);
 
-      // Position for the next record
-      long skipped = memDataIn.skip(currentValueLength);
-      if (skipped != currentValueLength) {
-        throw new IOException("Rec# " + recNo +
-            ": Failed to skip past value of length: " +
-            currentValueLength);
-      }
-      // Record the byte
-      bytesRead += currentValueLength;
-      ++recNo;
-    } catch (IOException ioe) {
-      dumpOnError();
-      throw ioe;
+    // Position for the next record
+    long skipped = memDataIn.skip(currentValueLength);
+    if (skipped != currentValueLength) {
+      throw new IOException("Rec# " + recNo +
+          ": Failed to skip past value of length: " +
+          currentValueLength);
     }
+    // Record the byte
+    bytesRead += currentValueLength;
+    ++recNo;
   }
 
   public void nextRawValue(BytesWritable value) throws IOException {
-    try {
-      int pos = memDataIn.getPosition();
-      byte[] data = memDataIn.getData();
-      // directly copy to the byte[] array of value after resizing if necessary
-      value.setSize(currentValueLength);
-      System.arraycopy(data, pos, value.getBytes(), 0, currentValueLength);
+    int pos = memDataIn.getPosition();
+    byte[] data = memDataIn.getData();
+    // directly copy to the byte[] array of value after resizing if necessary
+    value.setSize(currentValueLength);
+    System.arraycopy(data, pos, value.getBytes(), 0, currentValueLength);
 
-      // Position for the next record
-      long skipped = memDataIn.skip(currentValueLength);
-      if (skipped != currentValueLength) {
-        throw new IOException("Rec# " + recNo + ": Failed to skip past value of length: " + currentValueLength);
-      }
-
-      bytesRead += currentValueLength;
-      ++recNo;
-    } catch (IOException ioe) {
-      dumpOnError();
-      throw ioe;
+    // Position for the next record
+    long skipped = memDataIn.skip(currentValueLength);
+    if (skipped != currentValueLength) {
+      throw new IOException("Rec# " + recNo + ": Failed to skip past value of length: " + currentValueLength);
     }
+
+    bytesRead += currentValueLength;
+    ++recNo;
   }
 
   @Override
