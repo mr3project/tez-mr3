@@ -28,16 +28,20 @@ import java.nio.LongBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.concurrent.*;
 import java.util.zip.Deflater;
 
+import com.google.common.collect.Maps;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.compress.CodecPool;
+import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.io.compress.Compressor;
 import org.apache.tez.common.Preconditions;
 import com.google.common.collect.Lists;
 
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.tez.runtime.api.MultiByteArrayOutputStream;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
 import org.apache.tez.runtime.library.utils.CodecUtils;
@@ -46,31 +50,87 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.RawLocalFileSystem;
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.tez.common.io.NonSyncDataOutputStream;
+import org.apache.tez.common.TezRuntimeFrameworkConfigs;
+import org.apache.tez.common.counters.TaskCounter;
+import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.runtime.api.Event;
+import org.apache.tez.runtime.api.TezTaskOutput;
 import org.apache.tez.runtime.library.common.comparator.TezBytesComparator;
+import org.apache.tez.runtime.library.api.Partitioner;
 import org.apache.hadoop.util.IndexedSortable;
 import org.apache.hadoop.util.IndexedSorter;
+import org.apache.hadoop.util.Progressable;
+import org.apache.hadoop.util.QuickSort;
+import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.tez.common.TezCommonUtils;
 import org.apache.tez.runtime.api.OutputContext;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
+import org.apache.tez.runtime.library.api.TezRuntimeConfiguration.ReportPartitionStats;
 import org.apache.tez.runtime.library.common.serializer.SerializationContext;
+import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterBytesWritable;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterDataInputBuffer;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger.DiskSegment;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger.Segment;
-
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.tez.runtime.library.common.TezRuntimeUtils;
 
 import static org.apache.tez.runtime.library.common.sort.impl.TezSpillRecord.ensureSpillFilePermissions;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
-public class PipelinedSorter extends ExternalSorter {
+public final class PipelinedSorter {
   
   private static final Logger LOG = LoggerFactory.getLogger(PipelinedSorter.class);
   private static final boolean isDebugEnabled = LOG.isDebugEnabled();
+
+  private final Progressable progressable = new Progressable() {
+    @Override
+    public void progress() {
+    }
+  };
+
+  private final OutputContext outputContext;
+  private final Configuration conf;
+  private final int partitions;
+
+  private final RawLocalFileSystem localFs;
+  private final boolean localFsSpillFilePerms;
+
+  final ReportPartitionStats reportPartitionStats;
+  private final long[] partitionStats;
+  private final boolean sendEmptyPartitionDetails;
+
+  private int numSpills;
+  private final boolean cleanup;
+  private final long availableMemoryMb;
+  private final IndexedSorter sorter;
+  private final Partitioner partitioner;
+  private final CompressionCodec codec;
+  private final boolean ifileReadAhead;
+  private final int ifileReadAheadLength;
+  private final String auxiliaryService;
+  private final boolean compositeFetch;
+  private final TezTaskOutput mapOutputFile;
+  private final boolean writeSpillRecord;
+  private final Map<Integer, Path> spillFilePaths;
+  private final Map<Integer, Path> spillFileIndexPaths;
+  private final TezCounter outputRecordsCounter;
+  private final TezCounter outputRecordBytesCounter;
+  private final TezCounter outputBytesWithOverheadCounter;
+  private final TezCounter fileOutputBytesCounter;
+  private final TezCounter fileOutputBytesMemoryCounter;
+  private final TezCounter spilledRecordsCounter;
+  private final TezCounter additionalSpillBytesWrittenCounter;
+  private final TezCounter additionalSpillBytesReadCounter;
+  private final TezCounter numAdditionalSpillsCounter;
+
+  private Path finalOutputFile;
+  private Path finalIndexFile;
+  private boolean finalIndexComputed;
 
   /**
    * The size of each record in the index file for the map-outputs.
@@ -142,7 +202,88 @@ public class PipelinedSorter extends ExternalSorter {
 
   public PipelinedSorter(OutputContext outputContext, Configuration conf, int numOutputs,
       long initialMemoryAvailable) throws IOException {
-    super(outputContext, conf, numOutputs, initialMemoryAvailable);
+    this.outputContext = outputContext;
+    this.conf = conf;
+    this.partitions = numOutputs;
+
+    this.localFs = (RawLocalFileSystem) FileSystem.getLocal(this.conf).getRaw();
+    this.localFsSpillFilePerms = TezSpillRecord.SPILL_FILE_PERMS.equals(
+        TezSpillRecord.SPILL_FILE_PERMS.applyUMask(FsPermission.getUMask(this.localFs.getConf())));
+
+    this.reportPartitionStats = ReportPartitionStats.fromString(
+        conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_REPORT_PARTITION_STATS,
+            TezRuntimeConfiguration.TEZ_RUNTIME_REPORT_PARTITION_STATS_DEFAULT));
+    this.partitionStats = reportPartitionStats.isEnabled() ? (new long[partitions]) : null;
+    this.sendEmptyPartitionDetails = conf.getBoolean(
+        TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED,
+        TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED_DEFAULT);
+
+    this.numSpills = 0;
+    this.cleanup = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT,
+        TezRuntimeConfiguration.TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT_DEFAULT);
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(outputContext.getDestinationVertexName() + ": Initial Mem bytes : " +
+          initialMemoryAvailable + ", in MB=" + ((initialMemoryAvailable >> 20)));
+    }
+    int assignedMb = (int) (initialMemoryAvailable >> 20);
+    this.availableMemoryMb = assignedMb;
+
+    this.sorter = ReflectionUtils.newInstance(this.conf.getClass(
+        TezRuntimeConfiguration.TEZ_RUNTIME_INTERNAL_SORTER_CLASS, QuickSort.class,
+        IndexedSorter.class), this.conf);
+
+    this.conf.setInt(TezRuntimeFrameworkConfigs.TEZ_RUNTIME_NUM_EXPECTED_PARTITIONS, this.partitions);
+    this.partitioner = TezRuntimeUtils.instantiatePartitioner(this.conf);
+
+    LOG.info("{}, memoryMb={}", outputContext.getDestinationVertexName(), assignedMb);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("keyClass=" + SerializationContext.getKeyClass()
+          + ", valueClass=" + SerializationContext.getValueClass()
+          + ", partitioner=" + conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_PARTITIONER_CLASS)
+          + ", reportPartitionStats=" + reportPartitionStats);
+    }
+
+    Configuration codecConf = ShuffleServer.getCodecConf(outputContext.peekShuffleServer(), conf);
+    this.codec = CodecUtils.getCodec(codecConf);
+
+    this.ifileReadAhead = this.conf.getBoolean(
+        TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD,
+        TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_DEFAULT);
+    if (this.ifileReadAhead) {
+      this.ifileReadAheadLength = conf.getInt(
+          TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_BYTES,
+          TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_BYTES_DEFAULT);
+    } else {
+      this.ifileReadAheadLength = 0;
+    }
+
+    this.auxiliaryService = ShuffleUtils.getTezShuffleHandlerServiceId(conf);
+    this.compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
+    this.mapOutputFile = TezRuntimeUtils.instantiateTaskOutputManager(
+        this.conf, outputContext, this.compositeFetch);
+
+    this.writeSpillRecord = !compositeFetch;
+    this.spillFilePaths = Maps.newHashMap();
+    this.spillFileIndexPaths = this.writeSpillRecord ? Maps.newHashMap() : null;
+
+    this.outputRecordsCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_RECORDS);
+    this.outputRecordBytesCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_BYTES);
+    this.outputBytesWithOverheadCounter =
+        outputContext.getCounters().findCounter(TaskCounter.OUTPUT_BYTES_WITH_OVERHEAD);
+
+    this.fileOutputBytesCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_BYTES_DISK);
+    this.fileOutputBytesMemoryCounter = outputContext.getCounters().findCounter(TaskCounter.OUTPUT_BYTES_MEMORY);
+
+    this.spilledRecordsCounter = outputContext.getCounters().findCounter(TaskCounter.SPILLED_RECORDS);
+    this.additionalSpillBytesWrittenCounter =
+        outputContext.getCounters().findCounter(TaskCounter.SPILL_BYTES_DISK);
+    this.additionalSpillBytesReadCounter =
+        outputContext.getCounters().findCounter(TaskCounter.SPILL_BYTES_READ_ADDITIONAL);
+    this.numAdditionalSpillsCounter =
+        outputContext.getCounters().findCounter(TaskCounter.SPILL_COUNT_ADDITIONAL);
+
+    this.finalIndexComputed = false;
 
     this.partitionBits = bitcount(partitions) + 1;
 
@@ -398,13 +539,11 @@ public class PipelinedSorter extends ExternalSorter {
   //  - closeWriter(), called after all collect() calls, is guarded with synchronized.
   //  - flush()/close() are guided with synchronized.
 
-  @Override
   public void write(BytesWritable key, BytesWritable value) throws IOException {
     collect(key, value, partitioner.getPartition(key, value, partitions));
   }
 
   // TODO: optimize by directly calling collect(), if this method is actually called
-  @Override
   public void write(BytesWritable key, Iterable<BytesWritable> values) throws IOException {
     Iterator<BytesWritable> it = values.iterator();
     while (it.hasNext()) {
@@ -752,7 +891,6 @@ public class PipelinedSorter extends ExternalSorter {
     }
   }
 
-  @Override
   synchronized public void flush() throws IOException {
     final String uniqueIdentifier = outputContext.getUniqueIdentifier();
 
@@ -1018,8 +1156,92 @@ public class PipelinedSorter extends ExternalSorter {
    * @throws IOException parent can throw this.
    */
   synchronized public final List<Event> close() throws IOException {
-    super.close();
+    if (writeSpillRecord) {
+      spillFileIndexPaths.clear();
+    }
+    spillFilePaths.clear();
     return finalEvents;
+  }
+
+  public TezTaskOutput getMapOutput() {
+    return mapOutputFile;
+  }
+
+  public boolean getFinalIndexComputed() {
+    return finalIndexComputed;
+  }
+
+  public Path getFinalIndexFile() {
+    return finalIndexFile;
+  }
+
+  public Path getFinalOutputFile() {
+    return finalOutputFile;
+  }
+
+  public static long getInitialMemoryRequirement(Configuration conf, long maxAvailableTaskMemory) {
+    int initialMemRequestMb = conf.getInt(
+        TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB,
+        TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB_DEFAULT);
+    long reqBytes = ((long) initialMemRequestMb) << 20;
+    Preconditions.checkArgument(initialMemRequestMb > 0 && reqBytes < maxAvailableTaskMemory,
+        "{} {} should be larger than 0 and should be less than the available task memory (MB): {}",
+        TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB, initialMemRequestMb, maxAvailableTaskMemory >> 20);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Requested SortBufferSize ("
+          + TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB + "): " + initialMemRequestMb);
+    }
+    return reqBytes;
+  }
+
+  public int getNumSpills() {
+    return numSpills;
+  }
+
+  private synchronized void cleanup() throws IOException {
+    if (!cleanup) {
+      return;
+    }
+    cleanup(spillFilePaths);
+    cleanup(finalOutputFile);
+
+    if (writeSpillRecord) {
+      cleanup(spillFileIndexPaths);
+      cleanup(finalIndexFile);
+    }
+  }
+
+  private synchronized void cleanup(Path path) {
+    if (path == null || !cleanup) {
+      return;
+    }
+    try {
+      LOG.info("Deleting " + path);
+      localFs.delete(path, true);
+    } catch (IOException ioe) {
+      LOG.warn("Error in deleting " + path);
+    }
+  }
+
+  private synchronized void cleanup(Map<Integer, Path> spillMap) {
+    if (!cleanup) {
+      return;
+    }
+    for (Map.Entry<Integer, Path> entry : spillMap.entrySet()) {
+      cleanup(entry.getValue());
+    }
+  }
+
+  public long[] getPartitionStats() {
+    return partitionStats;
+  }
+
+  private boolean reportPartitionStats() {
+    return (partitionStats != null);
+  }
+
+  public boolean reportDetailedPartitionStats() {
+    return reportPartitionStats.isPrecise();
   }
 
 
