@@ -43,7 +43,6 @@ import org.apache.tez.runtime.library.api.KeyValuesWriterEdge;
 import org.apache.tez.runtime.library.api.Partitioner;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.MemoryUpdateCallbackHandler;
-import org.apache.tez.runtime.library.common.sort.impl.ExternalSorter;
 import org.apache.tez.runtime.library.common.sort.impl.PipelinedSorter;
 import org.apache.tez.runtime.library.common.sort.impl.TezSpillRecord;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
@@ -88,7 +87,7 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput implements
     this.conf.setStrings(TezRuntimeFrameworkConfigs.LOCAL_DIRS, getContext().getWorkDirs());
     this.memoryUpdateCallbackHandler = new MemoryUpdateCallbackHandler();
     getContext().requestInitialMemory(
-        ExternalSorter.getInitialMemoryRequirement(conf,
+        PipelinedSorter.getInitialMemoryRequirement(conf,
             getContext().getTotalMemoryAvailableToTask()), memoryUpdateCallbackHandler);
 
     sendEmptyPartitionDetails = conf.getBoolean(
