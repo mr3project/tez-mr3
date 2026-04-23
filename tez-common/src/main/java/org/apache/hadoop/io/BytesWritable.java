@@ -190,7 +190,14 @@ public class BytesWritable extends BinaryComparable
     }
     size = newSize;
   }
-  
+
+  public byte[] reinitialize(int newSize) {
+    bytes = new byte[newSize];
+    offset = 0;
+    size = newSize;
+    return bytes;
+  }
+
   /**
    * Get the capacity, which is the maximum size that could handled without
    * resizing the backing storage.
