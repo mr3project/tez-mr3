@@ -57,8 +57,7 @@ public class ValuesIterator {
   public ValuesIterator(TezRawKeyValueIterator in,
                         RawComparator<BytesWritable> comparator,
                         TezCounter inputKeyCounter,
-                        TezCounter inputValueCounter)
-    throws IOException {
+                        TezCounter inputValueCounter) {
     this.in = in;
     this.comparator = comparator;
     this.inputKeyCounter = inputKeyCounter;
@@ -89,10 +88,14 @@ public class ValuesIterator {
   }
 
   /** The current key. */
+  // Invariant:
+  //   The backing byte[] array of BytesWritable is immutable, so the consumer may keep pointers to it.
   public BytesWritable getKey() {
     return key; 
   }
-  
+
+  // Invariant:
+  //   The backing byte[] array of BytesWritable is immutable, so the consumer may keep pointers to it.
   public Iterable<BytesWritable> getValues() {
     return new Iterable<BytesWritable>() {
 
@@ -195,8 +198,8 @@ public class ValuesIterator {
 
     int pos = source.getPosition();
     int length = source.getLength() - pos;
-    target.expandIfNecessary(length);
-    System.arraycopy(source.getData(), pos, target.getBytesRaw(), 0, length);
+    byte[] bytes = target.reinitialize(length);
+    System.arraycopy(source.getData(), pos, bytes, 0, length);
 
     return target;
   }
