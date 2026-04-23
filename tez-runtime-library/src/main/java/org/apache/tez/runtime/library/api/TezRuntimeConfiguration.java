@@ -74,10 +74,6 @@ public class TezRuntimeConfiguration {
   public static final String TEZ_RUNTIME_KEY_SECONDARY_COMPARATOR_CLASS =
     TEZ_RUNTIME_PREFIX + "key.secondary.comparator.class";
 
-  @ConfigurationProperty
-  public static final String TEZ_RUNTIME_INTERNAL_SORTER_CLASS =
-    TEZ_RUNTIME_PREFIX + "internal.sorter.class";
-
   /**
    * Specifies a partitioner class
    */
