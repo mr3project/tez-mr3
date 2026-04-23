@@ -1285,6 +1285,8 @@ public final class PipelinedSorter {
     final IntBuffer kvmeta;
     final LongBuffer kvmetalong;
     final ByteBuffer kvbuffer;
+    final byte[] kvbufferArray;
+    final int kvbufferArrayOffset;
     final NonSyncDataOutputStream out;
 
     private int index = 0;
@@ -1308,6 +1310,8 @@ public final class PipelinedSorter {
       }
       reserved.position(metasize);
       kvbuffer = reserved.slice();
+      kvbufferArray = kvbuffer.array();
+      kvbufferArrayOffset = kvbuffer.arrayOffset();
       reserved.flip();
       reserved.limit(metasize);
       ByteBuffer kvmetabuffer = reserved.slice();
@@ -1482,11 +1486,10 @@ public final class PipelinedSorter {
         return ilen - jlen;
       }
 
-      final byte[] buf = kvbuffer.array();
-      final int off = kvbuffer.arrayOffset();
-
       // sort by key
-      final int cmp = TezBytesComparator.compare(buf, off + istart, ilen, buf, off + jstart, jlen);
+      final int cmp = TezBytesComparator.compare(
+          kvbufferArray, kvbufferArrayOffset + istart, ilen,
+          kvbufferArray, kvbufferArrayOffset + jstart, jlen);
       if (cmp == 0) eq++;
       return cmp;
     }
