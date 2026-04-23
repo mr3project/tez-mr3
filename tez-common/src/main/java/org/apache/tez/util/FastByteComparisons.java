@@ -73,10 +73,43 @@ public final class FastByteComparisons {
   /**
    * Lexicographically compare two byte arrays.
    */
-  public static int compareTo(byte[] b1, int s1, int l1, byte[] b2, int s2,
-      int l2) {
-    return LexicographicalComparerHolder.BEST_COMPARER.compareTo(
-        b1, s1, l1, b2, s2, l2);
+  public static int compareTo(byte[] buffer1, int offset1, int length1, byte[] buffer2, int offset2, int length2) {
+    if (buffer1 == buffer2 &&
+        offset1 == offset2 &&
+        length1 == length2) {
+      return 0;
+    }
+
+    final int stride = 8;
+    int minLength = Math.min(length1, length2);
+    int strideLimit = minLength & ~(stride - 1);
+    int offset1Adj = offset1 + BYTE_ARRAY_BASE_OFFSET;
+    int offset2Adj = offset2 + BYTE_ARRAY_BASE_OFFSET;
+    int i;
+
+    for (i = 0; i < strideLimit; i += stride) {
+      long lw = theUnsafe.getLong(buffer1, offset1Adj + (long) i);
+      long rw = theUnsafe.getLong(buffer2, offset2Adj + (long) i);
+
+      if (lw != rw) {
+        // original approach (slower in JMH testing)
+        // int n = Long.numberOfTrailingZeros(lw ^ rw) & ~0x7;
+        // return ((int) ((lw >>> n) & 0xFF)) - ((int) ((rw >>> n) & 0xFF));
+        long bw = Long.reverseBytes(lw);
+        long br = Long.reverseBytes(rw);
+        return Long.compareUnsigned(bw, br);
+      }
+    }
+
+    for (; i < minLength; i++) {
+      // do not use UnsignedBytes.compare() because we want to avoid Guava
+      int b1 = buffer1[offset1 + i] & 0xFF;
+      int b2 = buffer2[offset2 + i] & 0xFF;
+      if (b1 != b2) {
+        return b1 - b2;
+      }
+    }
+    return length1 - length2;
   }
 
   /* Determine if two strings are equal from two byte arrays each
@@ -138,7 +171,6 @@ public final class FastByteComparisons {
   private static Comparer<byte[]> lexicographicalComparerJavaImpl() {
     return LexicographicalComparerHolder.PureJavaComparer.INSTANCE;
   }
-
 
   /**
    * Provides a lexicographical comparer implementation; either a Java
@@ -224,42 +256,7 @@ public final class FastByteComparisons {
       @Override
       public int compareTo(byte[] buffer1, int offset1, int length1,
           byte[] buffer2, int offset2, int length2) {
-        if (buffer1 == buffer2 &&
-            offset1 == offset2 &&
-            length1 == length2) {
-          return 0;
-        }
-
-        final int stride = 8;
-        int minLength = Math.min(length1, length2);
-        int strideLimit = minLength & ~(stride - 1);
-        int offset1Adj = offset1 + BYTE_ARRAY_BASE_OFFSET;
-        int offset2Adj = offset2 + BYTE_ARRAY_BASE_OFFSET;
-        int i;
-
-        for (i = 0; i < strideLimit; i += stride) {
-          long lw = theUnsafe.getLong(buffer1, offset1Adj + (long) i);
-          long rw = theUnsafe.getLong(buffer2, offset2Adj + (long) i);
-
-          if (lw != rw) {
-            // original approach (slower in JMH testing)
-            // int n = Long.numberOfTrailingZeros(lw ^ rw) & ~0x7;
-            // return ((int) ((lw >>> n) & 0xFF)) - ((int) ((rw >>> n) & 0xFF));
-            long bw = Long.reverseBytes(lw);
-            long br = Long.reverseBytes(rw);
-            return Long.compareUnsigned(bw, br);
-          }
-        }
-
-        for (; i < minLength; i++) {
-          // do not use UnsignedBytes.compare() because we want to avoid Guava
-          int b1 = buffer1[offset1 + i] & 0xFF;
-          int b2 = buffer2[offset2 + i] & 0xFF;
-          if (b1 != b2) {
-            return b1 - b2;
-          }
-        }
-        return length1 - length2;
+        return FastByteComparisons.compareTo(buffer1, offset1, length1, buffer2, offset2, length2);
       }
     }
   }

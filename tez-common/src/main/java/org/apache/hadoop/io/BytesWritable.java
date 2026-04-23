@@ -278,14 +278,8 @@ public class BytesWritable extends BinaryComparable
     if (this == other) {
       return 0;
     }
-    if (other instanceof BytesWritable) {
-      BytesWritable that = (BytesWritable)other;
-      return org.apache.tez.util.FastByteComparisons.compareTo(
-          this.bytes, this.offset, this.size, that.bytes, that.offset, that.size);
-    } else {
-      return org.apache.tez.util.FastByteComparisons.compareTo(
-          this.bytes, this.offset, this.size, other.getBytes(), 0, other.getLength());
-    }
+    return org.apache.tez.util.FastByteComparisons.compareTo(
+        this.bytes, this.offset, this.size, other.getBytes(), 0, other.getLength());
   }
 
   @Override
