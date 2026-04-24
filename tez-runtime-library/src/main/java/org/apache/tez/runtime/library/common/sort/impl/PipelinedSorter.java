@@ -22,9 +22,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.IntBuffer;
-import java.nio.LongBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -73,6 +70,7 @@ import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterDataInputBuff
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger.DiskSegment;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger.Segment;
 import org.apache.tez.runtime.library.common.TezRuntimeUtils;
+import org.apache.tez.util.FastByteComparisons;
 
 import static org.apache.tez.runtime.library.common.sort.impl.TezSpillRecord.ensureSpillFilePermissions;
 
@@ -546,7 +544,7 @@ public final class PipelinedSorter {
           partition + ")");
     }
     // TBD:FIX in TEZ-2574
-    if (span.kvmeta.remaining() < METASIZE) {
+    if (span.metaRemaining() < METASIZE) {
       this.sort();
       if (span.length() == 0) {
         spillSingleRecord(key, value, partition);
@@ -585,10 +583,10 @@ public final class PipelinedSorter {
     prefix = (partition << (32 - partitionBits)) | (prefix >>> partitionBits);
 
     /* maintain order as in PARTITION, KEYSTART, VALSTART, VALLEN */
-    span.kvmeta.put(prefix);
-    span.kvmeta.put(keystart);
-    span.kvmeta.put(valstart);
-    span.kvmeta.put(valend - valstart);
+    span.putMetaInt(prefix);
+    span.putMetaInt(keystart);
+    span.putMetaInt(valstart);
+    span.putMetaInt(valend - valstart);
     outputRecordsCounter.increment(1);
     outputRecordBytesCounter.increment(valend - keystart);
   }
@@ -1282,8 +1280,9 @@ public final class PipelinedSorter {
   }
 
   private final class SortSpan {
-    final IntBuffer kvmeta;
-    final LongBuffer kvmetalong;
+    final byte[] kvmetaArray;
+    final long kvmetaBaseOffset;
+    final int kvmetaCapacity;
     final ByteBuffer kvbuffer;
     final byte[] kvbufferArray;
     final int kvbufferArrayOffset;
@@ -1293,8 +1292,11 @@ public final class PipelinedSorter {
     private long eq = 0;
     private boolean reinit = false;
     private int capacity;
+    private int kvmetaPosition;
+    private int kvmetaLimit;
 
     public SortSpan(ByteBuffer source, int maxItems, int perItem) {
+      Preconditions.checkArgument(source.hasArray(), "SortSpan source must be backed by a byte[]");
       capacity = source.remaining();
       int metasize = METASIZE*maxItems;
       long dataSize = (long) maxItems * (long) perItem;
@@ -1302,22 +1304,22 @@ public final class PipelinedSorter {
         // try to allocate less meta space, because we have sample data
         metasize = METASIZE*(capacity/(perItem+METASIZE));
       }
+      int sourcePosition = source.position();
       ByteBuffer reserved = source.duplicate();
       reserved.mark();
       if (isDebugEnabled) {
         LOG.debug("{}: reserved.remaining()={}, reserved.metasize={}",
             outputContext.getDestinationVertexName(), reserved.remaining(), metasize);
       }
-      reserved.position(metasize);
+      reserved.position(sourcePosition + metasize);
       kvbuffer = reserved.slice();
       kvbufferArray = kvbuffer.array();
       kvbufferArrayOffset = kvbuffer.arrayOffset();
-      reserved.flip();
-      reserved.limit(metasize);
-      ByteBuffer kvmetabuffer = reserved.slice();
-      ByteBuffer orderedMetaBuffer = kvmetabuffer.order(ByteOrder.nativeOrder());
-      kvmeta = orderedMetaBuffer.asIntBuffer();
-      kvmetalong = orderedMetaBuffer.asLongBuffer();
+      kvmetaArray = source.array();
+      kvmetaBaseOffset = FastByteComparisons.BYTE_ARRAY_BASE_OFFSET + source.arrayOffset() + sourcePosition;
+      kvmetaCapacity = metasize;
+      kvmetaPosition = 0;
+      kvmetaLimit = metasize;
       out = new NonSyncDataOutputStream(
               new BufferStreamWrapper(kvbuffer));
     }
@@ -1460,24 +1462,54 @@ public final class PipelinedSorter {
       return i * (NMETA / 2);
     }
 
+    private long offsetForIntIndex(int intIndex) {
+      return kvmetaBaseOffset + (((long) intIndex) << 2);
+    }
+
+    private long offsetForLongIndex(int longIndex) {
+      return kvmetaBaseOffset + (((long) longIndex) << 3);
+    }
+
+    private int getMetaInt(int intIndex) {
+      return FastByteComparisons.theUnsafe.getInt(kvmetaArray, offsetForIntIndex(intIndex));
+    }
+
+    private long getMetaLong(int longIndex) {
+      return FastByteComparisons.theUnsafe.getLong(kvmetaArray, offsetForLongIndex(longIndex));
+    }
+
+    private void setMetaLong(int longIndex, long value) {
+      FastByteComparisons.theUnsafe.putLong(kvmetaArray, offsetForLongIndex(longIndex), value);
+    }
+
+    private int metaRemaining() {
+      return kvmetaLimit - kvmetaPosition;
+    }
+
+    private void putMetaInt(int value) {
+      Preconditions.checkState(metaRemaining() >= Integer.BYTES, "Insufficient metadata space in span");
+      FastByteComparisons.theUnsafe.putInt(kvmetaArray, kvmetaBaseOffset + kvmetaPosition, value);
+      kvmetaPosition += Integer.BYTES;
+    }
+
     private void swap(final int mi, final int mj) {
       final int kvi = longOffsetFor(mi);
       final int kvj = longOffsetFor(mj);
-      final long l1 = kvmetalong.get(kvi);
-      final long l2 = kvmetalong.get(kvi + 1);
+      final long l1 = getMetaLong(kvi);
+      final long l2 = getMetaLong(kvi + 1);
 
-      kvmetalong.put(kvi, kvmetalong.get(kvj));
-      kvmetalong.put(kvi + 1, kvmetalong.get(kvj + 1));
+      setMetaLong(kvi, getMetaLong(kvj));
+      setMetaLong(kvi + 1, getMetaLong(kvj + 1));
 
-      kvmetalong.put(kvj, l1);
-      kvmetalong.put(kvj + 1, l2);
+      setMetaLong(kvj, l1);
+      setMetaLong(kvj + 1, l2);
     }
 
     private int compareKeys(final int kvi, final int kvj) {
-      final int istart = kvmeta.get(kvi + KEYSTART);
-      final int jstart = kvmeta.get(kvj + KEYSTART);
-      final int ilen   = kvmeta.get(kvi + VALSTART) - istart;
-      final int jlen   = kvmeta.get(kvj + VALSTART) - jstart;
+      final int istart = getMetaInt(kvi + KEYSTART);
+      final int jstart = getMetaInt(kvj + KEYSTART);
+      final int ilen   = getMetaInt(kvi + VALSTART) - istart;
+      final int jlen   = getMetaInt(kvj + VALSTART) - jstart;
 
       if (ilen == 0 || jlen == 0) {
         if (ilen == jlen) {
@@ -1497,8 +1529,8 @@ public final class PipelinedSorter {
     private int compare(final int mi, final int mj) {
       final int kvi = offsetFor(mi);
       final int kvj = offsetFor(mj);
-      final int kvip = kvmeta.get(kvi + PARTITION);
-      final int kvjp = kvmeta.get(kvj + PARTITION);
+      final int kvip = getMetaInt(kvi + PARTITION);
+      final int kvjp = getMetaInt(kvj + PARTITION);
       // sort by partition      
       if (kvip != kvjp) {
         return kvip - kvjp;
@@ -1530,7 +1562,7 @@ public final class PipelinedSorter {
     }
 
     private int length() {
-      return kvmeta.limit()/NMETA;
+      return kvmetaLimit / METASIZE;
     }
 
     private ByteBuffer end() {
@@ -1538,7 +1570,7 @@ public final class PipelinedSorter {
       remaining.position(kvbuffer.position());
       remaining = remaining.slice();
       kvbuffer.limit(kvbuffer.position());
-      kvmeta.limit(kvmeta.position());
+      kvmetaLimit = kvmetaPosition;
       int items = length();
       if (items == 0) {
         return null;
@@ -1567,12 +1599,12 @@ public final class PipelinedSorter {
       final int keystart;
       final int valstart;
       final int partition;
-      partition = kvmeta.get(this.offsetFor(index) + PARTITION);
+      partition = getMetaInt(this.offsetFor(index) + PARTITION);
       if (partition != needlePart) {
           cmp = (partition-needlePart);
       } else {
-        keystart = kvmeta.get(this.offsetFor(index) + KEYSTART);
-        valstart = kvmeta.get(this.offsetFor(index) + VALSTART);
+        keystart = getMetaInt(this.offsetFor(index) + KEYSTART);
+        valstart = getMetaInt(this.offsetFor(index) + VALSTART);
         final byte[] buf = kvbuffer.array();
         final int off = kvbuffer.arrayOffset();
         cmp = TezBytesComparator.compare(buf,
@@ -1589,14 +1621,13 @@ public final class PipelinedSorter {
     
     @Override
     public String toString() {
-        return String.format("Span[%d,%d]", NMETA*kvmeta.capacity(), kvbuffer.limit());
+        return String.format("Span[%d,%d]", kvmetaCapacity, kvbuffer.limit());
     }
   }
 
   private static class SpanIterator implements PartitionedRawKeyValueIterator, Comparable<SpanIterator> {
     private int kvindex = -1;
     private final int maxindex;
-    private final IntBuffer kvmeta;
     private final ByteBuffer kvbuffer;
     private final SortSpan span;
     private final InputByteBuffer key = new InputByteBuffer();
@@ -1605,15 +1636,14 @@ public final class PipelinedSorter {
     private static final int minrun = (1 << 4);
 
     public SpanIterator(SortSpan span) {
-      this.kvmeta = span.kvmeta;
       this.kvbuffer = span.kvbuffer;
       this.span = span;
-      this.maxindex = (kvmeta.limit()/NMETA) - 1;
+      this.maxindex = span.length() - 1;
     }
 
     public DataInputBuffer getKey()  {
-      final int keystart = kvmeta.get(span.offsetFor(kvindex) + KEYSTART);
-      final int valstart = kvmeta.get(span.offsetFor(kvindex) + VALSTART);
+      final int keystart = span.getMetaInt(span.offsetFor(kvindex) + KEYSTART);
+      final int valstart = span.getMetaInt(span.offsetFor(kvindex) + VALSTART);
       final byte[] buf = kvbuffer.array();
       final int off = kvbuffer.arrayOffset();
       key.reset(buf, off + keystart, valstart - keystart);
@@ -1621,8 +1651,8 @@ public final class PipelinedSorter {
     }
 
     public DataInputBuffer getValue() {
-      final int valstart = kvmeta.get(span.offsetFor(kvindex) + VALSTART);
-      final int vallen = kvmeta.get(span.offsetFor(kvindex) + VALLEN);
+      final int valstart = span.getMetaInt(span.offsetFor(kvindex) + VALSTART);
+      final int vallen = span.getMetaInt(span.offsetFor(kvindex) + VALLEN);
       final byte[] buf = kvbuffer.array();
       final int off = kvbuffer.arrayOffset();
       value.reset(buf, off + valstart, vallen);
@@ -1650,7 +1680,7 @@ public final class PipelinedSorter {
     }
 
     public int getPartition() {
-      final int partition = kvmeta.get(span.offsetFor(kvindex) + PARTITION);
+      final int partition = span.getMetaInt(span.offsetFor(kvindex) + PARTITION);
       return partition;
     }
 
@@ -1658,7 +1688,7 @@ public final class PipelinedSorter {
       if (!hasNext()) {
         return null;
       } else {
-          return kvmeta.get(span.offsetFor(kvindex + 1) + PARTITION);
+          return span.getMetaInt(span.offsetFor(kvindex + 1) + PARTITION);
       }
     }
 
