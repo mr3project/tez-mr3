@@ -126,12 +126,15 @@ public final class PipelinedSorter {
 
   private final int partitionBits;
 
-  private static final int PARTITION = 0;        // partition offset in acct
-  private static final int KEYSTART = 1;         // key offset in acct
-  private static final int VALSTART = 2;         // val offset in acct
+  private static final int KEYSTART = 0;         // key offset in acct
+  private static final int VALSTART = 1;         // val offset in acct
+  private static final int PARTITION = 2;        // partition offset in acct
   private static final int VALLEN = 3;           // val len in acct
   private static final int NMETA = 4;            // num meta ints
   private static final int METASIZE = NMETA * 4; // size in bytes
+
+  // Assume: ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN
+  // This is checked in the static block of FastByteComparisons, so no need to check here again.
 
   private final boolean lazyAllocateMem;
   private final int MIN_BLOCK_SIZE;
@@ -582,11 +585,9 @@ public final class PipelinedSorter {
     int prefix = TezBytesComparator.getProxy(key);
     prefix = (partition << (32 - partitionBits)) | (prefix >>> partitionBits);
 
-    /* maintain order as in PARTITION, KEYSTART, VALSTART, VALLEN */
-    span.putMetaInt(prefix);
-    span.putMetaInt(keystart);
-    span.putMetaInt(valstart);
-    span.putMetaInt(valend - valstart);
+    /* maintain order as in KEYSTART, VALSTART, PARTITION, VALLEN */
+    span.putMetaLong(keystart, valstart);
+    span.putMetaLong(prefix, valend - valstart);
     outputRecordsCounter.increment(1);
     outputRecordBytesCounter.increment(valend - keystart);
   }
@@ -1474,6 +1475,35 @@ public final class PipelinedSorter {
       return FastByteComparisons.theUnsafe.getInt(kvmetaArray, offsetForIntIndex(intIndex));
     }
 
+    private int unpackFirstInt(long packed) {
+      return (int) packed;
+      // big-endian: (int) (packed >>> Integer.SIZE)
+    }
+
+    private int unpackSecondInt(long packed) {
+      return (int) (packed >>> Integer.SIZE);
+      // big-endian: (int) packed
+    }
+
+    private long packTwoInts(int first, int second) {
+      long firstBits = first & 0xFFFFFFFFL;
+      long secondBits = second & 0xFFFFFFFFL;
+      return firstBits | (secondBits << Integer.SIZE);
+      // big-endian: (firstBits << Integer.SIZE) | secondBits
+    }
+
+    private long getKeyValStartPair(int kvi) {
+      return getMetaLong(longOffsetFor(kvi >>> 2));
+    }
+
+    private int getKeyStartFromPair(long pair) {
+      return unpackFirstInt(pair);
+    }
+
+    private int getValStartFromPair(long pair) {
+      return unpackSecondInt(pair);
+    }
+
     private long getMetaLong(int longIndex) {
       return FastByteComparisons.theUnsafe.getLong(kvmetaArray, offsetForLongIndex(longIndex));
     }
@@ -1487,9 +1517,14 @@ public final class PipelinedSorter {
     }
 
     private void putMetaInt(int value) {
-      Preconditions.checkState(metaRemaining() >= Integer.BYTES, "Insufficient metadata space in span");
       FastByteComparisons.theUnsafe.putInt(kvmetaArray, kvmetaBaseOffset + kvmetaPosition, value);
       kvmetaPosition += Integer.BYTES;
+    }
+
+    private void putMetaLong(int first, int second) {
+      FastByteComparisons.theUnsafe.putLong(
+          kvmetaArray, kvmetaBaseOffset + kvmetaPosition, packTwoInts(first, second));
+      kvmetaPosition += Long.BYTES;
     }
 
     private void swap(final int mi, final int mj) {
@@ -1506,10 +1541,12 @@ public final class PipelinedSorter {
     }
 
     private int compareKeys(final int kvi, final int kvj) {
-      final int istart = getMetaInt(kvi + KEYSTART);
-      final int jstart = getMetaInt(kvj + KEYSTART);
-      final int ilen   = getMetaInt(kvi + VALSTART) - istart;
-      final int jlen   = getMetaInt(kvj + VALSTART) - jstart;
+      final long ipair = getKeyValStartPair(kvi);
+      final int istart = getKeyStartFromPair(ipair);
+      final int ilen   = getValStartFromPair(ipair) - istart;
+      final long jpair = getKeyValStartPair(kvj);
+      final int jstart = getKeyStartFromPair(jpair);
+      final int jlen   = getValStartFromPair(jpair) - jstart;
 
       if (ilen == 0 || jlen == 0) {
         if (ilen == jlen) {
@@ -1603,8 +1640,9 @@ public final class PipelinedSorter {
       if (partition != needlePart) {
           cmp = (partition-needlePart);
       } else {
-        keystart = getMetaInt(this.offsetFor(index) + KEYSTART);
-        valstart = getMetaInt(this.offsetFor(index) + VALSTART);
+        long keyValStartPair = getKeyValStartPair(this.offsetFor(index));
+        keystart = getKeyStartFromPair(keyValStartPair);
+        valstart = getValStartFromPair(keyValStartPair);
         final byte[] buf = kvbuffer.array();
         final int off = kvbuffer.arrayOffset();
         cmp = TezBytesComparator.compare(buf,
@@ -1642,8 +1680,9 @@ public final class PipelinedSorter {
     }
 
     public DataInputBuffer getKey()  {
-      final int keystart = span.getMetaInt(span.offsetFor(kvindex) + KEYSTART);
-      final int valstart = span.getMetaInt(span.offsetFor(kvindex) + VALSTART);
+      long keyValStartPair = span.getKeyValStartPair(span.offsetFor(kvindex));
+      final int keystart = span.getKeyStartFromPair(keyValStartPair);
+      final int valstart = span.getValStartFromPair(keyValStartPair);
       final byte[] buf = kvbuffer.array();
       final int off = kvbuffer.arrayOffset();
       key.reset(buf, off + keystart, valstart - keystart);
@@ -1651,7 +1690,8 @@ public final class PipelinedSorter {
     }
 
     public DataInputBuffer getValue() {
-      final int valstart = span.getMetaInt(span.offsetFor(kvindex) + VALSTART);
+      long keyValStartPair = span.getKeyValStartPair(span.offsetFor(kvindex));
+      final int valstart = span.getValStartFromPair(keyValStartPair);
       final int vallen = span.getMetaInt(span.offsetFor(kvindex) + VALLEN);
       final byte[] buf = kvbuffer.array();
       final int off = kvbuffer.arrayOffset();
