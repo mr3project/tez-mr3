@@ -910,9 +910,9 @@ public class IFile {
   public interface KeyValueReaderBytesWritable extends KeyValueReaderBase {
     // Invariant: key already contains the previous key read from this stream.
     // On the first call, key can be any BytesWritable instance.
-    // The contents of key are mutable and overwritten on subsequent reads.
+    // After readRawKey() returns, the backing byte[] array is immutable, so the consumer may keep pointers to it.
     Reader.KeyState readRawKey(BytesWritable key) throws IOException;
-    // The contents of value are mutable and overwritten on subsequent reads.
+    // After readRawValue() returns, the backing byte[] array is immutable, so the consumer may keep pointers to it.
     void nextRawValue(BytesWritable value) throws IOException;
   }
 
@@ -1382,8 +1382,8 @@ public class IFile {
       if (!positionToNextRecordNoRle()) {
         return KeyState.NO_KEY;
       }
-      key.expandIfNecessary(currentKeyLength);
-      int i = readData(key.getBytesRaw(), currentKeyLength);
+      byte[] bytes = key.reinitialize(currentKeyLength);
+      int i = readData(bytes, currentKeyLength);
 
       if (i != currentKeyLength) {
         throw new IOException(String.format(INCOMPLETE_READ, currentKeyLength, i));
@@ -1401,8 +1401,8 @@ public class IFile {
         // the previous key is already present in "key".
         return KeyState.SAME_KEY;
       }
-      key.expandIfNecessary(currentKeyLength);
-      int i = readData(key.getBytesRaw(), currentKeyLength);
+      byte[] bytes = key.reinitialize(currentKeyLength);
+      int i = readData(bytes, currentKeyLength);
 
       if (i != currentKeyLength) {
         throw new IOException(String.format(INCOMPLETE_READ, currentKeyLength, i));
@@ -1433,8 +1433,8 @@ public class IFile {
     }
 
     public void nextRawValue(BytesWritable value) throws IOException {
-      value.expandIfNecessary(currentValueLength);
-      int i = readData(value.getBytesRaw(), currentValueLength);
+      byte[] bytes = value.reinitialize(currentValueLength);
+      int i = readData(bytes, currentValueLength);
 
       if (i != currentValueLength) {
         throw new IOException(String.format(INCOMPLETE_READ, currentValueLength, i));
