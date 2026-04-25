@@ -392,10 +392,6 @@ public class MultiByteArrayOutputStream extends OutputStream {
         scanned += currentLen;
         memoryIndex++;
       }
-      if (memoryIndex >= memoryBufferLengths.length) {
-        offsetInMemoryBuffer = 0;
-      }
-
       assert endPos <= totalBytes;
     }
 
@@ -453,9 +449,6 @@ public class MultiByteArrayOutputStream extends OutputStream {
       int copied = 0;
       while (len > 0 && globalPos < endPos) {
         if (globalPos < memoryBytes) {
-          if (memoryIndex >= memoryBuffers.size()) {
-            break;
-          }
           byte[] cur = memoryBuffers.get(memoryIndex);
           int curLen = memoryBufferLengths[memoryIndex];
           int availableInCur = curLen - offsetInMemoryBuffer;
@@ -504,9 +497,6 @@ public class MultiByteArrayOutputStream extends OutputStream {
       long skipped = 0;
       if (globalPos < memoryBytes) {
         while (toSkip > 0 && globalPos < Math.min(memoryBytes, endPos)) {
-          if (memoryIndex >= memoryBufferLengths.length) {
-            break;
-          }
           int curLen = memoryBufferLengths[memoryIndex];
           int availableInCur = curLen - offsetInMemoryBuffer;
           if (availableInCur <= 0) {
@@ -553,7 +543,7 @@ public class MultiByteArrayOutputStream extends OutputStream {
     private void ensureSpillOpen() throws IOException {
       if (spillIn == null) {
         spillIn = fs.open(outputPath);
-        spillIn.seek(Math.max(0, globalPos - memoryBytes));
+        spillIn.seek(globalPos - memoryBytes);
       }
     }
   }
