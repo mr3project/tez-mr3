@@ -5,22 +5,21 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.handler.ssl.SslHandler;
 import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.ReadaheadPool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.ByteArrayInputStream;
+import java.io.EOFException;
 import java.io.File;
 import java.io.InputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.Vector;
 
 /**
  * An OutputStream that grows in fixed-size chunks up to a limit, after which
@@ -302,13 +301,14 @@ public class MultiByteArrayOutputStream extends OutputStream {
   //   1. called only after close() is called
   //   2. on InputStream returned, close() is eventually called.
   //      In the current implementation, Segment.close() eventually calls InputStream.close() in TezMerger.
-  public InputStream createInputStream() throws IOException {
+  // The returned stream reads bytes in [offset, offset + length).
+  public InputStream createInputStreamFrom(long offset, long length) throws IOException {
     List<byte[]> buffersFinal;
     int posInBufFinal;
     long bufferBytesFinal;
     long totalBytesFinal;
 
-    // TODO: synchronized() is unnecessary because createInputStream() is called in the same thread that calls close()
+    // TODO: synchronized() is unnecessary because createInputStreamFrom() is called in the same thread that calls close()
     synchronized (this) {
       buffersFinal = buffers;
       posInBufFinal = posInBuf;
@@ -316,23 +316,236 @@ public class MultiByteArrayOutputStream extends OutputStream {
       totalBytesFinal = totalBytes;
     }
 
-    assert buffersFinal != null;  // because createInputStream() is called before clean()
+    assert buffersFinal != null;  // because createInputStreamFrom() is called before clean()
 
-    Vector<InputStream> streams = new Vector<>();
+    if (offset < 0 || length < 0 || offset > totalBytesFinal || length > totalBytesFinal - offset) {
+      throw new IndexOutOfBoundsException(String.format(
+          "Invalid range: offset=%d, length=%d, totalBytes=%d", offset, length, totalBytesFinal));
+    }
+
+    int numNonEmptyBuffers = 0;
     for (int i = 0; i < buffersFinal.size(); i++) {
       byte[] bufferElement = buffersFinal.get(i);
       int bufferLength = (i < buffersFinal.size() - 1) ? bufferElement.length : posInBufFinal;
       if (bufferLength > 0) {
-        streams.add(new ByteArrayInputStream(bufferElement, 0, bufferLength));
+        numNonEmptyBuffers++;
       }
     }
 
-    if (totalBytesFinal > bufferBytesFinal) {
-      streams.add(fs.open(outputPath));
+    byte[][] memoryBuffers = new byte[numNonEmptyBuffers][];
+    int[] memoryBufferLengths = new int[numNonEmptyBuffers];
+    int outIndex = 0;
+    for (int i = 0; i < buffersFinal.size(); i++) {
+      byte[] bufferElement = buffersFinal.get(i);
+      int bufferLength = (i < buffersFinal.size() - 1) ? bufferElement.length : posInBufFinal;
+      if (bufferLength > 0) {
+        memoryBuffers[outIndex] = bufferElement;
+        memoryBufferLengths[outIndex++] = bufferLength;
+      }
     }
 
-    // works okay even when streams.isEmpty(), so no need to return ByteArrayInputStream(new byte[0])
-    return new java.io.SequenceInputStream(Collections.enumeration(streams));
+    return new MultiBufferRangeInputStream(
+        memoryBuffers,
+        memoryBufferLengths,
+        bufferBytesFinal,
+        totalBytesFinal,
+        offset,
+        length);
+  }
+
+  private final class MultiBufferRangeInputStream extends InputStream {
+    private final byte[][] memoryBuffers;
+    private final int[] memoryBufferLengths;
+    private final long memoryBytes;
+    private final long endPos;
+
+    private long globalPos;
+    private int memoryIndex;
+    private int offsetInMemoryBuffer;
+    private FSDataInputStream spillIn;
+    private boolean closed;
+
+    private MultiBufferRangeInputStream(
+        byte[][] memoryBuffers,
+        int[] memoryBufferLengths,
+        long memoryBytes,
+        long totalBytes,
+        long offset,
+        long length) {
+      this.memoryBuffers = memoryBuffers;
+      this.memoryBufferLengths = memoryBufferLengths;
+      this.memoryBytes = memoryBytes;
+      this.globalPos = offset;
+      this.endPos = offset + length;
+
+      this.memoryIndex = 0;
+      this.offsetInMemoryBuffer = 0;
+
+      long memoryStartPos = Math.min(offset, memoryBytes);
+      long scanned = 0;
+      while (memoryIndex < memoryBufferLengths.length) {
+        int currentLen = memoryBufferLengths[memoryIndex];
+        if (scanned + currentLen > memoryStartPos) {
+          offsetInMemoryBuffer = (int) (memoryStartPos - scanned);
+          break;
+        }
+        scanned += currentLen;
+        memoryIndex++;
+      }
+      assert endPos <= totalBytes;
+    }
+
+    @Override
+    public int read() throws IOException {
+      if (closed) {
+        throw new IOException("Stream closed");
+      }
+      if (globalPos >= endPos) {
+        return -1;
+      }
+
+      if (globalPos < memoryBytes) {
+        while (memoryIndex < memoryBuffers.length) {
+          int curLen = memoryBufferLengths[memoryIndex];
+          if (offsetInMemoryBuffer < curLen) {
+            int result = memoryBuffers[memoryIndex][offsetInMemoryBuffer] & 0xFF;
+            offsetInMemoryBuffer++;
+            globalPos++;
+            return result;
+          }
+          memoryIndex++;
+          offsetInMemoryBuffer = 0;
+        }
+      }
+
+      ensureSpillOpen();
+      int result = spillIn.read();
+      if (result < 0) {
+        throw new EOFException(String.format(
+            "Unexpected EOF while reading spill file: outputPath=%s, position=%d", outputPath, globalPos));
+      }
+      globalPos++;
+      return result;
+    }
+
+    @Override
+    public int read(byte[] b, int off, int len) throws IOException {
+      if (closed) {
+        throw new IOException("Stream closed");
+      }
+      if (b == null) {
+        throw new NullPointerException("b");
+      }
+      if (off < 0 || len < 0 || len > b.length - off) {
+        throw new IndexOutOfBoundsException();
+      }
+      if (len == 0) {
+        return 0;
+      }
+      if (globalPos >= endPos) {
+        return -1;
+      }
+
+      int copied = 0;
+      while (len > 0 && globalPos < endPos) {
+        if (globalPos < memoryBytes) {
+          byte[] cur = memoryBuffers[memoryIndex];
+          int curLen = memoryBufferLengths[memoryIndex];
+          int availableInCur = curLen - offsetInMemoryBuffer;
+          if (availableInCur <= 0) {
+            memoryIndex++;
+            offsetInMemoryBuffer = 0;
+            continue;
+          }
+
+          int toCopy = (int) Math.min(Math.min((long) len, endPos - globalPos), availableInCur);
+          System.arraycopy(cur, offsetInMemoryBuffer, b, off, toCopy);
+
+          off += toCopy;
+          len -= toCopy;
+          copied += toCopy;
+          globalPos += toCopy;
+          offsetInMemoryBuffer += toCopy;
+        } else {
+          ensureSpillOpen();
+          int toRead = (int) Math.min((long) len, endPos - globalPos);
+          int n = spillIn.read(b, off, toRead);
+          if (n < 0) {
+            throw new EOFException(String.format(
+                "Unexpected EOF while reading spill file: outputPath=%s, position=%d", outputPath, globalPos));
+          }
+          off += n;
+          len -= n;
+          copied += n;
+          globalPos += n;
+        }
+      }
+
+      return copied == 0 ? -1 : copied;
+    }
+
+    @Override
+    public long skip(long n) throws IOException {
+      if (n <= 0) {
+        return 0;
+      }
+      long toSkip = Math.min(n, endPos - globalPos);
+      if (toSkip <= 0) {
+        return 0;
+      }
+
+      long skipped = 0;
+      if (globalPos < memoryBytes) {
+        while (toSkip > 0 && globalPos < Math.min(memoryBytes, endPos)) {
+          int curLen = memoryBufferLengths[memoryIndex];
+          int availableInCur = curLen - offsetInMemoryBuffer;
+          if (availableInCur <= 0) {
+            memoryIndex++;
+            offsetInMemoryBuffer = 0;
+            continue;
+          }
+          int jump = (int) Math.min((long) availableInCur, toSkip);
+          offsetInMemoryBuffer += jump;
+          globalPos += jump;
+          toSkip -= jump;
+          skipped += jump;
+        }
+      }
+
+      if (toSkip > 0 && globalPos < endPos) {
+        ensureSpillOpen();
+        long targetPosInSpill = (globalPos - memoryBytes) + toSkip;
+        spillIn.seek(targetPosInSpill);
+        globalPos += toSkip;
+        skipped += toSkip;
+      }
+
+      return skipped;
+    }
+
+    @Override
+    public int available() {
+      long remaining = endPos - globalPos;
+      return (int) Math.min(Integer.MAX_VALUE, Math.max(remaining, 0));
+    }
+
+    @Override
+    public void close() throws IOException {
+      if (closed) {
+        return;
+      }
+      closed = true;
+      if (spillIn != null) {
+        spillIn.close();
+      }
+    }
+
+    private void ensureSpillOpen() throws IOException {
+      if (spillIn == null) {
+        spillIn = fs.open(outputPath);
+        spillIn.seek(globalPos - memoryBytes);
+      }
+    }
   }
 
   // 3. called from ShuffleHandlerDaemonProcessor thread
