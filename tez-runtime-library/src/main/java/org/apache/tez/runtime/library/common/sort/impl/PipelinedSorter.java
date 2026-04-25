@@ -846,17 +846,8 @@ public final class PipelinedSorter {
           true, null, outputContext);
     }
 
-    InputStream input = byteArrayOutput.createInputStream();
-    long remaining = indexRecord.getStartOffset();
-    while (remaining > 0) {
-      long skipped = input.skip(remaining);
-      if (skipped <= 0) {
-        input.close();
-        throw new IOException("Failed to seek spill to offset "
-            + indexRecord.getStartOffset());
-      }
-      remaining -= skipped;
-    }
+    InputStream input = byteArrayOutput.createInputStreamFrom(
+        indexRecord.getStartOffset(), indexRecord.getPartLength());
 
     IFile.KeyValueReaderDataInputBuffer reader = new IFile.Reader(input, indexRecord.getPartLength(),
         codec, null, null, ifileReadAhead, ifileReadAheadLength, outputContext, null);
