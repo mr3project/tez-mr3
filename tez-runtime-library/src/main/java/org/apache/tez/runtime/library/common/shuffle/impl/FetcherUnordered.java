@@ -427,6 +427,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       String pathComponent = inputAttemptIdentifier.getPathComponent();   // already in expanded form
       TezSpillRecord spillRecord = null;  // specific to each inputAttemptIdentifier/pathComponent
       Path inputFilePath = null;
+      Map<Integer, TezOffsetRecord> offsetRecordMap = null;
 
       boolean hasFailures = false;  // set to true if errors occur inside the inner loop
       for (int k = 0; k < partitionCount; k++) {
@@ -444,11 +445,21 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
                 fetcherConfigCommon.localDirAllocator, fetcherConfigCommon.localFs);
             spillRecord = pair.getKey();
             inputFilePath = pair.getValue();
+            if (fetcherConfigCommon.compositeFetch) {
+              org.apache.tez.runtime.api.IndexPathCache.MapOutputInfo mapOutputInfo =
+                  taskContext.getIndexPathCache().get(pathComponent);
+              if (mapOutputInfo != null) {
+                offsetRecordMap = mapOutputInfo.getOffsetRecordMap();
+              }
+            }
           }
           TezIndexRecord indexRecord = spillRecord.getIndex(reduceId);
           // TODO: continue if !indexRecord.hasData()
 
           fetchedInput = getLocalFetchedInput(srcAttemptId, pathComponent, indexRecord, inputFilePath);
+          if (offsetRecordMap != null) {
+            fetchedInput.setTezOffsetRecord(offsetRecordMap.get(reduceId));
+          }
           long endTime = System.currentTimeMillis();
           fetcherCallback.fetchSucceeded(shuffleClientId, host, srcAttemptId, fetchedInput,
               indexRecord.getPartLength(), indexRecord.getRawLength(), (endTime - startTime));
