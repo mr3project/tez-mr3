@@ -323,7 +323,6 @@ public class MultiByteArrayOutputStream extends OutputStream {
           "Invalid range: offset=%d, length=%d, totalBytes=%d", offset, length, totalBytesFinal));
     }
 
-    List<byte[]> memoryBuffers = new ArrayList<>(buffersFinal.size());
     int numNonEmptyBuffers = 0;
     for (int i = 0; i < buffersFinal.size(); i++) {
       byte[] bufferElement = buffersFinal.get(i);
@@ -333,13 +332,14 @@ public class MultiByteArrayOutputStream extends OutputStream {
       }
     }
 
+    byte[][] memoryBuffers = new byte[numNonEmptyBuffers][];
     int[] memoryBufferLengths = new int[numNonEmptyBuffers];
     int outIndex = 0;
     for (int i = 0; i < buffersFinal.size(); i++) {
       byte[] bufferElement = buffersFinal.get(i);
       int bufferLength = (i < buffersFinal.size() - 1) ? bufferElement.length : posInBufFinal;
       if (bufferLength > 0) {
-        memoryBuffers.add(bufferElement);
+        memoryBuffers[outIndex] = bufferElement;
         memoryBufferLengths[outIndex++] = bufferLength;
       }
     }
@@ -354,7 +354,7 @@ public class MultiByteArrayOutputStream extends OutputStream {
   }
 
   private final class MultiBufferRangeInputStream extends InputStream {
-    private final List<byte[]> memoryBuffers;
+    private final byte[][] memoryBuffers;
     private final int[] memoryBufferLengths;
     private final long memoryBytes;
     private final long endPos;
@@ -366,7 +366,7 @@ public class MultiByteArrayOutputStream extends OutputStream {
     private boolean closed;
 
     private MultiBufferRangeInputStream(
-        List<byte[]> memoryBuffers,
+        byte[][] memoryBuffers,
         int[] memoryBufferLengths,
         long memoryBytes,
         long totalBytes,
@@ -405,10 +405,10 @@ public class MultiByteArrayOutputStream extends OutputStream {
       }
 
       if (globalPos < memoryBytes) {
-        while (memoryIndex < memoryBuffers.size()) {
+        while (memoryIndex < memoryBuffers.length) {
           int curLen = memoryBufferLengths[memoryIndex];
           if (offsetInMemoryBuffer < curLen) {
-            int result = memoryBuffers.get(memoryIndex)[offsetInMemoryBuffer] & 0xFF;
+            int result = memoryBuffers[memoryIndex][offsetInMemoryBuffer] & 0xFF;
             offsetInMemoryBuffer++;
             globalPos++;
             return result;
@@ -449,7 +449,7 @@ public class MultiByteArrayOutputStream extends OutputStream {
       int copied = 0;
       while (len > 0 && globalPos < endPos) {
         if (globalPos < memoryBytes) {
-          byte[] cur = memoryBuffers.get(memoryIndex);
+          byte[] cur = memoryBuffers[memoryIndex];
           int curLen = memoryBufferLengths[memoryIndex];
           int availableInCur = curLen - offsetInMemoryBuffer;
           if (availableInCur <= 0) {
