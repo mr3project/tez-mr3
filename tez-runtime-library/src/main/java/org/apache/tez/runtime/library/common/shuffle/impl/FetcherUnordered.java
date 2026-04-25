@@ -32,7 +32,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.commons.io.input.BoundedInputStream;
 import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.FetcherConfigCommon;
@@ -514,7 +513,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       InputStream inputStream = byteArrayOutput.createInputStreamFrom(
           indexRecord.getStartOffset(), indexRecord.getPartLength());
       fetchedInput = new InputStreamFetchedInput(
-          new BoundedInputStream(inputStream, indexRecord.getPartLength()),
+          inputStream,
           indexRecord.getPartLength(),
           srcAttemptId, NO_OP_FETCHED_INPUT_CALLBACK);
     }

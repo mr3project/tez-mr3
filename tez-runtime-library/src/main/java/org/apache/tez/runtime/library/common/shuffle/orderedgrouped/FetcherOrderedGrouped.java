@@ -34,7 +34,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.commons.io.input.BoundedInputStream;
 import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.FetcherConfigCommon;
@@ -772,7 +771,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         indexRecord.getStartOffset(), indexRecord.getPartLength());
     return MapOutput.createInputStreamMapOutput(
         srcAttemptId, allocator,
-        new BoundedInputStream(inputStream, indexRecord.getPartLength()),
+        inputStream,
         indexRecord.getRawLength(),
         indexRecord.getPartLength(),
         true);
