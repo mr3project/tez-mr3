@@ -34,7 +34,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.commons.io.input.BoundedInputStream;
 import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.FetcherConfigCommon;
@@ -779,19 +778,11 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     if (byteArrayOutput == null) {
       throw new IOException("ConcurrentByteCache not found for pathComponent=" + pathComponent);
     }
-    InputStream inputStream = byteArrayOutput.createInputStream();
-    long remaining = indexRecord.getStartOffset();
-    while (remaining > 0) {
-      long skipped = inputStream.skip(remaining);
-      if (skipped <= 0) {
-        inputStream.close();
-        throw new IOException("Failed to seek spill to offset " + indexRecord.getStartOffset());
-      }
-      remaining -= skipped;
-    }
+    InputStream inputStream = byteArrayOutput.createInputStreamFrom(
+        indexRecord.getStartOffset(), indexRecord.getPartLength());
     return MapOutput.createInputStreamMapOutput(
         srcAttemptId, allocator,
-        new BoundedInputStream(inputStream, indexRecord.getPartLength()),
+        inputStream,
         indexRecord.getRawLength(),
         indexRecord.getPartLength(),
         true);

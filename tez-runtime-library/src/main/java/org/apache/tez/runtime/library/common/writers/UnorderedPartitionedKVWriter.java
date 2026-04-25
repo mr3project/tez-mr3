@@ -1415,18 +1415,10 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
                   }
                   additionalSpillBytesReadCounter.increment(indexRecord.getPartLength());
                 } else {
-                  InputStream input = spillInfo.byteArrayOutput.createInputStream();
+                  InputStream input = spillInfo.byteArrayOutput.createInputStreamFrom(
+                      indexRecord.getStartOffset(), indexRecord.getPartLength());
                   boolean closeInput = true;
                   try {
-                    long remaining = indexRecord.getStartOffset();
-                    while (remaining > 0) {
-                      long skipped = input.skip(remaining);
-                      if (skipped <= 0) {
-                        throw new IOException("Failed to seek spill to offset "
-                            + indexRecord.getStartOffset());
-                      }
-                      remaining -= skipped;
-                    }
                     IFileInputStream inputStream = IFile.Reader.openIFileInputStream(
                         input, indexRecord.getPartLength(), ifileReadAhead, ifileReadAheadLength);
                     closeInput = false;
@@ -1448,17 +1440,8 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
                       additionalSpillBytesReadCounter, ifileReadAhead, ifileReadAheadLength,
                       outputContext, spillOffsetRecord);
                 } else {
-                  InputStream input = spillInfo.byteArrayOutput.createInputStream();
-                  long remaining = indexRecord.getStartOffset();
-                  while (remaining > 0) {
-                    long skipped = input.skip(remaining);
-                    if (skipped <= 0) {
-                      input.close();
-                      throw new IOException("Failed to seek spill to offset "
-                          + indexRecord.getStartOffset());
-                    }
-                    remaining -= skipped;
-                  }
+                  InputStream input = spillInfo.byteArrayOutput.createInputStreamFrom(
+                      indexRecord.getStartOffset(), indexRecord.getPartLength());
                   reader = new IFile.Reader(input, indexRecord.getPartLength(), spillCodecForReader, null, null,
                       ifileReadAhead, ifileReadAheadLength, outputContext, spillOffsetRecord);
                 }

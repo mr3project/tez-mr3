@@ -583,7 +583,9 @@ public class TezMerger {
             tempSegment = new DiskSegment(fs, outputFile, 0, fs.getFileStatus(outputFile).getLen(), codec,
                 ifileReadAhead, ifileReadAheadLength, false, null, inputContext);
           } else {
-            IFile.KeyValueReaderDataInputBuffer reader = new Reader(byteArrayOutput.createInputStream(), byteArrayOutput.getTotalBytes(),
+            IFile.KeyValueReaderDataInputBuffer reader = new Reader(
+                byteArrayOutput.createInputStreamFrom(0, byteArrayOutput.getTotalBytes()),
+                byteArrayOutput.getTotalBytes(),
                 codec, null, null, ifileReadAhead, ifileReadAheadLength, inputContext);
             tempSegment = new IntermediateMemorySegment(reader, byteArrayOutput, true);
           }
