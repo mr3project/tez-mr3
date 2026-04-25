@@ -399,27 +399,28 @@ public class TezRuntimeConfiguration {
       TEZ_RUNTIME_PREFIX + "shuffle.fetch.verify-disk-checksum";
   public static final boolean TEZ_RUNTIME_SHUFFLE_FETCH_VERIFY_DISK_CHECKSUM_DEFAULT = true;
 
+  // TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH, TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_ORDERED
+  // Setting it to true is usually less efficient than setting it to false
+  // because IFile.Reader (implementing KeyValueReaderBytesWritable) allocates a new byte array to store a key/value.
+  // Thus, it is more efficient to set it to false so that the entire stream is decompressed at once into memory.
+
   /**
    * If the shuffle input is on the local host bypass the http fetch and access the files directly
    * only for unordered fetch
    */
-  // do not change the default value because local mode assumes 'true'.
-  // do not change the default value because tez-site.xml does not set it.
   // read only in constructFetcherConfigCommon() from ShuffleServer, so not included in tezRuntimeKeys[]
   @ConfigurationProperty(type = "boolean")
   public static final String TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH = TEZ_RUNTIME_PREFIX +
       "optimize.local.fetch";
-  public static final boolean TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_DEFAULT = true;
+  public static final boolean TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_DEFAULT = false;
 
   // for ordered fetched
   // set to false when tez.runtime.shuffle.memory-to-memory.enable=true.
-  // do not change the default value because local mode assumes 'true'.
-  // do not change the default value because tez-site.xml does not set it.
   // read only in constructFetcherConfigCommon() from ShuffleServer, so not included in tezRuntimeKeys[]
   @ConfigurationProperty(type = "boolean")
   public static final String TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_ORDERED = TEZ_RUNTIME_PREFIX +
       "optimize.local.fetch.ordered";
-  public static final boolean TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_ORDERED_DEFAULT = true;
+  public static final boolean TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_ORDERED_DEFAULT = false;
 
   static {
     tezRuntimeKeys.add(TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID);
