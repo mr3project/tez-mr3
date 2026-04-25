@@ -1,7 +1,5 @@
 package org.apache.tez.runtime.api;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.junit.Assert;
 import org.junit.Test;
@@ -59,10 +57,8 @@ public class TestMultiByteArrayOutputStream {
   }
 
   private static MultiByteArrayOutputStream newStream() throws IOException {
-    FileSystem fs = FileSystem.getLocal(new Configuration());
-    Path path = new Path(System.getProperty("java.io.tmpdir"),
-        "tez-mb-aos-test-" + UUID.randomUUID());
-    return new MultiByteArrayOutputStream(fs, path);
+    Path path = new Path("tez-mb-aos-test-" + UUID.randomUUID());
+    return new MultiByteArrayOutputStream(null, path);
   }
 
   private static void assertThrowsIndexOutOfBounds(
