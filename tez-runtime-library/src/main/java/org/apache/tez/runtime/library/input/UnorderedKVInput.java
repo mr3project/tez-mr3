@@ -20,6 +20,7 @@ package org.apache.tez.runtime.library.input;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.function.BiConsumer;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -180,6 +181,13 @@ public class UnorderedKVInput extends AbstractLogicalInput implements LogicalInp
         @Override
         public BytesWritable getCurrentValue() throws IOException {
           throw new RuntimeException("No data available in Input");
+        }
+
+        @Override
+        public int consumeAll(BiConsumer<BytesWritable, BytesWritable> consumer) throws IOException {
+          hasCompletedProcessing();
+          completedProcessing = true;
+          return 0;
         }
       };
     }
