@@ -25,6 +25,7 @@ import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.api.ReaderEdge;
 
 public abstract class KeyValueReaderEdge extends KeyValueReader implements ReaderEdge {
+  // Contract: next() and consumeAll() are mutually exclusive and must not be mixed.
 
   /**
    * Returns the current key

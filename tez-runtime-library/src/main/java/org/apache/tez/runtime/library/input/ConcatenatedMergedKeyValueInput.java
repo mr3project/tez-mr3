@@ -90,32 +90,25 @@ public class ConcatenatedMergedKeyValueInput extends MergedLogicalInput implemen
     @Override
     public int consumeAll(BiConsumer<BytesWritable, BytesWritable> consumer) throws IOException {
       int consumedRecords = 0;
-      while (true) {
-        while (currentReader == null) {
-          if (currentReaderIndex == getInputs().size()) {
-            hasCompletedProcessing();
-            completedProcessing = true;
-            return consumedRecords;
+      for (; currentReaderIndex < getInputs().size(); currentReaderIndex++) {
+        try {
+          Reader reader = getInputs().get(currentReaderIndex).getReader();
+          if (!(reader instanceof KeyValueReaderEdge)) {
+            throw new TezUncheckedException("Expected KeyValueReaderEdge. "
+                + "Got: " + reader.getClass().getName());
           }
-          try {
-            Reader reader = getInputs().get(currentReaderIndex).getReader();
-            if (!(reader instanceof KeyValueReaderEdge)) {
-              throw new TezUncheckedException("Expected KeyValueReaderEdge. "
-                  + "Got: " + reader.getClass().getName());
-            }
-            currentReader = (KeyValueReaderEdge) reader;
-            currentReaderIndex++;
-          } catch (Exception e) {
-            if (e instanceof IOException) {
-              throw (IOException) e;
-            } else {
-              throw new IOException(e);
-            }
+          consumedRecords += ((KeyValueReaderEdge) reader).consumeAll(consumer);
+        } catch (Exception e) {
+          if (e instanceof IOException) {
+            throw (IOException) e;
+          } else {
+            throw new IOException(e);
           }
         }
-        consumedRecords += currentReader.consumeAll(consumer);
-        currentReader = null;
       }
+      hasCompletedProcessing();
+      completedProcessing = true;
+      return consumedRecords;
     }
 
     public float getProgress() throws IOException, InterruptedException {

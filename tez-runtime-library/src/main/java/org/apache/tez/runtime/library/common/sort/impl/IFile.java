@@ -909,6 +909,7 @@ public class IFile {
   }
 
   public interface KeyValueReaderBytesWritable extends KeyValueReaderBase {
+    // Contract: readRawKey()/nextRawValue() and consumeAll() are mutually exclusive and must not be mixed.
     // Invariant: key already contains the previous key read from this stream.
     // On the first call, key can be any BytesWritable instance.
     // After readRawKey() returns, the backing byte[] array is immutable, so the consumer may keep pointers to it.
