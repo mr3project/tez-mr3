@@ -114,16 +114,15 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
 
   @Override
   public int consumeAll(BiConsumer<BytesWritable, BytesWritable> consumer) throws IOException {
-    int consumedRecords = 0;
+    assert numRecordsRead == 0;
     while (moveToNextInput()) {
       int currentConsumed = currentReader.consumeAll(consumer);
       inputRecordCounter.increment(currentConsumed);
       numRecordsRead += currentConsumed;
-      consumedRecords += currentConsumed;
     }
     LOG.info("Num Records read: " + numRecordsRead);
     completedProcessing = true;
-    return consumedRecords;
+    return numRecordsRead;
   }
 
   public float getProgress() throws IOException, InterruptedException {
