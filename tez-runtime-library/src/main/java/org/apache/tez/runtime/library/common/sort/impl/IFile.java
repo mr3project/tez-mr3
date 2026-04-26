@@ -17,7 +17,6 @@
  */
 package org.apache.tez.runtime.library.common.sort.impl;
 
-import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -26,6 +25,7 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiConsumer;
 
 import org.apache.hadoop.io.BoundedByteArrayOutputStream;
 import org.apache.hadoop.io.BytesWritable;
@@ -908,12 +908,17 @@ public class IFile {
   }
 
   public interface KeyValueReaderBytesWritable extends KeyValueReaderBase {
+    // Contract: readRawKey()/nextRawValue() and consumeAll() are mutually exclusive and must not be mixed.
     // Invariant: key already contains the previous key read from this stream.
     // On the first call, key can be any BytesWritable instance.
     // After readRawKey() returns, the backing byte[] array is immutable, so the consumer may keep pointers to it.
     Reader.KeyState readRawKey(BytesWritable key) throws IOException;
     // After readRawValue() returns, the backing byte[] array is immutable, so the consumer may keep pointers to it.
     void nextRawValue(BytesWritable value) throws IOException;
+
+    // Retrieves all key/value pairs, where both BytesWritable arguments are backed by immutable byte[] arrays.
+    // consumeAll() must not be mixed with readRawKey()/nextRawValue().
+    long consumeAll(BiConsumer<BytesWritable, BytesWritable> consumer) throws IOException;
   }
 
   public interface KeyValueReader extends KeyValueReaderDataInputBuffer, KeyValueReaderBytesWritable {
@@ -1444,6 +1449,27 @@ public class IFile {
 
       ++recNo;
       ++numRecordsRead;
+    }
+
+    @Override
+    public long consumeAll(BiConsumer<BytesWritable, BytesWritable> consumer) throws IOException {
+      assert numRecordsRead == 0;   // must not be mixed with nextRawValue()
+      BytesWritable key = new BytesWritable();
+      BytesWritable value = new BytesWritable();
+      if (isRleEnabled) {
+        while (readRawKeyRle(key) != KeyState.NO_KEY) {
+          nextRawValue(value);
+          consumer.accept(key, value);
+          numRecordsRead++;
+        }
+      } else {
+        while (readRawKeyNoRle(key) != KeyState.NO_KEY) {
+          nextRawValue(value);
+          consumer.accept(key, value);
+          numRecordsRead++;
+        }
+      }
+      return numRecordsRead;
     }
 
     private static void verifyHeaderMagic(byte[] header) throws IOException {

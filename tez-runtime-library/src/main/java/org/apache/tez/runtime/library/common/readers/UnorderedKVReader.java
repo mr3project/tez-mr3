@@ -19,6 +19,7 @@
 package org.apache.tez.runtime.library.common.readers;
 
 import java.io.IOException;
+import java.util.function.BiConsumer;
 
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.api.InputContext;
@@ -55,7 +56,7 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
   private FetchedInput currentFetchedInput;
   private IFile.KeyValueReaderBytesWritable currentReader;
   
-  private int numRecordsRead = 0;
+  private long numRecordsRead = 0;
 
   public UnorderedKVReader(ShuffleManager shuffleManager, Configuration conf,
       CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLength,
@@ -109,6 +110,19 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
   @Override
   public BytesWritable getCurrentValue() throws IOException {
     return value;
+  }
+
+  @Override
+  public long consumeAll(BiConsumer<BytesWritable, BytesWritable> consumer) throws IOException {
+    assert numRecordsRead == 0L;  // must not be mixed with next()
+    while (moveToNextInput()) {
+      long currentConsumed = currentReader.consumeAll(consumer);
+      inputRecordCounter.increment(currentConsumed);
+      numRecordsRead += currentConsumed;
+    }
+    LOG.info("Num Records read: {}", numRecordsRead);
+    completedProcessing = true;
+    return numRecordsRead;
   }
 
   public float getProgress() throws IOException, InterruptedException {
