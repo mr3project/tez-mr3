@@ -26,6 +26,7 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiConsumer;
 
 import org.apache.hadoop.io.BoundedByteArrayOutputStream;
 import org.apache.hadoop.io.BytesWritable;
@@ -908,12 +909,15 @@ public class IFile {
   }
 
   public interface KeyValueReaderBytesWritable extends KeyValueReaderBase {
+    // Contract: readRawKey()/nextRawValue() and consumeAll() are mutually exclusive and must not be mixed.
     // Invariant: key already contains the previous key read from this stream.
     // On the first call, key can be any BytesWritable instance.
     // After readRawKey() returns, the backing byte[] array is immutable, so the consumer may keep pointers to it.
     Reader.KeyState readRawKey(BytesWritable key) throws IOException;
     // After readRawValue() returns, the backing byte[] array is immutable, so the consumer may keep pointers to it.
     void nextRawValue(BytesWritable value) throws IOException;
+    // Retrieves all key/value pairs, where both BytesWritable arguments are backed by immutable byte[] arrays.
+    int consumeAll(BiConsumer<BytesWritable, BytesWritable> consumer) throws IOException;
   }
 
   public interface KeyValueReader extends KeyValueReaderDataInputBuffer, KeyValueReaderBytesWritable {
@@ -1444,6 +1448,27 @@ public class IFile {
 
       ++recNo;
       ++numRecordsRead;
+    }
+
+    @Override
+    public int consumeAll(BiConsumer<BytesWritable, BytesWritable> consumer) throws IOException {
+      BytesWritable key = new BytesWritable();
+      BytesWritable value = new BytesWritable();
+      int recordCount = 0;
+      if (isRleEnabled) {
+        while (readRawKeyRle(key) != KeyState.NO_KEY) {
+          nextRawValue(value);
+          consumer.accept(key, value);
+          recordCount++;
+        }
+      } else {
+        while (readRawKeyNoRle(key) != KeyState.NO_KEY) {
+          nextRawValue(value);
+          consumer.accept(key, value);
+          recordCount++;
+        }
+      }
+      return recordCount;
     }
 
     private static void verifyHeaderMagic(byte[] header) throws IOException {

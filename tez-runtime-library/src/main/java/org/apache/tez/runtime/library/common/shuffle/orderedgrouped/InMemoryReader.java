@@ -21,6 +21,7 @@ package org.apache.tez.runtime.library.common.shuffle.orderedgrouped;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.function.BiConsumer;
 
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DataInputBuffer;
@@ -381,6 +382,27 @@ public class InMemoryReader implements IFile.KeyValueReader {
 
     bytesRead += currentValueLength;
     ++recNo;
+  }
+
+  @Override
+  public int consumeAll(BiConsumer<BytesWritable, BytesWritable> consumer) throws IOException {
+    BytesWritable key = new BytesWritable();
+    BytesWritable value = new BytesWritable();
+    int recordCount = 0;
+    if (isRleEnabled) {
+      while (readRawKeyRle(key) != KeyState.NO_KEY) {
+        nextRawValue(value);
+        consumer.accept(key, value);
+        recordCount++;
+      }
+    } else {
+      while (readRawKeyNoRle(key) != KeyState.NO_KEY) {
+        nextRawValue(value);
+        consumer.accept(key, value);
+        recordCount++;
+      }
+    }
+    return recordCount;
   }
 
   @Override
