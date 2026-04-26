@@ -26,6 +26,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.PriorityQueue;
 import java.util.Set;
+import java.util.function.BiConsumer;
 
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.library.api.KeyValuesReaderEdge;
@@ -136,6 +137,37 @@ public class OrderedGroupedMergedKVInput extends MergedLogicalInput implements L
     @Override
     public Iterable<BytesWritable> getCurrentValues() throws IOException {
       return currentValues;
+    }
+
+    @Override
+    public long consumeAll(BiConsumer<BytesWritable, Iterable<BytesWritable>> consumer)
+        throws IOException {
+      long consumedKeys = 0;
+      while (true) {
+        // Skip values of current key if not consumed by the user
+        currentValues.discardCurrent();
+
+        for (KeyValuesReaderEdge reader : finishedReaders) {
+          // add them back to queue
+          advanceAndAddToQueue(reader);
+        }
+        finishedReaders.clear();
+
+        nextKVReader = pQueue.poll();
+        if (nextKVReader == null) {
+          hasCompletedProcessing();
+          completedProcessing = true;
+          return consumedKeys;
+        }
+
+        currentKey = nextKVReader.getCurrentKey();
+        currentValues.moveToNext();
+        consumer.accept(currentKey, currentValues);
+        for (BytesWritable ignored : currentValues) {
+          // drain values for current key to advance the merged reader.
+        }
+        consumedKeys++;
+      }
     }
 
     private class ValuesIterable implements Iterable<BytesWritable> {

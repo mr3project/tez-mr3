@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -233,6 +234,14 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
           public Iterable<BytesWritable> getCurrentValues() throws IOException {
             throw new RuntimeException("No data available in Input");
           }
+
+          @Override
+          public long consumeAll(BiConsumer<BytesWritable, Iterable<BytesWritable>> consumer)
+              throws IOException {
+            hasCompletedProcessing();
+            completedProcessing = true;
+            return 0;
+          }
         };
       }
     }
@@ -319,6 +328,12 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
     @SuppressWarnings("unchecked")
     public Iterable<BytesWritable> getCurrentValues() throws IOException {
       return valuesIter.getValues();
+    }
+
+    @Override
+    public long consumeAll(BiConsumer<BytesWritable, Iterable<BytesWritable>> consumer)
+        throws IOException {
+      return valuesIter.consumeAll(consumer);
     }
   };
 

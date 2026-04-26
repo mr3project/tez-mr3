@@ -18,7 +18,9 @@
 package org.apache.tez.runtime.library.common.sort.impl;
 
 import java.io.IOException;
+import java.util.function.BiConsumer;
 
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DataInputBuffer;
 
 /**
@@ -59,6 +61,8 @@ public interface TezRawKeyValueIterator {
    * @throws IOException
    */
   boolean hasNext() throws IOException;
+
+  long consumeAll(BiConsumer<BytesWritable, Iterable<BytesWritable>> consumer) throws IOException;
 
   /** 
    * Closes the iterator so that the underlying streams can be closed.

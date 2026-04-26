@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.function.BiConsumer;
 
 import org.apache.tez.runtime.api.DecompressorPool;
 import org.slf4j.Logger;
@@ -33,6 +34,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.compress.CompressionCodec;
@@ -662,6 +664,39 @@ public class TezMerger {
       return true;
     }
 
+    @Override
+    public long consumeAll(BiConsumer<BytesWritable, Iterable<BytesWritable>> consumer)
+        throws IOException {
+      long consumedKeys = 0;
+      BytesWritable keyWritable = new BytesWritable();
+      List<BytesWritable> values = new ArrayList<BytesWritable>();
+      while (next()) {
+        if (values.isEmpty() || !isSameKey()) {
+          if (!values.isEmpty()) {
+            consumer.accept(keyWritable, values);
+            consumedKeys++;
+            values = new ArrayList<BytesWritable>();
+          }
+          copyToWritable(keyWritable, getKey());
+        }
+        BytesWritable valueWritable = new BytesWritable();
+        copyToWritable(valueWritable, getValue());
+        values.add(valueWritable);
+      }
+      if (!values.isEmpty()) {
+        consumer.accept(keyWritable, values);
+        consumedKeys++;
+      }
+      return consumedKeys;
+    }
+
+    private void copyToWritable(BytesWritable target, DataInputBuffer source) {
+      int pos = source.getPosition();
+      int length = source.getLength() - pos;
+      byte[] bytes = target.reinitialize(length);
+      System.arraycopy(source.getData(), pos, bytes, 0, length);
+    }
+
   }
 
   private static class EmptyIterator implements TezRawKeyValueIterator {
@@ -683,6 +718,12 @@ public class TezMerger {
     @Override
     public boolean hasNext() throws IOException {
       return false;
+    }
+
+    @Override
+    public long consumeAll(BiConsumer<BytesWritable, Iterable<BytesWritable>> consumer)
+        throws IOException {
+      return 0;
     }
 
     @Override

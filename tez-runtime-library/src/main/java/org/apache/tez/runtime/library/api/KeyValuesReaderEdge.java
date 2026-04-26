@@ -19,11 +19,13 @@
 package org.apache.tez.runtime.library.api;
 
 import java.io.IOException;
+import java.util.function.BiConsumer;
 
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.api.ReaderEdge;
 
 public abstract class KeyValuesReaderEdge extends KeyValuesReader implements ReaderEdge {
+  // Contract: next() and consumeAll() are mutually exclusive and must not be mixed.
 
   /**
    * Returns the current key
@@ -42,4 +44,9 @@ public abstract class KeyValuesReaderEdge extends KeyValuesReader implements Rea
   //   The backing byte[] array of BytesWritable is immutable, so the consumer may keep pointers to it.
   @Override
   public abstract Iterable<BytesWritable> getCurrentValues() throws IOException;
+
+  // Invariant:
+  //   The backing byte[] arrays of the key and all values are immutable.
+  public abstract long consumeAll(BiConsumer<BytesWritable, Iterable<BytesWritable>> consumer)
+      throws IOException;
 }

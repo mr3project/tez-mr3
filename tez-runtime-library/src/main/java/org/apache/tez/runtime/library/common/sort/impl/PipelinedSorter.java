@@ -27,6 +27,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
+import java.util.function.BiConsumer;
 import java.util.concurrent.*;
 import java.util.zip.Deflater;
 
@@ -1681,6 +1682,50 @@ public final class PipelinedSorter {
       return false;
     }
 
+    @Override
+    public long consumeAll(BiConsumer<BytesWritable, Iterable<BytesWritable>> consumer)
+        throws IOException {
+      long consumedKeys = 0;
+      BytesWritable keyWritable = new BytesWritable();
+      List<BytesWritable> values = new ArrayList<BytesWritable>();
+      while (next()) {
+        DataInputBuffer currentKey = getKey();
+        if (values.isEmpty() || !sameKey(keyWritable, currentKey)) {
+          if (!values.isEmpty()) {
+            consumer.accept(keyWritable, values);
+            consumedKeys++;
+            values = new ArrayList<BytesWritable>();
+          }
+          copyToWritable(keyWritable, currentKey);
+        }
+        BytesWritable valueWritable = new BytesWritable();
+        copyToWritable(valueWritable, getValue());
+        values.add(valueWritable);
+      }
+      if (!values.isEmpty()) {
+        consumer.accept(keyWritable, values);
+        consumedKeys++;
+      }
+      return consumedKeys;
+    }
+
+    private boolean sameKey(BytesWritable keyWritable, DataInputBuffer keyBuffer) {
+      int keyLength = keyBuffer.getLength() - keyBuffer.getPosition();
+      if (keyWritable.getLength() != keyLength) {
+        return false;
+      }
+      return TezBytesComparator.compare(
+          keyWritable.getBytes(), 0, keyWritable.getLength(),
+          keyBuffer.getData(), keyBuffer.getPosition(), keyLength) == 0;
+    }
+
+    private void copyToWritable(BytesWritable target, DataInputBuffer source) {
+      int pos = source.getPosition();
+      int length = source.getLength() - pos;
+      byte[] bytes = target.reinitialize(length);
+      System.arraycopy(source.getData(), pos, bytes, 0, length);
+    }
+
     public int getPartition() {
       final int partition = FastByteComparisons.theUnsafe.getInt(
           span.kvmetaArray, span.offsetForIntIndex(span.offsetFor(kvindex) + PARTITION));
@@ -1824,6 +1869,39 @@ public final class PipelinedSorter {
         }
       }
       return false;
+    }
+
+    @Override
+    public long consumeAll(BiConsumer<BytesWritable, Iterable<BytesWritable>> consumer)
+        throws IOException {
+      long consumedKeys = 0;
+      BytesWritable keyWritable = new BytesWritable();
+      List<BytesWritable> values = new ArrayList<BytesWritable>();
+      while (next()) {
+        if (values.isEmpty() || !isSameKey()) {
+          if (!values.isEmpty()) {
+            consumer.accept(keyWritable, values);
+            consumedKeys++;
+            values = new ArrayList<BytesWritable>();
+          }
+          copyToWritable(keyWritable, getKey());
+        }
+        BytesWritable valueWritable = new BytesWritable();
+        copyToWritable(valueWritable, getValue());
+        values.add(valueWritable);
+      }
+      if (!values.isEmpty()) {
+        consumer.accept(keyWritable, values);
+        consumedKeys++;
+      }
+      return consumedKeys;
+    }
+
+    private void copyToWritable(BytesWritable target, DataInputBuffer source) {
+      int pos = source.getPosition();
+      int length = source.getLength() - pos;
+      byte[] bytes = target.reinitialize(length);
+      System.arraycopy(source.getData(), pos, bytes, 0, length);
     }
 
     public void reset(int partition) {
@@ -2005,6 +2083,50 @@ public final class PipelinedSorter {
     @Override
     public boolean isSameKey() {
       return false;
+    }
+
+    @Override
+    public long consumeAll(BiConsumer<BytesWritable, Iterable<BytesWritable>> consumer)
+        throws IOException {
+      long consumedKeys = 0;
+      BytesWritable keyWritable = new BytesWritable();
+      List<BytesWritable> values = new ArrayList<BytesWritable>();
+      while (next()) {
+        DataInputBuffer currentKey = getKey();
+        if (values.isEmpty() || !sameKey(keyWritable, currentKey)) {
+          if (!values.isEmpty()) {
+            consumer.accept(keyWritable, values);
+            consumedKeys++;
+            values = new ArrayList<BytesWritable>();
+          }
+          copyToWritable(keyWritable, currentKey);
+        }
+        BytesWritable valueWritable = new BytesWritable();
+        copyToWritable(valueWritable, getValue());
+        values.add(valueWritable);
+      }
+      if (!values.isEmpty()) {
+        consumer.accept(keyWritable, values);
+        consumedKeys++;
+      }
+      return consumedKeys;
+    }
+
+    private boolean sameKey(BytesWritable keyWritable, DataInputBuffer keyBuffer) {
+      int keyLength = keyBuffer.getLength() - keyBuffer.getPosition();
+      if (keyWritable.getLength() != keyLength) {
+        return false;
+      }
+      return TezBytesComparator.compare(
+          keyWritable.getBytes(), 0, keyWritable.getLength(),
+          keyBuffer.getData(), keyBuffer.getPosition(), keyLength) == 0;
+    }
+
+    private void copyToWritable(BytesWritable target, DataInputBuffer source) {
+      int pos = source.getPosition();
+      int length = source.getLength() - pos;
+      byte[] bytes = target.reinitialize(length);
+      System.arraycopy(source.getData(), pos, bytes, 0, length);
     }
 
     public TezRawKeyValueIterator filter(int partition) {

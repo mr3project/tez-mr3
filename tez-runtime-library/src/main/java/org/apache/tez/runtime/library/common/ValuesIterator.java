@@ -21,6 +21,7 @@ package org.apache.tez.runtime.library.common;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+import java.util.function.BiConsumer;
 
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DataInputBuffer;
@@ -84,6 +85,38 @@ public class ValuesIterator {
     return more;
   }
 
+  // Invariant:
+  //   The backing byte[] arrays of the key and all values are immutable.
+  public long consumeAll(BiConsumer<BytesWritable, Iterable<BytesWritable>> consumer)
+      throws IOException {
+    long consumedKeys = 0;
+    if (isFirstRecord) {
+      readNextKey();
+      key = nextKey;
+      nextKey = null;
+      isFirstRecord = false;
+    }
+
+    while (more) {
+      Iterable<BytesWritable> currentValues = createValuesIterable();
+      BytesWritable currentKey = key;
+      consumer.accept(currentKey, currentValues);
+      for (BytesWritable ignored : currentValues) {
+        // drain values for this key to advance the iterator efficiently.
+      }
+      consumedKeys++;
+      if (more) {
+        nextKey();
+      }
+    }
+
+    if (!completedProcessing) {
+      hasCompletedProcessing();
+      completedProcessing = true;
+    }
+    return consumedKeys;
+  }
+
   /** The current key. */
   // Invariant:
   //   The backing byte[] array of BytesWritable is immutable, so the consumer may keep pointers to it.
@@ -94,6 +127,10 @@ public class ValuesIterator {
   // Invariant:
   //   The backing byte[] array of BytesWritable is immutable, so the consumer may keep pointers to it.
   public Iterable<BytesWritable> getValues() {
+    return createValuesIterable();
+  }
+
+  private Iterable<BytesWritable> createValuesIterable() {
     return new Iterable<BytesWritable>() {
 
       @Override

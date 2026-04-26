@@ -20,6 +20,7 @@ package org.apache.tez.runtime.library.input;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.function.BiConsumer;
 
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.dag.api.GroupInputEdge;
@@ -86,6 +87,31 @@ public class ConcatenatedMergedKeyValuesInput extends MergedLogicalInput impleme
     @Override
     public Iterable<BytesWritable> getCurrentValues() throws IOException {
       return currentReader.getCurrentValues();
+    }
+
+    @Override
+    public long consumeAll(BiConsumer<BytesWritable, Iterable<BytesWritable>> consumer)
+        throws IOException {
+      long consumedKeys = 0;
+      for (; currentReaderIndex < getInputs().size(); currentReaderIndex++) {
+        try {
+          Reader reader = getInputs().get(currentReaderIndex).getReader();
+          if (!(reader instanceof KeyValuesReaderEdge)) {
+            throw new TezUncheckedException("Expected KeyValuesReader. "
+                + "Got: " + reader.getClass().getName());
+          }
+          consumedKeys += ((KeyValuesReaderEdge) reader).consumeAll(consumer);
+        } catch (Exception e) {
+          if (e instanceof IOException) {
+            throw (IOException) e;
+          } else {
+            throw new IOException(e);
+          }
+        }
+      }
+      hasCompletedProcessing();
+      completedProcessing = true;
+      return consumedKeys;
     }
 
     public float getProgress() throws IOException, InterruptedException {
