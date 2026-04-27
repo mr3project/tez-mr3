@@ -1514,14 +1514,14 @@ public class IFile {
         consumeValue.accept(value);
         numRecordsRead++;
         groupCount++;
-        copyWritable(previousKey, key);
+        previousKey.setDirect(key.getBytesRaw(), key.getOffset(), key.getLength());
 
         while (readRawKeyNoRle(key) != KeyState.NO_KEY) {
           if (TezBytesComparator.compare(previousKey, key) != 0) {
             closeCurrentKey.run();
             openNewKey.accept(key);
             groupCount++;
-            copyWritable(previousKey, key);
+            previousKey.setDirect(key.getBytesRaw(), key.getOffset(), key.getLength());
           }
           nextRawValue(value);
           consumeValue.accept(value);
@@ -1530,11 +1530,6 @@ public class IFile {
         closeCurrentKey.run();
       }
       return groupCount;
-    }
-
-    private static void copyWritable(BytesWritable target, BytesWritable source) {
-      byte[] bytes = target.reinitialize(source.getLength());
-      System.arraycopy(source.getBytesRaw(), source.getOffset(), bytes, 0, source.getLength());
     }
 
     private static void verifyHeaderMagic(byte[] header) throws IOException {
