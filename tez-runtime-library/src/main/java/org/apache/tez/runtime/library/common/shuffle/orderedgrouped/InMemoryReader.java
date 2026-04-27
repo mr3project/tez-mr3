@@ -415,6 +415,9 @@ public class InMemoryReader implements IFile.KeyValueReader {
     BytesWritable key = new BytesWritable();
     BytesWritable value = new BytesWritable();
     long groupCount = 0;
+    // Ordered/grouped in-memory segments are frequently RLE-encoded (e.g. MergeManager/InMemoryWriter paths),
+    // but this reader can also consume map outputs whose IFile header disables RLE.
+    // Keep both branches to match the on-stream flag.
     if (isRleEnabled) {
       KeyState keyState = readRawKeyRle(key);
       while (keyState != KeyState.NO_KEY) {
