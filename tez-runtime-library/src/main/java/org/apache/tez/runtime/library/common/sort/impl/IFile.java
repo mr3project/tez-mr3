@@ -43,6 +43,7 @@ import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.tez.runtime.library.utils.BufferUtils;
 import org.apache.tez.runtime.library.utils.CodecUtils;
+import org.apache.tez.runtime.library.common.comparator.TezBytesComparator;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.compress.CodecPool;
 import org.apache.hadoop.io.compress.CompressionCodec;
@@ -1504,16 +1505,36 @@ public class IFile {
           groupCount++;
         }
       } else {
+        BytesWritable previousKey = new BytesWritable();
+        if (readRawKeyNoRle(key) == KeyState.NO_KEY) {
+          return 0;
+        }
+        openNewKey.accept(key);
+        nextRawValue(value);
+        consumeValue.accept(value);
+        numRecordsRead++;
+        groupCount++;
+        copyWritable(previousKey, key);
+
         while (readRawKeyNoRle(key) != KeyState.NO_KEY) {
-          openNewKey.accept(key);
+          if (TezBytesComparator.compare(previousKey, key) != 0) {
+            closeCurrentKey.run();
+            openNewKey.accept(key);
+            groupCount++;
+            copyWritable(previousKey, key);
+          }
           nextRawValue(value);
           consumeValue.accept(value);
           numRecordsRead++;
-          closeCurrentKey.run();
-          groupCount++;
         }
+        closeCurrentKey.run();
       }
       return groupCount;
+    }
+
+    private static void copyWritable(BytesWritable target, BytesWritable source) {
+      byte[] bytes = target.reinitialize(source.getLength());
+      System.arraycopy(source.getBytesRaw(), source.getOffset(), bytes, 0, source.getLength());
     }
 
     private static void verifyHeaderMagic(byte[] header) throws IOException {
