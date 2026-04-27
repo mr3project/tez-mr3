@@ -257,10 +257,12 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
     }
     @SuppressWarnings("rawtypes")
     ValuesIterator valuesIter = null;
+    TezRawKeyValueIterator rawIteratorForReader;
     synchronized(this) {
       valuesIter = vIter;
+      rawIteratorForReader = rawIter;
     }
-    return new OrderedGroupedKeyValuesReader(valuesIter);
+    return new OrderedGroupedKeyValuesReader(valuesIter, rawIteratorForReader);
   }
 
   @Override
@@ -311,11 +313,13 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
   private static class OrderedGroupedKeyValuesReader extends KeyValuesReaderEdge {
 
     private final ValuesIterator valuesIter;
+    private final TezRawKeyValueIterator rawIterator;
     private boolean usedNextApi;
     private boolean usedConsumeAllApi;
 
-    OrderedGroupedKeyValuesReader(ValuesIterator valuesIter) {
+    OrderedGroupedKeyValuesReader(ValuesIterator valuesIter, TezRawKeyValueIterator rawIterator) {
       this.valuesIter = valuesIter;
+      this.rawIterator = rawIterator;
     }
 
     @Override
@@ -352,7 +356,6 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
 
       final KeyGroupLifecycle lifecycle = new KeyGroupLifecycle(openNewKey, consumeValue, closeCurrentKey);
       try {
-        TezRawKeyValueIterator rawIterator = valuesIter.getRawIterator();
         if (rawIterator instanceof GroupedConsumeTezRawKeyValueIterator) {
           long groups = ((GroupedConsumeTezRawKeyValueIterator) rawIterator)
               .consumeAllGrouped(lifecycle::open, lifecycle::consume, lifecycle::close);
