@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DataInputBuffer;
@@ -404,6 +405,41 @@ public class InMemoryReader implements IFile.KeyValueReader {
       }
     }
     return recordCount;
+  }
+
+  @Override
+  public long consumeAllGrouped(Consumer<BytesWritable> openNewKey,
+                                Consumer<BytesWritable> consumeValue,
+                                Runnable closeCurrentKey) throws IOException {
+    assert recNo == 1;  // must not be mixed with next()/consumeAll()
+    BytesWritable key = new BytesWritable();
+    BytesWritable value = new BytesWritable();
+    long groupCount = 0;
+    if (isRleEnabled) {
+      KeyState keyState = readRawKeyRle(key);
+      while (keyState != KeyState.NO_KEY) {
+        if (keyState != KeyState.NEW_KEY) {
+          throw new IOException("RLE stream cannot start a key-group with SAME_KEY");
+        }
+        openNewKey.accept(key);
+        do {
+          nextRawValue(value);
+          consumeValue.accept(value);
+          keyState = readRawKeyRle(key);
+        } while (keyState == KeyState.SAME_KEY);
+        closeCurrentKey.run();
+        groupCount++;
+      }
+    } else {
+      while (readRawKeyNoRle(key) != KeyState.NO_KEY) {
+        openNewKey.accept(key);
+        nextRawValue(value);
+        consumeValue.accept(value);
+        closeCurrentKey.run();
+        groupCount++;
+      }
+    }
+    return groupCount;
   }
 
   @Override

@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.function.Consumer;
 
 import org.apache.tez.runtime.api.DecompressorPool;
 import org.slf4j.Logger;
@@ -33,6 +34,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.compress.CompressionCodec;
@@ -275,7 +277,7 @@ public class TezMerger {
   }
 
   static class MergeQueue<K extends Object, V extends Object>
-  extends PriorityQueue<Segment> implements TezRawKeyValueIterator {
+  extends PriorityQueue<Segment> implements GroupedConsumeTezRawKeyValueIterator {
     final Configuration conf;
     final FileSystem fs;
     final CompressionCodec codec;
@@ -662,9 +664,46 @@ public class TezMerger {
       return true;
     }
 
+    @Override
+    public long consumeAllGrouped(Consumer<BytesWritable> openNewKey,
+                                  Consumer<BytesWritable> consumeValue,
+                                  Runnable closeCurrentKey) throws IOException {
+      BytesWritable keyWritable = new BytesWritable();
+      BytesWritable valueWritable = new BytesWritable();
+      boolean keyOpen = false;
+      long groupCount = 0;
+      while (next()) {
+        if (!isSameKey()) {
+          if (keyOpen) {
+            closeCurrentKey.run();
+          }
+          copyToWritable(keyWritable, getKey());
+          openNewKey.accept(keyWritable);
+          keyOpen = true;
+          groupCount++;
+        }
+        if (!keyOpen) {
+          throw new IOException("Received value before opening a key-group");
+        }
+        copyToWritable(valueWritable, getValue());
+        consumeValue.accept(valueWritable);
+      }
+      if (keyOpen) {
+        closeCurrentKey.run();
+      }
+      return groupCount;
+    }
+
+    private static void copyToWritable(BytesWritable target, DataInputBuffer source) {
+      int pos = source.getPosition();
+      int length = source.getLength() - pos;
+      byte[] bytes = target.reinitialize(length);
+      System.arraycopy(source.getData(), pos, bytes, 0, length);
+    }
+
   }
 
-  private static class EmptyIterator implements TezRawKeyValueIterator {
+  private static class EmptyIterator implements GroupedConsumeTezRawKeyValueIterator {
     @Override
     public DataInputBuffer getKey() throws IOException {
       throw new RuntimeException("No keys on an empty iterator");
@@ -692,6 +731,13 @@ public class TezMerger {
     @Override
     public boolean isSameKey() {
       throw new UnsupportedOperationException("isSameKey is not supported");
+    }
+
+    @Override
+    public long consumeAllGrouped(Consumer<BytesWritable> openNewKey,
+                                  Consumer<BytesWritable> consumeValue,
+                                  Runnable closeCurrentKey) {
+      return 0;
     }
   }
 }

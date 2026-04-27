@@ -26,6 +26,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 import org.apache.hadoop.io.BoundedByteArrayOutputStream;
 import org.apache.hadoop.io.BytesWritable;
@@ -919,6 +920,12 @@ public class IFile {
     // Retrieves all key/value pairs, where both BytesWritable arguments are backed by immutable byte[] arrays.
     // consumeAll() must not be mixed with readRawKey()/nextRawValue().
     long consumeAll(BiConsumer<BytesWritable, BytesWritable> consumer) throws IOException;
+
+    // Retrieves all key/value pairs grouped by key.
+    // readRawKey()/nextRawValue()/consumeAll() and consumeAllGrouped() are mutually exclusive and must not be mixed.
+    long consumeAllGrouped(Consumer<BytesWritable> openNewKey,
+                           Consumer<BytesWritable> consumeValue,
+                           Runnable closeCurrentKey) throws IOException;
   }
 
   public interface KeyValueReader extends KeyValueReaderDataInputBuffer, KeyValueReaderBytesWritable {
@@ -1470,6 +1477,43 @@ public class IFile {
         }
       }
       return numRecordsRead;
+    }
+
+    @Override
+    public long consumeAllGrouped(Consumer<BytesWritable> openNewKey,
+                                  Consumer<BytesWritable> consumeValue,
+                                  Runnable closeCurrentKey) throws IOException {
+      assert numRecordsRead == 0;   // must not be mixed with nextRawValue()/consumeAll()
+      BytesWritable key = new BytesWritable();
+      BytesWritable value = new BytesWritable();
+      long groupCount = 0;
+      if (isRleEnabled) {
+        KeyState keyState = readRawKeyRle(key);
+        while (keyState != KeyState.NO_KEY) {
+          if (keyState != KeyState.NEW_KEY) {
+            throw new IOException("RLE stream cannot start a key-group with SAME_KEY");
+          }
+          openNewKey.accept(key);
+          do {
+            nextRawValue(value);
+            consumeValue.accept(value);
+            numRecordsRead++;
+            keyState = readRawKeyRle(key);
+          } while (keyState == KeyState.SAME_KEY);
+          closeCurrentKey.run();
+          groupCount++;
+        }
+      } else {
+        while (readRawKeyNoRle(key) != KeyState.NO_KEY) {
+          openNewKey.accept(key);
+          nextRawValue(value);
+          consumeValue.accept(value);
+          numRecordsRead++;
+          closeCurrentKey.run();
+          groupCount++;
+        }
+      }
+      return groupCount;
     }
 
     private static void verifyHeaderMagic(byte[] header) throws IOException {

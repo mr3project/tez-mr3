@@ -26,6 +26,7 @@ import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.library.api.LogicalInputEdge;
@@ -48,6 +49,7 @@ import org.apache.tez.runtime.library.common.MemoryUpdateCallbackHandler;
 import org.apache.tez.runtime.library.common.ValuesIterator;
 import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.Shuffle;
 import org.apache.tez.runtime.library.common.sort.impl.TezRawKeyValueIterator;
+import org.apache.tez.runtime.library.common.sort.impl.GroupedConsumeTezRawKeyValueIterator;
 
 import org.apache.tez.common.Preconditions;
 
@@ -233,6 +235,15 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
           public Iterable<BytesWritable> getCurrentValues() throws IOException {
             throw new RuntimeException("No data available in Input");
           }
+
+          @Override
+          public long consumeAll(Consumer<BytesWritable> openNewKey,
+                                 Consumer<BytesWritable> consumeValue,
+                                 Runnable closeCurrentKey) throws IOException {
+            hasCompletedProcessing();
+            completedProcessing = true;
+            return 0;
+          }
         };
       }
     }
@@ -300,6 +311,8 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
   private static class OrderedGroupedKeyValuesReader extends KeyValuesReaderEdge {
 
     private final ValuesIterator valuesIter;
+    private boolean usedNextApi;
+    private boolean usedConsumeAllApi;
 
     OrderedGroupedKeyValuesReader(ValuesIterator valuesIter) {
       this.valuesIter = valuesIter;
@@ -307,7 +320,11 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
 
     @Override
     public boolean next() throws IOException {
-      return valuesIter.moveToNext();
+      if (usedConsumeAllApi) {
+        throw new IOException("next() and consumeAll(...) are mutually exclusive");
+      }
+      usedNextApi = true;
+      return moveNextInternal();
     }
 
     @Override
@@ -319,6 +336,100 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
     @SuppressWarnings("unchecked")
     public Iterable<BytesWritable> getCurrentValues() throws IOException {
       return valuesIter.getValues();
+    }
+
+    @Override
+    public long consumeAll(Consumer<BytesWritable> openNewKey,
+                           Consumer<BytesWritable> consumeValue,
+                           Runnable closeCurrentKey) throws IOException {
+      if (usedConsumeAllApi) {
+        hasCompletedProcessing();
+      }
+      if (usedNextApi) {
+        throw new IOException("next() and consumeAll(...) are mutually exclusive");
+      }
+      usedConsumeAllApi = true;
+
+      final KeyGroupLifecycle lifecycle = new KeyGroupLifecycle(openNewKey, consumeValue, closeCurrentKey);
+      try {
+        TezRawKeyValueIterator rawIterator = valuesIter.getRawIterator();
+        if (rawIterator instanceof GroupedConsumeTezRawKeyValueIterator) {
+          long groups = ((GroupedConsumeTezRawKeyValueIterator) rawIterator)
+              .consumeAllGrouped(lifecycle::open, lifecycle::consume, lifecycle::close);
+          lifecycle.finish();
+          completedProcessing = true;
+          return groups;
+        }
+
+        long groups = 0;
+        while (moveNextInternal()) {
+          lifecycle.open(getCurrentKey());
+          for (BytesWritable value : getCurrentValues()) {
+            lifecycle.consume(value);
+          }
+          lifecycle.close();
+          groups++;
+        }
+        lifecycle.finish();
+        completedProcessing = true;
+        return groups;
+      } catch (IllegalStateException e) {
+        throw new IOException(e.getMessage(), e);
+      }
+    }
+
+    private boolean moveNextInternal() throws IOException {
+      return valuesIter.moveToNext();
+    }
+
+    private static final class KeyGroupLifecycle {
+      private final Consumer<BytesWritable> openNewKey;
+      private final Consumer<BytesWritable> consumeValue;
+      private final Runnable closeCurrentKey;
+      private boolean keyOpen;
+      private boolean hasConsumedValueForCurrentKey;
+
+      private KeyGroupLifecycle(Consumer<BytesWritable> openNewKey,
+                                Consumer<BytesWritable> consumeValue,
+                                Runnable closeCurrentKey) {
+        this.openNewKey = openNewKey;
+        this.consumeValue = consumeValue;
+        this.closeCurrentKey = closeCurrentKey;
+      }
+
+      private void open(BytesWritable key) {
+        if (keyOpen) {
+          throw new IllegalStateException("openNewKey cannot be called while another key-group is active");
+        }
+        openNewKey.accept(key);
+        keyOpen = true;
+        hasConsumedValueForCurrentKey = false;
+      }
+
+      private void consume(BytesWritable value) {
+        if (!keyOpen) {
+          throw new IllegalStateException("consumeValue cannot be called without an active key-group");
+        }
+        consumeValue.accept(value);
+        hasConsumedValueForCurrentKey = true;
+      }
+
+      private void close() {
+        if (!keyOpen) {
+          throw new IllegalStateException("closeCurrentKey cannot be called without an active key-group");
+        }
+        if (!hasConsumedValueForCurrentKey) {
+          throw new IllegalStateException("closeCurrentKey cannot be called for an empty key-group");
+        }
+        closeCurrentKey.run();
+        keyOpen = false;
+      }
+
+      private void finish() {
+        if (keyOpen) {
+          throw new IllegalStateException("Unclosed key-group detected at end of consumeAll");
+        }
+      }
     }
   };
 

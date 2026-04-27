@@ -19,6 +19,7 @@
 package org.apache.tez.runtime.library.api;
 
 import java.io.IOException;
+import java.util.function.Consumer;
 
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.api.ReaderEdge;
@@ -42,4 +43,38 @@ public abstract class KeyValuesReaderEdge extends KeyValuesReader implements Rea
   //   The backing byte[] array of BytesWritable is immutable, so the consumer may keep pointers to it.
   @Override
   public abstract Iterable<BytesWritable> getCurrentValues() throws IOException;
+
+  /**
+   * Consume all key-groups as an event stream.
+   *
+   * <p>Lifecycle contract for each non-empty key-group:
+   * <ol>
+   *   <li>{@code openNewKey.accept(key)} is invoked exactly once.</li>
+   *   <li>{@code consumeValue.accept(value)} is invoked for every value in the key-group.</li>
+   *   <li>{@code closeCurrentKey.run()} is invoked exactly once.</li>
+   * </ol>
+   *
+   * <p>{@link #next()} and {@code consumeAll(...)} are mutually exclusive and must not be mixed.
+   *
+   * @return number of consumed key-groups
+   */
+  public long consumeAll(Consumer<BytesWritable> openNewKey,
+                         Consumer<BytesWritable> consumeValue,
+                         Runnable closeCurrentKey) throws IOException {
+    long groups = 0;
+    while (next()) {
+      openNewKey.accept(getCurrentKey());
+      boolean consumedAnyValue = false;
+      for (BytesWritable value : getCurrentValues()) {
+        consumeValue.accept(value);
+        consumedAnyValue = true;
+      }
+      if (!consumedAnyValue) {
+        throw new IOException("Encountered key-group with no values");
+      }
+      closeCurrentKey.run();
+      groups++;
+    }
+    return groups;
+  }
 }
