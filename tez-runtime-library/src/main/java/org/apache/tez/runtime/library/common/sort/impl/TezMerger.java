@@ -423,6 +423,11 @@ public class TezMerger {
       return true;
     }
 
+    @Override
+    public boolean hasStableCurrentBuffer() {
+      return minSegment != null && minSegment.inMemory();
+    }
+
     int compare(KeyValueBuffer nextKey, DataOutputBuffer buf2) {
       byte[] b1 = nextKey.getData();
       byte[] b2 = buf2.getData();

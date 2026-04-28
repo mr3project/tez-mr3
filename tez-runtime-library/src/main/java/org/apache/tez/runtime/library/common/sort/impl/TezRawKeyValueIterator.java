@@ -74,4 +74,16 @@ public interface TezRawKeyValueIterator {
    */
   // false negatives are allowed: two keys are the same, but isSameKey() returns false
   boolean isSameKey();
+
+  /**
+   * Whether the current key/value pair points to an in-memory backing buffer
+   * that can be safely exposed via zero-copy APIs.
+   *
+   * Implementations should return {@code true} only when the backing array is
+   * stable and will not be overwritten/reused while consumers may still hold
+   * references to it.
+   */
+  default boolean hasStableCurrentBuffer() {
+    return false;
+  }
 }

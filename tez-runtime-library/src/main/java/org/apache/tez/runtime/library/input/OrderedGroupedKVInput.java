@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -319,6 +320,13 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
     @SuppressWarnings("unchecked")
     public Iterable<BytesWritable> getCurrentValues() throws IOException {
       return valuesIter.getValues();
+    }
+
+    @Override
+    public long consumeAll(Consumer<BytesWritable> openNewKey,
+                           Consumer<BytesWritable> consumeValue,
+                           Runnable closeCurrentKey) throws IOException {
+      return valuesIter.consumeAll(openNewKey, consumeValue, closeCurrentKey);
     }
   };
 

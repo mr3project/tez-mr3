@@ -21,6 +21,7 @@ package org.apache.tez.runtime.library.common;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+import java.util.function.Consumer;
 
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DataInputBuffer;
@@ -137,6 +138,29 @@ public class ValuesIterator {
     };
   }
 
+  /**
+   * Consume all key groups in order, preserving key-group boundaries.
+   *
+   * @return number of values consumed
+   */
+  public long consumeAll(Consumer<BytesWritable> openNewKey,
+                         Consumer<BytesWritable> consumeValue,
+                         Runnable closeCurrentKey) throws IOException {
+    long consumed = 0;
+    while (moveToNext()) {
+      openNewKey.accept(getKey());
+      while (hasMoreValues) {
+        readNextValue();
+        readNextKey();
+        inputValueCounter.increment(1);
+        consumeValue.accept(value);
+        consumed++;
+      }
+      closeCurrentKey.run();
+    }
+    return consumed;
+  }
+
   /** Start processing next unique key. */
   private void nextKey() throws IOException {
     // read until we find a new key
@@ -159,7 +183,7 @@ public class ValuesIterator {
     if (more) {      
       DataInputBuffer nextKeyBytes = in.getKey();
       if (!in.isSameKey()) {
-        nextKey = copyToWritable(nextKey, nextKeyBytes);
+        nextKey = copyToWritable(nextKey, nextKeyBytes, in.hasStableCurrentBuffer());
         // hasMoreValues = is it first key or is key the same?
         hasMoreValues = (key == null) || (TezBytesComparator.compare(key, nextKey) == 0);
         if (key == null || !hasMoreValues) {
@@ -184,10 +208,11 @@ public class ValuesIterator {
    */
   private void readNextValue() throws IOException {
     DataInputBuffer nextValueBytes = in.getValue();
-    value = copyToWritable(value, nextValueBytes);
+    value = copyToWritable(value, nextValueBytes, in.hasStableCurrentBuffer());
   }
 
-  private BytesWritable copyToWritable(BytesWritable writable, DataInputBuffer source) {
+  private BytesWritable copyToWritable(BytesWritable writable, DataInputBuffer source,
+                                       boolean useDirect) {
     BytesWritable target = writable;
     if (target == null) {
       target = new BytesWritable();
@@ -195,8 +220,12 @@ public class ValuesIterator {
 
     int pos = source.getPosition();
     int length = source.getLength() - pos;
-    byte[] bytes = target.reinitialize(length);
-    System.arraycopy(source.getData(), pos, bytes, 0, length);
+    if (useDirect) {
+      target.setDirect(source.getData(), pos, length);
+    } else {
+      byte[] bytes = target.reinitialize(length);
+      System.arraycopy(source.getData(), pos, bytes, 0, length);
+    }
 
     return target;
   }
