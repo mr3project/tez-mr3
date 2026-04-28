@@ -323,22 +323,7 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
 
     @Override
     public long consumeAll(KeyGroupConsumer consumer) throws IOException {
-      return valuesIter.consumeAll(new TezRawKeyValueIterator.OrderedGroupedConsumer() {
-        @Override
-        public void startKey(BytesWritable key) throws IOException {
-          consumer.startKey(key);
-        }
-
-        @Override
-        public void consumeValue(BytesWritable value) throws IOException {
-          consumer.consumeValue(value);
-        }
-
-        @Override
-        public void endKey() throws IOException {
-          consumer.endKey();
-        }
-      });
+      return valuesIter.consumeAll(consumer);
     }
   };
 

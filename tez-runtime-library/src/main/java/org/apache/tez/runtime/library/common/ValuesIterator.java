@@ -25,6 +25,7 @@ import java.util.NoSuchElementException;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.tez.common.counters.TezCounter;
+import org.apache.tez.runtime.library.api.KeyValuesReaderEdge;
 import org.apache.tez.runtime.library.common.comparator.TezBytesComparator;
 import org.apache.tez.runtime.library.common.sort.impl.TezRawKeyValueIterator;
 
@@ -137,7 +138,7 @@ public class ValuesIterator {
     };
   }
 
-  public long consumeAll(TezRawKeyValueIterator.OrderedGroupedConsumer consumer) throws IOException {
+  public long consumeAll(KeyValuesReaderEdge.KeyGroupConsumer consumer) throws IOException {
     if (in.supportsOrderedGroupedConsume()) {
       long consumedValues = in.consumeOrderedGrouped(consumer);
       completedProcessing = true;

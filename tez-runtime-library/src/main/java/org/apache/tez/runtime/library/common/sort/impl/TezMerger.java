@@ -41,6 +41,7 @@ import org.apache.hadoop.util.PriorityQueue;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.runtime.api.MultiByteArrayOutputStream;
+import org.apache.tez.runtime.library.api.KeyValuesReaderEdge;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.comparator.TezBytesComparator;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader;
@@ -669,7 +670,7 @@ public class TezMerger {
     }
 
     @Override
-    public long consumeOrderedGrouped(OrderedGroupedConsumer consumer) throws IOException {
+    public long consumeOrderedGrouped(KeyValuesReaderEdge.KeyGroupConsumer consumer) throws IOException {
       BytesWritable groupedKey = new BytesWritable();
       BytesWritable groupedValue = new BytesWritable();
       DataInputBuffer groupedValueBuffer = new DataInputBuffer();
