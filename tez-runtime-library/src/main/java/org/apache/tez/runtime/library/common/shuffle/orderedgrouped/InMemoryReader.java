@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DataInputBuffer;
@@ -408,7 +409,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
 
   @Override
   public KeyState consumeValuesForCurrentKey(
-      BytesWritable key, BytesWritable value, IFile.IOConsumer<BytesWritable> consumer) throws IOException {
+      BytesWritable key, BytesWritable value, Consumer<BytesWritable> consumer) throws IOException {
     KeyState nextKeyState;
     do {
       nextRawValue(value);

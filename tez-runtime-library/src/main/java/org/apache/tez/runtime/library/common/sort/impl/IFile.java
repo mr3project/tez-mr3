@@ -26,6 +26,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 import org.apache.hadoop.io.BoundedByteArrayOutputStream;
 import org.apache.hadoop.io.BytesWritable;
@@ -907,10 +908,6 @@ public class IFile {
     void nextRawValue(DataInputBuffer value) throws IOException;
   }
 
-  public interface IOConsumer<T> {
-    void accept(T value) throws IOException;
-  }
-
   public interface KeyValueReaderBytesWritable extends KeyValueReaderBase {
     // Contract: readRawKey()/nextRawValue() and consumeAll() are mutually exclusive and must not be mixed.
     // Invariant: key already contains the previous key read from this stream.
@@ -926,7 +923,7 @@ public class IFile {
 
     // Contract: key currently stores this key-group key and is updated to the next key when NEW_KEY is returned.
     default Reader.KeyState consumeValuesForCurrentKey(
-        BytesWritable key, BytesWritable value, IOConsumer<BytesWritable> consumer) throws IOException {
+        BytesWritable key, BytesWritable value, Consumer<BytesWritable> consumer) throws IOException {
       Reader.KeyState nextKeyState;
       do {
         nextRawValue(value);

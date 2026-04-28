@@ -18,6 +18,7 @@
 package org.apache.tez.runtime.library.common.sort.impl;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -700,11 +701,20 @@ public class TezMerger {
             segmentKey.setDirect(
                 segmentCurrentKey.getData(), segmentCurrentKey.getPosition(), segmentCurrentKey.getLength());
             final long[] segmentValueCount = new long[] {0L};
-            KeyState keyState = ((IFile.KeyValueReaderBytesWritable) segment.reader)
-                .consumeValuesForCurrentKey(segmentKey, groupedValue, value -> {
-                  consumer.consumeValue(value);
-                  segmentValueCount[0]++;
-                });
+            KeyState keyState;
+            try {
+              keyState = ((IFile.KeyValueReaderBytesWritable) segment.reader)
+                  .consumeValuesForCurrentKey(segmentKey, groupedValue, value -> {
+                    try {
+                      consumer.consumeValue(value);
+                    } catch (IOException ioe) {
+                      throw new UncheckedIOException(ioe);
+                    }
+                    segmentValueCount[0]++;
+                  });
+            } catch (UncheckedIOException uioe) {
+              throw uioe.getCause();
+            }
             consumedValues += segmentValueCount[0];
             if (keyState == KeyState.NEW_KEY) {
               segment.getKey().reset(segmentKey.getBytesRaw(), segmentKey.getOffset(), segmentKey.getLength());
