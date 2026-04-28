@@ -137,6 +137,25 @@ public class ValuesIterator {
     };
   }
 
+  public long consumeAll(TezRawKeyValueIterator.OrderedGroupedConsumer consumer) throws IOException {
+    if (in.supportsOrderedGroupedConsume()) {
+      long consumedValues = in.consumeOrderedGrouped(consumer);
+      completedProcessing = true;
+      return consumedValues;
+    }
+
+    long consumedValues = 0;
+    while (moveToNext()) {
+      consumer.startKey(getKey());
+      for (BytesWritable currentValue : getValues()) {
+        consumer.consumeValue(currentValue);
+        consumedValues++;
+      }
+      consumer.endKey();
+    }
+    return consumedValues;
+  }
+
   /** Start processing next unique key. */
   private void nextKey() throws IOException {
     // read until we find a new key

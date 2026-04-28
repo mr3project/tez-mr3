@@ -24,6 +24,13 @@ import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.api.ReaderEdge;
 
 public abstract class KeyValuesReaderEdge extends KeyValuesReader implements ReaderEdge {
+  public interface KeyGroupConsumer {
+    void startKey(BytesWritable key) throws IOException;
+
+    void consumeValue(BytesWritable value) throws IOException;
+
+    void endKey() throws IOException;
+  }
 
   /**
    * Returns the current key
@@ -42,4 +49,9 @@ public abstract class KeyValuesReaderEdge extends KeyValuesReader implements Rea
   //   The backing byte[] array of BytesWritable is immutable, so the consumer may keep pointers to it.
   @Override
   public abstract Iterable<BytesWritable> getCurrentValues() throws IOException;
+
+  public long consumeAll(KeyGroupConsumer consumer) throws IOException {
+    throw new UnsupportedOperationException(
+        "consumeAll(KeyGroupConsumer) is not supported by " + getClass().getName());
+  }
 }

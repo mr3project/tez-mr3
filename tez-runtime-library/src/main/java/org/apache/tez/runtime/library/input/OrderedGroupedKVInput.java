@@ -320,6 +320,26 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
     public Iterable<BytesWritable> getCurrentValues() throws IOException {
       return valuesIter.getValues();
     }
+
+    @Override
+    public long consumeAll(KeyGroupConsumer consumer) throws IOException {
+      return valuesIter.consumeAll(new TezRawKeyValueIterator.OrderedGroupedConsumer() {
+        @Override
+        public void startKey(BytesWritable key) throws IOException {
+          consumer.startKey(key);
+        }
+
+        @Override
+        public void consumeValue(BytesWritable value) throws IOException {
+          consumer.consumeValue(value);
+        }
+
+        @Override
+        public void endKey() throws IOException {
+          consumer.endKey();
+        }
+      });
+    }
   };
 
   private static final Set<String> confKeys = new HashSet<String>();

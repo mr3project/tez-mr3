@@ -19,6 +19,7 @@ package org.apache.tez.runtime.library.common.sort.impl;
 
 import java.io.IOException;
 
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DataInputBuffer;
 
 /**
@@ -26,6 +27,14 @@ import org.apache.hadoop.io.DataInputBuffer;
  * the raw keys and values during sort/merge of intermediate data. 
  */
 public interface TezRawKeyValueIterator {
+  interface OrderedGroupedConsumer {
+    void startKey(BytesWritable key) throws IOException;
+
+    void consumeValue(BytesWritable value) throws IOException;
+
+    void endKey() throws IOException;
+  }
+
   /** 
    * Gets the current raw key.
    * 
@@ -74,4 +83,12 @@ public interface TezRawKeyValueIterator {
    */
   // false negatives are allowed: two keys are the same, but isSameKey() returns false
   boolean isSameKey();
+
+  default boolean supportsOrderedGroupedConsume() {
+    return false;
+  }
+
+  default long consumeOrderedGrouped(OrderedGroupedConsumer consumer) throws IOException {
+    throw new UnsupportedOperationException("Ordered grouped consume is not supported");
+  }
 }

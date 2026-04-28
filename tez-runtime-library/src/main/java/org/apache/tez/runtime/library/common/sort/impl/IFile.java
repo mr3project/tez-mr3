@@ -907,6 +907,10 @@ public class IFile {
     void nextRawValue(DataInputBuffer value) throws IOException;
   }
 
+  public interface IOConsumer<T> {
+    void accept(T value) throws IOException;
+  }
+
   public interface KeyValueReaderBytesWritable extends KeyValueReaderBase {
     // Contract: readRawKey()/nextRawValue() and consumeAll() are mutually exclusive and must not be mixed.
     // Invariant: key already contains the previous key read from this stream.
@@ -919,6 +923,18 @@ public class IFile {
     // Retrieves all key/value pairs, where both BytesWritable arguments are backed by immutable byte[] arrays.
     // consumeAll() must not be mixed with readRawKey()/nextRawValue().
     long consumeAll(BiConsumer<BytesWritable, BytesWritable> consumer) throws IOException;
+
+    // Contract: key currently stores this key-group key and is updated to the next key when NEW_KEY is returned.
+    default Reader.KeyState consumeValuesForCurrentKey(
+        BytesWritable key, BytesWritable value, IOConsumer<BytesWritable> consumer) throws IOException {
+      Reader.KeyState nextKeyState;
+      do {
+        nextRawValue(value);
+        consumer.accept(value);
+        nextKeyState = readRawKey(key);
+      } while (nextKeyState == Reader.KeyState.SAME_KEY);
+      return nextKeyState;
+    }
   }
 
   public interface KeyValueReader extends KeyValueReaderDataInputBuffer, KeyValueReaderBytesWritable {

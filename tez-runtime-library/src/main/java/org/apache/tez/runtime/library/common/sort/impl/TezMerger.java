@@ -33,6 +33,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.compress.CompressionCodec;
@@ -660,6 +661,94 @@ public class TezMerger {
       }
 
       return true;
+    }
+
+    @Override
+    public boolean supportsOrderedGroupedConsume() {
+      return true;
+    }
+
+    @Override
+    public long consumeOrderedGrouped(OrderedGroupedConsumer consumer) throws IOException {
+      BytesWritable groupedKey = new BytesWritable();
+      BytesWritable groupedValue = new BytesWritable();
+      DataInputBuffer groupedValueBuffer = new DataInputBuffer();
+      DataInputBuffer groupedNextKey = new DataInputBuffer();
+      long consumedValues = 0;
+
+      while (hasNext()) {
+        Segment firstSegment = pop();
+        KeyValueBuffer currentKey = firstSegment.getKey();
+        copyToWritable(groupedKey, currentKey);
+        consumer.startKey(groupedKey);
+
+        List<Segment> groupedSegments = new ArrayList<Segment>();
+        groupedSegments.add(firstSegment);
+        Segment candidate = top();
+        while (candidate != null && TezBytesComparator.compare(
+            candidate.getKey().getData(), candidate.getKey().getPosition(), candidate.getKey().getLength(),
+            currentKey.getData(), currentKey.getPosition(), currentKey.getLength()) == 0) {
+          groupedSegments.add(pop());
+          candidate = top();
+        }
+
+        for (Segment segment : groupedSegments) {
+          if (segment.reader instanceof IFile.KeyValueReaderBytesWritable) {
+            BytesWritable segmentKey = new BytesWritable();
+            KeyValueBuffer segmentCurrentKey = segment.getKey();
+            segmentKey.setDirect(
+                segmentCurrentKey.getData(), segmentCurrentKey.getPosition(), segmentCurrentKey.getLength());
+            final long[] segmentValueCount = new long[] {0L};
+            KeyState keyState = ((IFile.KeyValueReaderBytesWritable) segment.reader)
+                .consumeValuesForCurrentKey(segmentKey, groupedValue, value -> {
+                  consumer.consumeValue(value);
+                  segmentValueCount[0]++;
+                });
+            consumedValues += segmentValueCount[0];
+            if (keyState == KeyState.NEW_KEY) {
+              segment.getKey().reset(segmentKey.getBytesRaw(), segmentKey.getOffset(), segmentKey.getLength());
+              put(segment);
+            } else {
+              segment.close();
+            }
+          } else {
+            while (true) {
+              segment.nextRawValue(groupedValueBuffer);
+              copyToWritable(groupedValue, groupedValueBuffer);
+              consumer.consumeValue(groupedValue);
+              consumedValues++;
+
+              KeyState keyState = segment.readRawKey(groupedNextKey);
+              if (keyState == KeyState.SAME_KEY) {
+                continue;
+              }
+              if (keyState == KeyState.NEW_KEY) {
+                put(segment);
+              } else {
+                segment.close();
+              }
+              break;
+            }
+          }
+        }
+
+        consumer.endKey();
+        minSegment = null;
+      }
+      return consumedValues;
+    }
+
+    private static void copyToWritable(BytesWritable writable, DataInputBuffer source) {
+      int position = source.getPosition();
+      int length = source.getLength() - position;
+      byte[] bytes = writable.reinitialize(length);
+      System.arraycopy(source.getData(), position, bytes, 0, length);
+    }
+
+    private static void copyToWritable(BytesWritable writable, KeyValueBuffer source) {
+      int length = source.getLength();
+      byte[] bytes = writable.reinitialize(length);
+      System.arraycopy(source.getData(), source.getPosition(), bytes, 0, length);
     }
 
   }
