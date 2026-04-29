@@ -138,7 +138,7 @@ public class ValuesIterator {
     };
   }
 
-  public long consumeAll(KeyValuesReaderEdge.KeyGroupConsumer consumer) throws IOException {
+  public long consumeAll(KeyValuesReaderEdge.KeyGroupConsumer consumer) throws Exception {
     if (in.supportsOrderedGroupedConsume()) {
       long consumedValues = in.consumeOrderedGrouped(consumer);
       completedProcessing = true;

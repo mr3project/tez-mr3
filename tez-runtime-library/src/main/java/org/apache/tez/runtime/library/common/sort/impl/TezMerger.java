@@ -18,7 +18,6 @@
 package org.apache.tez.runtime.library.common.sort.impl;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -671,7 +670,7 @@ public class TezMerger {
     }
 
     @Override
-    public long consumeOrderedGrouped(KeyValuesReaderEdge.KeyGroupConsumer consumer) throws IOException {
+    public long consumeOrderedGrouped(KeyValuesReaderEdge.KeyGroupConsumer consumer) throws Exception {
       BytesWritable groupedKey = new BytesWritable();
       BytesWritable groupedValue = new BytesWritable();
       DataInputBuffer groupedValueBuffer = new DataInputBuffer();
@@ -708,22 +707,11 @@ public class TezMerger {
             KeyValueBuffer segmentCurrentKey = segment.getKey();
             segmentKey.setDirect(
                 segmentCurrentKey.getData(), segmentCurrentKey.getPosition(), segmentCurrentKey.getLength());
-            IFile.KeyStateCount keyStateCount;
-            try {
-              // Deliberately mixed API usage:
-              // segment keys are tracked via DataInputBuffer in MergeQueue, while values can be drained
-              // through BytesWritable for lower-copy delivery when supported by the reader.
-              keyStateCount = ((IFile.KeyValueReaderBytesWritable) segment.reader)
-                  .consumeValuesForCurrentKey(segmentKey, groupedValue, value -> {
-                    try {
-                      consumer.consumeValue(value);
-                    } catch (IOException ioe) {
-                      throw new UncheckedIOException(ioe);
-                    }
-                  });
-            } catch (UncheckedIOException uioe) {
-              throw uioe.getCause();
-            }
+            // Deliberately mixed API usage:
+            // segment keys are tracked via DataInputBuffer in MergeQueue, while values can be drained
+            // through BytesWritable for lower-copy delivery when supported by the reader.
+            IFile.KeyStateCount keyStateCount = ((IFile.KeyValueReaderBytesWritable) segment.reader)
+                .consumeValuesForCurrentKey(segmentKey, groupedValue, consumer::consumeValue);
             consumedValues += keyStateCount.count;
             if (keyStateCount.keyState == KeyState.NEW_KEY) {
               segment.getKey().reset(segmentKey.getBytesRaw(), segmentKey.getOffset(), segmentKey.getLength());
