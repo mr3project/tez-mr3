@@ -20,6 +20,7 @@ package org.apache.tez.runtime.library.common.sort.impl;
 import java.io.IOException;
 
 import org.apache.hadoop.io.DataInputBuffer;
+import org.apache.tez.runtime.library.api.KeyValuesReaderEdge;
 
 /**
  * <code>TezRawKeyValueIterator</code> is an iterator used to iterate over
@@ -74,4 +75,12 @@ public interface TezRawKeyValueIterator {
    */
   // false negatives are allowed: two keys are the same, but isSameKey() returns false
   boolean isSameKey();
+
+  default boolean supportsOrderedGroupedConsume() {
+    return false;
+  }
+
+  default long consumeOrderedGrouped(KeyValuesReaderEdge.KeyGroupConsumer consumer) throws IOException {
+    throw new UnsupportedOperationException("Ordered grouped consume is not supported");
+  }
 }

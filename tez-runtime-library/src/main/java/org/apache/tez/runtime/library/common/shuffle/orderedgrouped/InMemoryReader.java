@@ -21,6 +21,7 @@ package org.apache.tez.runtime.library.common.shuffle.orderedgrouped;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.function.Consumer;
 
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DataInputBuffer;
@@ -369,6 +370,11 @@ public class InMemoryReader implements IFile.KeyValueReader {
     ++recNo;
   }
 
+  @Override
+  public boolean supportsImmutableRawKeyBuffer() {
+    return true;
+  }
+
   public void nextRawValue(BytesWritable value) throws IOException {
     int pos = memDataIn.getPosition();
     byte[] data = memDataIn.getData();
@@ -404,6 +410,29 @@ public class InMemoryReader implements IFile.KeyValueReader {
       }
     }
     return recordCount;
+  }
+
+  @Override
+  public IFile.KeyStateCount consumeValuesForCurrentKey(
+      BytesWritable key, BytesWritable value, Consumer<BytesWritable> consumer) throws IOException {
+    long count = 0;
+    KeyState nextKeyState;
+    if (isRleEnabled) {
+      do {
+        nextRawValue(value);
+        consumer.accept(value);
+        count++;
+        nextKeyState = readRawKeyRle(key);
+      } while (nextKeyState == KeyState.SAME_KEY);
+    } else {
+      do {
+        nextRawValue(value);
+        consumer.accept(value);
+        count++;
+        nextKeyState = readRawKeyNoRle(key);
+      } while (nextKeyState == KeyState.SAME_KEY);
+    }
+    return new IFile.KeyStateCount(nextKeyState, count);
   }
 
   @Override

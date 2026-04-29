@@ -18,6 +18,7 @@
 package org.apache.tez.runtime.library.common.sort.impl;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -33,6 +34,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.compress.CompressionCodec;
@@ -40,6 +42,7 @@ import org.apache.hadoop.util.PriorityQueue;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.runtime.api.MultiByteArrayOutputStream;
+import org.apache.tez.runtime.library.api.KeyValuesReaderEdge;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.comparator.TezBytesComparator;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader;
@@ -660,6 +663,112 @@ public class TezMerger {
       }
 
       return true;
+    }
+
+    @Override
+    public boolean supportsOrderedGroupedConsume() {
+      return true;
+    }
+
+    @Override
+    public long consumeOrderedGrouped(KeyValuesReaderEdge.KeyGroupConsumer consumer) throws IOException {
+      BytesWritable groupedKey = new BytesWritable();
+      BytesWritable groupedValue = new BytesWritable();
+      DataInputBuffer groupedValueBuffer = new DataInputBuffer();
+      DataInputBuffer groupedNextKey = new DataInputBuffer();
+      long consumedValues = 0;
+
+      while (hasNext()) {
+        Segment firstSegment = pop();
+        KeyValueBuffer currentKey = firstSegment.getKey();
+        if (firstSegment.reader.supportsImmutableRawKeyBuffer()) {
+          groupedKey.setDirect(currentKey.getData(), currentKey.getPosition(), currentKey.getLength());
+        } else {
+          copyToWritable(groupedKey, currentKey);
+        }
+        consumer.startKey(groupedKey);
+
+        List<Segment> groupedSegments = new ArrayList<Segment>();
+        groupedSegments.add(firstSegment);
+        Segment candidate = top();
+        while (candidate != null) {
+          KeyValueBuffer candidateKey = candidate.getKey();
+          if (TezBytesComparator.compare(
+              candidateKey.getData(), candidateKey.getPosition(), candidateKey.getLength(),
+              currentKey.getData(), currentKey.getPosition(), currentKey.getLength()) != 0) {
+            break;
+          }
+          groupedSegments.add(pop());
+          candidate = top();
+        }
+
+        for (Segment segment : groupedSegments) {
+          if (segment.reader instanceof IFile.KeyValueReaderBytesWritable) {
+            BytesWritable segmentKey = new BytesWritable();
+            KeyValueBuffer segmentCurrentKey = segment.getKey();
+            segmentKey.setDirect(
+                segmentCurrentKey.getData(), segmentCurrentKey.getPosition(), segmentCurrentKey.getLength());
+            IFile.KeyStateCount keyStateCount;
+            try {
+              // Deliberately mixed API usage:
+              // segment keys are tracked via DataInputBuffer in MergeQueue, while values can be drained
+              // through BytesWritable for lower-copy delivery when supported by the reader.
+              keyStateCount = ((IFile.KeyValueReaderBytesWritable) segment.reader)
+                  .consumeValuesForCurrentKey(segmentKey, groupedValue, value -> {
+                    try {
+                      consumer.consumeValue(value);
+                    } catch (IOException ioe) {
+                      throw new UncheckedIOException(ioe);
+                    }
+                  });
+            } catch (UncheckedIOException uioe) {
+              throw uioe.getCause();
+            }
+            consumedValues += keyStateCount.count;
+            if (keyStateCount.keyState == KeyState.NEW_KEY) {
+              segment.getKey().reset(segmentKey.getBytesRaw(), segmentKey.getOffset(), segmentKey.getLength());
+              put(segment);
+            } else {
+              segment.close();
+            }
+          } else {
+            while (true) {
+              segment.nextRawValue(groupedValueBuffer);
+              copyToWritable(groupedValue, groupedValueBuffer);
+              consumer.consumeValue(groupedValue);
+              consumedValues++;
+
+              KeyState keyState = segment.readRawKey(groupedNextKey);
+              if (keyState == KeyState.SAME_KEY) {
+                continue;
+              }
+              if (keyState == KeyState.NEW_KEY) {
+                put(segment);
+              } else {
+                segment.close();
+              }
+              break;
+            }
+          }
+        }
+
+        consumer.endKey();
+        minSegment = null;
+      }
+      return consumedValues;
+    }
+
+    private static void copyToWritable(BytesWritable writable, DataInputBuffer source) {
+      int position = source.getPosition();
+      int length = source.getLength() - position;
+      byte[] bytes = writable.reinitialize(length);
+      System.arraycopy(source.getData(), position, bytes, 0, length);
+    }
+
+    private static void copyToWritable(BytesWritable writable, KeyValueBuffer source) {
+      int length = source.getLength();
+      byte[] bytes = writable.reinitialize(length);
+      System.arraycopy(source.getData(), source.getPosition(), bytes, 0, length);
     }
 
   }

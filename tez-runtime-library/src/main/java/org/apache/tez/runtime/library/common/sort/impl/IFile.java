@@ -25,6 +25,7 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 import org.apache.hadoop.io.BoundedByteArrayOutputStream;
 import org.apache.hadoop.io.BytesWritable;
@@ -902,23 +903,59 @@ public class IFile {
     void close() throws IOException;
   }
 
+  // If KeyValueReaderBase implements both KeyValueReaderDataInputBuffer and KeyValueReaderBytesWritable,
+  // mixing DataInputBuffer and BytesWritable key/value APIs is allowed.
+  // Example: readRawKey(DataInputBuffer) + nextRawValue(BytesWritable) is valid.
+
   public interface KeyValueReaderDataInputBuffer extends KeyValueReaderBase {
+
     Reader.KeyState readRawKey(DataInputBuffer key) throws IOException;
+
     void nextRawValue(DataInputBuffer value) throws IOException;
+
+    default boolean supportsImmutableRawKeyBuffer() {
+      return false;
+    }
+  }
+
+  public static class KeyStateCount {
+    public final Reader.KeyState keyState;
+    public final long count;
+
+    public KeyStateCount(Reader.KeyState keyState, long count) {
+      this.keyState = keyState;
+      this.count = count;
+    }
   }
 
   public interface KeyValueReaderBytesWritable extends KeyValueReaderBase {
     // Contract: readRawKey()/nextRawValue() and consumeAll() are mutually exclusive and must not be mixed.
+
     // Invariant: key already contains the previous key read from this stream.
     // On the first call, key can be any BytesWritable instance.
     // After readRawKey() returns, the backing byte[] array is immutable, so the consumer may keep pointers to it.
     Reader.KeyState readRawKey(BytesWritable key) throws IOException;
+
     // After readRawValue() returns, the backing byte[] array is immutable, so the consumer may keep pointers to it.
     void nextRawValue(BytesWritable value) throws IOException;
 
     // Retrieves all key/value pairs, where both BytesWritable arguments are backed by immutable byte[] arrays.
     // consumeAll() must not be mixed with readRawKey()/nextRawValue().
     long consumeAll(KeyValueReaderEdge.ThrowingBiConsumer<BytesWritable, BytesWritable> consumer) throws Exception;
+
+    // Contract: key currently stores this key-group key and is updated to the next key when NEW_KEY is returned.
+    default KeyStateCount consumeValuesForCurrentKey(
+        BytesWritable key, BytesWritable value, Consumer<BytesWritable> consumer) throws IOException {
+      Reader.KeyState nextKeyState;
+      long count = 0;
+      do {
+        nextRawValue(value);
+        consumer.accept(value);
+        count++;
+        nextKeyState = readRawKey(key);
+      } while (nextKeyState == Reader.KeyState.SAME_KEY);
+      return new KeyStateCount(nextKeyState, count);
+    }
   }
 
   public interface KeyValueReader extends KeyValueReaderDataInputBuffer, KeyValueReaderBytesWritable {
@@ -1470,6 +1507,29 @@ public class IFile {
         }
       }
       return numRecordsRead;
+    }
+
+    @Override
+    public KeyStateCount consumeValuesForCurrentKey(
+        BytesWritable key, BytesWritable value, Consumer<BytesWritable> consumer) throws IOException {
+      long count = 0;
+      KeyState nextKeyState;
+      if (isRleEnabled) {
+        do {
+          nextRawValue(value);
+          consumer.accept(value);
+          count++;
+          nextKeyState = readRawKeyRle(key);
+        } while (nextKeyState == KeyState.SAME_KEY);
+      } else {
+        do {
+          nextRawValue(value);
+          consumer.accept(value);
+          count++;
+          nextKeyState = readRawKeyNoRle(key);
+        } while (nextKeyState == KeyState.SAME_KEY);
+      }
+      return new KeyStateCount(nextKeyState, count);
     }
 
     private static void verifyHeaderMagic(byte[] header) throws IOException {
