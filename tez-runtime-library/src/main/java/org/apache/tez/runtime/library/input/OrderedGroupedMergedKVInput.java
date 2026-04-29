@@ -128,6 +128,49 @@ public class OrderedGroupedMergedKVInput extends MergedLogicalInput implements L
       return false;
     }
 
+
+    @Override
+    public long consumeAll(KeyGroupConsumer consumer) throws Exception {
+      long consumedValues = 0;
+
+      // Contract: next()/getCurrent*() and consumeAll() are mutually exclusive and must not be mixed.
+      currentValues.discardCurrent();
+      for (KeyValuesReaderEdge reader : finishedReaders) {
+        advanceAndAddToQueue(reader);
+      }
+      finishedReaders.clear();
+
+      while (!pQueue.isEmpty()) {
+        KeyValuesReaderEdge currentReader = pQueue.poll();
+        BytesWritable groupedKey = currentReader.getCurrentKey();
+        consumer.startKey(groupedKey);
+
+        do {
+          for (BytesWritable value : currentReader.getCurrentValues()) {
+            consumer.consumeValue(value);
+            consumedValues++;
+          }
+
+          if (currentReader.next()) {
+            pQueue.add(currentReader);
+          }
+
+          currentReader = pQueue.peek();
+          if (currentReader != null
+              && TezBytesComparator.compare(groupedKey, currentReader.getCurrentKey()) == 0) {
+            currentReader = pQueue.poll();
+          } else {
+            currentReader = null;
+          }
+        } while (currentReader != null);
+
+        consumer.endKey();
+      }
+
+      hasCompletedProcessing();
+      completedProcessing = true;
+      return consumedValues;
+    }
     @Override
     public BytesWritable getCurrentKey() throws IOException {
       return currentKey;
