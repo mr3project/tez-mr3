@@ -706,6 +706,9 @@ public class TezMerger {
                 segmentCurrentKey.getData(), segmentCurrentKey.getPosition(), segmentCurrentKey.getLength());
             IFile.KeyStateCount keyStateCount;
             try {
+              // Deliberately mixed API usage:
+              // segment keys are tracked via DataInputBuffer in MergeQueue, while values can be drained
+              // through BytesWritable for lower-copy delivery when supported by the reader.
               keyStateCount = ((IFile.KeyValueReaderBytesWritable) segment.reader)
                   .consumeValuesForCurrentKey(segmentKey, groupedValue, value -> {
                     try {

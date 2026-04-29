@@ -904,6 +904,8 @@ public class IFile {
   }
 
   public interface KeyValueReaderDataInputBuffer extends KeyValueReaderBase {
+    // Mixing DataInputBuffer and BytesWritable key/value APIs is allowed, as long as consumeAll() is not used.
+    // Example: readRawKey(DataInputBuffer) + nextRawValue(BytesWritable) is valid.
     Reader.KeyState readRawKey(DataInputBuffer key) throws IOException;
     void nextRawValue(DataInputBuffer value) throws IOException;
     default boolean supportsImmutableRawKeyBuffer() {
@@ -923,6 +925,7 @@ public class IFile {
 
   public interface KeyValueReaderBytesWritable extends KeyValueReaderBase {
     // Contract: readRawKey()/nextRawValue() and consumeAll() are mutually exclusive and must not be mixed.
+    // It is okay to mix BytesWritable and DataInputBuffer key/value methods with each other.
     // Invariant: key already contains the previous key read from this stream.
     // On the first call, key can be any BytesWritable instance.
     // After readRawKey() returns, the backing byte[] array is immutable, so the consumer may keep pointers to it.
