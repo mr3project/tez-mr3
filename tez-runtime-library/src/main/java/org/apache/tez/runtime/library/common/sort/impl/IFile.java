@@ -25,7 +25,6 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Consumer;
 
 import org.apache.hadoop.io.BoundedByteArrayOutputStream;
 import org.apache.hadoop.io.BytesWritable;
@@ -34,6 +33,7 @@ import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.api.TezOffsetRecord;
 import org.apache.tez.runtime.api.TezTaskOutput;
 import org.apache.tez.runtime.library.api.KeyValueReaderEdge;
+import org.apache.tez.runtime.library.api.KeyValuesReaderEdge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -945,7 +945,8 @@ public class IFile {
 
     // Contract: key currently stores this key-group key and is updated to the next key when NEW_KEY is returned.
     default KeyStateCount consumeValuesForCurrentKey(
-        BytesWritable key, BytesWritable value, Consumer<BytesWritable> consumer) throws IOException {
+        BytesWritable key, BytesWritable value, KeyValuesReaderEdge.ThrowingConsumer<BytesWritable> consumer)
+        throws Exception {
       Reader.KeyState nextKeyState;
       long count = 0;
       do {
@@ -1511,7 +1512,8 @@ public class IFile {
 
     @Override
     public KeyStateCount consumeValuesForCurrentKey(
-        BytesWritable key, BytesWritable value, Consumer<BytesWritable> consumer) throws IOException {
+        BytesWritable key, BytesWritable value, KeyValuesReaderEdge.ThrowingConsumer<BytesWritable> consumer)
+        throws Exception {
       long count = 0;
       KeyState nextKeyState;
       if (isRleEnabled) {
