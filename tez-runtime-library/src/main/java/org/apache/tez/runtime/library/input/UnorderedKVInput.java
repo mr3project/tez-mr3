@@ -20,7 +20,6 @@ package org.apache.tez.runtime.library.input;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.function.BiConsumer;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -184,7 +183,7 @@ public class UnorderedKVInput extends AbstractLogicalInput implements LogicalInp
         }
 
         @Override
-        public long consumeAll(BiConsumer<BytesWritable, BytesWritable> consumer) throws IOException {
+        public long consumeAll(KeyValueReaderEdge.ThrowingBiConsumer<BytesWritable, BytesWritable> consumer) throws Exception {
           hasCompletedProcessing();
           completedProcessing = true;
           return 0L;

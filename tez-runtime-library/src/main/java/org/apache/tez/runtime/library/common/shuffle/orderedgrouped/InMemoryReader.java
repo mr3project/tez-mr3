@@ -21,12 +21,12 @@ package org.apache.tez.runtime.library.common.shuffle.orderedgrouped;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.function.BiConsumer;
 
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.tez.runtime.api.TezOffsetRecord;
 import org.apache.tez.common.io.NonSyncByteArrayInputStream;
+import org.apache.tez.runtime.library.api.KeyValueReaderEdge;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader.KeyState;
@@ -385,7 +385,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
   }
 
   @Override
-  public long consumeAll(BiConsumer<BytesWritable, BytesWritable> consumer) throws IOException {
+  public long consumeAll(KeyValueReaderEdge.ThrowingBiConsumer<BytesWritable, BytesWritable> consumer) throws Exception {
     assert recNo == 1;  // must not be mixed with next()
     BytesWritable key = new BytesWritable();
     BytesWritable value = new BytesWritable();

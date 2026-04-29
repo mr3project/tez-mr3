@@ -19,7 +19,6 @@
 package org.apache.tez.runtime.library.common.readers;
 
 import java.io.IOException;
-import java.util.function.BiConsumer;
 
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.api.InputContext;
@@ -113,7 +112,7 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
   }
 
   @Override
-  public long consumeAll(BiConsumer<BytesWritable, BytesWritable> consumer) throws IOException {
+  public long consumeAll(KeyValueReaderEdge.ThrowingBiConsumer<BytesWritable, BytesWritable> consumer) throws Exception {
     assert numRecordsRead == 0L;  // must not be mixed with next()
     while (moveToNextInput()) {
       long currentConsumed = currentReader.consumeAll(consumer);

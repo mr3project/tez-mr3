@@ -25,7 +25,6 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.BiConsumer;
 
 import org.apache.hadoop.io.BoundedByteArrayOutputStream;
 import org.apache.hadoop.io.BytesWritable;
@@ -33,6 +32,7 @@ import org.apache.tez.runtime.api.DecompressorPool;
 import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.api.TezOffsetRecord;
 import org.apache.tez.runtime.api.TezTaskOutput;
+import org.apache.tez.runtime.library.api.KeyValueReaderEdge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -918,7 +918,7 @@ public class IFile {
 
     // Retrieves all key/value pairs, where both BytesWritable arguments are backed by immutable byte[] arrays.
     // consumeAll() must not be mixed with readRawKey()/nextRawValue().
-    long consumeAll(BiConsumer<BytesWritable, BytesWritable> consumer) throws IOException;
+    long consumeAll(KeyValueReaderEdge.ThrowingBiConsumer<BytesWritable, BytesWritable> consumer) throws Exception;
   }
 
   public interface KeyValueReader extends KeyValueReaderDataInputBuffer, KeyValueReaderBytesWritable {
@@ -1452,7 +1452,7 @@ public class IFile {
     }
 
     @Override
-    public long consumeAll(BiConsumer<BytesWritable, BytesWritable> consumer) throws IOException {
+    public long consumeAll(KeyValueReaderEdge.ThrowingBiConsumer<BytesWritable, BytesWritable> consumer) throws Exception {
       assert numRecordsRead == 0;   // must not be mixed with nextRawValue()
       BytesWritable key = new BytesWritable();
       BytesWritable value = new BytesWritable();

@@ -19,7 +19,6 @@
 package org.apache.tez.runtime.library.api;
 
 import java.io.IOException;
-import java.util.function.BiConsumer;
 
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.api.ReaderEdge;
@@ -47,7 +46,12 @@ public abstract class KeyValueReaderEdge extends KeyValueReader implements Reade
   @Override
   public abstract BytesWritable getCurrentValue() throws IOException;
 
+  @FunctionalInterface
+  public interface ThrowingBiConsumer<T, U> {
+    void accept(T t, U u) throws Exception;
+  }
+
   // Invariant:
   //   The backing byte[] arrays of both BytesWritable arguments are immutable.
-  public abstract long consumeAll(BiConsumer<BytesWritable, BytesWritable> consumer) throws IOException;
+  public abstract long consumeAll(ThrowingBiConsumer<BytesWritable, BytesWritable> consumer) throws Exception;
 }
