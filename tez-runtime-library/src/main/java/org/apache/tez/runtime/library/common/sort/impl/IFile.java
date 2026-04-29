@@ -1503,6 +1503,29 @@ public class IFile {
       return numRecordsRead;
     }
 
+    @Override
+    public KeyStateCount consumeValuesForCurrentKey(
+        BytesWritable key, BytesWritable value, Consumer<BytesWritable> consumer) throws IOException {
+      long count = 0;
+      KeyState nextKeyState;
+      if (isRleEnabled) {
+        do {
+          nextRawValue(value);
+          consumer.accept(value);
+          count++;
+          nextKeyState = readRawKeyRle(key);
+        } while (nextKeyState == KeyState.SAME_KEY);
+      } else {
+        do {
+          nextRawValue(value);
+          consumer.accept(value);
+          count++;
+          nextKeyState = readRawKeyNoRle(key);
+        } while (nextKeyState == KeyState.SAME_KEY);
+      }
+      return new KeyStateCount(nextKeyState, count);
+    }
+
     private static void verifyHeaderMagic(byte[] header) throws IOException {
       if (!(header[0] == 'T' && header[1] == 'I'
           && header[2] == 'F')) {
