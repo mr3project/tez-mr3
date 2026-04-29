@@ -908,6 +908,16 @@ public class IFile {
     void nextRawValue(DataInputBuffer value) throws IOException;
   }
 
+  public static class KeyStateCount {
+    public final Reader.KeyState keyState;
+    public final long count;
+
+    public KeyStateCount(Reader.KeyState keyState, long count) {
+      this.keyState = keyState;
+      this.count = count;
+    }
+  }
+
   public interface KeyValueReaderBytesWritable extends KeyValueReaderBase {
     // Contract: readRawKey()/nextRawValue() and consumeAll() are mutually exclusive and must not be mixed.
     // Invariant: key already contains the previous key read from this stream.
@@ -922,15 +932,17 @@ public class IFile {
     long consumeAll(BiConsumer<BytesWritable, BytesWritable> consumer) throws IOException;
 
     // Contract: key currently stores this key-group key and is updated to the next key when NEW_KEY is returned.
-    default Reader.KeyState consumeValuesForCurrentKey(
+    default KeyStateCount consumeValuesForCurrentKey(
         BytesWritable key, BytesWritable value, Consumer<BytesWritable> consumer) throws IOException {
       Reader.KeyState nextKeyState;
+      long count = 0;
       do {
         nextRawValue(value);
         consumer.accept(value);
+        count++;
         nextKeyState = readRawKey(key);
       } while (nextKeyState == Reader.KeyState.SAME_KEY);
-      return nextKeyState;
+      return new KeyStateCount(nextKeyState, count);
     }
   }
 

@@ -700,23 +700,21 @@ public class TezMerger {
             KeyValueBuffer segmentCurrentKey = segment.getKey();
             segmentKey.setDirect(
                 segmentCurrentKey.getData(), segmentCurrentKey.getPosition(), segmentCurrentKey.getLength());
-            final long[] segmentValueCount = new long[] {0L};
-            KeyState keyState;
+            IFile.KeyStateCount keyStateCount;
             try {
-              keyState = ((IFile.KeyValueReaderBytesWritable) segment.reader)
+              keyStateCount = ((IFile.KeyValueReaderBytesWritable) segment.reader)
                   .consumeValuesForCurrentKey(segmentKey, groupedValue, value -> {
                     try {
                       consumer.consumeValue(value);
                     } catch (IOException ioe) {
                       throw new UncheckedIOException(ioe);
                     }
-                    segmentValueCount[0]++;
                   });
             } catch (UncheckedIOException uioe) {
               throw uioe.getCause();
             }
-            consumedValues += segmentValueCount[0];
-            if (keyState == KeyState.NEW_KEY) {
+            consumedValues += keyStateCount.count;
+            if (keyStateCount.keyState == KeyState.NEW_KEY) {
               segment.getKey().reset(segmentKey.getBytesRaw(), segmentKey.getOffset(), segmentKey.getLength());
               put(segment);
             } else {

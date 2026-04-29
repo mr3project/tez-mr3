@@ -408,15 +408,17 @@ public class InMemoryReader implements IFile.KeyValueReader {
   }
 
   @Override
-  public KeyState consumeValuesForCurrentKey(
+  public IFile.KeyStateCount consumeValuesForCurrentKey(
       BytesWritable key, BytesWritable value, Consumer<BytesWritable> consumer) throws IOException {
     KeyState nextKeyState;
+    long count = 0;
     do {
       nextRawValue(value);
       consumer.accept(value);
+      count++;
       nextKeyState = isRleEnabled ? readRawKeyRle(key) : readRawKeyNoRle(key);
     } while (nextKeyState == KeyState.SAME_KEY);
-    return nextKeyState;
+    return new IFile.KeyStateCount(nextKeyState, count);
   }
 
   @Override
