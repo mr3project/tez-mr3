@@ -311,18 +311,18 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
     }
 
     @Override
-    public BytesWritable getCurrentKey() throws IOException {
+    public BytesWritable getCurrentKey() {
       return valuesIter.getKey();
     }
 
     @Override
     @SuppressWarnings("unchecked")
-    public Iterable<BytesWritable> getCurrentValues() throws IOException {
+    public Iterable<BytesWritable> getCurrentValues() {
       return valuesIter.getValues();
     }
 
     @Override
-    public long consumeAll(KeyGroupConsumer consumer) throws IOException {
+    public long consumeAll(KeyGroupConsumer consumer) throws Exception {
       return valuesIter.consumeAll(consumer);
     }
   };

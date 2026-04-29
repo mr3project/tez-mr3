@@ -26,9 +26,14 @@ import org.apache.tez.runtime.api.ReaderEdge;
 public abstract class KeyValuesReaderEdge extends KeyValuesReader implements ReaderEdge {
 
   public interface KeyGroupConsumer {
-    void startKey(BytesWritable key) throws IOException;
-    void consumeValue(BytesWritable value) throws IOException;
-    void endKey() throws IOException;
+    void startKey(BytesWritable key) throws Exception;
+    void consumeValue(BytesWritable value) throws Exception;
+    void endKey() throws Exception;
+  }
+
+  @FunctionalInterface
+  public interface ThrowingConsumer<T> {
+    void accept(T t) throws Exception;
   }
 
   /**
@@ -49,7 +54,7 @@ public abstract class KeyValuesReaderEdge extends KeyValuesReader implements Rea
   @Override
   public abstract Iterable<BytesWritable> getCurrentValues() throws IOException;
 
-  public long consumeAll(KeyGroupConsumer consumer) throws IOException {
+  public long consumeAll(KeyGroupConsumer consumer) throws Exception {
     throw new UnsupportedOperationException(
         "consumeAll(KeyGroupConsumer) is not supported by " + getClass().getName());
   }

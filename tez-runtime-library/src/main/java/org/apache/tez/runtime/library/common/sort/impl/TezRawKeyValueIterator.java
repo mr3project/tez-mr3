@@ -80,7 +80,7 @@ public interface TezRawKeyValueIterator {
     return false;
   }
 
-  default long consumeOrderedGrouped(KeyValuesReaderEdge.KeyGroupConsumer consumer) throws IOException {
+  default long consumeOrderedGrouped(KeyValuesReaderEdge.KeyGroupConsumer consumer) throws Exception {
     throw new UnsupportedOperationException("Ordered grouped consume is not supported");
   }
 }
