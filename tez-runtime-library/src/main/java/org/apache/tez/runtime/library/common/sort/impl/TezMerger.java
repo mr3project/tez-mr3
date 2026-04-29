@@ -681,7 +681,11 @@ public class TezMerger {
       while (hasNext()) {
         Segment firstSegment = pop();
         KeyValueBuffer currentKey = firstSegment.getKey();
-        copyToWritable(groupedKey, currentKey);
+        if (firstSegment.reader.supportsImmutableRawKeyBuffer()) {
+          groupedKey.setDirect(currentKey.getData(), currentKey.getPosition(), currentKey.getLength());
+        } else {
+          copyToWritable(groupedKey, currentKey);
+        }
         consumer.startKey(groupedKey);
 
         List<Segment> groupedSegments = new ArrayList<Segment>();

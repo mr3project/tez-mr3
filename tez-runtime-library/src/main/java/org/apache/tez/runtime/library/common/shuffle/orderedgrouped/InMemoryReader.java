@@ -370,6 +370,11 @@ public class InMemoryReader implements IFile.KeyValueReader {
     ++recNo;
   }
 
+  @Override
+  public boolean supportsImmutableRawKeyBuffer() {
+    return true;
+  }
+
   public void nextRawValue(BytesWritable value) throws IOException {
     int pos = memDataIn.getPosition();
     byte[] data = memDataIn.getData();

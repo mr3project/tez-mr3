@@ -906,6 +906,9 @@ public class IFile {
   public interface KeyValueReaderDataInputBuffer extends KeyValueReaderBase {
     Reader.KeyState readRawKey(DataInputBuffer key) throws IOException;
     void nextRawValue(DataInputBuffer value) throws IOException;
+    default boolean supportsImmutableRawKeyBuffer() {
+      return false;
+    }
   }
 
   public static class KeyStateCount {
