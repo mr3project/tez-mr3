@@ -151,10 +151,7 @@ public class OrderedGroupedMergedKVInput extends MergedLogicalInput implements L
         consumer.startKey(groupedKey);
 
         do {
-          for (BytesWritable value : currentReader.getCurrentValues()) {
-            consumer.consumeValue(value);
-            consumedValues++;
-          }
+          consumedValues += currentReader.consumeCurrentValuesOnly(consumer::consumeValue);
 
           if (currentReader.next()) {
             pQueue.add(currentReader);
