@@ -141,6 +141,11 @@ public class OrderedGroupedMergedKVInput extends MergedLogicalInput implements L
       finishedReaders.clear();
 
       while (!pQueue.isEmpty()) {
+        if (pQueue.size() == 1) {
+          consumedValues += pQueue.poll().consumeAll(consumer);
+          break;
+        }
+
         KeyValuesReaderEdge currentReader = pQueue.poll();
         BytesWritable groupedKey = currentReader.getCurrentKey();
         consumer.startKey(groupedKey);
