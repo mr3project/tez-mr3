@@ -138,6 +138,21 @@ public class ValuesIterator {
     };
   }
 
+
+  // Contract: consumeCurrentValuesOnly() and getValues() iteration are mutually exclusive for the same key-group.
+  public long consumeCurrentValuesOnly(KeyValuesReaderEdge.ThrowingConsumer<BytesWritable> consumer) throws Exception {
+    if (in.supportsConsumeCurrentValuesOnly()) {
+      return in.consumeCurrentValuesOnly(consumer);
+    }
+
+    long consumedValues = 0;
+    for (BytesWritable currentValue : getValues()) {
+      consumer.accept(currentValue);
+      consumedValues++;
+    }
+    return consumedValues;
+  }
+
   public long consumeAll(KeyValuesReaderEdge.KeyGroupConsumer consumer) throws Exception {
     if (in.supportsOrderedGroupedConsume()) {
       long consumedValues = in.consumeOrderedGrouped(consumer);

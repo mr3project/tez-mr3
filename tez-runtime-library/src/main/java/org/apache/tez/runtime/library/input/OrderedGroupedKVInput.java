@@ -325,6 +325,12 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
     public long consumeAll(KeyGroupConsumer consumer) throws Exception {
       return valuesIter.consumeAll(consumer);
     }
+
+    @Override
+    public long consumeCurrentValuesOnly(ThrowingConsumer<BytesWritable> consumer) throws Exception {
+      return valuesIter.consumeCurrentValuesOnly(consumer);
+    }
+
   };
 
   private static final Set<String> confKeys = new HashSet<String>();

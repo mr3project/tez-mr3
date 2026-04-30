@@ -20,6 +20,7 @@ package org.apache.tez.runtime.library.common.sort.impl;
 import java.io.IOException;
 
 import org.apache.hadoop.io.DataInputBuffer;
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.library.api.KeyValuesReaderEdge;
 
 /**
@@ -82,5 +83,15 @@ public interface TezRawKeyValueIterator {
 
   default long consumeOrderedGrouped(KeyValuesReaderEdge.KeyGroupConsumer consumer) throws Exception {
     throw new UnsupportedOperationException("Ordered grouped consume is not supported");
+  }
+
+  default boolean supportsConsumeCurrentValuesOnly() {
+    return false;
+  }
+
+  // Contract: consumeCurrentValuesOnly() must not be mixed with getValue()/next() for the same key-group.
+  default long consumeCurrentValuesOnly(
+      KeyValuesReaderEdge.ThrowingConsumer<BytesWritable> consumer) throws Exception {
+    throw new UnsupportedOperationException("Current-key consume is not supported");
   }
 }
