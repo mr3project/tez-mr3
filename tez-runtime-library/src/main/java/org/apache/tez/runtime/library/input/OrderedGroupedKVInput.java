@@ -282,8 +282,7 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
   }
 
   @SuppressWarnings({ "rawtypes", "unchecked" })
-  protected synchronized void createValuesIterator()
-      throws IOException {
+  protected synchronized void createValuesIterator() {
     // Not used by ReduceProcessor
     Class<?> keyClass = SerializationContext.getKeyClass();
     Class<?> valClass = SerializationContext.getValueClass();
@@ -324,6 +323,11 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
     @Override
     public long consumeAll(KeyGroupConsumer consumer) throws Exception {
       return valuesIter.consumeAll(consumer);
+    }
+
+    @Override
+    public long consumeCurrentValuesOnly(ThrowingConsumer<BytesWritable> consumer) throws Exception {
+      return valuesIter.consumeCurrentValuesOnly(consumer);
     }
   };
 

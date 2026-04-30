@@ -54,6 +54,19 @@ public abstract class KeyValuesReaderEdge extends KeyValuesReader implements Rea
   @Override
   public abstract Iterable<BytesWritable> getCurrentValues() throws IOException;
 
+
+  /**
+   * Consume all values for the current key only.
+   *
+   * Implementations may override for optimized paths.
+   *
+   * @return number of consumed values for the current key
+   */
+  public long consumeCurrentValuesOnly(ThrowingConsumer<BytesWritable> consumer) throws Exception {
+    throw new UnsupportedOperationException(
+        "consumeCurrentValuesOnly() should not be called in " + getClass().getName());
+  }
+
   public long consumeAll(KeyGroupConsumer consumer) throws Exception {
     throw new UnsupportedOperationException(
         "consumeAll(KeyGroupConsumer) is not supported by " + getClass().getName());
