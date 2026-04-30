@@ -677,89 +677,49 @@ public class TezMerger {
     @Override
     public long consumeCurrentValuesOnly(KeyValuesReaderEdge.ThrowingConsumer<BytesWritable> consumer)
         throws Exception {
-      if (size() == 0) {
-        return 0;
-      }
-
-      Segment firstSegment = pop();
-      KeyValueBuffer currentKey = firstSegment.getKey();
-      BytesWritable groupedValue = new BytesWritable();
-      DataInputBuffer groupedValueBuffer = new DataInputBuffer();
-      DataInputBuffer groupedNextKey = new DataInputBuffer();
-      long consumedValues = 0;
-
-      List<Segment> groupedSegments = new ArrayList<Segment>();
-      groupedSegments.add(firstSegment);
-      Segment candidate = top();
-      while (candidate != null) {
-        KeyValueBuffer candidateKey = candidate.getKey();
-        if (TezBytesComparator.compare(
-            candidateKey.getData(), candidateKey.getPosition(), candidateKey.getLength(),
-            currentKey.getData(), currentKey.getPosition(), currentKey.getLength()) != 0) {
-          break;
+      KeyValuesReaderEdge.KeyGroupConsumer noOpKeyGroupConsumer = new KeyValuesReaderEdge.KeyGroupConsumer() {
+        @Override
+        public void startKey(BytesWritable key) {
         }
-        groupedSegments.add(pop());
-        candidate = top();
-      }
 
-      for (Segment segment : groupedSegments) {
-        if (segment.reader instanceof IFile.KeyValueReaderBytesWritable) {
-          BytesWritable segmentKey = new BytesWritable();
-          KeyValueBuffer segmentCurrentKey = segment.getKey();
-          segmentKey.setDirect(
-              segmentCurrentKey.getData(), segmentCurrentKey.getPosition(), segmentCurrentKey.getLength());
-          IFile.KeyStateCount keyStateCount = ((IFile.KeyValueReaderBytesWritable) segment.reader)
-              .consumeValuesForCurrentKey(segmentKey, groupedValue, consumer);
-          consumedValues += keyStateCount.count;
-          if (keyStateCount.keyState == KeyState.NEW_KEY) {
-            segment.getKey().reset(segmentKey.getBytesRaw(), segmentKey.getOffset(), segmentKey.getLength());
-            put(segment);
-          } else {
-            segment.close();
-          }
-        } else {
-          while (true) {
-            segment.nextRawValue(groupedValueBuffer);
-            copyToWritable(groupedValue, groupedValueBuffer);
-            consumer.accept(groupedValue);
-            consumedValues++;
-
-            KeyState keyState = segment.readRawKey(groupedNextKey);
-            if (keyState == KeyState.SAME_KEY) {
-              continue;
-            }
-            if (keyState == KeyState.NEW_KEY) {
-              put(segment);
-            } else {
-              segment.close();
-            }
-            break;
-          }
+        @Override
+        public void consumeValue(BytesWritable value) throws Exception {
+          consumer.accept(value);
         }
-      }
 
-      minSegment = null;
-      hasNext = null;
-      return consumedValues;
+        @Override
+        public void endKey() {
+        }
+      };
+      return consumeGroupedValues(noOpKeyGroupConsumer, false, true);
     }
 
     @Override
     public long consumeOrderedGrouped(KeyValuesReaderEdge.KeyGroupConsumer consumer) throws Exception {
-      BytesWritable groupedKey = new BytesWritable();
+      return consumeGroupedValues(consumer, true, false);
+    }
+
+    private long consumeGroupedValues(
+        KeyValuesReaderEdge.KeyGroupConsumer consumer,
+        boolean shouldStartKey,
+        boolean consumeSingleGroupOnly) throws Exception {
+      BytesWritable groupedKey = shouldStartKey ? new BytesWritable() : null;
       BytesWritable groupedValue = new BytesWritable();
       DataInputBuffer groupedValueBuffer = new DataInputBuffer();
       DataInputBuffer groupedNextKey = new DataInputBuffer();
       long consumedValues = 0;
 
-      while (hasNext()) {
+      while (size() != 0) {
         Segment firstSegment = pop();
         KeyValueBuffer currentKey = firstSegment.getKey();
-        if (firstSegment.reader.supportsImmutableRawKeyBuffer()) {
-          groupedKey.setDirect(currentKey.getData(), currentKey.getPosition(), currentKey.getLength());
-        } else {
-          copyToWritable(groupedKey, currentKey);
+        if (shouldStartKey) {
+          if (firstSegment.reader.supportsImmutableRawKeyBuffer()) {
+            groupedKey.setDirect(currentKey.getData(), currentKey.getPosition(), currentKey.getLength());
+          } else {
+            copyToWritable(groupedKey, currentKey);
+          }
+          consumer.startKey(groupedKey);
         }
-        consumer.startKey(groupedKey);
 
         List<Segment> groupedSegments = new ArrayList<Segment>();
         groupedSegments.add(firstSegment);
@@ -781,9 +741,6 @@ public class TezMerger {
             KeyValueBuffer segmentCurrentKey = segment.getKey();
             segmentKey.setDirect(
                 segmentCurrentKey.getData(), segmentCurrentKey.getPosition(), segmentCurrentKey.getLength());
-            // Deliberately mixed API usage:
-            // segment keys are tracked via DataInputBuffer in MergeQueue, while values can be drained
-            // through BytesWritable for lower-copy delivery when supported by the reader.
             IFile.KeyStateCount keyStateCount = ((IFile.KeyValueReaderBytesWritable) segment.reader)
                 .consumeValuesForCurrentKey(segmentKey, groupedValue, consumer::consumeValue);
             consumedValues += keyStateCount.count;
@@ -814,9 +771,17 @@ public class TezMerger {
           }
         }
 
-        consumer.endKey();
+        if (shouldStartKey) {
+          consumer.endKey();
+        }
+
         minSegment = null;
+        hasNext = null;
+        if (consumeSingleGroupOnly) {
+          break;
+        }
       }
+
       return consumedValues;
     }
 
