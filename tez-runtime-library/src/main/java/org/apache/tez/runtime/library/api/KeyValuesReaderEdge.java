@@ -63,12 +63,8 @@ public abstract class KeyValuesReaderEdge extends KeyValuesReader implements Rea
    * @return number of consumed values for the current key
    */
   public long consumeCurrentValuesOnly(ThrowingConsumer<BytesWritable> consumer) throws Exception {
-    long consumedValues = 0;
-    for (BytesWritable value : getCurrentValues()) {
-      consumer.accept(value);
-      consumedValues++;
-    }
-    return consumedValues;
+    throw new UnsupportedOperationException(
+        "consumeCurrentValuesOnly() should not be called in " + getClass().getName());
   }
 
   public long consumeAll(KeyGroupConsumer consumer) throws Exception {
