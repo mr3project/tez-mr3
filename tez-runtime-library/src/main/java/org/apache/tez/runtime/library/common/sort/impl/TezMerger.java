@@ -672,6 +672,7 @@ public class TezMerger {
     @Override
     public long consumeOrderedGrouped(KeyValuesReaderEdge.KeyGroupConsumer consumer) throws Exception {
       BytesWritable groupedKey = new BytesWritable();
+      BytesWritable groupedKeySnapshot = new BytesWritable();
       BytesWritable groupedValue = new BytesWritable();
       DataInputBuffer groupedValueBuffer = new DataInputBuffer();
       DataInputBuffer groupedNextKey = new DataInputBuffer();
@@ -685,7 +686,8 @@ public class TezMerger {
         } else {
           copyToWritable(groupedKey, currentKey);
         }
-        consumer.startKey(groupedKey);
+        groupedKeySnapshot.set(groupedKey);
+        consumer.startKey(groupedKeySnapshot);
 
         List<Segment> groupedSegments = new ArrayList<Segment>();
         groupedSegments.add(firstSegment);

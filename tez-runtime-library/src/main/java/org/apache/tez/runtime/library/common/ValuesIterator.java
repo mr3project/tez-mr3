@@ -158,7 +158,9 @@ public class ValuesIterator {
 
     long consumedValues = 0;
     while (moveToNext()) {
-      consumer.startKey(getKey());
+      BytesWritable groupedKeySnapshot = new BytesWritable();
+      groupedKeySnapshot.set(getKey());
+      consumer.startKey(groupedKeySnapshot);
       for (BytesWritable currentValue : getValues()) {
         consumer.consumeValue(currentValue);
         consumedValues++;

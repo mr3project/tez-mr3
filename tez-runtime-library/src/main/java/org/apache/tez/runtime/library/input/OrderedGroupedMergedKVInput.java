@@ -148,7 +148,9 @@ public class OrderedGroupedMergedKVInput extends MergedLogicalInput implements L
 
         KeyValuesReaderEdge currentReader = pQueue.poll();
         BytesWritable groupedKey = currentReader.getCurrentKey();
-        consumer.startKey(groupedKey);
+        BytesWritable groupedKeySnapshot = new BytesWritable();
+        groupedKeySnapshot.set(groupedKey);
+        consumer.startKey(groupedKeySnapshot);
 
         do {
           consumedValues += currentReader.consumeCurrentValuesOnly(consumer::consumeValue);
@@ -159,7 +161,7 @@ public class OrderedGroupedMergedKVInput extends MergedLogicalInput implements L
 
           currentReader = pQueue.peek();
           if (currentReader != null
-              && TezBytesComparator.compare(groupedKey, currentReader.getCurrentKey()) == 0) {
+              && TezBytesComparator.compare(groupedKeySnapshot, currentReader.getCurrentKey()) == 0) {
             currentReader = pQueue.poll();
           } else {
             currentReader = null;
