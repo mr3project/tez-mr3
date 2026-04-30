@@ -147,8 +147,11 @@ public class OrderedGroupedMergedKVInput extends MergedLogicalInput implements L
         }
 
         KeyValuesReaderEdge currentReader = pQueue.poll();
-        BytesWritable groupedKey = currentReader.getCurrentKey();
-        consumer.startKey(groupedKey);
+        BytesWritable currentGroupedKey = currentReader.getCurrentKey();
+        // create groupedKey because currentGroupedKey can be mutated (although its backing byte[] array remains immutable)
+        BytesWritable groupedKey = new BytesWritable(
+            currentGroupedKey.getBytesRaw(), currentGroupedKey.getOffset(), currentGroupedKey.getLength());
+        consumer.startKey(groupedKey);  // keeps a reference to groupedKey, which should not be mutated
 
         do {
           consumedValues += currentReader.consumeCurrentValuesOnly(consumer::consumeValue);

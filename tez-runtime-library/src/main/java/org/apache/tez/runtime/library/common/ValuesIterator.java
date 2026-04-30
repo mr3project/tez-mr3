@@ -158,7 +158,11 @@ public class ValuesIterator {
 
     long consumedValues = 0;
     while (moveToNext()) {
-      consumer.startKey(getKey());
+      BytesWritable currentKey = getKey();
+      // create groupedKey because currentKey can be mutated (although its backing byte[] array remains immutable)
+      BytesWritable groupedKey = new BytesWritable(
+          currentKey.getBytesRaw(), currentKey.getOffset(), currentKey.getLength());
+      consumer.startKey(groupedKey);  // keeps a reference to groupedKey, which should not be mutated
       for (BytesWritable currentValue : getValues()) {
         consumer.consumeValue(currentValue);
         consumedValues++;

@@ -671,7 +671,6 @@ public class TezMerger {
 
     @Override
     public long consumeOrderedGrouped(KeyValuesReaderEdge.KeyGroupConsumer consumer) throws Exception {
-      BytesWritable groupedKey = new BytesWritable();
       BytesWritable groupedValue = new BytesWritable();
       DataInputBuffer groupedValueBuffer = new DataInputBuffer();
       DataInputBuffer groupedNextKey = new DataInputBuffer();
@@ -680,12 +679,14 @@ public class TezMerger {
       while (hasNext()) {
         Segment firstSegment = pop();
         KeyValueBuffer currentKey = firstSegment.getKey();
+        BytesWritable groupedKey;
         if (firstSegment.reader.supportsImmutableRawKeyBuffer()) {
-          groupedKey.setDirect(currentKey.getData(), currentKey.getPosition(), currentKey.getLength());
+          groupedKey = new BytesWritable(currentKey.getData(), currentKey.getPosition(), currentKey.getLength());
         } else {
+          groupedKey = new BytesWritable();
           copyToWritable(groupedKey, currentKey);
         }
-        consumer.startKey(groupedKey);
+        consumer.startKey(groupedKey);  // keeps a reference to groupedKey, which should not be mutated
 
         List<Segment> groupedSegments = new ArrayList<Segment>();
         groupedSegments.add(firstSegment);
@@ -694,7 +695,7 @@ public class TezMerger {
           KeyValueBuffer candidateKey = candidate.getKey();
           if (TezBytesComparator.compare(
               candidateKey.getData(), candidateKey.getPosition(), candidateKey.getLength(),
-              currentKey.getData(), currentKey.getPosition(), currentKey.getLength()) != 0) {
+              groupedKey.getBytesRaw(), groupedKey.getOffset(), groupedKey.getLength()) != 0) {
             break;
           }
           groupedSegments.add(pop());
