@@ -670,6 +670,80 @@ public class TezMerger {
     }
 
     @Override
+    public boolean supportsConsumeCurrentValuesOnly() {
+      return true;
+    }
+
+    @Override
+    public long consumeCurrentValuesOnly(KeyValuesReaderEdge.ThrowingConsumer<BytesWritable> consumer)
+        throws Exception {
+      if (size() == 0) {
+        return 0;
+      }
+
+      Segment firstSegment = pop();
+      KeyValueBuffer currentKey = firstSegment.getKey();
+      BytesWritable groupedValue = new BytesWritable();
+      DataInputBuffer groupedValueBuffer = new DataInputBuffer();
+      DataInputBuffer groupedNextKey = new DataInputBuffer();
+      long consumedValues = 0;
+
+      List<Segment> groupedSegments = new ArrayList<Segment>();
+      groupedSegments.add(firstSegment);
+      Segment candidate = top();
+      while (candidate != null) {
+        KeyValueBuffer candidateKey = candidate.getKey();
+        if (TezBytesComparator.compare(
+            candidateKey.getData(), candidateKey.getPosition(), candidateKey.getLength(),
+            currentKey.getData(), currentKey.getPosition(), currentKey.getLength()) != 0) {
+          break;
+        }
+        groupedSegments.add(pop());
+        candidate = top();
+      }
+
+      for (Segment segment : groupedSegments) {
+        if (segment.reader instanceof IFile.KeyValueReaderBytesWritable) {
+          BytesWritable segmentKey = new BytesWritable();
+          KeyValueBuffer segmentCurrentKey = segment.getKey();
+          segmentKey.setDirect(
+              segmentCurrentKey.getData(), segmentCurrentKey.getPosition(), segmentCurrentKey.getLength());
+          IFile.KeyStateCount keyStateCount = ((IFile.KeyValueReaderBytesWritable) segment.reader)
+              .consumeValuesForCurrentKey(segmentKey, groupedValue, consumer);
+          consumedValues += keyStateCount.count;
+          if (keyStateCount.keyState == KeyState.NEW_KEY) {
+            segment.getKey().reset(segmentKey.getBytesRaw(), segmentKey.getOffset(), segmentKey.getLength());
+            put(segment);
+          } else {
+            segment.close();
+          }
+        } else {
+          while (true) {
+            segment.nextRawValue(groupedValueBuffer);
+            copyToWritable(groupedValue, groupedValueBuffer);
+            consumer.accept(groupedValue);
+            consumedValues++;
+
+            KeyState keyState = segment.readRawKey(groupedNextKey);
+            if (keyState == KeyState.SAME_KEY) {
+              continue;
+            }
+            if (keyState == KeyState.NEW_KEY) {
+              put(segment);
+            } else {
+              segment.close();
+            }
+            break;
+          }
+        }
+      }
+
+      minSegment = null;
+      hasNext = null;
+      return consumedValues;
+    }
+
+    @Override
     public long consumeOrderedGrouped(KeyValuesReaderEdge.KeyGroupConsumer consumer) throws Exception {
       BytesWritable groupedKey = new BytesWritable();
       BytesWritable groupedValue = new BytesWritable();
