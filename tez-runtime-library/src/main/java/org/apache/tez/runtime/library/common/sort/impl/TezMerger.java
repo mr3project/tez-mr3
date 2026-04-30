@@ -696,7 +696,8 @@ public class TezMerger {
           KeyValueBuffer candidateKey = candidate.getKey();
           if (TezBytesComparator.compare(
               candidateKey.getData(), candidateKey.getPosition(), candidateKey.getLength(),
-              currentKey.getData(), currentKey.getPosition(), currentKey.getLength()) != 0) {
+              groupedKeySnapshot.getBytesRaw(), groupedKeySnapshot.getOffset(),
+              groupedKeySnapshot.getLength()) != 0) {
             break;
           }
           groupedSegments.add(pop());
