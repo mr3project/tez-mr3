@@ -48,7 +48,10 @@ public class TezIndexRecord {
 
   public boolean hasData() {
     //TEZ-941 - Avoid writing out empty partitions
-    //EOF_MARKER + Header bytes
-    return !(rawLength <= (IFile.HEADER.length + 2));
+    // Empty IFile consists of:
+    //   - header bytes
+    //   - EOF marker (2 ints)
+    // Any payload beyond that means this partition has data records.
+    return rawLength > (IFile.getHeaderLength() + IFile.getEOFMarkerLength());
   }
 }
