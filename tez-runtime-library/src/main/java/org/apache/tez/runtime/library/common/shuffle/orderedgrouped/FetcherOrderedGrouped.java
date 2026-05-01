@@ -90,6 +90,11 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
   }
 
   private final ShuffleScheduler shuffleScheduler;
+
+  private static String formatOffsetRecordContents(TezOffsetRecord r) {
+    return r.getMaxKeyLen() + "_" + r.getMaxValLen() + "_" + r.getFirstKeyOffset()
+        + "_" + r.getFirstValOffset() + "_" + r.getEofPos();
+  }
   private final int fetcherIdentifier;
   private final String logIdentifier;
 
@@ -476,6 +481,13 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
           ShuffleHeader header = new ShuffleHeader(fetcherConfigCommon.compositeFetch);
           // TODO Review: Multiple header reads in case of status WAIT ?
           header.readFields(input);
+          TezOffsetRecord headerOffsetRecord = header.getTezOffsetRecord();
+          if (headerOffsetRecord != null) {
+            LOG.error("zzzzz {} {}", taskContext.getUniqueIdentifier(),
+                formatOffsetRecordContents(headerOffsetRecord));
+          } else {
+            LOG.error("zzzzz {} NULL", taskContext.getUniqueIdentifier());
+          }
           if (!header.mapId.startsWith(InputAttemptIdentifier.PATH_PREFIX_MR3) && !header.mapId.startsWith(InputAttemptIdentifier.PATH_PREFIX)) {
             if (!stopped) {
               shuffleErrorCounterGroup.badIdErrs.increment(1);

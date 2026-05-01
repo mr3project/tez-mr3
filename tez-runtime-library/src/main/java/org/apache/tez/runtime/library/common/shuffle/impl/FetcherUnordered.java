@@ -77,6 +77,11 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
   private static final CompositeInputAttemptIdentifier[] EMPTY_ATTEMPT_ID_ARRAY = new CompositeInputAttemptIdentifier[0];
 
   private final ShuffleManager shuffleManager;
+
+  private static String formatOffsetRecordContents(TezOffsetRecord r) {
+    return r.getMaxKeyLen() + "_" + r.getMaxValLen() + "_" + r.getFirstKeyOffset()
+        + "_" + r.getFirstValOffset() + "_" + r.getEofPos();
+  }
   private final int fetcherIdentifier;
   private final String logIdentifier;
 
@@ -647,6 +652,13 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         try {
           ShuffleHeader header = new ShuffleHeader(fetcherConfigCommon.compositeFetch);
           header.readFields(input);
+          TezOffsetRecord headerOffsetRecord = header.getTezOffsetRecord();
+          if (headerOffsetRecord != null) {
+            LOG.error("zzzzz {} {}", taskContext.getUniqueIdentifier(),
+                formatOffsetRecordContents(headerOffsetRecord));
+          } else {
+            LOG.error("zzzzz {} NULL", taskContext.getUniqueIdentifier());
+          }
           pathComponent = header.getMapId();
           if (!pathComponent.startsWith(InputAttemptIdentifier.PATH_PREFIX_MR3) && !pathComponent.startsWith(InputAttemptIdentifier.PATH_PREFIX)) {
             shuffleErrorCounterGroup.badIdErrs.increment(1);
