@@ -455,9 +455,18 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
           TezIndexRecord indexRecord = spillRecord.getIndex(reduceId);
           // TODO: continue if !indexRecord.hasData()
 
+          if (fetcherConfigCommon.compositeFetch && offsetRecordMap == null) {
+            throw new IOException("Missing TezOffsetRecord map for local direct fetch: pathComponent=" + pathComponent);
+          }
+
           fetchedInput = getLocalFetchedInput(srcAttemptId, pathComponent, indexRecord, inputFilePath);
           if (offsetRecordMap != null) {
-            fetchedInput.setTezOffsetRecord(offsetRecordMap.get(reduceId));
+            TezOffsetRecord tezOffsetRecord = offsetRecordMap.get(reduceId);
+            if (fetcherConfigCommon.compositeFetch && tezOffsetRecord == null) {
+              throw new IOException("Missing TezOffsetRecord for local direct fetch: pathComponent="
+                  + pathComponent + ", reduceId=" + reduceId);
+            }
+            fetchedInput.setTezOffsetRecord(tezOffsetRecord);
           }
           long endTime = System.currentTimeMillis();
           fetcherCallback.fetchSucceeded(shuffleClientId, host, srcAttemptId, fetchedInput,

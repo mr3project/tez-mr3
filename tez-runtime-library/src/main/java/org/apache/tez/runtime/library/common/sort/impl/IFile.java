@@ -1043,7 +1043,6 @@ public class IFile {
       this.dataIn = new DataInputStream(this.in);
       this.fileLength = length;
       this.isRleEnabled = isRleEnabled;
-
       assert !(tezOffsetRecord != null) || !isRleEnabled;
       this.tezOffsetRecord = tezOffsetRecord;
     }

@@ -709,9 +709,18 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
             continue;
           }
 
+          if (fetcherConfigCommon.compositeFetch && offsetRecordMap == null) {
+            throw new IOException("Missing TezOffsetRecord map for local direct fetch: pathComponent=" + pathComponent);
+          }
+
           mapOutput = getMapOutputForDirectFetch(srcAttemptId, pathComponent, inputFilePath, indexRecord);
           if (offsetRecordMap != null) {
-            mapOutput.setTezOffsetRecord(offsetRecordMap.get(reduceId));
+            TezOffsetRecord tezOffsetRecord = offsetRecordMap.get(reduceId);
+            if (fetcherConfigCommon.compositeFetch && tezOffsetRecord == null) {
+              throw new IOException("Missing TezOffsetRecord for local direct fetch: pathComponent="
+                  + pathComponent + ", reduceId=" + reduceId);
+            }
+            mapOutput.setTezOffsetRecord(tezOffsetRecord);
           }
           long endTime = System.currentTimeMillis();
           fetcherCallback.fetchSucceeded(shuffleClientId, host, srcAttemptId, mapOutput,
