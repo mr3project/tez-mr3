@@ -75,6 +75,11 @@ public class PipelinedSorter extends ExternalSorter {
   private static final Logger LOG = LoggerFactory.getLogger(PipelinedSorter.class);
   private static final boolean isDebugEnabled = LOG.isDebugEnabled();
 
+  private static String formatOffsetRecordContents(TezOffsetRecord r) {
+    return r.getMaxKeyLen() + "_" + r.getMaxValLen() + "_" + r.getFirstKeyOffset()
+        + "_" + r.getFirstValOffset() + "_" + r.getEofPos();
+  }
+
   /**
    * The size of each record in the index file for the map-outputs.
    */
@@ -554,7 +559,10 @@ public class PipelinedSorter extends ExternalSorter {
             rawLength = writer.getRawLength();
             partLength = writer.getCompressedLength();
             if (spillOffsetRecordMap != null && i == partition) {
-              spillOffsetRecordMap.put(i, writer.getTezOffsetRecord());
+              TezOffsetRecord offsetRecord = writer.getTezOffsetRecord();
+              LOG.error("xxxxx {} {}", outputContext.getUniqueIdentifier(),
+                  formatOffsetRecordContents(offsetRecord));
+              spillOffsetRecordMap.put(i, offsetRecord);
             }
           }
           adjustSpillCounters(rawLength, partLength);
@@ -694,7 +702,10 @@ public class PipelinedSorter extends ExternalSorter {
         final TezIndexRecord rec = new TezIndexRecord(segmentStart, rawLength, partLength);
         spillRec.putIndex(rec, i);
         if (spillOffsetRecordMap != null && rec.hasData()) {
-          spillOffsetRecordMap.put(i, writer.getTezOffsetRecord());
+          TezOffsetRecord offsetRecord = writer.getTezOffsetRecord();
+          LOG.error("xxxxx {} {}", outputContext.getUniqueIdentifier(),
+              formatOffsetRecordContents(offsetRecord));
+          spillOffsetRecordMap.put(i, offsetRecord);
         }
         if (!isFinalMergeEnabled && reportPartitionStats()) {
           partitionStats[i] += rawLength;
@@ -1008,7 +1019,10 @@ public class PipelinedSorter extends ExternalSorter {
           final TezIndexRecord rec = new TezIndexRecord(segmentStart, rawLength, partLength);
           spillRec.putIndex(rec, parts);
           if (offsetRecordMap != null && rec.hasData()) {
-            offsetRecordMap.put(parts, writer.getTezOffsetRecord());
+            TezOffsetRecord offsetRecord = writer.getTezOffsetRecord();
+            LOG.error("xxxxx {} {}", outputContext.getUniqueIdentifier(),
+                formatOffsetRecordContents(offsetRecord));
+            offsetRecordMap.put(parts, offsetRecord);
           }
           if (reportPartitionStats()) {
             partitionStats[parts] += rawLength;

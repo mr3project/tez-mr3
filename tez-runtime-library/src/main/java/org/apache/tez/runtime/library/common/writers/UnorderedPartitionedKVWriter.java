@@ -106,6 +106,11 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
   private static final Logger LOG = LoggerFactory.getLogger(UnorderedPartitionedKVWriter.class);
   private static final boolean isDebugEnabled = LOG.isDebugEnabled();
 
+  private static String formatOffsetRecordContents(TezOffsetRecord r) {
+    return r.getMaxKeyLen() + "_" + r.getMaxValLen() + "_" + r.getFirstKeyOffset()
+        + "_" + r.getFirstValOffset() + "_" + r.getEofPos();
+  }
+
   private static final int INT_SIZE = 4;
   private static final int NUM_META = 3; // Number of meta fields.
   private static final int INDEX_KEYLEN = 0; // KeyLength index
@@ -736,7 +741,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
                   writer.getCompressedLength());
               spillRecord.putIndex(indexRecord, i);
               if (spillOffsetRecordMap != null && indexRecord.hasData()) {
-                spillOffsetRecordMap.put(i, writer.getTezOffsetRecord());
+                TezOffsetRecord offsetRecord = writer.getTezOffsetRecord();
+                LOG.error("xxxxx {} {}", outputContext.getUniqueIdentifier(),
+                    formatOffsetRecordContents(offsetRecord));
+                spillOffsetRecordMap.put(i, offsetRecord);
               }
               writer = null;
             }
@@ -909,7 +917,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
             final Map<Integer, TezOffsetRecord> spillOffsetRecordMap =
               (compositeFetch && !useCachedStream && !isRleEnabled) ? new HashMap<>() : null;
             if (spillOffsetRecordMap != null && rec.hasData()) {
-              spillOffsetRecordMap.put(0, writer.getTezOffsetRecord());
+              TezOffsetRecord offsetRecord = writer.getTezOffsetRecord();
+              LOG.error("xxxxx {} {}", outputContext.getUniqueIdentifier(),
+                  formatOffsetRecordContents(offsetRecord));
+              spillOffsetRecordMap.put(0, offsetRecord);
             }
 
             ShuffleUtils.writeToIndexPathCacheAndByteCache(
@@ -1362,7 +1373,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
           TezIndexRecord indexRecord = new TezIndexRecord(segmentStart, writer.getRawLength(),
               writer.getCompressedLength());
           if (spillOffsetRecordMap != null && indexRecord.hasData()) {
-            spillOffsetRecordMap.put(i, writer.getTezOffsetRecord());
+            TezOffsetRecord offsetRecord = writer.getTezOffsetRecord();
+            LOG.error("xxxxx {} {}", outputContext.getUniqueIdentifier(),
+                formatOffsetRecordContents(offsetRecord));
+            spillOffsetRecordMap.put(i, offsetRecord);
           }
           writer = null;
           finalSpillRecord.putIndex(indexRecord, i);
@@ -1497,7 +1511,10 @@ public class UnorderedPartitionedKVWriter extends BaseUnorderedPartitionedKVWrit
                 writer.getCompressedLength());
             spillRecord.putIndex(indexRecord, i);
             if (spillOffsetRecordMap != null && indexRecord.hasData()) {
-              spillOffsetRecordMap.put(i, writer.getTezOffsetRecord());
+              TezOffsetRecord offsetRecord = writer.getTezOffsetRecord();
+              LOG.error("xxxxx {} {}", outputContext.getUniqueIdentifier(),
+                  formatOffsetRecordContents(offsetRecord));
+              spillOffsetRecordMap.put(i, offsetRecord);
             }
             outSize = writer.getCompressedLength();
             writer = null;

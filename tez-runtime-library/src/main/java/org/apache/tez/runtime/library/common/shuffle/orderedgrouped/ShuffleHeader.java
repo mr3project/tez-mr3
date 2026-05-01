@@ -26,6 +26,8 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.tez.runtime.api.TezOffsetRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Shuffle Header information that is sent by the TaskTracker and 
@@ -33,6 +35,7 @@ import org.apache.tez.runtime.api.TezOffsetRecord;
  *
  */
 public class ShuffleHeader implements Writable {
+  private static final Logger LOG = LoggerFactory.getLogger(ShuffleHeader.class);
   
   /** Header info of the shuffle http request/response */
   public static final String HTTP_HEADER_NAME = "name";
@@ -113,6 +116,7 @@ public class ShuffleHeader implements Writable {
       int eofPos = in.readInt();
       if (eofPos >= 0) {
         tezOffsetRecord = new TezOffsetRecord(maxKeyLen, maxValLen, firstKeyOffset, firstValOffset, eofPos);
+        LOG.error("yyyyy {}_{}_{}_{}_{}", maxKeyLen, maxValLen, firstKeyOffset, firstValOffset, eofPos);
       } else {
         tezOffsetRecord = null;
       }
