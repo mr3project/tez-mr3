@@ -628,11 +628,13 @@ public class IFile {
       }
 
       int lengthBytes = 0;
-      if (!keyLenTransitioned && keyLength != maxKeyLen) {
+      if (!keyLenTransitioned
+          && (keyLength != maxKeyLen || (numRecordsWritten == 0 && keyLength == 0))) {
         keyLenTransitioned = true;
         firstKeyOffset = (int) getDecompressedBytesWritten();
       }
-      if (!valLenTransitioned && valueLength != maxValLen) {
+      if (!valLenTransitioned
+          && (valueLength != maxValLen || (numRecordsWritten == 0 && valueLength == 0))) {
         valLenTransitioned = true;
         firstValOffset = (int) getDecompressedBytesWritten();
       }
