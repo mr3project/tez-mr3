@@ -283,7 +283,7 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
 
       String hostIdentifier = shufflePayload.getHost() + ":" + port;
       FetchedInput fetchedInput = inputAllocator.allocate(dataProto.getRawLength(),
-          dataProto.getCompressedLength(), input, true);
+          dataProto.getCompressedLength(), input, true, true);
       moveDataToFetchedInput(dataProto, fetchedInput, hostIdentifier);
       shuffleManager.addCompletedInputWithData(input, fetchedInput);
 

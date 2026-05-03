@@ -136,27 +136,27 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       codecHolder.set(newCodec);
     }
 
-    boolean useLocalDiskFetch;
-    if (fetcherConfigCommon.localDiskFetchEnabled &&
-        host.equals(fetcherConfigCommon.localHostName)) {
-      if (fetcherConfigCommon.compositeFetch) {
-        // inspect 'first' to find the container where all inputs originate from
-        CompositeInputAttemptIdentifier first = pendingInputsSeq.getInputs().get(0);
-        // true if inputs originate from the current ContainerWorker
-        useLocalDiskFetch = first.getPathComponent().startsWith(
-            taskContext.getExecutionContext().getEnvContainerId());
-      } else {
-        useLocalDiskFetch = true;
-      }
+    boolean isFetchFromLocal;
+    boolean isFetchFromLocalInternal = false;   // true if inputs originate from the current ContainerWorker
+    if (host.equals(fetcherConfigCommon.localHostName)) {
+      isFetchFromLocal = true;
+      // inspect 'first' to find the container where all inputs originate from
+      CompositeInputAttemptIdentifier first = pendingInputsSeq.getInputs().get(0);
+      isFetchFromLocalInternal = first.getPathComponent().startsWith(
+          taskContext.getExecutionContext().getEnvContainerId());
     } else {
-      useLocalDiskFetch = false;
+      isFetchFromLocal = false;
     }
 
     HostFetchResult hostFetchResult;
-    if (useLocalDiskFetch) {
-      hostFetchResult = doLocalDiskFetch();
+    if (isFetchFromLocal) {
+      if (isFetchFromLocalInternal) {
+        hostFetchResult = doLocalDiskFetch();   // TezSpillRecord can be obtained directly
+      } else {
+        hostFetchResult = doHttpFetch(true);
+      }
     } else {
-      hostFetchResult = doHttpFetch();
+      hostFetchResult = doHttpFetch(false);
     }
 
     if (hostFetchResult.failedInputs != null && hostFetchResult.failedInputs.length > 0) {
@@ -299,7 +299,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     return null;
   }
 
-  private HostFetchResult doHttpFetch() {
+  private HostFetchResult doHttpFetch(boolean isFetchFromLocal) {
     HostFetchResult connectionsWithRetryResult = setupConnection(0);
     if (connectionsWithRetryResult != null) {
       // no InputAttemptIdentifier has been consumed, so return here
@@ -340,7 +340,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         // fetchInputs() either:
         //   1. successfully read inputAttemptIdentifier at index, returning null
         //   2. fails to read inputAttemptIdentifier, returning non-null
-        failedInputs = fetchInputs(input, inputAttemptIdentifier, index);
+        failedInputs = fetchInputs(input, inputAttemptIdentifier, index, isFetchFromLocal);
         // failedInputs can be:
         //   1. all remaining inputs starting from index
         //   2. inputAttemptIdentifier
@@ -406,6 +406,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         null, false);
   }
 
+  // doLocalDiskFetch(): TezSpillRecord can be obtained directly
   private HostFetchResult doLocalDiskFetch() {
     int partitionId = pendingInputsSeq.getPartition();
     int partitionCount = pendingInputsSeq.getPartitionCount();
@@ -622,7 +623,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
   private CompositeInputAttemptIdentifier[] fetchInputs(
       DataInputStream input,
       CompositeInputAttemptIdentifier inputAttemptIdentifier,
-      int currentIndex) throws FetcherReadTimeoutException {
+      int currentIndex, boolean isFetchFromLocal) throws FetcherReadTimeoutException {
     FetchedInput fetchedInput = null;
     InputAttemptIdentifier srcAttemptId = null;   // to be constructed from data fetched from ShuffleServer
     long decompressedLength = 0;
@@ -723,7 +724,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         // TODO TEZ-957. handle IOException here when Broadcast has better error checking
         {
           fetchedInput = shuffleManager.getInputManager().allocate(
-              decompressedLength, compressedLength, srcAttemptId, false);
+              decompressedLength, compressedLength, srcAttemptId, false, isFetchFromLocal);
           fetchedInput.setTezOffsetRecord(mapOutputStat.tezOffsetRecord);
         }
         if (fetchedInput.getType() == ShuffleClient.Type.WAIT) {

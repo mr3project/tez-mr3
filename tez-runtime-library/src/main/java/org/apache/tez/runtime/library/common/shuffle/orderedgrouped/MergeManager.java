@@ -403,7 +403,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       InputAttemptIdentifier srcAttemptIdentifier,
       long requestedSize,
       long compressedLength,
-      int fetcher) throws IOException {
+      int fetcher,
+      boolean isFetchFromLocal) throws IOException {
     if (!canShuffleToMemory(requestedSize)) {
       LOG.info("Creating DiskMapOutput for {}: {} > maxSingleShuffleLimit", srcAttemptIdentifier, requestedSize);
       return MapOutput.createDiskMapOutput(srcAttemptIdentifier, this, compressedLength, conf,

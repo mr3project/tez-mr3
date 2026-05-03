@@ -26,7 +26,8 @@ public interface FetchedInputAllocatorOrderedGrouped {
   public MapOutput reserve(InputAttemptIdentifier srcAttemptIdentifier,
                            long requestedSize,
                            long compressedLength,
-                           int fetcherId) throws IOException;
+                           int fetcherId,
+                           boolean isFetchFromLocal) throws IOException;
 
   void closeInMemoryFile(MapOutput mapOutput);
 

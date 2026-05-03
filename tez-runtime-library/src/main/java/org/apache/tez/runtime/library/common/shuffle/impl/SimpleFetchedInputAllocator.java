@@ -123,10 +123,10 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator, Fetch
   @Override
   public synchronized FetchedInput allocate(long actualSize, long compressedSize,
       InputAttemptIdentifier inputAttemptIdentifier,
-      boolean isFromShufflePayload) throws IOException {
+      boolean isFromShufflePayload, boolean isFetchFromLocal) throws IOException {
     if (actualSize > maxSingleMemoryShuffle) {
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Creating DiskFetchedInput: {} > maxSingleMemoryShuffle", actualSize);
+        LOG.debug("Creating DiskFetchedInput: {} > maxSingleMemoryShuffle, isFetchFromLocal={}", actualSize, isFetchFromLocal);
       }
       return new DiskFetchedInput(compressedSize,
           inputAttemptIdentifier, this, conf, fileNameAllocator);
@@ -139,7 +139,7 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator, Fetch
           return stallShuffle;
         }
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Creating DiskFetchedInput: {} + {} > memoryLimit", this.usedMemory, actualSize);
+          LOG.debug("Creating DiskFetchedInput: {} + {} > memoryLimit, isFetchFromLocal={}", this.usedMemory, actualSize, isFetchFromLocal);
         }
         return new DiskFetchedInput(compressedSize,
             inputAttemptIdentifier, this, conf, fileNameAllocator);
@@ -155,7 +155,7 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator, Fetch
           return stallShuffle;
         }
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Creating DiskFetchedInput: {}, {} < freeMemoryThreshold", actualSize, currentFreeMemory);
+          LOG.debug("Creating DiskFetchedInput: {}, {} < freeMemoryThreshold, isFetchFromLocal={}", actualSize, currentFreeMemory, isFetchFromLocal);
         }
         return new DiskFetchedInput(compressedSize,
             inputAttemptIdentifier, this, conf, fileNameAllocator);

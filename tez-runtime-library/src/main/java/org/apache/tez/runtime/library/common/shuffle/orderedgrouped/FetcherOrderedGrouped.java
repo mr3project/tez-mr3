@@ -188,20 +188,16 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
   }
 
   private Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> fetchNext() throws InterruptedException {
-    boolean useLocalDiskFetch;
-    if (fetcherConfigCommon.localDiskFetchOrderedEnabled &&
-        host.equals(fetcherConfigCommon.localHostName)) {
-      if (fetcherConfigCommon.compositeFetch) {
-        // inspect 'first' to find the container where all inputs originate from
-        CompositeInputAttemptIdentifier first = pendingInputsSeq.getInputs().get(0);
-        // true if inputs originate from the current ContainerWorker
-        useLocalDiskFetch = first.getPathComponent().startsWith(
-            taskContext.getExecutionContext().getEnvContainerId());
-      } else {
-        useLocalDiskFetch = true;
-      }
+    boolean isFetchFromLocal;
+    boolean isFetchFromLocalInternal = false;   // true if inputs originate from the current ContainerWorker
+    if (host.equals(fetcherConfigCommon.localHostName)) {
+      isFetchFromLocal = true;
+      // inspect 'first' to find the container where all inputs originate from
+      CompositeInputAttemptIdentifier first = pendingInputsSeq.getInputs().get(0);
+      isFetchFromLocalInternal = first.getPathComponent().startsWith(
+        taskContext.getExecutionContext().getEnvContainerId());
     } else {
-      useLocalDiskFetch = false;
+      isFetchFromLocal = false;
     }
 
     List<CompositeInputAttemptIdentifier> failedFetches = null;
@@ -209,10 +205,14 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
 
     try {
       fetcherCallback.waitForMergeManager(shuffleClientId);
-      if (useLocalDiskFetch) {
-        failedFetches = setupLocalDiskFetch();
+      if (isFetchFromLocal) {
+        if (isFetchFromLocalInternal) {
+          failedFetches = setupLocalDiskFetch();    // TezSpillRecord can be obtained directly
+        } else {
+          pendingInputs = copyFromHost(true);
+        }
       } else {
-        pendingInputs = copyFromHost();
+        pendingInputs = copyFromHost(false);
       }
     } finally {
       if (failedFetches != null && !failedFetches.isEmpty()) {
@@ -220,7 +220,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
           fetcherCallback.fetchFailed(shuffleClientId, input, true, false,
               inputHost, getPartitionRange(), this));
       }
-      if (!useLocalDiskFetch) {
+      if (!isFetchFromLocalInternal) {
         // This is a minor optimization that cleans up the current connection.
         // shutdown() will call cleanupCurrentConnection() again, but will have no effect.
         cleanupCurrentConnection(false);  // false to reuse connection
@@ -231,7 +231,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
   }
 
   // return pendingInputs[]
-  private Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> copyFromHost() {
+  private Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> copyFromHost(boolean isFetchFromLocal) {
     // reset retryStartTime for a new host
     retryStartTime = 0;
 
@@ -263,7 +263,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       // skip for this error in the input stream. So we cannot move on to the
       // remaining outputs. YARN-1773. Will get to them in the next retry.
       try {
-        failedInputs = copyMapOutput(input, inputAttemptIdentifier);
+        failedInputs = copyMapOutput(input, inputAttemptIdentifier, isFetchFromLocal);
         if (failedInputs != null) {
           break;
         }
@@ -454,7 +454,8 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
   // return failedInputs[]
   private CompositeInputAttemptIdentifier[] copyMapOutput(
       DataInputStream input,
-      CompositeInputAttemptIdentifier inputAttemptIdentifier) throws FetcherReadTimeoutException {
+      CompositeInputAttemptIdentifier inputAttemptIdentifier,
+      boolean isFetchFromLocal) throws FetcherReadTimeoutException {
     MapOutput mapOutput = null;
     InputAttemptIdentifier srcAttemptId = null;
     long decompressedLength = 0;
@@ -556,7 +557,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         decompressedLength = mapOutputStat.decompressedLength;
         compressedLength = mapOutputStat.compressedLength;
         try {
-          mapOutput = allocator.reserve(srcAttemptId, decompressedLength, compressedLength, fetcherIdentifier);
+          mapOutput = allocator.reserve(srcAttemptId, decompressedLength, compressedLength, fetcherIdentifier, isFetchFromLocal);
           mapOutput.setTezOffsetRecord(mapOutputStat.tezOffsetRecord);
         } catch (IOException e) {
           if (!stopped) {
