@@ -277,9 +277,6 @@ public class TezRuntimeConfiguration {
       TEZ_RUNTIME_PREFIX + "shuffle.unordered.memory.streaming";
   public static final boolean TEZ_RUNTIME_SHUFFLE_UNORDERED_MEMORY_STREAMING_DEFAULT = false;
 
-  // if set to true, automatically set:
-  //   1. tez.runtime.optimize.local.fetch = false
-  //   2. tez.runtime.optimize.local.fetch.ordered = false
   @ConfigurationProperty(type = "boolean")
   public static final String TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT =
       TEZ_RUNTIME_PREFIX + "use.free.memory.writer.output";
@@ -412,15 +409,14 @@ public class TezRuntimeConfiguration {
   @ConfigurationProperty(type = "boolean")
   public static final String TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH = TEZ_RUNTIME_PREFIX +
       "optimize.local.fetch";
-  public static final boolean TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_DEFAULT = false;
+  public static final boolean TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_DEFAULT = true;
 
-  // for ordered fetched
-  // set to false when tez.runtime.shuffle.memory-to-memory.enable=true.
+  // only for ordered fetch
   // read only in constructFetcherConfigCommon() from ShuffleServer, so not included in tezRuntimeKeys[]
   @ConfigurationProperty(type = "boolean")
   public static final String TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_ORDERED = TEZ_RUNTIME_PREFIX +
       "optimize.local.fetch.ordered";
-  public static final boolean TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_ORDERED_DEFAULT = false;
+  public static final boolean TEZ_RUNTIME_OPTIMIZE_LOCAL_FETCH_ORDERED_DEFAULT = true;
 
   static {
     tezRuntimeKeys.add(TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID);
