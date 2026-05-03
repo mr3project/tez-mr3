@@ -76,13 +76,14 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator, Fetch
     final float maxSingleShuffleMemoryPercent = conf.getFloat(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MEMORY_LIMIT_PERCENT,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MEMORY_LIMIT_PERCENT_DEFAULT);
-    if (maxSingleShuffleMemoryPercent <= 0.0f) {
+    if (maxSingleShuffleMemoryPercent <= 0.0f || maxSingleShuffleMemoryPercent >= 1.0f) {
       throw new IllegalArgumentException("Invalid value for "
           + TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MEMORY_LIMIT_PERCENT + ": "
           + maxSingleShuffleMemoryPercent);
     }
     // TODO: currently we must cap to MAX_VALUE because MemoryFetchedInput cannot handle > 2 GB
     this.maxSingleMemoryShuffle = (long) Math.min((memoryLimit * maxSingleShuffleMemoryPercent), Integer.MAX_VALUE);
+    assert this.maxSingleMemoryShuffle < memoryLimit;
 
     this.useFreeMemoryFetchedInput = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT,
@@ -132,15 +133,22 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator, Fetch
           return result;
         }
       }
+      // usedMemory > 0 ensures that there is another ongoing FetchedInput.
+      if (isFetchFromLocal && usedMemory.get() > 0) {
+        return stallShuffle;
+      }
       return getDiskFetchedInput(compressedSize, inputAttemptIdentifier);
     }
 
     if (!isFromShufflePayload && usedMemory.get() + actualSize > memoryLimit) {
+      assert usedMemory.get() > 0;  // because actualSize <= maxSingleMemoryShuffle < memoryLimit
+      // usedMemory > 0, so returning stallShuffle is safe.
+
       // This Task has used up all its memory (memoryLimit).
       // check if we can borrow from free memory in the current ContainerWorker
       // Even when we have enough free memory, do not use more memory than freeMemoryLimit for storing MemoryFetchedInput.
       if (!useFreeMemoryFetchedInput || !hasFreeMemoryForSize(actualSize)) {
-        if (shuffleMemoryStreaming) {
+        if (shuffleMemoryStreaming || isFetchFromLocal) {
           return stallShuffle;
         }
         return getDiskFetchedInput(compressedSize, inputAttemptIdentifier);
@@ -153,6 +161,10 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator, Fetch
     MemoryFetchedInput result = getMemoryFetchedInput(actualSize, inputAttemptIdentifier, false);
     if (result != null) {
       return result;
+    }
+    // usedMemory > 0 ensures that there is another ongoing FetchedInput.
+    if (isFetchFromLocal && usedMemory.get() > 0) {
+      return stallShuffle;
     }
     return getDiskFetchedInput(compressedSize, inputAttemptIdentifier);
   }
