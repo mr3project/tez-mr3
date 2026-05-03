@@ -127,7 +127,7 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator, Fetch
       boolean isFromShufflePayload, boolean isFetchFromLocal) throws IOException {
     if (actualSize > maxSingleMemoryShuffle) {
       if (useFreeMemoryFetchedInput) {
-        MemoryFetchedInput result = getMemoryFetchedInput(actualSize, inputAttemptIdentifier);
+        MemoryFetchedInput result = getMemoryFetchedInput(actualSize, inputAttemptIdentifier, true);
         if (result != null) {
           return result;
         }
@@ -147,7 +147,10 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator, Fetch
       }
     }
 
-    MemoryFetchedInput result = getMemoryFetchedInput(actualSize, inputAttemptIdentifier);
+    // If useFreeMemoryFetchedInput == true, we have:
+    //   usedMemory.get() + actualSize <= memoryLimit || hasFreeMemoryForSize(actualSize)
+    // Hence, do not call checkFreeMemoryForSize() again.
+    MemoryFetchedInput result = getMemoryFetchedInput(actualSize, inputAttemptIdentifier, false);
     if (result != null) {
       return result;
     }
@@ -168,8 +171,9 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator, Fetch
     return currentFreeMemory >= freeMemoryThreshold && usedMemory.get() + actualSize <= freeMemoryLimit;
   }
 
-  private MemoryFetchedInput getMemoryFetchedInput(long actualSize, InputAttemptIdentifier inputAttemptIdentifier) {
-    if (hasFreeMemoryForSize(actualSize)) {
+  private MemoryFetchedInput getMemoryFetchedInput(long actualSize, InputAttemptIdentifier inputAttemptIdentifier,
+      boolean checkFreeMemory) {
+    if (!checkFreeMemory || hasFreeMemoryForSize(actualSize)) {
       try {
         MemoryFetchedInput result = new MemoryFetchedInput(actualSize, inputAttemptIdentifier, this);
         this.usedMemory.addAndGet(actualSize);
