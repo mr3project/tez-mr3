@@ -22,7 +22,6 @@ import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 
 public interface FetchedInputAllocatorOrderedGrouped {
 
-  // TODO TEZ-912 Consolidate this with FetchedInputAllocator.
   public MapOutput reserve(InputAttemptIdentifier srcAttemptIdentifier,
                            long requestedSize,
                            long compressedLength,

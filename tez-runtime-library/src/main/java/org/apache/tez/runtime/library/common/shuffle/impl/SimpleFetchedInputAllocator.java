@@ -169,17 +169,17 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator, Fetch
   }
 
   private MemoryFetchedInput getMemoryFetchedInput(long actualSize, InputAttemptIdentifier inputAttemptIdentifier) {
-    try {
-      if (hasFreeMemoryForSize(actualSize)) {
+    if (hasFreeMemoryForSize(actualSize)) {
+      try {
         MemoryFetchedInput result = new MemoryFetchedInput(actualSize, inputAttemptIdentifier, this);
         this.usedMemory.addAndGet(actualSize);
         if (LOG.isDebugEnabled()) {
           LOG.debug("Created MemoryFetchedInput: {}, {}", this.usedMemory.get(), actualSize);
         }
         return result;
+      } catch (OutOfMemoryError oom) {
+        LOG.error("Failed to create MemoryFetchedInput, fall through: {}, {}", this.usedMemory.get(), actualSize, oom);
       }
-    } catch (OutOfMemoryError oom) {
-      LOG.error("Failed to create MemoryFetchedInput, fall through: {}, {}", this.usedMemory.get(), actualSize, oom);
     }
     return null;
   }

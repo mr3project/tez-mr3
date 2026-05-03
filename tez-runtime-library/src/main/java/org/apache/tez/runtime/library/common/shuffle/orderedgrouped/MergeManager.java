@@ -382,10 +382,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     }
   }
 
-  private boolean canShuffleToMemory(long requestedSize) {
-    return (requestedSize < maxSingleShuffleLimit);
-  }
-
   public synchronized void waitForShuffleToMergeMemory() throws InterruptedException {
     long startTime = System.currentTimeMillis();
     while (this.usedMemory > memoryLimit) {
@@ -401,14 +397,21 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   @Override
   public MapOutput reserve(
       InputAttemptIdentifier srcAttemptIdentifier,
-      long requestedSize,
+      long actualSize,
       long compressedLength,
       int fetcher,
       boolean isFetchFromLocal) throws IOException {
-    if (!canShuffleToMemory(requestedSize)) {
-      LOG.info("Creating DiskMapOutput for {}: {} > maxSingleShuffleLimit", srcAttemptIdentifier, requestedSize);
-      return MapOutput.createDiskMapOutput(srcAttemptIdentifier, this, compressedLength, conf,
-          fetcher, true, mapOutputFile);
+    if (actualSize > maxSingleShuffleLimit) {
+      if (useFreeMemoryFetchedInput) {
+        synchronized (this) {
+          MapOutput result = getMemoryMapOutput(
+              srcAttemptIdentifier, 0L, actualSize);
+          if (result != null) {
+            return result;
+          }
+        }
+      }
+      return getDiskMapOutput(compressedLength, srcAttemptIdentifier, fetcher);
     }
     
     // Stall shuffle if we are above the memory limit
@@ -422,57 +425,68 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     //
     // To avoid this from happening, we allow exactly one thread to go past
     // the memory limit. We check (usedMemory > memoryLimit) and not
-    // (usedMemory + requestedSize > memoryLimit). When this thread is done
+    // (usedMemory + actualSize > memoryLimit). When this thread is done
     // fetching, this will automatically trigger a merge thereby unlocking
     // all the stalled threads
 
     synchronized (this) {
       if (this.usedMemory > memoryLimit) {
-        if (!useFreeMemoryFetchedInput) {
-          if (isDebugEnabled) {
-            LOG.debug(srcAttemptIdentifier + ": Stalling shuffle since usedMemory (" + this.usedMemory
-                + ") is greater than memoryLimit (" + memoryLimit + ")." +
-                " CommitMemory is (" + this.commitMemory + ")");
-          }
-          return stallShuffle;
-        }
-        // check if we can find free memory in the current ContainerWorker
-        long currentFreeMemory = Runtime.getRuntime().freeMemory();
-        if (currentFreeMemory < freeMemoryThreshold ||
-            this.usedMemory + requestedSize > freeMemoryLimit) {
+        if (!useFreeMemoryFetchedInput || !hasFreeMemoryForSize(actualSize)) {
           // this ContainerWorker is busy serving Tasks, so do not borrow
           return stallShuffle;
         }
-        if (isDebugEnabled) {
-          LOG.debug("Creating MemoryMapOutput in free memory: {}, {}, CommitMemory={}",
-              this.usedMemory, currentFreeMemory, this.commitMemory);
+
+        MapOutput result = getMemoryMapOutput(
+            srcAttemptIdentifier, 0L, actualSize);
+        if (result != null) {
+          return result;
         }
-        try {
-          // usedMemoryForMergeManager = 0 because this MemoryMapOutput should not contribute to usedMemory
-          return unconditionalReserve(srcAttemptIdentifier, 0L, requestedSize, true);
-        } catch (OutOfMemoryError oom) {
-          LOG.error("Failed to created MemoryMapOutput, stalling instead: {}, {}",
-            this.usedMemory, requestedSize, oom);
-          return stallShuffle;
-        }
+        return stallShuffle;
       } else {
         // Allow the in-memory shuffle to progress
-        if (isDebugEnabled) {
-          LOG.debug("Creating MemoryMapOutput: {}, {}, CommitMemory={}",
-              this.usedMemory, memoryLimit, this.commitMemory);
+        MapOutput result = getMemoryMapOutput(srcAttemptIdentifier, actualSize, actualSize);
+        if (result != null) {
+          return result;
         }
-        try {
-          // usedMemoryForMergeManager == requestedSize
-          return unconditionalReserve(srcAttemptIdentifier, requestedSize, requestedSize, true);
-        } catch (OutOfMemoryError oom) {
-          LOG.error("Failed to created MemoryMapOutput, returning DiskMapOutput instead: {}, {}",
-            this.usedMemory, requestedSize, oom);
-          // TODO: can we return stallShuffle without stalling all Fetchers?
-          return MapOutput.createDiskMapOutput(srcAttemptIdentifier, this, compressedLength, conf,
-              fetcher, true, mapOutputFile);
-        }
+        // TODO: can we return stallShuffle without stalling all Fetchers?
+        return getDiskMapOutput(compressedLength, srcAttemptIdentifier, fetcher);
       }
     }
+  }
+
+  // Invariant: inside this.synchronized{}
+  private boolean hasFreeMemoryForSize(long actualSize) {
+    long currentFreeMemory = Runtime.getRuntime().freeMemory();
+    return currentFreeMemory >= freeMemoryThreshold && this.usedMemory + actualSize <= freeMemoryLimit;
+  }
+
+  // Invariant: inside this.synchronized{}
+  private MapOutput getMemoryMapOutput(
+      InputAttemptIdentifier srcAttemptIdentifier,
+      long usedMemoryForMergeManager, long actualSize) {
+    if (hasFreeMemoryForSize(actualSize)) {
+      try {
+        // usedMemoryForMergeManager = 0 because this MemoryMapOutput should not contribute to usedMemory
+        MapOutput result = unconditionalReserve(
+            srcAttemptIdentifier, usedMemoryForMergeManager, actualSize, true);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Created MemoryMapOutput: {}, {}", this.usedMemory, actualSize);
+        }
+        return result;
+      } catch (OutOfMemoryError oom) {
+        LOG.error("Failed to created MemoryMapOutput: {}, {}", this.usedMemory, actualSize, oom);
+      }
+    }
+    return null;
+  }
+
+  private MapOutput getDiskMapOutput(
+      long compressedLength, InputAttemptIdentifier srcAttemptIdentifier, int fetcher) throws IOException {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Creating DiskMapOutput: {}", compressedLength);
+    }
+    return MapOutput.createDiskMapOutput(srcAttemptIdentifier, this, compressedLength, conf,
+      fetcher, true, mapOutputFile);
   }
 
   /**
