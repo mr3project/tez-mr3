@@ -405,7 +405,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       if (useFreeMemoryFetchedInput) {
         synchronized (this) {
           MapOutput result = getMemoryMapOutput(
-              srcAttemptIdentifier, 0L, actualSize);
+              srcAttemptIdentifier, 0L, actualSize, true);
           if (result != null) {
             return result;
           }
@@ -437,14 +437,15 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         }
 
         MapOutput result = getMemoryMapOutput(
-            srcAttemptIdentifier, 0L, actualSize);
+            srcAttemptIdentifier, 0L, actualSize, false);
         if (result != null) {
           return result;
         }
         return stallShuffle;
       } else {
         // Allow the in-memory shuffle to progress
-        MapOutput result = getMemoryMapOutput(srcAttemptIdentifier, actualSize, actualSize);
+        MapOutput result = getMemoryMapOutput(
+            srcAttemptIdentifier, actualSize, actualSize, false);
         if (result != null) {
           return result;
         }
@@ -463,8 +464,9 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   // Invariant: inside this.synchronized{}
   private MapOutput getMemoryMapOutput(
       InputAttemptIdentifier srcAttemptIdentifier,
-      long usedMemoryForMergeManager, long actualSize) {
-    if (hasFreeMemoryForSize(actualSize)) {
+      long usedMemoryForMergeManager, long actualSize,
+      boolean checkFreeMemory) {
+    if (!checkFreeMemory || hasFreeMemoryForSize(actualSize)) {
       try {
         // usedMemoryForMergeManager = 0 because this MemoryMapOutput should not contribute to usedMemory
         MapOutput result = unconditionalReserve(
