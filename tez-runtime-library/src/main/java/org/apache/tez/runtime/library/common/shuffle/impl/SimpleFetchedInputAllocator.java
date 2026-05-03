@@ -19,6 +19,7 @@
 package org.apache.tez.runtime.library.common.shuffle.impl;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,7 +51,7 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator, Fetch
 
   private final String srcNameTrimmed;
   
-  private volatile long usedMemory = 0;
+  private AtomicLong usedMemory = new AtomicLong(0L);
 
   private final boolean useFreeMemoryFetchedInput;
   private final long freeMemoryThreshold;   // minimum size of free memory for useFreeMemoryFetchedInput
@@ -125,57 +126,62 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator, Fetch
       InputAttemptIdentifier inputAttemptIdentifier,
       boolean isFromShufflePayload, boolean isFetchFromLocal) throws IOException {
     if (actualSize > maxSingleMemoryShuffle) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Creating DiskFetchedInput: {} > maxSingleMemoryShuffle, isFetchFromLocal={}", actualSize, isFetchFromLocal);
+      if (useFreeMemoryFetchedInput) {
+        MemoryFetchedInput result = getMemoryFetchedInput(actualSize, inputAttemptIdentifier);
+        if (result != null) {
+          return result;
+        }
       }
-      return new DiskFetchedInput(compressedSize,
-          inputAttemptIdentifier, this, conf, fileNameAllocator);
+      return getDiskFetchedInput(compressedSize, inputAttemptIdentifier);
     }
 
-    if (!isFromShufflePayload && this.usedMemory + actualSize > memoryLimit) {
+    if (!isFromShufflePayload && usedMemory.get() + actualSize > memoryLimit) {
       // This Task has used up all its memory (memoryLimit).
-      if (!useFreeMemoryFetchedInput) {
-        if (shuffleMemoryStreaming) {
-          return stallShuffle;
-        }
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Creating DiskFetchedInput: {} + {} > memoryLimit, isFetchFromLocal={}", this.usedMemory, actualSize, isFetchFromLocal);
-        }
-        return new DiskFetchedInput(compressedSize,
-            inputAttemptIdentifier, this, conf, fileNameAllocator);
-      }
-
       // check if we can borrow from free memory in the current ContainerWorker
-      // Even when we have enough free memory, do not use more memory than freMemoryLimit
-      // for storing MemoryFetchedInput.
-      long currentFreeMemory = Runtime.getRuntime().freeMemory();
-      if (currentFreeMemory < freeMemoryThreshold ||
-          this.usedMemory + actualSize > freeMemoryLimit) {
+      // Even when we have enough free memory, do not use more memory than freeMemoryLimit for storing MemoryFetchedInput.
+      if (!useFreeMemoryFetchedInput || !hasFreeMemoryForSize(actualSize)) {
         if (shuffleMemoryStreaming) {
           return stallShuffle;
         }
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Creating DiskFetchedInput: {}, {} < freeMemoryThreshold, isFetchFromLocal={}", actualSize, currentFreeMemory, isFetchFromLocal);
-        }
-        return new DiskFetchedInput(compressedSize,
-            inputAttemptIdentifier, this, conf, fileNameAllocator);
+        return getDiskFetchedInput(compressedSize, inputAttemptIdentifier);
       }
     }
 
-    try {
-      // MemoryFetchedInput may throw OOM, so increase usedMemory only if successful
-      MemoryFetchedInput result = new MemoryFetchedInput(actualSize, inputAttemptIdentifier, this);
-      this.usedMemory += actualSize;
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Creating MemoryFetchedInput: {}, {}", this.usedMemory, actualSize);
-      }
+    MemoryFetchedInput result = getMemoryFetchedInput(actualSize, inputAttemptIdentifier);
+    if (result != null) {
       return result;
-    } catch (OutOfMemoryError oom) {
-      LOG.error("Failed to created MemoryFetchedInput, returning DiskFetchedInput instead: {}, {}",
-          this.usedMemory, actualSize, oom);
-      return new DiskFetchedInput(compressedSize,
-          inputAttemptIdentifier, this, conf, fileNameAllocator);
     }
+    return getDiskFetchedInput(compressedSize, inputAttemptIdentifier);
+  }
+
+  private DiskFetchedInput getDiskFetchedInput(long compressedSize, InputAttemptIdentifier inputAttemptIdentifier)
+      throws IOException {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Creating DiskFetchedInput: {}", compressedSize);
+    }
+    return new DiskFetchedInput(compressedSize,
+      inputAttemptIdentifier, this, conf, fileNameAllocator);
+  }
+
+  private boolean hasFreeMemoryForSize(long actualSize) {
+    long currentFreeMemory = Runtime.getRuntime().freeMemory();
+    return currentFreeMemory >= freeMemoryThreshold && usedMemory.get() + actualSize <= freeMemoryLimit;
+  }
+
+  private MemoryFetchedInput getMemoryFetchedInput(long actualSize, InputAttemptIdentifier inputAttemptIdentifier) {
+    try {
+      if (hasFreeMemoryForSize(actualSize)) {
+        MemoryFetchedInput result = new MemoryFetchedInput(actualSize, inputAttemptIdentifier, this);
+        this.usedMemory.addAndGet(actualSize);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Created MemoryFetchedInput: {}, {}", this.usedMemory.get(), actualSize);
+        }
+        return result;
+      }
+    } catch (OutOfMemoryError oom) {
+      LOG.error("Failed to create MemoryFetchedInput, fall through: {}, {}", this.usedMemory.get(), actualSize, oom);
+    }
+    return null;
   }
 
   @Override
@@ -218,9 +224,9 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator, Fetch
   }
 
   private synchronized void unreserve(long size) {
-    this.usedMemory -= size;
+    this.usedMemory.addAndGet(-size);
     if (LOG.isDebugEnabled()) {
-      LOG.debug(srcNameTrimmed + ": " + "Used memory after freeing " + size  + " : " + this.usedMemory);
+      LOG.debug(srcNameTrimmed + ": " + "Used memory after freeing " + size  + " : " + this.usedMemory.get());
     }
   }
 }
