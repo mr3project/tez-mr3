@@ -150,7 +150,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
 
     HostFetchResult hostFetchResult;
     if (isFetchFromLocal) {
-      if (isFetchFromLocalInternal) {
+      if (fetcherConfigCommon.localDiskFetchEnabled && isFetchFromLocalInternal) {
         hostFetchResult = doLocalDiskFetch();   // TezSpillRecord can be obtained directly
       } else {
         hostFetchResult = doHttpFetch(true);

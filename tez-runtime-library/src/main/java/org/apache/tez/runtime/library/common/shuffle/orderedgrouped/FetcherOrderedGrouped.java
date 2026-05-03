@@ -206,7 +206,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     try {
       fetcherCallback.waitForMergeManager(shuffleClientId);
       if (isFetchFromLocal) {
-        if (isFetchFromLocalInternal) {
+        if (fetcherConfigCommon.localDiskFetchOrderedEnabled && isFetchFromLocalInternal) {
           failedFetches = setupLocalDiskFetch();    // TezSpillRecord can be obtained directly
         } else {
           pendingInputs = copyFromHost(true);
