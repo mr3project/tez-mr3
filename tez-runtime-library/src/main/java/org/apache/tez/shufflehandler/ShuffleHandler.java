@@ -1062,14 +1062,25 @@ public class ShuffleHandler {
         if (mapOutputInfoMap.size() < mapOutputMetaInfoCacheSize) {
           mapOutputInfoMap.put(mapId, outputInfo);
         }
-        int lengthInitial = Text.encode(mapId).limit();
+        int mapIdLength = Text.encode(mapId).limit();
+        contentLength += 4; // shared mapIdLength
+        contentLength += mapIdLength; // shared mapId bytes
         for (int reduce = reduceRange.getFirst(); reduce <= reduceRange.getLast(); reduce++) {
           TezIndexRecord indexRecord = outputInfo.getIndex(reduce);
-          // contentLength += new ShuffleHeader(mapId, indexRecord.getPartLength(), indexRecord.getRawLength(), reduce, outputInfo.getTezOffsetRecord(reduce)).writeLength();
-          int length = lengthInitial;
-          length += 4 + 8 + 8 + 4;  // encoding of mapIdLength, compressedLength, uncompressedLength, forReduce
-          length += 5 * 4;          // encoding of TezOffsetRecord
-          contentLength += length;
+          contentLength += 8; // compressedLength
+          if (indexRecord.getPartLength() == 0) {
+            continue;
+          }
+
+          contentLength += 8; // uncompressedLength
+          contentLength += 4; // forReduce
+          contentLength += 1; // tezOffsetPresent
+          TezOffsetRecord tezOffsetRecord = outputInfo.getTezOffsetRecord(reduce);
+          if (tezOffsetRecord != null) {
+            contentLength += 5 * 4; // TezOffsetRecord fields
+          } else {
+            contentLength += 4; // sentinel -1
+          }
 
           contentLength += indexRecord.getPartLength();
         }
@@ -1202,29 +1213,50 @@ public class ShuffleHandler {
       TezIndexRecord lastIndex = null;
 
       DataOutputBuffer dob = new DataOutputBuffer();
-      // Indicate how many record to be written
-      dob.writeInt(reduceRange.getLast() - reduceRange.getFirst() + 1);
+      // Indicate how many records and write shared mapId once.
+      int partitionCount = reduceRange.getLast() - reduceRange.getFirst() + 1;
+      dob.writeInt(partitionCount);
+      ByteBuffer mapIdBytes = Text.encode(mapId);
+      int mapIdLength = mapIdBytes.limit();
+      dob.writeInt(mapIdLength);
+      dob.write(mapIdBytes.array(), 0, mapIdLength);
       // DataOutputBuffer is reused below, so copy bytes before enqueuing async channel write.
       ChannelFuture writeFuture = ch.write(Unpooled.copiedBuffer(dob.getData(), 0, dob.getLength()));
+
       for (int reduce = reduceRange.getFirst(); reduce <= reduceRange.getLast(); reduce++) {
         TezIndexRecord index = outputInfo.getIndex(reduce);
-        // Records are only valid if they have a non-zero part length
-        if (index.getPartLength() != 0) {
+        long compressedLength = index.getPartLength();
+        dob.reset();
+        dob.writeLong(compressedLength);
+        if (compressedLength != 0) {
           if (firstIndex == null) {
             firstIndex = index;
           }
           lastIndex = index;
-        }
 
-        TezOffsetRecord offsetRecord = outputInfo.getTezOffsetRecord(reduce);
-        ShuffleHeader header = new ShuffleHeader(
-            mapId, index.getPartLength(), index.getRawLength(), reduce, offsetRecord);
-        dob.reset();
-        header.write(dob);
-        // Free the memory needed to store the spill and index records
+          dob.writeLong(index.getRawLength());
+          dob.writeInt(reduce);
+          TezOffsetRecord offsetRecord = outputInfo.getTezOffsetRecord(reduce);
+          if (offsetRecord != null) {
+            dob.writeByte(1);
+            dob.writeInt(offsetRecord.getMaxKeyLen());
+            dob.writeInt(offsetRecord.getMaxValLen());
+            dob.writeInt(offsetRecord.getFirstKeyOffset());
+            dob.writeInt(offsetRecord.getFirstValOffset());
+            dob.writeInt(offsetRecord.getEofPos());
+          } else {
+            dob.writeByte(0);
+            dob.writeInt(-1);
+          }
+        }
         writeFuture = ch.write(Unpooled.copiedBuffer(dob.getData(), 0, dob.getLength()));
       }
       outputInfo.finish();
+
+      if (firstIndex == null) {
+        ch.flush();
+        return writeFuture;
+      }
 
       final long rangeOffset = firstIndex.getStartOffset();
       final long rangePartLength = lastIndex.getStartOffset() + lastIndex.getPartLength() - firstIndex.getStartOffset();

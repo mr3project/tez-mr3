@@ -673,19 +673,60 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         partitionCount = input.readInt();
       }
 
-      // read the second part - ShuffleHeader[]
       ArrayList<MapOutputStat> mapOutputStats = new ArrayList<>(partitionCount);
+      String sharedMapId = null;
+      if (fetcherConfigCommon.compositeFetch) {
+        int sharedMapIdLength = input.readInt();
+        if (sharedMapIdLength < 0 || sharedMapIdLength > 1000) {
+          throw new IllegalArgumentException("Invalid shared map id length: " + sharedMapIdLength);
+        }
+        byte[] sharedMapIdBytes = new byte[sharedMapIdLength];
+        input.readFully(sharedMapIdBytes, 0, sharedMapIdLength);
+        sharedMapId = org.apache.hadoop.io.Text.decode(sharedMapIdBytes);
+      }
       for (int mapOutputIndex = 0; mapOutputIndex < partitionCount; mapOutputIndex++) {
         MapOutputStat mapOutputStat = null;
         int responsePartition = -1;
-        // read the shuffle header
         String pathComponent = null;
 
         // build srcAttemptId and MapOutputStat
         try {
-          ShuffleHeader header = new ShuffleHeader(fetcherConfigCommon.compositeFetch);
-          header.readFields(input);
-          pathComponent = header.getMapId();
+          long headerCompressedLength;
+          long headerUncompressedLength;
+          int headerPartition;
+          org.apache.tez.runtime.api.TezOffsetRecord headerTezOffsetRecord = null;
+          if (fetcherConfigCommon.compositeFetch) {
+            pathComponent = sharedMapId;
+            headerCompressedLength = input.readLong();
+            if (headerCompressedLength == 0) {
+              continue;
+            }
+            headerUncompressedLength = input.readLong();
+            headerPartition = input.readInt();
+            int tezOffsetPresent = input.readUnsignedByte();
+            if (tezOffsetPresent != 0) {
+              int maxKeyLen = input.readInt();
+              int maxValLen = input.readInt();
+              int firstKeyOffset = input.readInt();
+              int firstValOffset = input.readInt();
+              int eofPos = input.readInt();
+              headerTezOffsetRecord = new org.apache.tez.runtime.api.TezOffsetRecord(
+                  maxKeyLen, maxValLen, firstKeyOffset, firstValOffset, eofPos);
+            } else {
+              input.readInt();
+            }
+          } else {
+            ShuffleHeader header = new ShuffleHeader(false);
+            header.readFields(input);
+            pathComponent = header.getMapId();
+            headerCompressedLength = header.getCompressedLength();
+            headerUncompressedLength = header.getUncompressedLength();
+            headerPartition = header.getPartition();
+            headerTezOffsetRecord = header.getTezOffsetRecord();
+            if (headerCompressedLength == 0) {
+              continue;
+            }
+          }
           if (!pathComponent.startsWith(InputAttemptIdentifier.PATH_PREFIX_MR3) && !pathComponent.startsWith(InputAttemptIdentifier.PATH_PREFIX)) {
             shuffleErrorCounterGroup.badIdErrs.increment(1);
             if (pathComponent.startsWith(ShuffleHandlerError.DISK_ERROR_EXCEPTION.toString())) {
@@ -694,27 +735,22 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
               // this should be treated as local fetch failure in order to send InputReadError
               return new CompositeInputAttemptIdentifier[]{ inputAttemptIdentifier };
             }
-            throw new IllegalArgumentException("Invalid map id: " + header.getMapId() + ", expected to start with " +
-                InputAttemptIdentifier.PATH_PREFIX_MR3 + "/" + InputAttemptIdentifier.PATH_PREFIX + ", partition: " + header.getPartition()
+            throw new IllegalArgumentException("Invalid map id: " + pathComponent + ", expected to start with " +
+                InputAttemptIdentifier.PATH_PREFIX_MR3 + "/" + InputAttemptIdentifier.PATH_PREFIX + ", partition: " + headerPartition
                 + " while fetching " + inputAttemptIdentifier);
           }
 
-          srcAttemptId = pathToAttemptMap.get(new PathPartition(pathComponent, header.getPartition()));
+          srcAttemptId = pathToAttemptMap.get(new PathPartition(pathComponent, headerPartition));
           if (srcAttemptId == null) {
-            throw new IllegalArgumentException("Source attempt not found for map id: " + header.getMapId() +
-                ", partition: " + header.getPartition() + " while fetching " + inputAttemptIdentifier);
-          }
-
-          if (header.getCompressedLength() == 0) {
-            // empty partitions are already accounted for
-            continue;
+            throw new IllegalArgumentException("Source attempt not found for map id: " + pathComponent +
+                ", partition: " + headerPartition + " while fetching " + inputAttemptIdentifier);
           }
 
           mapOutputStat = new MapOutputStat(srcAttemptId,
-              header.getUncompressedLength(), header.getCompressedLength(), header.getPartition(),
-              header.getTezOffsetRecord());
+              headerUncompressedLength, headerCompressedLength, headerPartition,
+              headerTezOffsetRecord);
           mapOutputStats.add(mapOutputStat);
-          responsePartition = header.getPartition();
+          responsePartition = headerPartition;
         } catch (IllegalArgumentException e) {
           if (!isShutDown.get()) {
             shuffleErrorCounterGroup.badIdErrs.increment(1);

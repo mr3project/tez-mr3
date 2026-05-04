@@ -471,25 +471,66 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         partitionCount = input.readInt();
       }
       ArrayList<MapOutputStat> mapOutputStats = new ArrayList<>(partitionCount);
+      String sharedMapId = null;
+      if (fetcherConfigCommon.compositeFetch) {
+        int sharedMapIdLength = input.readInt();
+        if (sharedMapIdLength < 0 || sharedMapIdLength > 1000) {
+          throw new IllegalArgumentException("Invalid shared map id length: " + sharedMapIdLength);
+        }
+        byte[] sharedMapIdBytes = new byte[sharedMapIdLength];
+        input.readFully(sharedMapIdBytes, 0, sharedMapIdLength);
+        sharedMapId = org.apache.hadoop.io.Text.decode(sharedMapIdBytes);
+      }
       for (int mapOutputIndex = 0; mapOutputIndex < partitionCount; mapOutputIndex++) {
         MapOutputStat mapOutputStat = null;
         try {
-          // Read the shuffle header
-          ShuffleHeader header = new ShuffleHeader(fetcherConfigCommon.compositeFetch);
-          // TODO Review: Multiple header reads in case of status WAIT ?
-          header.readFields(input);
-          if (!header.mapId.startsWith(InputAttemptIdentifier.PATH_PREFIX_MR3) && !header.mapId.startsWith(InputAttemptIdentifier.PATH_PREFIX)) {
+          String headerMapId;
+          long headerCompressedLength;
+          long headerUncompressedLength;
+          int headerForReduce;
+          TezOffsetRecord headerTezOffsetRecord = null;
+          if (fetcherConfigCommon.compositeFetch) {
+            headerMapId = sharedMapId;
+            headerCompressedLength = input.readLong();
+            if (headerCompressedLength == 0) {
+              continue;
+            }
+            headerUncompressedLength = input.readLong();
+            headerForReduce = input.readInt();
+            int tezOffsetPresent = input.readUnsignedByte();
+            if (tezOffsetPresent != 0) {
+              int maxKeyLen = input.readInt();
+              int maxValLen = input.readInt();
+              int firstKeyOffset = input.readInt();
+              int firstValOffset = input.readInt();
+              int eofPos = input.readInt();
+              headerTezOffsetRecord = new TezOffsetRecord(maxKeyLen, maxValLen, firstKeyOffset, firstValOffset, eofPos);
+            } else {
+              input.readInt();
+            }
+          } else {
+            ShuffleHeader header = new ShuffleHeader(false);
+            header.readFields(input);
+            headerMapId = header.mapId;
+            headerCompressedLength = header.compressedLength;
+            headerUncompressedLength = header.uncompressedLength;
+            headerForReduce = header.forReduce;
+            headerTezOffsetRecord = header.getTezOffsetRecord();
+            if (headerCompressedLength == 0) {
+              continue;
+            }
+          }
+          if (!headerMapId.startsWith(InputAttemptIdentifier.PATH_PREFIX_MR3) && !headerMapId.startsWith(InputAttemptIdentifier.PATH_PREFIX)) {
             if (!stopped) {
               shuffleErrorCounterGroup.badIdErrs.increment(1);
-              if (header.mapId.startsWith(ShuffleHandlerError.DISK_ERROR_EXCEPTION.toString())) {
+              if (headerMapId.startsWith(ShuffleHandlerError.DISK_ERROR_EXCEPTION.toString())) {
                 LOG.warn("{}: ShuffleHandler error - {}, while fetching {}",
-                    logIdentifier, header.mapId, inputAttemptIdentifier);
-                // TODO: Why is this necessary? We return [inputAttemptIdentifier] anyway.
+                    logIdentifier, headerMapId, inputAttemptIdentifier);
                 fetcherCallback.informAM(shuffleClientId, inputAttemptIdentifier);
               } else {
                 LOG.warn("{}: Invalid map id: {}, expected to start with {} / {}, partition: {}",
-                    logIdentifier, header.mapId,
-                    InputAttemptIdentifier.PATH_PREFIX_MR3, InputAttemptIdentifier.PATH_PREFIX, header.forReduce);
+                    logIdentifier, headerMapId,
+                    InputAttemptIdentifier.PATH_PREFIX_MR3, InputAttemptIdentifier.PATH_PREFIX, headerForReduce);
               }
               return new CompositeInputAttemptIdentifier[]{ inputAttemptIdentifier };
             } else {
@@ -500,24 +541,17 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
             }
           }
 
-          if (header.getCompressedLength() == 0) {
-            // Empty partitions are already accounted for
-            continue;
-          }
-
           mapOutputStat = new MapOutputStat(
-              pathToAttemptMap.get(new PathPartition(header.mapId, header.forReduce)),
-              header.uncompressedLength,
-              header.compressedLength,
-              header.forReduce,
-              header.getTezOffsetRecord());
+              pathToAttemptMap.get(new PathPartition(headerMapId, headerForReduce)),
+              headerUncompressedLength,
+              headerCompressedLength,
+              headerForReduce,
+              headerTezOffsetRecord);
           mapOutputStats.add(mapOutputStat);
         } catch (IllegalArgumentException e) {
           if (!stopped) {
             shuffleErrorCounterGroup.badIdErrs.increment(1);
             LOG.warn("{}: Invalid map id", logIdentifier, e);
-            // Don't know which one was bad, so consider this one bad and don't read
-            // the remaining because we don't know where to start reading from. YARN-1773
             return new CompositeInputAttemptIdentifier[]{ inputAttemptIdentifier };
           } else {
             if (isDebugEnabled) {
