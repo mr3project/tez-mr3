@@ -244,6 +244,10 @@ public class TezRuntimeConfiguration {
       TEZ_RUNTIME_PREFIX + "pipelined-shuffle.enabled";
   public static final boolean TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT = false;
 
+  public static final String TEZ_RUNTIME_PIPELINED_SHUFFLE_ORDERED_ENABLED =
+    TEZ_RUNTIME_PREFIX + "pipelined-shuffle.ordered.enabled";
+  public static final boolean TEZ_RUNTIME_PIPELINED_SHUFFLE_ORDERED_ENABLED_DEFAULT = false;
+
   /**
    * Expert level setting. Enable final merge in ordered (defaultsorter/pipelinedsorter) outputs.
    * Speculative execution needs to be turned off when disabling this parameter. //TODO: TEZ-2132
@@ -444,6 +448,7 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_ENABLED);
     tezRuntimeKeys.add(TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_MAX_SIZE);
     tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED);
+    tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SHUFFLE_ORDERED_ENABLED);
     tezRuntimeKeys.add(TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT);
     tezRuntimeKeys.add(TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT);
     tezRuntimeKeys.add(TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT);

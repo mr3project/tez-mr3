@@ -298,8 +298,8 @@ public final class PipelinedSorter {
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_USE_SOFT_REFERENCE_DEFAULT);
 
     this.isPipelinedShuffle = this.conf.getBoolean(
-        TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED,
-        TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT);
+        TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ORDERED_ENABLED,
+        TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ORDERED_ENABLED_DEFAULT);
     // We do not use TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT.
     this.isFinalMergeEnabled = !this.isPipelinedShuffle;
 
