@@ -27,5 +27,9 @@ public interface FetchedInputAllocator {
   FetchedInput allocate(long actualSize, long compressedSize,
       InputAttemptIdentifier inputAttemptIdentifier,
       boolean isFromShufflePayload, boolean isFetchFromLocal) throws IOException;
-  
+
+  MemoryFetchedInput getMemoryFetchedInput(long actualSize,
+      InputAttemptIdentifier inputAttemptIdentifier,
+      boolean checkFreeMemory);
+
 }

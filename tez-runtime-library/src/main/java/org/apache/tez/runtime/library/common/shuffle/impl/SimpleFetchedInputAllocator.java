@@ -183,7 +183,7 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator, Fetch
     return currentFreeMemory >= freeMemoryThreshold && usedMemory.get() + actualSize <= freeMemoryLimit;
   }
 
-  private MemoryFetchedInput getMemoryFetchedInput(long actualSize, InputAttemptIdentifier inputAttemptIdentifier,
+  public MemoryFetchedInput getMemoryFetchedInput(long actualSize, InputAttemptIdentifier inputAttemptIdentifier,
       boolean checkFreeMemory) {
     if (!checkFreeMemory || hasFreeMemoryForSize(actualSize)) {
       try {

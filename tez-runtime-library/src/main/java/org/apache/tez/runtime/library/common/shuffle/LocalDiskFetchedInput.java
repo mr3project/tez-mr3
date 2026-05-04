@@ -67,7 +67,7 @@ public class LocalDiskFetchedInput extends FetchedInput {
   public InputStream getInputStream() throws IOException {
     FSDataInputStream inputStream = localFS.open(inputFile);
     inputStream.seek(startOffset);
-    return new BoundedInputStream(inputStream, getSize());
+    return new BoundedInputStream(inputStream, size);
   }
 
   @Override

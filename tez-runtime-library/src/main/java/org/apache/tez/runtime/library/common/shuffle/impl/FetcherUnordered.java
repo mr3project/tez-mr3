@@ -31,6 +31,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.commons.io.input.BoundedInputStream;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.FetcherConfig;
@@ -511,6 +513,34 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
   private FetchedInput getLocalFetchedInput(
       InputAttemptIdentifier srcAttemptId, String pathComponent,
       TezIndexRecord indexRecord, Path inputFilePath) throws IOException {
+    // It is always a win to use MemoryFetchedInput if memory is available because
+    // even with LocalDiskFetchedInput and InputStreamFetchedInput, we eventually allocate BytesArray for every record.
+    // Thus, it is more efficient to allocate BytesArray for the entire payload at once.
+    MemoryFetchedInput memoryFetchedInput = shuffleManager.getInputManager().getMemoryFetchedInput(
+        indexRecord.getRawLength(), srcAttemptId, true);
+
+    if (memoryFetchedInput != null) {
+      InputStream inputStream;
+      if (inputFilePath != null) {
+        FSDataInputStream dataInputStream = fetcherConfigCommon.localFs.open(inputFilePath);
+        dataInputStream.seek(indexRecord.getStartOffset());
+        inputStream = new BoundedInputStream(dataInputStream, indexRecord.getPartLength());
+      } else {
+        org.apache.tez.runtime.api.MultiByteArrayOutputStream byteArrayOutput =
+            taskContext.getConcurrentByteCache().get(pathComponent);
+        if (byteArrayOutput == null) {
+          throw new IOException("ConcurrentByteCache not found for pathComponent=" + pathComponent);
+        }
+        inputStream = byteArrayOutput.createInputStreamFrom(
+            indexRecord.getStartOffset(), indexRecord.getPartLength());
+      }
+      ShuffleUtils.shuffleToMemory(memoryFetchedInput.getBytes(),
+          inputStream, (int) indexRecord.getRawLength(), (int) indexRecord.getPartLength(), codec,
+          fetcherConfig.ifileReadAhead, fetcherConfig.ifileReadAheadLength, LOG,
+          memoryFetchedInput.getInputAttemptIdentifier(), taskContext, true);
+      return memoryFetchedInput;
+    }
+
     FetchedInput fetchedInput;
     if (inputFilePath != null) {
       fetchedInput = new LocalDiskFetchedInput(
