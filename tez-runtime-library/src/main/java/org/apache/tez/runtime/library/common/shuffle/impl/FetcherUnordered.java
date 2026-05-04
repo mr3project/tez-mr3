@@ -703,17 +703,14 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
             }
             headerUncompressedLength = input.readLong();
             headerPartition = input.readInt();
-            int tezOffsetPresent = input.readUnsignedByte();
-            if (tezOffsetPresent != 0) {
-              int maxKeyLen = input.readInt();
+            int maxKeyLen = input.readInt();
+            if (maxKeyLen != -1) {
               int maxValLen = input.readInt();
               int firstKeyOffset = input.readInt();
               int firstValOffset = input.readInt();
               int eofPos = input.readInt();
               headerTezOffsetRecord = new org.apache.tez.runtime.api.TezOffsetRecord(
                   maxKeyLen, maxValLen, firstKeyOffset, firstValOffset, eofPos);
-            } else {
-              input.readInt();
             }
           } else {
             ShuffleHeader header = new ShuffleHeader(false);

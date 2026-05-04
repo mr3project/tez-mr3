@@ -1074,7 +1074,6 @@ public class ShuffleHandler {
 
           contentLength += 8; // uncompressedLength
           contentLength += 4; // forReduce
-          contentLength += 1; // tezOffsetPresent
           TezOffsetRecord tezOffsetRecord = outputInfo.getTezOffsetRecord(reduce);
           if (tezOffsetRecord != null) {
             contentLength += 5 * 4; // TezOffsetRecord fields
@@ -1238,14 +1237,12 @@ public class ShuffleHandler {
           dob.writeInt(reduce);
           TezOffsetRecord offsetRecord = outputInfo.getTezOffsetRecord(reduce);
           if (offsetRecord != null) {
-            dob.writeByte(1);
             dob.writeInt(offsetRecord.getMaxKeyLen());
             dob.writeInt(offsetRecord.getMaxValLen());
             dob.writeInt(offsetRecord.getFirstKeyOffset());
             dob.writeInt(offsetRecord.getFirstValOffset());
             dob.writeInt(offsetRecord.getEofPos());
           } else {
-            dob.writeByte(0);
             dob.writeInt(-1);
           }
         }
