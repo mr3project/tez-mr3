@@ -534,11 +534,16 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         inputStream = byteArrayOutput.createInputStreamFrom(
             indexRecord.getStartOffset(), indexRecord.getPartLength());
       }
-      ShuffleUtils.shuffleToMemory(memoryFetchedInput.getBytes(),
-          inputStream, (int) indexRecord.getRawLength(), (int) indexRecord.getPartLength(), codec,
-          fetcherConfig.ifileReadAhead, fetcherConfig.ifileReadAheadLength, LOG,
-          memoryFetchedInput.getInputAttemptIdentifier(), taskContext, true);
-      return memoryFetchedInput;
+      try {
+        ShuffleUtils.shuffleToMemory(memoryFetchedInput.getBytes(),
+            inputStream, (int) indexRecord.getRawLength(), (int) indexRecord.getPartLength(), codec,
+            fetcherConfig.ifileReadAhead, fetcherConfig.ifileReadAheadLength, LOG,
+            memoryFetchedInput.getInputAttemptIdentifier(), taskContext, true);
+        return memoryFetchedInput;
+      } catch (IOException | RuntimeException e) {
+        memoryFetchedInput.abort();
+        throw e;
+      }
     }
 
     FetchedInput fetchedInput;

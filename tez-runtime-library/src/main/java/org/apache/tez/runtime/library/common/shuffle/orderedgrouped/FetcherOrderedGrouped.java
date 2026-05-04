@@ -30,8 +30,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.io.input.BoundedInputStream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.tez.http.HttpConnectionParams;
@@ -770,6 +772,34 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
   private MapOutput getMapOutputForDirectFetch(
       InputAttemptIdentifier srcAttemptId, String pathComponent, Path filename,
       TezIndexRecord indexRecord) throws IOException {
+    MapOutput memoryMapOutput = allocator.getMemoryMapOutput(srcAttemptId, indexRecord.getRawLength(), true);
+    if (memoryMapOutput != null) {
+      InputStream inputStream;
+      if (filename != null) {
+        FSDataInputStream dataInputStream = fetcherConfigCommon.localFs.open(filename);
+        dataInputStream.seek(indexRecord.getStartOffset());
+        inputStream = new BoundedInputStream(dataInputStream, indexRecord.getPartLength());
+      } else {
+        org.apache.tez.runtime.api.MultiByteArrayOutputStream byteArrayOutput =
+            taskContext.getConcurrentByteCache().get(pathComponent);
+        if (byteArrayOutput == null) {
+          throw new IOException("ConcurrentByteCache not found for pathComponent=" + pathComponent);
+        }
+        inputStream = byteArrayOutput.createInputStreamFrom(
+            indexRecord.getStartOffset(), indexRecord.getPartLength());
+      }
+      try {
+        ShuffleUtils.shuffleToMemory(memoryMapOutput.getMemory(),
+            inputStream, (int) indexRecord.getRawLength(), (int) indexRecord.getPartLength(), codec,
+            fetcherConfig.ifileReadAhead, fetcherConfig.ifileReadAheadLength, LOG,
+            srcAttemptId, taskContext, true);
+        return memoryMapOutput;
+      } catch (IOException | RuntimeException e) {
+        memoryMapOutput.abort();
+        throw e;
+      }
+    }
+
     if (filename != null) {
       return MapOutput.createLocalDiskMapOutput(srcAttemptId, allocator, filename,
           indexRecord.getStartOffset(), indexRecord.getPartLength(), true);
