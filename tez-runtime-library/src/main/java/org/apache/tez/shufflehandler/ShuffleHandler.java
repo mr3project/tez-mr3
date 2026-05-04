@@ -1250,14 +1250,6 @@ public class ShuffleHandler {
       }
       outputInfo.finish();
 
-      // All partitions in the requested range are empty (partLength == 0), so we have already
-      // written partition metadata and there is no payload section to stream. Returning here also
-      // avoids dereferencing firstIndex/lastIndex below.
-      if (firstIndex == null) {
-        ch.flush();
-        return writeFuture;
-      }
-
       final long rangeOffset = firstIndex.getStartOffset();
       final long rangePartLength = lastIndex.getStartOffset() + lastIndex.getPartLength() - firstIndex.getStartOffset();
 
