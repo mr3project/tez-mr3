@@ -404,7 +404,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     if (actualSize > maxSingleShuffleLimit) {
       if (useFreeMemoryFetchedInput) {
         synchronized (this) {
-          MapOutput result = getMemoryMapOutput(
+          MapOutput result = getMemoryMapOutputInternal(
               srcAttemptIdentifier, 0L, actualSize, true);
           if (result != null) {
             return result;
@@ -436,7 +436,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
           return stallShuffle;
         }
 
-        MapOutput result = getMemoryMapOutput(
+        MapOutput result = getMemoryMapOutputInternal(
             srcAttemptIdentifier, 0L, actualSize, false);
         if (result != null) {
           return result;
@@ -444,7 +444,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         return stallShuffle;
       } else {
         // Allow the in-memory shuffle to progress
-        MapOutput result = getMemoryMapOutput(
+        MapOutput result = getMemoryMapOutputInternal(
             srcAttemptIdentifier, actualSize, actualSize, false);
         if (result != null) {
           return result;
@@ -461,8 +461,16 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     return currentFreeMemory >= freeMemoryThreshold && this.usedMemory + actualSize <= freeMemoryLimit;
   }
 
+  @Override
+  public synchronized MapOutput getMemoryMapOutput(
+      InputAttemptIdentifier srcAttemptIdentifier,
+      long actualSize,
+      boolean checkFreeMemory) {
+    return getMemoryMapOutputInternal(srcAttemptIdentifier, 0L, actualSize, checkFreeMemory);
+  }
+
   // Invariant: inside this.synchronized{}
-  private MapOutput getMemoryMapOutput(
+  private MapOutput getMemoryMapOutputInternal(
       InputAttemptIdentifier srcAttemptIdentifier,
       long usedMemoryForMergeManager, long actualSize,
       boolean checkFreeMemory) {

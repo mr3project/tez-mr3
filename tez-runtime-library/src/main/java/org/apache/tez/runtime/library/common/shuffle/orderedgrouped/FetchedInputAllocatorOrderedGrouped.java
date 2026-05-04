@@ -30,6 +30,10 @@ public interface FetchedInputAllocatorOrderedGrouped {
 
   void closeInMemoryFile(MapOutput mapOutput);
 
+  MapOutput getMemoryMapOutput(InputAttemptIdentifier srcAttemptIdentifier,
+                              long requestedSize,
+                              boolean checkFreeMemory);
+
   FileSystem getLocalFileSystem();
 
   void closeOnDiskFile(FileChunk file);
