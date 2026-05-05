@@ -1050,9 +1050,11 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       java.io.InputStream inputStream = mapOutput.getInputStream();
       final long commitSize = mapOutput.getSizeForMergeMemoryAccounting();
       final long readerLength = mapOutput.getReaderLength();
+      LOG.error("xxxxx4 {}_{} {}", commitSize, readerLength, mapOutput.getIndexString());
       return new IFile.Reader(
           inputStream, readerLength, codec,
-          null, null, ifileReadAhead, ifileReadAheadLength, inputContext) {
+          null, null, ifileReadAhead, ifileReadAheadLength, inputContext,
+          commitSize, mapOutput.getIndexString()) {
         @Override
         public void close() throws IOException {
           try {

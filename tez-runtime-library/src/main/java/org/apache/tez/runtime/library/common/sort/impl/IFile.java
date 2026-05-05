@@ -742,6 +742,9 @@ public class IFile {
     private long bytesRead = 0;
     private int recNo = 1;
 
+    private long rawLength = -1;
+    private String indexString = null;
+
     /**
      * Construct an IFile Reader.
      *
@@ -764,6 +767,19 @@ public class IFile {
       if (bytesReadCounter != null) {
         bytesReadCounter.increment(IFile.HEADER.length);
       }
+    }
+
+    public Reader(InputStream in, long length,
+                  CompressionCodec codec,
+                  TezCounter readsCounter, TezCounter bytesReadCounter,
+                  boolean readAhead, int readAheadLength,
+                  DecompressorPool taskContext,
+                  long rawLength,
+                  String indexString) throws IOException {
+      this(in, length, codec, readsCounter, bytesReadCounter, readAhead, readAheadLength, taskContext);
+      this.rawLength = rawLength;
+      this.indexString = indexString;
+      assert rawLength >= length;
     }
 
     /**
@@ -1060,6 +1076,18 @@ public class IFile {
       return new byte[newLength];
     }
 
+    private void check(String msg) {
+      if (rawLength > 0) {
+        LOG.error("xxxxx5 {}: {} : {} >= {}", msg, indexString, rawLength, bytesRead);
+      }
+    }
+
+    private void check2(String msg) {
+      if (rawLength > 0) {
+        LOG.error("xxxxx6 {}: {} : {} >= {}", msg, indexString, rawLength, bytesRead);
+      }
+    }
+
     public KeyState readRawKey(DataInputBuffer key) throws IOException {
       if (isRleEnabled) {
         return readRawKeyRle(key);
@@ -1069,7 +1097,9 @@ public class IFile {
     }
 
     private KeyState readRawKeyNoRle(DataInputBuffer key) throws IOException {
+      check("readRawKeyNoRle");
       if (!positionToNextRecordNoRle(dataIn)) {
+        check2("readRawKeyNoRle1");
         return KeyState.NO_KEY;
       }
       if (keyBytes.length < currentKeyLength) {
@@ -1081,16 +1111,20 @@ public class IFile {
       }
       key.reset(keyBytes, currentKeyLength);
       bytesRead += currentKeyLength;
+      check2("readRawKeyNoRle2");
       return KeyState.NEW_KEY;
     }
 
     private KeyState readRawKeyRle(DataInputBuffer key) throws IOException {
+      check("readRawKeyRle");
       if (!positionToNextRecordRle(dataIn)) {
+        check2("readRawKeyRle1");
         return KeyState.NO_KEY;
       }
       if (currentKeyLength == RLE_MARKER) {
         // get key length from original key
         key.reset(keyBytes, originalKeyLength);
+        check2("readRawKeyRle2");
         return KeyState.SAME_KEY;
       }
       if (keyBytes.length < currentKeyLength) {
@@ -1102,6 +1136,7 @@ public class IFile {
       }
       key.reset(keyBytes, currentKeyLength);
       bytesRead += currentKeyLength;
+      check2("readRawKeyRle3");
       return KeyState.NEW_KEY;
     }
 
@@ -1149,6 +1184,7 @@ public class IFile {
     }
 
     public void nextRawValue(DataInputBuffer value) throws IOException {
+      check("nextRawValue");
       final byte[] valBytes;
       if ((value.getData().length < currentValueLength) || (value.getData() == keyBytes)) {
         valBytes = createLargerArray(currentValueLength);
@@ -1165,6 +1201,7 @@ public class IFile {
       // Record the bytes read
       bytesRead += currentValueLength;
 
+      check2("nextRawValue");
       ++recNo;
       ++numRecordsRead;
     }

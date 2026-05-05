@@ -767,6 +767,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     long remaining = indexRecord.getStartOffset();
     LOG.error("xxxxx3 pathComponent={}, TezIndexRecord_{}_{}_{}", pathComponent,
         indexRecord.getStartOffset(), indexRecord.getRawLength(), indexRecord.getPartLength());
+    String indexString = "TezIndexRecord_" + indexRecord.getStartOffset() + "_" + indexRecord.getRawLength() + "_" + indexRecord.getPartLength();
     while (remaining > 0) {
       long skipped = inputStream.skip(remaining);
       if (skipped <= 0) {
@@ -780,7 +781,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         new BoundedInputStream(inputStream, indexRecord.getPartLength()),
         indexRecord.getRawLength(),
         indexRecord.getPartLength(),
-        true);
+        true, indexString);
   }
 
   private boolean verifySanity(long compressedLength, long decompressedLength,

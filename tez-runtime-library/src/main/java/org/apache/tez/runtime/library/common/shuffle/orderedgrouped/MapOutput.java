@@ -86,9 +86,9 @@ public abstract class MapOutput implements ShuffleInput {
       InputStream inputStream,
       long size,
       long readerLength,
-      boolean primaryMapOutput) {
+      boolean primaryMapOutput, String indexString) {
     return new InputStreamMapOutput(
-        attemptIdentifier, callback, inputStream, size, readerLength, primaryMapOutput);
+        attemptIdentifier, callback, inputStream, size, readerLength, primaryMapOutput, indexString);
   }
 
   // may throw OutOfMemoryError
@@ -159,6 +159,10 @@ public abstract class MapOutput implements ShuffleInput {
    */
   public long getReaderLength() {
     return -1;
+  }
+
+  public String getIndexString() {
+    return null;
   }
 
   public long getUsedMemoryForMergeManager() {
@@ -360,17 +364,19 @@ public abstract class MapOutput implements ShuffleInput {
     private InputStream inputStream;
     private final long size;
     private final long readerLength;
+    private final String indexString;
 
     private InputStreamMapOutput(InputAttemptIdentifier attemptIdentifier,
                                  FetchedInputAllocatorOrderedGrouped callback,
                                  InputStream inputStream,
                                  long size,
                                  long readerLength,
-                                 boolean primaryMapOutput) {
+                                 boolean primaryMapOutput, String indexString) {
       super(attemptIdentifier, callback, primaryMapOutput);
       this.inputStream = inputStream;
       this.size = size;
       this.readerLength = readerLength;
+      this.indexString = indexString;
     }
 
     @Override
@@ -386,6 +392,11 @@ public abstract class MapOutput implements ShuffleInput {
     @Override
     public long getReaderLength() {
       return readerLength;
+    }
+
+    @Override
+    public String getIndexString() {
+      return indexString;
     }
 
     @Override
