@@ -38,6 +38,7 @@ import org.apache.commons.io.input.BoundedInputStream;
 import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.FetcherConfigCommon;
+import org.apache.tez.runtime.api.IndexPathCache;
 import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.api.TezOffsetRecord;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
@@ -702,7 +703,15 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
             continue;
           }
 
-          mapOutput = getMapOutputForDirectFetch(srcAttemptId, pathComponent, inputFilePath, indexRecord);
+          TezOffsetRecord tezOffsetRecord = null;
+          if (inputFilePath == null) {
+            IndexPathCache.MapOutputInfo mapOutputInfo = taskContext.getIndexPathCache().get(pathComponent);
+            if (mapOutputInfo != null && mapOutputInfo.getOffsetRecordMap() != null) {
+              tezOffsetRecord = mapOutputInfo.getOffsetRecordMap().get(reduceId);
+            }
+          }
+          mapOutput = getMapOutputForDirectFetch(
+              srcAttemptId, pathComponent, inputFilePath, indexRecord, tezOffsetRecord);
           long endTime = System.currentTimeMillis();
           fetcherCallback.fetchSucceeded(shuffleClientId, host, srcAttemptId, mapOutput,
               indexRecord.getPartLength(), indexRecord.getRawLength(), (endTime - startTime));
@@ -758,10 +767,13 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
 
   private MapOutput getMapOutputForDirectFetch(
       InputAttemptIdentifier srcAttemptId, String pathComponent, Path filename,
-      TezIndexRecord indexRecord) throws IOException {
+      TezIndexRecord indexRecord, TezOffsetRecord tezOffsetRecord) throws IOException {
+    MapOutput mapOutput;
     if (filename != null) {
-      return MapOutput.createLocalDiskMapOutput(srcAttemptId, allocator, filename,
+      mapOutput = MapOutput.createLocalDiskMapOutput(srcAttemptId, allocator, filename,
           indexRecord.getStartOffset(), indexRecord.getPartLength(), true);
+      mapOutput.setTezOffsetRecord(tezOffsetRecord);
+      return mapOutput;
     }
     org.apache.tez.runtime.api.MultiByteArrayOutputStream byteArrayOutput =
         taskContext.getConcurrentByteCache().get(pathComponent);
@@ -778,12 +790,14 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       }
       remaining -= skipped;
     }
-    return MapOutput.createInputStreamMapOutput(
+    mapOutput = MapOutput.createInputStreamMapOutput(
         srcAttemptId, allocator,
         new BoundedInputStream(inputStream, indexRecord.getPartLength()),
         indexRecord.getRawLength(),
         indexRecord.getPartLength(),
         true);
+    mapOutput.setTezOffsetRecord(tezOffsetRecord);
+    return mapOutput;
   }
 
   private boolean verifySanity(long compressedLength, long decompressedLength,
