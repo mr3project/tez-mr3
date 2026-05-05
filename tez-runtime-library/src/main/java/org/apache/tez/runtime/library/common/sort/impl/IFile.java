@@ -1078,13 +1078,13 @@ public class IFile {
 
     private void check(String msg) {
       if (rawLength > 0 && bytesRead > rawLength - 100) {
-        LOG.error("xxxxx5 {}: {} : {} >= {}", msg, indexString, rawLength, bytesRead);
+        LOG.error("xxxxx5 {} {} : {} >= {}", msg, indexString, rawLength, bytesRead);
       }
     }
 
     private void check2(String msg) {
       if (rawLength > 0 && bytesRead > rawLength - 100) {
-        LOG.error("xxxxx6 {}: {} : {} >= {}", msg, indexString, rawLength, bytesRead);
+        LOG.error("xxxxx6 {} {} : {} >= {}", msg, indexString, rawLength, bytesRead);
       }
     }
 
@@ -1099,7 +1099,7 @@ public class IFile {
     private KeyState readRawKeyNoRle(DataInputBuffer key) throws IOException {
       check("readRawKeyNoRle");
       if (!positionToNextRecordNoRle(dataIn)) {
-        check2("readRawKeyNoRle1");
+        check2("readRawKeyNoRle_NO_KEY");
         return KeyState.NO_KEY;
       }
       if (keyBytes.length < currentKeyLength) {
@@ -1111,20 +1111,20 @@ public class IFile {
       }
       key.reset(keyBytes, currentKeyLength);
       bytesRead += currentKeyLength;
-      check2("readRawKeyNoRle2");
+      check2("readRawKeyNoRle_RETURN_" + currentKeyLength);
       return KeyState.NEW_KEY;
     }
 
     private KeyState readRawKeyRle(DataInputBuffer key) throws IOException {
       check("readRawKeyRle");
       if (!positionToNextRecordRle(dataIn)) {
-        check2("readRawKeyRle1");
+        check2("readRawKeyRle_NO_KEY");
         return KeyState.NO_KEY;
       }
       if (currentKeyLength == RLE_MARKER) {
         // get key length from original key
         key.reset(keyBytes, originalKeyLength);
-        check2("readRawKeyRle2");
+        check2("readRawKeyRle_RLE_MARKER");
         return KeyState.SAME_KEY;
       }
       if (keyBytes.length < currentKeyLength) {
@@ -1136,7 +1136,7 @@ public class IFile {
       }
       key.reset(keyBytes, currentKeyLength);
       bytesRead += currentKeyLength;
-      check2("readRawKeyRle3");
+      check2("readRawKeyRle_RETURN_" + currentKeyLength);
       return KeyState.NEW_KEY;
     }
 
@@ -1201,7 +1201,7 @@ public class IFile {
       // Record the bytes read
       bytesRead += currentValueLength;
 
-      check2("nextRawValue");
+      check2("nextRawValue_RETURN_" + currentValueLength);
       ++recNo;
       ++numRecordsRead;
     }
