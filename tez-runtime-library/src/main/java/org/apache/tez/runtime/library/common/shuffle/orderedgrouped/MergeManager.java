@@ -112,9 +112,9 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   // - create InputStreamMapOutput, do not increase usedMemory
   // - 1. InputStreamMapOutput.commit()
   //      --> closeInMemoryFile()
-  //      --> createMapOutputReader() creates IFile.Reader over InputStream
-  //      --> stream is consumed while merging
-  //      --> IFile.Reader.close() releases stream resources
+  //      --> createMapOutputReader() materializes input stream into byte[]
+  //      --> createMapOutputReader() creates InMemoryReader over byte[]
+  //      --> map output is consumed while merging
   // - 2. InputStreamMapOutput.abort()
   //      --> closes InputStream without enqueuing
 
@@ -1047,23 +1047,19 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   private IFile.KeyValueReaderDataInputBuffer createMapOutputReader(MapOutput mapOutput) throws IOException {
     assert mapOutput.getType() == ShuffleClient.Type.MEMORY || mapOutput.getType() == ShuffleClient.Type.LOCAL_BYTE_CACHE;
     if (mapOutput.getType() == ShuffleClient.Type.LOCAL_BYTE_CACHE) {
-      java.io.InputStream inputStream = mapOutput.getInputStream();
       final long commitSize = mapOutput.getSizeForMergeMemoryAccounting();
-      final long readerLength = mapOutput.getReaderLength();
-      LOG.error("xxxxx4 {}_{} {}", commitSize, readerLength, mapOutput.getIndexString());
-      return new IFile.Reader(
-          inputStream, readerLength, codec,
-          null, null, ifileReadAhead, ifileReadAheadLength, inputContext,
-          commitSize, mapOutput.getIndexString()) {
-        @Override
-        public void close() throws IOException {
-          try {
-            super.close();
-          } finally {
-            releaseCommittedMemory(commitSize, 0L);
-          }
-        }
-      };
+      final byte[] data = new byte[Math.toIntExact(commitSize)];
+      try {
+        IFile.Reader.readToMemory(data, mapOutput.getInputStream(),
+            Math.toIntExact(mapOutput.getReaderLength()), codec, ifileReadAhead, ifileReadAheadLength,
+            inputContext, false);
+      } finally {
+        releaseCommittedMemory(commitSize, 0L);
+      }
+
+      return new InMemoryReader(
+          MergeManager.this, mapOutput.getAttemptIdentifier(), data, 0, data.length,
+          (int) mapOutput.getUsedMemoryForMergeManager());
     }
     byte[] data = mapOutput.getMemory();
     return new InMemoryReader(
