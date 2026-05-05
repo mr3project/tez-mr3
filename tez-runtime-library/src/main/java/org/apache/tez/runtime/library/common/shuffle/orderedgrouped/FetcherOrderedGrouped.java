@@ -38,6 +38,7 @@ import org.apache.commons.io.input.BoundedInputStream;
 import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.FetcherConfigCommon;
+import org.apache.tez.runtime.api.IndexPathCache;
 import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
@@ -693,6 +694,14 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
             inputFilePath = pair.getValue();
           }
           TezIndexRecord indexRecord = spillRecord.getIndex(reduceId);
+          if (inputFilePath == null) {
+            IndexPathCache.MapOutputInfo mapOutputInfo = taskContext.getIndexPathCache().get(pathComponent);
+            if (mapOutputInfo == null) {
+              throw new IOException("IndexPathCache not found for pathComponent=" + pathComponent);
+            }
+            TezSpillRecord cachedSpillRecord = new TezSpillRecord(mapOutputInfo.getSpillRecord());
+            indexRecord = cachedSpillRecord.getIndex(reduceId);
+          }
           if (!indexRecord.hasData()) {
             continue;
           }
