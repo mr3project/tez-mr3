@@ -1049,13 +1049,9 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     if (mapOutput.getType() == ShuffleClient.Type.LOCAL_BYTE_CACHE) {
       final long commitSize = mapOutput.getSizeForMergeMemoryAccounting();
       final byte[] data = new byte[Math.toIntExact(commitSize)];
-      try {
-        IFile.Reader.readToMemory(data, mapOutput.getInputStream(),
-            Math.toIntExact(mapOutput.getReaderLength()), codec, ifileReadAhead, ifileReadAheadLength,
-            inputContext, false);
-      } finally {
-        releaseCommittedMemory(commitSize, 0L);
-      }
+      IFile.Reader.readToMemory(data, mapOutput.getInputStream(),
+          Math.toIntExact(mapOutput.getReaderLength()), codec, ifileReadAhead, ifileReadAheadLength,
+          inputContext, false);
 
       return new InMemoryReader(
           MergeManager.this, mapOutput.getAttemptIdentifier(), data, 0, data.length,
