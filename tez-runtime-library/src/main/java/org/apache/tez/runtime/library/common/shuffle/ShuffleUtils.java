@@ -705,8 +705,13 @@ public class ShuffleUtils {
     if (byteArrayOutput != null) {
       ConcurrentByteCache concurrentByteCache = outputContext.getConcurrentByteCache();
       concurrentByteCache.add(mapId, byteArrayOutput);
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Write SpillInfo to IndexPathCache and ByteCache: mapId={}, totalBytes={}", mapId, byteArrayOutput.getTotalBytes());
+
+      LOG.error("xxxxx1 spillId={}, mapId={}, totalBytes={}",
+          mapId, spillId, byteArrayOutput.getTotalBytes());
+      for (int i = 0; i < spillRecord.size(); i++) {
+        TezIndexRecord indexRecord = spillRecord.getIndex(i);
+        LOG.error("xxxxx2 partition={}, TezIndexRecord_{}_{}_{}", i,
+            indexRecord.getStartOffset(), indexRecord.getRawLength(), indexRecord.getPartLength());
       }
     }
   }

@@ -765,6 +765,8 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     }
     InputStream inputStream = byteArrayOutput.createInputStream();
     long remaining = indexRecord.getStartOffset();
+    LOG.error("xxxxx3 pathComponent={}, TezIndexRecord_{}_{}_{}", pathComponent,
+        indexRecord.getStartOffset(), indexRecord.getRawLength(), indexRecord.getPartLength());
     while (remaining > 0) {
       long skipped = inputStream.skip(remaining);
       if (skipped <= 0) {
