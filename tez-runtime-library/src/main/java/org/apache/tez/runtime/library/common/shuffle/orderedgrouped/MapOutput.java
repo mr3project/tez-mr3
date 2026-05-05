@@ -370,6 +370,7 @@ public abstract class MapOutput implements ShuffleInput {
     private InputStream inputStream;
     private final long size;
     private final long readerLength;
+    private boolean streamRetrieved;
 
     private InputStreamMapOutput(InputAttemptIdentifier attemptIdentifier,
                                  FetchedInputAllocatorOrderedGrouped callback,
@@ -385,6 +386,11 @@ public abstract class MapOutput implements ShuffleInput {
 
     @Override
     public InputStream getInputStream() {
+      if (streamRetrieved) {
+        throw new IllegalStateException("LOCAL_BYTE_CACHE InputStreamMapOutput stream was requested more than once. "
+            + "The underlying stream is non-rewindable and reusing it can corrupt merge input.");
+      }
+      streamRetrieved = true;
       return inputStream;
     }
 

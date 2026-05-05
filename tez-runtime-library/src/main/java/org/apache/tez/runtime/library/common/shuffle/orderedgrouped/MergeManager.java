@@ -707,7 +707,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       synchronized (manager) {
 
         Iterator<MapOutput> it = inputs.iterator();
-        MapOutput lastAddedMapOutput = null;
+        List<MapOutput> selectedMapOutputs = new ArrayList<>();
         while (it.hasNext() && !Thread.currentThread().isInterrupted()) {
           MapOutput mo = it.next();
           // We have to use mo.getSizeForMergeMemoryAccounting(), not mo.getUsedMemoryForMergeManager(), because
@@ -725,10 +725,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
             }
           } else {
             mergeOutputSize += mo.getSizeForMergeMemoryAccounting();
-            IFile.KeyValueReaderDataInputBuffer reader = createMapOutputReader(mo);
-            inMemorySegments.add(new Segment(reader,
-                (mo.isPrimaryMapOutput() ? mergedMapOutputsCounter : null)));
-            lastAddedMapOutput = mo;
+            selectedMapOutputs.add(mo);
             it.remove();
             if (isDebugEnabled) {
               LOG.debug("Added segment for merging. mergeOutputSize=" + mergeOutputSize);
@@ -740,11 +737,15 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         inMemoryMapOutputs.addAll(inputs);
 
         //Exit early, if 0 or 1 segment is available
-        if (inMemorySegments.size() <= 1) {
-          if (lastAddedMapOutput != null) {
-            inMemoryMapOutputs.add(lastAddedMapOutput);
-          }
+        if (selectedMapOutputs.size() <= 1) {
+          inMemoryMapOutputs.addAll(selectedMapOutputs);
           return;
+        }
+
+        for (MapOutput mo : selectedMapOutputs) {
+          IFile.KeyValueReaderDataInputBuffer reader = createMapOutputReader(mo);
+          inMemorySegments.add(new Segment(reader,
+              (mo.isPrimaryMapOutput() ? mergedMapOutputsCounter : null)));
         }
 
         try {
