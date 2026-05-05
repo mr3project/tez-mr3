@@ -1077,13 +1077,13 @@ public class IFile {
     }
 
     private void check(String msg) {
-      if (rawLength > 0) {
+      if (rawLength > 0 && bytesRead > rawLength - 100) {
         LOG.error("xxxxx5 {}: {} : {} >= {}", msg, indexString, rawLength, bytesRead);
       }
     }
 
     private void check2(String msg) {
-      if (rawLength > 0) {
+      if (rawLength > 0 && bytesRead > rawLength - 100) {
         LOG.error("xxxxx6 {}: {} : {} >= {}", msg, indexString, rawLength, bytesRead);
       }
     }
