@@ -725,9 +725,8 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
           }
           if (!stopped) {
             hasFailures = true;
+            // do not fail srcAttemptId because later we fail the entire inputAttemptIdentifier
             shuffleErrorCounterGroup.ioErrs.increment(1);
-            fetcherCallback.fetchFailed(shuffleClientId, new CompositeInputAttemptIdentifier(srcAttemptId),
-                true, false, null, null, null);
             LOG.warn("{}: Failed to read local disk output of {} from {}", logIdentifier, srcAttemptId, host, e);
           } else {
             if (isDebugEnabled) {
@@ -740,7 +739,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
 
       if (hasFailures) {
         // failed to read some partition belonging to inputAttemptIdentifier inside the inner loop
-        failedFetches.add(inputAttemptIdentifier);
+        failedFetches.add(inputAttemptIdentifier);  // the entire inputAttemptIdentifier will fail later
       }
 
       index++;
