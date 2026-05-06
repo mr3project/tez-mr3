@@ -778,7 +778,8 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> inputsMap = new HashMap<>();
 
     CompositeInputAttemptIdentifier currentInput = pendingInputsSeq.getInputs().get(pendingInputsIndex);
-    assert currentInput.getInputIdentifier() == partitionId;
+    // currentInput.getInputIdentifier() is the DME target index, which may differ from partitionId
+    // (the DME source index), so advance both by the same offset instead of comparing them.
     int remainingPartitionCount = partitionCount - partitionOffset;
     CompositeInputAttemptIdentifier remainingInput = new CompositeInputAttemptIdentifier(
         currentInput.getInputIdentifier() + partitionOffset,
