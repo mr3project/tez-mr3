@@ -81,7 +81,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     new TreeSet<MapOutput>(new MapOutput.MapOutputComparator());
   private final IntermediateMemoryToMemoryMerger memToMemMerger;
 
-  // InMemoryMapOutput or InputStreamMapOutput
+  // InMemoryMapOutput instances waiting to be merged.
   final Set<MapOutput> inMemoryMapOutputs =
     new TreeSet<MapOutput>(new MapOutput.MapOutputComparator());
   private final InMemoryMerger inMemoryMerger;
@@ -99,16 +99,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   //      --> InMemoryReader
   //      --> releaseCommittedMemory()
   // - 2. InMemoryMapOutput.abort()
-
-  // Lifecycle of InputStreamMapOutput (LOCAL_BYTE_CACHE):
-  // - create InputStreamMapOutput, do not increase usedMemory
-  // - 1. InputStreamMapOutput.commit()
-  //      --> closeInMemoryFile()
-  //      --> createMapOutputReader() creates IFile.Reader over InputStream
-  //      --> stream is consumed while merging
-  //      --> IFile.Reader.close() releases stream resources
-  // - 2. InputStreamMapOutput.abort()
-  //      --> closes InputStream without enqueuing
 
   // MergeManager’s internal memory budget for controlling fetching
   // increases at the time of creating InMemoryMapOutput

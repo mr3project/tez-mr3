@@ -17,7 +17,6 @@
  */
 package org.apache.tez.runtime.library.common.shuffle.orderedgrouped;
 
-import java.io.InputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Comparator;
@@ -121,10 +120,6 @@ public abstract class MapOutput implements ShuffleInput {
   }
   
   public OutputStream getDisk() {
-    return null;
-  }
-
-  public InputStream getInputStream() {
     return null;
   }
 
