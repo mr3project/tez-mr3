@@ -401,8 +401,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       InputAttemptIdentifier srcAttemptIdentifier,
       long actualSize,
       long compressedLength,
-      int fetcher,
-      boolean isFetchFromLocal) throws IOException {
+      int fetcher) throws IOException {
     if (actualSize > maxSingleShuffleLimit) {
       if (useFreeMemoryFetchedInput) {
         synchronized (this) {
@@ -463,14 +462,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     return currentFreeMemory >= freeMemoryThreshold && this.usedMemory + actualSize <= freeMemoryLimit;
   }
 
-  @Override
-  public synchronized MapOutput getMemoryMapOutput(
-      InputAttemptIdentifier srcAttemptIdentifier,
-      long actualSize,
-      boolean checkFreeMemory) {
-    return getMemoryMapOutputInternal(srcAttemptIdentifier, 0L, actualSize, checkFreeMemory);
-  }
-
   // Invariant: inside this.synchronized{}
   private MapOutput getMemoryMapOutputInternal(
       InputAttemptIdentifier srcAttemptIdentifier,
@@ -498,7 +489,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       LOG.debug("Creating DiskMapOutput: {}", compressedLength);
     }
     return MapOutput.createDiskMapOutput(srcAttemptIdentifier, this, compressedLength, conf,
-      fetcher, true, mapOutputFile);
+        fetcher, true, mapOutputFile);
   }
 
   /**

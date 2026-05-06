@@ -30,10 +30,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.io.input.BoundedInputStream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.tez.http.HttpConnectionParams;
@@ -211,10 +209,10 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         if (fetcherConfigCommon.localDiskFetchOrderedEnabled && isFetchFromLocalInternal) {
           failedFetches = setupLocalDiskFetch();    // TezSpillRecord can be obtained directly
         } else {
-          pendingInputs = copyFromHost(true);
+          pendingInputs = copyFromHost();
         }
       } else {
-        pendingInputs = copyFromHost(false);
+        pendingInputs = copyFromHost();
       }
     } finally {
       if (failedFetches != null && !failedFetches.isEmpty()) {
@@ -233,7 +231,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
   }
 
   // return pendingInputs[]
-  private Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> copyFromHost(boolean isFetchFromLocal) {
+  private Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> copyFromHost() {
     // reset retryStartTime for a new host
     retryStartTime = 0;
 
@@ -265,7 +263,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       // skip for this error in the input stream. So we cannot move on to the
       // remaining outputs. YARN-1773. Will get to them in the next retry.
       try {
-        failedInputs = copyMapOutput(input, inputAttemptIdentifier, isFetchFromLocal);
+        failedInputs = copyMapOutput(input, inputAttemptIdentifier);
         if (failedInputs != null) {
           break;
         }
@@ -456,8 +454,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
   // return failedInputs[]
   private CompositeInputAttemptIdentifier[] copyMapOutput(
       DataInputStream input,
-      CompositeInputAttemptIdentifier inputAttemptIdentifier,
-      boolean isFetchFromLocal) throws FetcherReadTimeoutException {
+      CompositeInputAttemptIdentifier inputAttemptIdentifier) throws FetcherReadTimeoutException {
     MapOutput mapOutput = null;
     InputAttemptIdentifier srcAttemptId = null;
     long decompressedLength = 0;
@@ -559,7 +556,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         decompressedLength = mapOutputStat.decompressedLength;
         compressedLength = mapOutputStat.compressedLength;
         try {
-          mapOutput = allocator.reserve(srcAttemptId, decompressedLength, compressedLength, fetcherIdentifier, isFetchFromLocal);
+          mapOutput = allocator.reserve(srcAttemptId, decompressedLength, compressedLength, fetcherIdentifier);
           mapOutput.setTezOffsetRecord(mapOutputStat.tezOffsetRecord);
         } catch (IOException e) {
           if (!stopped) {

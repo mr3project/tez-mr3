@@ -22,17 +22,12 @@ import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 
 public interface FetchedInputAllocatorOrderedGrouped {
 
-  public MapOutput reserve(InputAttemptIdentifier srcAttemptIdentifier,
+  MapOutput reserve(InputAttemptIdentifier srcAttemptIdentifier,
                            long requestedSize,
                            long compressedLength,
-                           int fetcherId,
-                           boolean isFetchFromLocal) throws IOException;
+                           int fetcherId) throws IOException;
 
   void closeInMemoryFile(MapOutput mapOutput);
-
-  MapOutput getMemoryMapOutput(InputAttemptIdentifier srcAttemptIdentifier,
-                              long requestedSize,
-                              boolean checkFreeMemory);
 
   FileSystem getLocalFileSystem();
 
