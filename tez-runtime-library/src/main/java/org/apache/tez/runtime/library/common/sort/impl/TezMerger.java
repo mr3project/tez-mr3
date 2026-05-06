@@ -251,6 +251,17 @@ public class TezMerger {
     }
   }
 
+  public static final class InputStreamSegment extends Segment {
+    public InputStreamSegment(IFile.KeyValueReaderDataInputBuffer reader, TezCounter mapOutputsCounter) {
+      super(reader, mapOutputsCounter);
+    }
+
+    @Override
+    boolean inMemory() {
+      return false;
+    }
+  }
+
   public static final class IntermediateMemorySegment extends Segment {
     private final MultiByteArrayOutputStream byteArrayOutput;
     private final boolean cleanupOnClose;
