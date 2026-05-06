@@ -357,11 +357,9 @@ public class MultiByteArrayOutputStream extends OutputStream {
     private final byte[][] memoryBuffers;
     private final int[] memoryBufferLengths;
     private final long memoryBytes;
-    private final long startPos;
     private final long endPos;
 
     private long globalPos;
-    private long markPos = -1L;
     private int memoryIndex;
     private int offsetInMemoryBuffer;
     private FSDataInputStream spillIn;
@@ -377,7 +375,6 @@ public class MultiByteArrayOutputStream extends OutputStream {
       this.memoryBuffers = memoryBuffers;
       this.memoryBufferLengths = memoryBufferLengths;
       this.memoryBytes = memoryBytes;
-      this.startPos = offset;
       this.globalPos = offset;
       this.endPos = offset + length;
 
@@ -489,53 +486,47 @@ public class MultiByteArrayOutputStream extends OutputStream {
 
     @Override
     public long skip(long n) throws IOException {
-      if (closed) {
-        throw new IOException("Stream closed");
-      }
       if (n <= 0) {
         return 0;
       }
-      long skipped = Math.min(n, endPos - globalPos);
-      if (skipped <= 0) {
+      long toSkip = Math.min(n, endPos - globalPos);
+      if (toSkip <= 0) {
         return 0;
       }
 
-      seekToGlobalPosition(globalPos + skipped);
+      long skipped = 0;
+      if (globalPos < memoryBytes) {
+        while (toSkip > 0 && globalPos < Math.min(memoryBytes, endPos)) {
+          int curLen = memoryBufferLengths[memoryIndex];
+          int availableInCur = curLen - offsetInMemoryBuffer;
+          if (availableInCur <= 0) {
+            memoryIndex++;
+            offsetInMemoryBuffer = 0;
+            continue;
+          }
+          int jump = (int) Math.min((long) availableInCur, toSkip);
+          offsetInMemoryBuffer += jump;
+          globalPos += jump;
+          toSkip -= jump;
+          skipped += jump;
+        }
+      }
+
+      if (toSkip > 0 && globalPos < endPos) {
+        ensureSpillOpen();
+        long targetPosInSpill = (globalPos - memoryBytes) + toSkip;
+        spillIn.seek(targetPosInSpill);
+        globalPos += toSkip;
+        skipped += toSkip;
+      }
+
       return skipped;
     }
 
     @Override
-    public int available() throws IOException {
-      if (closed) {
-        throw new IOException("Stream closed");
-      }
+    public int available() {
       long remaining = endPos - globalPos;
       return (int) Math.min(Integer.MAX_VALUE, Math.max(remaining, 0));
-    }
-
-    // Some streaming consumers (for example IFile readers/codecs layered on top of this stream)
-    // may probe and rewind bytes instead of draining the full range in a single forward-only pass.
-    // Support mark/reset by repositioning the logical stream cursor across both the memory buffers
-    // and the optional spill file.
-    @Override
-    public synchronized void mark(int readlimit) {
-      markPos = globalPos;
-    }
-
-    @Override
-    public synchronized void reset() throws IOException {
-      if (closed) {
-        throw new IOException("Stream closed");
-      }
-      if (markPos < 0) {
-        throw new IOException("Mark has not been set");
-      }
-      seekToGlobalPosition(markPos);
-    }
-
-    @Override
-    public boolean markSupported() {
-      return true;
     }
 
     @Override
@@ -552,38 +543,6 @@ public class MultiByteArrayOutputStream extends OutputStream {
     private void ensureSpillOpen() throws IOException {
       if (spillIn == null) {
         spillIn = fs.open(outputPath);
-      }
-      spillIn.seek(globalPos - memoryBytes);
-    }
-
-    private void seekToGlobalPosition(long targetPos) throws IOException {
-      if (targetPos < startPos || targetPos > endPos) {
-        throw new EOFException(String.format(
-            "Cannot seek outside stream range: target=%d, start=%d, end=%d",
-            targetPos, startPos, endPos));
-      }
-
-      globalPos = targetPos;
-      if (globalPos < memoryBytes) {
-        long scanned = 0;
-        memoryIndex = 0;
-        offsetInMemoryBuffer = 0;
-        while (memoryIndex < memoryBufferLengths.length) {
-          int currentLen = memoryBufferLengths[memoryIndex];
-          if (scanned + currentLen > globalPos) {
-            offsetInMemoryBuffer = (int) (globalPos - scanned);
-            return;
-          }
-          scanned += currentLen;
-          memoryIndex++;
-        }
-        throw new EOFException(String.format(
-            "Cannot seek to in-memory position: target=%d, memoryBytes=%d", targetPos, memoryBytes));
-      }
-
-      memoryIndex = memoryBufferLengths.length;
-      offsetInMemoryBuffer = 0;
-      if (spillIn != null && globalPos < endPos) {
         spillIn.seek(globalPos - memoryBytes);
       }
     }
