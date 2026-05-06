@@ -82,17 +82,6 @@ public abstract class MapOutput implements ShuffleInput {
     return new DiskDirectMapOutput(attemptIdentifier, callback, size, path, offset, primaryMapOutput);
   }
 
-  public static MapOutput createInputStreamMapOutput(
-      InputAttemptIdentifier attemptIdentifier,
-      FetchedInputAllocatorOrderedGrouped callback,
-      InputStream inputStream,
-      long size,
-      long readerLength,
-      boolean primaryMapOutput) {
-    return new InputStreamMapOutput(
-        attemptIdentifier, callback, inputStream, size, readerLength, primaryMapOutput);
-  }
-
   // may throw OutOfMemoryError
   public static MapOutput createMemoryMapOutput(InputAttemptIdentifier attemptIdentifier,
                                                 FetchedInputAllocatorOrderedGrouped callback,
@@ -157,11 +146,11 @@ public abstract class MapOutput implements ShuffleInput {
    * Logical size of this map output as used by MergeManager for in-memory merge accounting,
    * merge candidate ordering, and output buffer sizing decisions.
    *
-   * For MEMORY and LOCAL_BYTE_CACHE only.
+   * For MEMORY only.
    * For DISK and DISK_DIRECT, this should not be called.
    */
   public long getSizeForMergeMemoryAccounting() {
-    throw new UnsupportedOperationException("Supported only for MEMORY and LOCAL_BYTE_CACHE");
+    throw new UnsupportedOperationException("Supported only for MEMORY");
   }
 
   /**
@@ -363,64 +352,6 @@ public abstract class MapOutput implements ShuffleInput {
     @Override
     public long getReaderLength() {
       return 0L;
-    }
-  }
-
-  private static class InputStreamMapOutput extends MapOutput {
-    private InputStream inputStream;
-    private final long size;
-    private final long readerLength;
-
-    private InputStreamMapOutput(InputAttemptIdentifier attemptIdentifier,
-                                 FetchedInputAllocatorOrderedGrouped callback,
-                                 InputStream inputStream,
-                                 long size,
-                                 long readerLength,
-                                 boolean primaryMapOutput) {
-      super(attemptIdentifier, callback, primaryMapOutput);
-      this.inputStream = inputStream;
-      this.size = size;
-      this.readerLength = readerLength;
-    }
-
-    @Override
-    public InputStream getInputStream() {
-      return inputStream;
-    }
-
-    @Override
-    public long getSizeForMergeMemoryAccounting() {
-      return size;
-    }
-
-    @Override
-    public long getReaderLength() {
-      return readerLength;
-    }
-
-    @Override
-    public void commit() throws IOException {
-      callback.closeInMemoryFile(this);
-    }
-
-    @Override
-    public void abort() {
-      if (inputStream != null) {
-        try {
-          inputStream.close();
-        } catch (IOException ioe) {
-          LOG.info("Failure to close input stream for {}", this, ioe);
-        } finally {
-          inputStream = null;
-          // pass 0L because MultiByteArrayOutputStream for inputStream is managed independently in ConcurrentByteCache
-          callback.unreserve(0L);
-        }
-      }
-    }
-
-    @Override
-    public ShuffleClient.Type getType() {
-      return ShuffleClient.Type.LOCAL_BYTE_CACHE;
     }
   }
 }

@@ -59,6 +59,11 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
   }
   private final static String SHUFFLE_ERR_GRP_NAME = "Shuffle Errors";
 
+  // LOCAL_BYTE_CACHE must not be used for ShuffleScheduler
+  // because MergeManager requires MapOutput backed by a byte[] array.
+  // Cf. FetcherOrderedGrouped.getMapOutputForDirectFetch() creates MemoryMapOutput
+  // from MultiByteArrayOutputStream after calling getMemoryMapOutput() for this reason.
+
   public enum Type {
     WAIT,
     MEMORY,

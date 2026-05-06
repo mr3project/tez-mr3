@@ -1060,24 +1060,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   }
 
   private IFile.KeyValueReaderDataInputBuffer createMapOutputReader(MapOutput mapOutput) throws IOException {
-    assert mapOutput.getType() == ShuffleClient.Type.MEMORY || mapOutput.getType() == ShuffleClient.Type.LOCAL_BYTE_CACHE;
-    if (mapOutput.getType() == ShuffleClient.Type.LOCAL_BYTE_CACHE) {
-      java.io.InputStream inputStream = mapOutput.getInputStream();
-      final long commitSize = mapOutput.getSizeForMergeMemoryAccounting();
-      final long readerLength = mapOutput.getReaderLength();
-      return new IFile.Reader(
-          inputStream, readerLength, codec,
-          null, null, ifileReadAhead, ifileReadAheadLength, inputContext, null) {
-        @Override
-        public void close() throws IOException {
-          try {
-            super.close();
-          } finally {
-            releaseCommittedMemory(commitSize, 0L);
-          }
-        }
-      };
-    }
+    assert mapOutput.getType() == ShuffleClient.Type.MEMORY;
     byte[] data = mapOutput.getMemory();
     return new InMemoryReader(
         MergeManager.this, mapOutput.getAttemptIdentifier(), data, 0, data.length,

@@ -209,7 +209,11 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       fetcherCallback.waitForMergeManager(shuffleClientId);
       if (isFetchFromLocal) {
         if (fetcherConfigCommon.localDiskFetchOrderedEnabled && isFetchFromLocalInternal) {
-          failedFetches = setupLocalDiskFetch();    // TezSpillRecord can be obtained directly
+          LocalDiskFetchResult result = setupLocalDiskFetch();    // TezSpillRecord can be obtained directly
+          if (result != null) {
+            failedFetches = result.failedFetches;
+            pendingInputs = result.pendingInputs;
+          }
         } else {
           pendingInputs = copyFromHost(true);
         }
@@ -656,12 +660,18 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     return null;
   }
 
-  private List<CompositeInputAttemptIdentifier> setupLocalDiskFetch() {
-    if (isDebugEnabled) {
-      LOG.debug("Fetcher " + fetcherIdentifier + " going to fetch (local disk) from " + host
-          + ", partition range: " + minPartition + "-" + maxPartition);
-    }
+  private static final class LocalDiskFetchResult {
+    private final List<CompositeInputAttemptIdentifier> failedFetches;
+    private final Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> pendingInputs;
 
+    private LocalDiskFetchResult(List<CompositeInputAttemptIdentifier> failedFetches,
+        Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> pendingInputs) {
+      this.failedFetches = failedFetches;
+      this.pendingInputs = pendingInputs;
+    }
+  }
+
+  private LocalDiskFetchResult setupLocalDiskFetch() {
     int partitionId = pendingInputsSeq.getPartition();
     int partitionCount = pendingInputsSeq.getPartitionCount();
 
@@ -713,6 +723,13 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
           }
 
           mapOutput = getMapOutputForDirectFetch(srcAttemptId, pathComponent, inputFilePath, indexRecord);
+          if (mapOutput.getType() == ShuffleClient.Type.WAIT) {
+            if (isDebugEnabled) {
+              LOG.debug("{}: No memory available for local byte-cache output of {} from {}; "
+                  + "re-enqueuing remaining inputs", logIdentifier, srcAttemptId, host);
+            }
+            return new LocalDiskFetchResult(failedFetches, buildRemainingLocalDiskInputMap(index, k));
+          }
           if (offsetRecordMap != null) {
             mapOutput.setTezOffsetRecord(offsetRecordMap.get(reduceId));
           }
@@ -726,8 +743,6 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
           if (!stopped) {
             hasFailures = true;
             shuffleErrorCounterGroup.ioErrs.increment(1);
-            fetcherCallback.fetchFailed(shuffleClientId, new CompositeInputAttemptIdentifier(srcAttemptId),
-                true, false, null, null, null);
             LOG.warn("{}: Failed to read local disk output of {} from {}", logIdentifier, srcAttemptId, host, e);
           } else {
             if (isDebugEnabled) {
@@ -735,6 +750,12 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
             }
             return null;
           }
+        }
+
+        if (hasFailures) {
+          // do not consider remaining partitions in the current inputAttemptIdentifier
+          // and add the whole inputAttemptIdentifier to failedFetches[] later
+          break;
         }
       }
 
@@ -747,7 +768,35 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     }
 
     assert index == numInputs;  // completed the loop
-    return failedFetches;
+    return new LocalDiskFetchResult(failedFetches, null);
+  }
+
+  private Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> buildRemainingLocalDiskInputMap(
+      int pendingInputsIndex, int partitionOffset) {
+    assert pendingInputsIndex < numInputs;
+    int partitionId = pendingInputsSeq.getPartition();
+    int partitionCount = pendingInputsSeq.getPartitionCount();
+    CompositeInputAttemptIdentifier currentInput = pendingInputsSeq.getInputs().get(pendingInputsIndex);
+    // Cf. currentInput.getInputIdentifier() == DME target index, partitionId == DME source index
+
+    Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> inputsMap = new HashMap<>();
+
+    int remainingPartitionCount = partitionCount - partitionOffset;
+    CompositeInputAttemptIdentifier remainingInput = new CompositeInputAttemptIdentifier(
+        currentInput.getInputIdentifier() + partitionOffset,
+        currentInput.getAttemptNumber(),
+        currentInput.getPathComponent(),
+        currentInput.getFetchTypeInfo(),
+        currentInput.getSpillEventId(),
+        remainingPartitionCount);
+    inputsMap.put(remainingInput, new InputHost.PartitionRange(
+        partitionId + partitionOffset, remainingPartitionCount));
+
+    for (int i = pendingInputsIndex + 1; i < numInputs; i++) {
+      CompositeInputAttemptIdentifier input = pendingInputsSeq.getInputs().get(i);
+      inputsMap.put(input, pendingInputsSeq.getPartitionRange());
+    }
+    return inputsMap;
   }
 
   private void cleanupCurrentConnection(boolean disconnect) {
@@ -804,19 +853,10 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       return MapOutput.createLocalDiskMapOutput(srcAttemptId, allocator, filename,
           indexRecord.getStartOffset(), indexRecord.getPartLength(), true);
     }
-    org.apache.tez.runtime.api.MultiByteArrayOutputStream byteArrayOutput =
-        taskContext.getConcurrentByteCache().get(pathComponent);
-    if (byteArrayOutput == null) {
-      throw new IOException("ConcurrentByteCache not found for pathComponent=" + pathComponent);
-    }
-    InputStream inputStream = byteArrayOutput.createInputStreamFrom(
-        indexRecord.getStartOffset(), indexRecord.getPartLength());
-    return MapOutput.createInputStreamMapOutput(
-        srcAttemptId, allocator,
-        inputStream,
-        indexRecord.getRawLength(),
-        indexRecord.getPartLength(),
-        true);
+    // Ordered-grouped shuffle readers require a MapOutput with either a single backing byte[]
+    // or a local-disk range. The local byte cache exposes the data only as an InputStream,
+    // so re-enqueue this and the remaining inputs instead of reporting a source read error.
+    return MapOutput.createWaitMapOutput(srcAttemptId);
   }
 
   private boolean verifySanity(long compressedLength, long decompressedLength,
