@@ -781,23 +781,6 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     if (byteArrayOutput == null) {
       throw new IOException("ConcurrentByteCache not found for pathComponent=" + pathComponent);
     }
-
-    MapOutput memoryMapOutput = allocator.getMemoryMapOutput(srcAttemptId, indexRecord.getRawLength(), true);
-    if (memoryMapOutput != null) {
-      InputStream inputStream = byteArrayOutput.createInputStreamFrom(
-          indexRecord.getStartOffset(), indexRecord.getPartLength());
-      try {
-        ShuffleUtils.shuffleToMemory(memoryMapOutput.getMemory(),
-            inputStream, (int) indexRecord.getRawLength(), (int) indexRecord.getPartLength(), codec,
-            fetcherConfig.ifileReadAhead, fetcherConfig.ifileReadAheadLength, LOG,
-            srcAttemptId, taskContext, true);
-        return memoryMapOutput;
-      } catch (IOException | RuntimeException e) {
-        memoryMapOutput.abort();
-        throw e;
-      }
-    }
-
     InputStream inputStream = byteArrayOutput.createInputStreamFrom(
         indexRecord.getStartOffset(), indexRecord.getPartLength());
     return MapOutput.createInputStreamMapOutput(
