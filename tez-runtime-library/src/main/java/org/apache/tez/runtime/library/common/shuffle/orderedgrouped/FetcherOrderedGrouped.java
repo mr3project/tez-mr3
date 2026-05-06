@@ -778,6 +778,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> inputsMap = new HashMap<>();
 
     CompositeInputAttemptIdentifier currentInput = pendingInputsSeq.getInputs().get(pendingInputsIndex);
+    assert currentInput.getInputIdentifier() == partitionId;
     int remainingPartitionCount = partitionCount - partitionOffset;
     CompositeInputAttemptIdentifier remainingInput = new CompositeInputAttemptIdentifier(
         currentInput.getInputIdentifier() + partitionOffset,
