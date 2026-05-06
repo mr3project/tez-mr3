@@ -42,6 +42,7 @@ import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterDataInputBuffer;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger.DiskSegment;
+import org.apache.tez.runtime.library.common.sort.impl.TezMerger.InputStreamSegment;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger.Segment;
 import org.apache.tez.runtime.library.common.sort.impl.TezRawKeyValueIterator;
 import org.apache.tez.runtime.library.common.task.local.output.TezTaskOutputFiles;
@@ -105,6 +106,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   // - 1. InputStreamMapOutput.commit()
   //      --> closeInMemoryFile()
   //      --> createMapOutputReader() creates IFile.Reader over InputStream
+  //      --> InputStreamSegment marks it as streaming, not in-memory, for merge buffer reuse
   //      --> stream is consumed while merging
   //      --> IFile.Reader.close() releases stream resources
   // - 2. InputStreamMapOutput.abort()
@@ -750,9 +752,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
             }
           } else {
             mergeOutputSize += mo.getSizeForMergeMemoryAccounting();
-            IFile.KeyValueReaderDataInputBuffer reader = createMapOutputReader(mo);
-            inMemorySegments.add(new Segment(reader,
-                (mo.isPrimaryMapOutput() ? mergedMapOutputsCounter : null)));
+            inMemorySegments.add(createMapOutputSegment(mo));
             lastAddedMapOutput = mo;
             it.remove();
             if (isDebugEnabled) {
@@ -1050,13 +1050,20 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       long size = mo.getSizeForMergeMemoryAccounting();
       totalSize += size;
       fullSize -= size;
-      IFile.KeyValueReaderDataInputBuffer reader = createMapOutputReader(mo);
-      inMemorySegments.add(new Segment(reader,
-          (mo.isPrimaryMapOutput() ? mergedMapOutputsCounter : null)));
+      inMemorySegments.add(createMapOutputSegment(mo));
     }
     // Bulk remove removed in-memory map outputs efficiently
     inMemoryMapOutputs.subList(0, inMemoryMapOutputsOffset).clear();
     return totalSize;
+  }
+
+  private Segment createMapOutputSegment(MapOutput mapOutput) throws IOException {
+    IFile.KeyValueReaderDataInputBuffer reader = createMapOutputReader(mapOutput);
+    TezCounter mapOutputsCounter = mapOutput.isPrimaryMapOutput() ? mergedMapOutputsCounter : null;
+    if (mapOutput.getType() == ShuffleClient.Type.LOCAL_BYTE_CACHE) {
+      return new InputStreamSegment(reader, mapOutputsCounter);
+    }
+    return new Segment(reader, mapOutputsCounter);
   }
 
   private IFile.KeyValueReaderDataInputBuffer createMapOutputReader(MapOutput mapOutput) throws IOException {
