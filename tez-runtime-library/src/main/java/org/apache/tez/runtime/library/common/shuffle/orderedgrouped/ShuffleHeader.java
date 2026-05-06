@@ -94,34 +94,58 @@ public class ShuffleHeader implements Writable {
 
   public void readFields(DataInput in) throws IOException {
     if (compositeFetch) {   // ShuffleHeader created by MR3 ShuffleHandler
-      int length = in.readInt();  // Cf. WritableUtils.readStringSafely() calls readVInt()
-      if (length < 0 || length > MAX_ID_LENGTH) {
-        throw new IllegalArgumentException("Encoded byte size for String was " + length +
-                                           ", which is outside of 0.." + MAX_ID_LENGTH + " range.");
-      }
-      byte [] bytes = new byte[length];
-      in.readFully(bytes, 0, length);
-      mapId = Text.decode(bytes);
-
-      compressedLength = in.readLong();
-      uncompressedLength = in.readLong();
-      forReduce = in.readInt();
-      int maxKeyLen = in.readInt();
-      int maxValLen = in.readInt();
-      int firstKeyOffset = in.readInt();
-      int firstValOffset = in.readInt();
-      int eofPos = in.readInt();
-      if (eofPos >= 0) {
-        tezOffsetRecord = new TezOffsetRecord(maxKeyLen, maxValLen, firstKeyOffset, firstValOffset, eofPos);
-      } else {
-        tezOffsetRecord = null;
-      }
+      readCompositeFields(in, readMapId(in));
     } else {  // ShuffleHeader created by Hadoop shuffle service
       mapId = WritableUtils.readStringSafely(in, MAX_ID_LENGTH);
       compressedLength = WritableUtils.readVLong(in);
       uncompressedLength = WritableUtils.readVLong(in);
       forReduce = WritableUtils.readVInt(in);
     }
+  }
+
+  public void readCompositeFields(DataInput in, String sharedMapId) throws IOException {
+    mapId = sharedMapId;
+    compressedLength = in.readLong();
+    if (compressedLength == 0) {
+      uncompressedLength = 0;
+      forReduce = -1;
+      tezOffsetRecord = null;
+      return;
+    }
+    uncompressedLength = in.readLong();
+    forReduce = in.readInt();
+    int maxKeyLen = in.readInt();
+    if (maxKeyLen < 0) {
+      tezOffsetRecord = null;
+    } else {
+      int maxValLen = in.readInt();
+      int firstKeyOffset = in.readInt();
+      int firstValOffset = in.readInt();
+      int eofPos = in.readInt();
+      tezOffsetRecord = new TezOffsetRecord(maxKeyLen, maxValLen, firstKeyOffset, firstValOffset, eofPos);
+    }
+  }
+
+  public static String readMapId(DataInput in) throws IOException {
+    int length = in.readInt();  // Cf. WritableUtils.readStringSafely() calls readVInt()
+    if (length < 0 || length > MAX_ID_LENGTH) {
+      throw new IllegalArgumentException("Encoded byte size for String was " + length +
+                                         ", which is outside of 0.." + MAX_ID_LENGTH + " range.");
+    }
+    byte [] bytes = new byte[length];
+    in.readFully(bytes, 0, length);
+    return Text.decode(bytes);
+  }
+
+  public static void writeMapId(DataOutput out, String mapId) throws IOException {
+    ByteBuffer bytes = Text.encode(mapId);
+    int length = bytes.limit();
+    out.writeInt(length);
+    out.write(bytes.array(), 0, length);
+  }
+
+  public static int mapIdWriteLength(String mapId) throws IOException {
+    return 4 + Text.encode(mapId).limit();
   }
 
   // called by MR3 ShuffleHandler (but not by Hadoop shuffle service)
@@ -133,14 +157,20 @@ public class ShuffleHeader implements Writable {
     return length;
   }
 
+  public int compositePartitionWriteLength() {
+    int length = 8;  // compressedLength
+    if (compressedLength != 0) {
+      length += 8 + 4;  // uncompressedLength, forReduce
+      length += tezOffsetRecord != null ? 5 * 4 : 4;
+    }
+    return length;
+  }
+
   // called by MR3 ShuffleHandler (but not by Hadoop shuffle service)
   // do not use WritableUtils.writeVLong/Int()
   public void write(DataOutput out) throws IOException {
     // Text.writeString(out, mapId);
-    ByteBuffer bytes = Text.encode(mapId);
-    int length = bytes.limit();
-    out.writeInt(length);
-    out.write(bytes.array(), 0, length);
+    writeMapId(out, mapId);
 
     out.writeLong(compressedLength);
     out.writeLong(uncompressedLength);
@@ -156,6 +186,24 @@ public class ShuffleHeader implements Writable {
       out.writeInt(-1);
       out.writeInt(-1);
       out.writeInt(-1);
+      out.writeInt(-1);
+    }
+  }
+
+  public void writeCompositePartition(DataOutput out) throws IOException {
+    out.writeLong(compressedLength);
+    if (compressedLength == 0) {
+      return;
+    }
+    out.writeLong(uncompressedLength);
+    out.writeInt(forReduce);
+    if (tezOffsetRecord != null) {
+      out.writeInt(tezOffsetRecord.getMaxKeyLen());
+      out.writeInt(tezOffsetRecord.getMaxValLen());
+      out.writeInt(tezOffsetRecord.getFirstKeyOffset());
+      out.writeInt(tezOffsetRecord.getFirstValOffset());
+      out.writeInt(tezOffsetRecord.getEofPos());
+    } else {
       out.writeInt(-1);
     }
   }
