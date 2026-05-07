@@ -143,9 +143,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     boolean isFetchFromLocalInternal = false;   // true if inputs originate from the current ContainerWorker
     if (host.equals(fetcherConfigCommon.localHostName)) {
       isFetchFromLocal = true;
-      // inspect 'first' to find the container where all inputs originate from
-      CompositeInputAttemptIdentifier first = pendingInputsSeq.getInputs().get(0);
-      isFetchFromLocalInternal = first.getPathComponent().startsWith(
+      isFetchFromLocalInternal = inputHost.getHostPort().getEnvContainerId().equals(
           taskContext.getExecutionContext().getEnvContainerId());
     } else {
       isFetchFromLocal = false;
