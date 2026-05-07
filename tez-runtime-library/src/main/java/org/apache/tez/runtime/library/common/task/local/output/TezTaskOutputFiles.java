@@ -81,8 +81,9 @@ public class TezTaskOutputFiles implements TezTaskOutput {
   /*
    * if service_id = mapreduce_shuffle  then "${appDir}/output/${uniqueId}"
    * if service_id = tez_shuffle  then "${appDir}/dagId/output/${uniqueId}"
-                                   --> "${appDir}/dagId/containerId/vertexId/${uniqueId}
-                                   where pathComponent == containerId/vertexId/${uniqueId}
+                                   --> "${appDir}/dagId/containerId/vertexId/${uniqueId}"
+                                   while shuffle map ids omit the containerId prefix:
+                                   "vertexId/${uniqueId}"
    */
   private Path getAttemptOutputDir() {
     if (LOG.isDebugEnabled()) {

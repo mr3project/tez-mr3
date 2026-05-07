@@ -177,9 +177,10 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput implements
       String pathComponent = (sorter.getNumSpills() == 1) ?
           getContext().getUniqueIdentifier() + "_0" :   // use original output directory ".../...10031_0"
           getContext().getUniqueIdentifier();           // use renamed output directory ".../...10031"
-      String pathComponentExpanded = ShuffleUtils.expandPathComponent(getContext(), compositeFetch, pathComponent);
+      String mapId = compositeFetch ?
+          ShuffleUtils.buildTezShuffleMapId(getContext().getTaskVertexIndex(), pathComponent) : pathComponent;
       TezSpillRecord tezSpillRecord = ShuffleUtils.getTezSpillRecord(
-          getContext(), pathComponentExpanded, sorter.getFinalIndexFile(), localFs);
+          getContext(), mapId, sorter.getFinalIndexFile(), localFs);
 
       boolean isLastEvent = true;
       ShuffleUtils.generateEventOnSpill(eventList, isFinalMergeEnabled, isLastEvent,

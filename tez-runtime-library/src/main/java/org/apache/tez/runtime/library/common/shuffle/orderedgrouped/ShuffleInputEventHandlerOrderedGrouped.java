@@ -250,8 +250,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
     String pathComponentRaw = (shufflePayload.hasPathComponent()) ? StringInterner.intern(shufflePayload.getPathComponent()) : null;
     String pathComponent =
         (pathComponentRaw == null || !compositeFetch) ? pathComponentRaw :
-        ShuffleUtils.buildExpandedPathComponent(
-            shufflePayload.getContainerId(), shufflePayload.getVertexId(), pathComponentRaw);
+        ShuffleUtils.buildTezShuffleMapId(shufflePayload.getVertexId(), pathComponentRaw);
 
     CompositeInputAttemptIdentifier srcAttemptIdentifier = null;
     if (shufflePayload.hasSpillId()) {

@@ -965,7 +965,8 @@ public final class PipelinedSorter {
         }
 
         String uniqueId = ShuffleUtils.getUniqueIdentifierSpillId(outputContext, 0);
-        String pathComponent = ShuffleUtils.expandPathComponent(outputContext, compositeFetch, uniqueId);
+        String pathComponent = compositeFetch ?
+            ShuffleUtils.buildTezShuffleMapId(outputContext.getTaskVertexIndex(), uniqueId) : uniqueId;
         // read back TezSpillRecord (which might be on local disk)
         TezSpillRecord spillRecord = ShuffleUtils.getTezSpillRecord(
             outputContext, pathComponent, finalIndexFile, localFs);

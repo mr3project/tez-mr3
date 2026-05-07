@@ -39,6 +39,7 @@ import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.FetcherConfigCommon;
 import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
+import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.shuffle.DiskFetchedInput;
 import org.apache.tez.runtime.library.common.shuffle.FetchResult;
 import org.apache.tez.runtime.library.common.shuffle.FetchedInput;
@@ -142,9 +143,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     boolean isFetchFromLocalInternal = false;   // true if inputs originate from the current ContainerWorker
     if (host.equals(fetcherConfigCommon.localHostName)) {
       isFetchFromLocal = true;
-      // inspect 'first' to find the container where all inputs originate from
-      CompositeInputAttemptIdentifier first = pendingInputsSeq.getInputs().get(0);
-      isFetchFromLocalInternal = first.getPathComponent().startsWith(
+      isFetchFromLocalInternal = inputHost.getHostPort().getEnvContainerId().equals(
           taskContext.getExecutionContext().getEnvContainerId());
     } else {
       isFetchFromLocal = false;
@@ -426,7 +425,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       }
 
       CompositeInputAttemptIdentifier inputAttemptIdentifier = pendingInputsSeq.getInputs().get(index);
-      String pathComponent = inputAttemptIdentifier.getPathComponent();   // already in expanded form
+      String pathComponent = inputAttemptIdentifier.getPathComponent();   // map id used by shuffle fetch/cache lookup
       TezSpillRecord spillRecord = null;  // specific to each inputAttemptIdentifier/pathComponent
       Path inputFilePath = null;
       Map<Integer, TezOffsetRecord> offsetRecordMap = null;
@@ -442,8 +441,8 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
           // pathComponent == srcAttemptId.getPathComponent(), so we compute spillRecord and inputFilePath only once
           if (spillRecord == null) {
             AbstractMap.SimpleEntry<TezSpillRecord, Path> pair = ShuffleUtils.getTezSpillRecordInputFilePath(
-                taskContext, pathComponent, fetcherConfigCommon.compositeFetch,
-                shuffleManager.getDagIdentifier(), conf,
+                taskContext, pathComponent, inputHost.getHostPort().getEnvContainerId(),
+                fetcherConfigCommon.compositeFetch, shuffleManager.getDagIdentifier(), conf,
                 fetcherConfigCommon.localDirAllocator, fetcherConfigCommon.localFs);
             spillRecord = pair.getKey();
             inputFilePath = pair.getValue();
@@ -692,7 +691,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
             header.readFields(input);
           }
           pathComponent = header.getMapId();
-          if (!pathComponent.startsWith(InputAttemptIdentifier.PATH_PREFIX_MR3) && !pathComponent.startsWith(InputAttemptIdentifier.PATH_PREFIX)) {
+          if (!InputAttemptIdentifier.isValidPathComponent(pathComponent)) {
             shuffleErrorCounterGroup.badIdErrs.increment(1);
             if (pathComponent.startsWith(ShuffleHandlerError.DISK_ERROR_EXCEPTION.toString())) {
               LOG.warn("{}: ShuffleHandler error - {}, while fetching {}",
@@ -701,7 +700,8 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
               return new CompositeInputAttemptIdentifier[]{ inputAttemptIdentifier };
             }
             throw new IllegalArgumentException("Invalid map id: " + header.getMapId() + ", expected to start with " +
-                InputAttemptIdentifier.PATH_PREFIX_MR3 + "/" + InputAttemptIdentifier.PATH_PREFIX + ", partition: " + header.getPartition()
+                Constants.VERTEX_PREFIX + " / " + InputAttemptIdentifier.PATH_PREFIX +
+                ", partition: " + header.getPartition()
                 + " while fetching " + inputAttemptIdentifier);
           }
 
