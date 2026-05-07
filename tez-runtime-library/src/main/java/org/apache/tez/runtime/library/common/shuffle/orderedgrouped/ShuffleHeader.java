@@ -137,15 +137,18 @@ public class ShuffleHeader implements Writable {
     return Text.decode(bytes);
   }
 
-  public static void writeMapId(DataOutput out, String mapId) throws IOException {
-    ByteBuffer bytes = Text.encode(mapId);
-    int length = bytes.limit();
-    out.writeInt(length);
-    out.write(bytes.array(), 0, length);
+  public static ByteBuffer encodeMapId(String mapId) throws IOException {
+    return Text.encode(mapId);
   }
 
-  public static int mapIdWriteLength(String mapId) throws IOException {
-    return 4 + Text.encode(mapId).limit();
+  public static void writeMapId(DataOutput out, ByteBuffer mapIdBytes) throws IOException {
+    int length = mapIdBytes.limit();
+    out.writeInt(length);
+    out.write(mapIdBytes.array(), 0, length);
+  }
+
+  public static int mapIdWriteLength(ByteBuffer mapIdBytes) {
+    return 4 + mapIdBytes.limit();
   }
 
   // called by MR3 ShuffleHandler (but not by Hadoop shuffle service)
@@ -170,7 +173,8 @@ public class ShuffleHeader implements Writable {
   // do not use WritableUtils.writeVLong/Int()
   public void write(DataOutput out) throws IOException {
     // Text.writeString(out, mapId);
-    writeMapId(out, mapId);
+    ByteBuffer mapIdBytes = encodeMapId(mapId);
+    writeMapId(out, mapIdBytes);
 
     out.writeLong(compressedLength);
     out.writeLong(uncompressedLength);
