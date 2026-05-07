@@ -1061,15 +1061,21 @@ public class ShuffleHandler {
         if (mapOutputInfoMap.size() < mapOutputMetaInfoCacheSize) {
           mapOutputInfoMap.put(mapId, outputInfo);
         }
+        // ShuffleHeader.encodeMapId() is called twice because it is called again in sendMapOutput().
+        // TODO: optimize by caching mapIdBytes in MapOutputInfo (effective only when keep-alive is enabled)
         ByteBuffer mapIdBytes = ShuffleHeader.encodeMapId(mapId);
         contentLength += ShuffleHeader.mapIdWriteLength(mapIdBytes);
         for (int reduce = reduceRange.getFirst(); reduce <= reduceRange.getLast(); reduce++) {
           TezIndexRecord indexRecord = outputInfo.getIndex(reduce);
-          TezOffsetRecord offsetRecord = outputInfo.getTezOffsetRecord(reduce);
-          ShuffleHeader header = new ShuffleHeader(
-              mapId, indexRecord.getPartLength(), indexRecord.getRawLength(), reduce, offsetRecord);
-          contentLength += header.compositePartitionWriteLength();
-          contentLength += indexRecord.getPartLength();
+          long partLength = indexRecord.getPartLength();
+          // Expand: contentLength += (new ShuffleHeader(...)).compositePartitionWriteLength();
+          contentLength += 8;  // compressedLength
+          if (partLength != 0) {
+            TezOffsetRecord offsetRecord = outputInfo.getTezOffsetRecord(reduce);
+            contentLength += 8 + 4;  // uncompressedLength, forReduce
+            contentLength += offsetRecord != null ? 5 * 4 : 4;
+          }
+          contentLength += partLength;
         }
       }
       return contentLength;
