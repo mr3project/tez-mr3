@@ -652,12 +652,10 @@ public class ShuffleUtils {
         TezRuntimeConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT);
   }
 
-  public static String adjustPathComponent(boolean compositeFetch, int dagIdentifier,
-      @Nullable String sourceContainerId, String pathComponent) {
+  public static String adjustPathComponent(boolean compositeFetch, int dagIdentifier, String pathComponent) {
     if (compositeFetch) {  // == isTezShuffleHandler
-      String diskPathComponent = sourceContainerId == null ?
-          pathComponent : sourceContainerId + Path.SEPARATOR + pathComponent;
-      return Constants.DAG_PREFIX + dagIdentifier + Path.SEPARATOR + diskPathComponent;
+      // pathComponent is the local-disk path component, which includes ${containerId}/${vertexId}/.
+      return Constants.DAG_PREFIX + dagIdentifier + Path.SEPARATOR + pathComponent;
     } else {
       return Constants.TEZ_RUNTIME_TASK_OUTPUT_DIR + Path.SEPARATOR + pathComponent;
     }
@@ -737,6 +735,11 @@ public class ShuffleUtils {
     return sb.toString();
   }
 
+  public static String buildTezShuffleDiskPathComponent(
+      @Nullable String sourceContainerId, String mapId) {
+    return sourceContainerId == null ? mapId : sourceContainerId + Path.SEPARATOR + mapId;
+  }
+
   public static String buildExpandedPathComponent(
       String containerId, int vertexId, String pathComponent) {
     StringBuilder sb = new StringBuilder();
@@ -774,7 +777,9 @@ public class ShuffleUtils {
       return new AbstractMap.SimpleEntry<>(
           new TezSpillRecord(mapOutputInfo.getSpillRecord()), mapOutputInfo.getMapOutputFilePath());
     } else {
-      String inputFile = adjustPathComponent(compositeFetch, dagId, sourceContainerId, pathComponent) +
+      String diskPathComponent = compositeFetch ?
+          buildTezShuffleDiskPathComponent(sourceContainerId, pathComponent) : pathComponent;
+      String inputFile = adjustPathComponent(compositeFetch, dagId, diskPathComponent) +
         Path.SEPARATOR + Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING;
       String indexFile = inputFile + Constants.TEZ_RUNTIME_TASK_OUTPUT_INDEX_SUFFIX_STRING;
       Path indexFilePath = localDirAllocator.getLocalPathToRead(indexFile, conf);
