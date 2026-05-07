@@ -736,8 +736,9 @@ public class ShuffleUtils {
   }
 
   public static String buildTezShuffleDiskPathComponent(
-      @Nullable String sourceContainerId, String mapId) {
-    return sourceContainerId == null ? mapId : sourceContainerId + Path.SEPARATOR + mapId;
+      String sourceContainerId, String mapId) {
+    Preconditions.checkArgument(sourceContainerId != null, "sourceContainerId must not be null");
+    return sourceContainerId + Path.SEPARATOR + mapId;
   }
 
   public static String buildExpandedPathComponent(
@@ -769,7 +770,7 @@ public class ShuffleUtils {
   public static AbstractMap.SimpleEntry<TezSpillRecord, Path> getTezSpillRecordInputFilePath(
       TaskContext taskContext,
       String pathComponent,   // map id used by shuffle fetch/cache lookup
-      @Nullable String sourceContainerId, boolean compositeFetch, int dagId, Configuration conf,
+      String sourceContainerId, boolean compositeFetch, int dagId, Configuration conf,
       LocalDirAllocator localDirAllocator,
       RawLocalFileSystem localFs) throws IOException {
     IndexPathCache.MapOutputInfo mapOutputInfo = taskContext.getIndexPathCache().get(pathComponent);
