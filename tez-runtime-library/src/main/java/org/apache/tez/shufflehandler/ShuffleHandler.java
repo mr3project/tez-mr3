@@ -336,11 +336,13 @@ public class ShuffleHandler {
     private Range reduceRange;
     private ChannelHandlerContext ctx;
     private Map<String, Shuffle.MapOutputInfo> infoMap;
+    private Map<String, ByteBuffer> mapIdBytesMap;
     private final boolean keepAlive;
 
     public ReduceContext(List<String> mapIds, Range reduceRange,
                          ChannelHandlerContext context,
                          Map<String, Shuffle.MapOutputInfo> mapOutputInfoMap,
+                         Map<String, ByteBuffer> mapIdBytesMap,
                          boolean keepAlive) {
 
       this.mapIds = mapIds;
@@ -360,6 +362,7 @@ public class ShuffleHandler {
       this.mapsToSend = new AtomicInteger(0);
       this.ctx = context;
       this.infoMap = mapOutputInfoMap;
+      this.mapIdBytesMap = mapIdBytesMap;
       this.keepAlive = keepAlive;
     }
 
@@ -373,6 +376,10 @@ public class ShuffleHandler {
 
     public Map<String, Shuffle.MapOutputInfo> getInfoMap() {
       return infoMap;
+    }
+
+    public Map<String, ByteBuffer> getMapIdBytesMap() {
+      return mapIdBytesMap;
     }
 
     public List<String> getMapIds() {
@@ -917,13 +924,14 @@ public class ShuffleHandler {
       }
 
       Map<String, MapOutputInfo> mapOutputInfoMap = new HashMap<String, MapOutputInfo>();
+      Map<String, ByteBuffer> mapIdBytesMap = new HashMap<String, ByteBuffer>();
       Channel ch = ctx.channel();
       ChannelPipeline pipeline = ch.pipeline();
       TimeoutHandler timeoutHandler = (TimeoutHandler)pipeline.get(TIMEOUT_HANDLER);
       timeoutHandler.setEnabledTimeout(false);
 
       try {
-        populateHeaders(mapIds, reduceRange, response, keepAliveParam, mapOutputInfoMap);
+        populateHeaders(mapIds, reduceRange, response, keepAliveParam, mapOutputInfoMap, mapIdBytesMap);
       } catch (DiskChecker.DiskErrorException e) {  // fatal error: fetcher should be aware of that
         LOG.error("Shuffle error in populating headers (fatal: DiskErrorException):", e);
         String errorMessage = getErrorMessage(e);
@@ -942,7 +950,8 @@ public class ShuffleHandler {
       ch.write(response);
       //Initialize one ReduceContext object per channelRead call
       boolean keepAlive = keepAliveParam || connectionKeepAliveEnabled;
-      ReduceContext reduceContext = new ReduceContext(mapIds, reduceRange, ctx, mapOutputInfoMap, keepAlive);
+      ReduceContext reduceContext = new ReduceContext(
+          mapIds, reduceRange, ctx, mapOutputInfoMap, mapIdBytesMap, keepAlive);
       for (int i = 0; i < Math.min(maxSessionOpenFiles, mapIds.size()); i++) {
         ChannelFuture nextMap = sendMap(reduceContext);
         if(nextMap == null) {
@@ -975,8 +984,14 @@ public class ShuffleHandler {
             info = getMapOutputInfo(mapId, reduceContext.getReduceRange());
           }
 
+          ByteBuffer mapIdBytes = reduceContext.getMapIdBytesMap().get(mapId);
+          if (mapIdBytes == null) {
+            mapIdBytes = ShuffleHeader.encodeMapId(mapId);
+            reduceContext.getMapIdBytesMap().put(mapId, mapIdBytes);
+          }
+
           nextMap = sendMapOutput(reduceContext.getCtx().channel(),
-              mapId, reduceContext.getReduceRange(), info);
+              mapId, mapIdBytes, reduceContext.getReduceRange(), info);
           if (null == nextMap) {
             // TODO: Can we call sendFakeShuffleHeaderWithError() with DISK_ERROR_EXCEPTION instead???
             sendError(reduceContext.getCtx(), NOT_FOUND);
@@ -1038,20 +1053,22 @@ public class ShuffleHandler {
                                    Range reduceRange,
                                    HttpResponse response,
                                    boolean keepAliveParam,
-                                   Map<String, MapOutputInfo> mapOutputInfoMap)
+                                   Map<String, MapOutputInfo> mapOutputInfoMap,
+                                   Map<String, ByteBuffer> mapIdBytesMap)
         throws IOException {
 
       long contentLength = 0;
       // Content-Length only needs calculated for keep-alive
       if (connectionKeepAliveEnabled || keepAliveParam) {
-        contentLength = getContentLength(mapIds, reduceRange, mapOutputInfoMap);
+        contentLength = getContentLength(mapIds, reduceRange, mapOutputInfoMap, mapIdBytesMap);
       }
 
       // Now set the response headers.
       setResponseHeaders(response, keepAliveParam, contentLength);
     }
 
-    long getContentLength(List<String> mapIds, Range reduceRange, Map<String, MapOutputInfo> mapOutputInfoMap) throws IOException {
+    long getContentLength(List<String> mapIds, Range reduceRange, Map<String, MapOutputInfo> mapOutputInfoMap,
+        Map<String, ByteBuffer> mapIdBytesMap) throws IOException {
       long contentLength = 0;
       // Reduce count is written once per mapId
       int reduceCountVSize = 4;   // 4 = size of int
@@ -1062,6 +1079,7 @@ public class ShuffleHandler {
           mapOutputInfoMap.put(mapId, outputInfo);
         }
         ByteBuffer mapIdBytes = ShuffleHeader.encodeMapId(mapId);
+        mapIdBytesMap.put(mapId, mapIdBytes);
         contentLength += ShuffleHeader.mapIdWriteLength(mapIdBytes);
         for (int reduce = reduceRange.getFirst(); reduce <= reduceRange.getLast(); reduce++) {
           TezIndexRecord indexRecord = outputInfo.getIndex(reduce);
@@ -1195,14 +1213,14 @@ public class ShuffleHandler {
     }
 
     private ChannelFuture sendMapOutput(
-        Channel ch, String mapId, Range reduceRange, MapOutputInfo outputInfo) throws IOException {
+        Channel ch, String mapId, ByteBuffer mapIdBytes, Range reduceRange, MapOutputInfo outputInfo)
+        throws IOException {
       TezIndexRecord firstIndex = null;
       TezIndexRecord lastIndex = null;
 
       DataOutputBuffer dob = new DataOutputBuffer();
       // Indicate how many records are in this composite block, followed by the shared map id.
       dob.writeInt(reduceRange.getLast() - reduceRange.getFirst() + 1);
-      ByteBuffer mapIdBytes = ShuffleHeader.encodeMapId(mapId);
       ShuffleHeader.writeMapId(dob, mapIdBytes);
       // DataOutputBuffer is reused below, so copy bytes before enqueuing async channel write.
       ChannelFuture writeFuture = ch.write(Unpooled.copiedBuffer(dob.getData(), 0, dob.getLength()));
