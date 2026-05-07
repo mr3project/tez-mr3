@@ -655,8 +655,7 @@ public class ShuffleUtils {
   public static String adjustPathComponent(boolean compositeFetch, int dagIdentifier,
       @Nullable String sourceContainerId, String pathComponent) {
     if (compositeFetch) {  // == isTezShuffleHandler
-      String diskPathComponent = sourceContainerId == null ||
-          pathComponent.startsWith(InputAttemptIdentifier.PATH_PREFIX_MR3) ?
+      String diskPathComponent = sourceContainerId == null ?
           pathComponent : sourceContainerId + Path.SEPARATOR + pathComponent;
       return Constants.DAG_PREFIX + dagIdentifier + Path.SEPARATOR + diskPathComponent;
     } else {

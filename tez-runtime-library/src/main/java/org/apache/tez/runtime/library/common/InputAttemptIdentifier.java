@@ -34,7 +34,6 @@ public class InputAttemptIdentifier {
   private final String pathComponent;   // map id used by shuffle fetch/cache lookup
 
   public static final String PATH_PREFIX = "attempt";
-  public static final String PATH_PREFIX_MR3 = com.datamonad.mr3.container.ContainerID$.MODULE$.prefixInContainerWorkerEnv();
 
   // non-pipelined: FINAL_MERGE_ENABLED, pipelined: INCREMENTAL_UPDATE or FINAL_UPDATE
   public enum SPILL_INFO {
@@ -65,15 +64,15 @@ public class InputAttemptIdentifier {
 
     if (!isValidPathComponent(pathComponent)) {
       throw new TezUncheckedException(
-          "Path component must start with: " + PATH_PREFIX_MR3 + " / " +
-              Constants.VERTEX_PREFIX + " / " + PATH_PREFIX + ", " + this);
+          "Path component must start with: " + Constants.VERTEX_PREFIX + " / " +
+              PATH_PREFIX + ", " + this);
     }
   }
 
 
   public static boolean isValidPathComponent(String pathComponent) {
-    return pathComponent == null || pathComponent.startsWith(PATH_PREFIX_MR3) ||
-        pathComponent.startsWith(Constants.VERTEX_PREFIX) || pathComponent.startsWith(PATH_PREFIX);
+    return pathComponent == null || pathComponent.startsWith(Constants.VERTEX_PREFIX) ||
+        pathComponent.startsWith(PATH_PREFIX);
   }
 
   public int getInputIdentifier() {

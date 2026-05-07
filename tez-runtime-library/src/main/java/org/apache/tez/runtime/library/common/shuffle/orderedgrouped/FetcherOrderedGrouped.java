@@ -491,10 +491,9 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
                 // TODO: Why is this necessary? We return [inputAttemptIdentifier] anyway.
                 fetcherCallback.informAM(shuffleClientId, inputAttemptIdentifier);
               } else {
-                LOG.warn("{}: Invalid map id: {}, expected to start with {} / {} / {}, partition: {}",
+                LOG.warn("{}: Invalid map id: {}, expected to start with {} / {}, partition: {}",
                     logIdentifier, header.mapId,
-                    InputAttemptIdentifier.PATH_PREFIX_MR3, Constants.VERTEX_PREFIX,
-                    InputAttemptIdentifier.PATH_PREFIX, header.forReduce);
+                    Constants.VERTEX_PREFIX, InputAttemptIdentifier.PATH_PREFIX, header.forReduce);
               }
               return new CompositeInputAttemptIdentifier[]{ inputAttemptIdentifier };
             } else {

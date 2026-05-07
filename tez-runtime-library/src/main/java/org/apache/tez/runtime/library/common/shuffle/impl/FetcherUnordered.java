@@ -702,8 +702,8 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
               return new CompositeInputAttemptIdentifier[]{ inputAttemptIdentifier };
             }
             throw new IllegalArgumentException("Invalid map id: " + header.getMapId() + ", expected to start with " +
-                InputAttemptIdentifier.PATH_PREFIX_MR3 + " / " + Constants.VERTEX_PREFIX + " / " +
-                InputAttemptIdentifier.PATH_PREFIX + ", partition: " + header.getPartition()
+                Constants.VERTEX_PREFIX + " / " + InputAttemptIdentifier.PATH_PREFIX +
+                ", partition: " + header.getPartition()
                 + " while fetching " + inputAttemptIdentifier);
           }
 
