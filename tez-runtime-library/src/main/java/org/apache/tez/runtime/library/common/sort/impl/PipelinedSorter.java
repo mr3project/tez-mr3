@@ -500,8 +500,7 @@ public final class PipelinedSorter {
     ShuffleUtils.generateEventOnSpill(events, isFinalMergeEnabled, false,
         outputContext, (numSpills - 1), spillInfoList.get(numSpills - 1).spillRecord,
         partitions, sendEmptyPartitionDetails, pathComponent, partitionStats,
-        reportDetailedPartitionStats(), auxiliaryService, deflater,
-        compositeFetch);
+        reportDetailedPartitionStats(), auxiliaryService, deflater);
     outputContext.sendEvents(events);
     if (isDebugEnabled) {
       LOG.debug("{}: Added spill event for spill (final update=false), spillId={}",
@@ -924,8 +923,7 @@ public final class PipelinedSorter {
           ShuffleUtils.generateEventOnSpill(finalEvents, isFinalMergeEnabled, isLastEvent,
               outputContext, i, spillInfoList.get(i).spillRecord, partitions,
               sendEmptyPartitionDetails, pathComponent, partitionStats,
-              reportDetailedPartitionStats(), auxiliaryService, deflater,
-              compositeFetch);
+              reportDetailedPartitionStats(), auxiliaryService, deflater);
           if (isDebugEnabled) {
             LOG.debug("{}: Adding spill event for spill (final update={}), spillId={}",
                 outputContext.getDestinationVertexName(), isLastEvent, i);

@@ -186,8 +186,7 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput implements
       ShuffleUtils.generateEventOnSpill(eventList, isFinalMergeEnabled, isLastEvent,
           getContext(), 0, tezSpillRecord,
           getNumPhysicalOutputs(), sendEmptyPartitionDetails, pathComponent,
-          sorter.getPartitionStats(), sorter.reportDetailedPartitionStats(), auxiliaryService, deflater,
-          compositeFetch);
+          sorter.getPartitionStats(), sorter.reportDetailedPartitionStats(), auxiliaryService, deflater);
     }
     return eventList;
   }
