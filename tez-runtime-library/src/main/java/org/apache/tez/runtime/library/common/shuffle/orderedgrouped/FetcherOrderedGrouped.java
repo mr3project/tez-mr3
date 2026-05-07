@@ -40,6 +40,7 @@ import org.apache.tez.runtime.api.FetcherConfigCommon;
 import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.api.TezOffsetRecord;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
+import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.shuffle.FetchResult;
 import org.apache.tez.runtime.library.common.shuffle.Fetcher;
@@ -481,7 +482,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
           } else {
             header.readFields(input);
           }
-          if (!header.mapId.startsWith(InputAttemptIdentifier.PATH_PREFIX_MR3) && !header.mapId.startsWith(InputAttemptIdentifier.PATH_PREFIX)) {
+          if (!InputAttemptIdentifier.isValidPathComponent(header.mapId)) {
             if (!stopped) {
               shuffleErrorCounterGroup.badIdErrs.increment(1);
               if (header.mapId.startsWith(ShuffleHandlerError.DISK_ERROR_EXCEPTION.toString())) {
@@ -490,9 +491,10 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
                 // TODO: Why is this necessary? We return [inputAttemptIdentifier] anyway.
                 fetcherCallback.informAM(shuffleClientId, inputAttemptIdentifier);
               } else {
-                LOG.warn("{}: Invalid map id: {}, expected to start with {} / {}, partition: {}",
+                LOG.warn("{}: Invalid map id: {}, expected to start with {} / {} / {}, partition: {}",
                     logIdentifier, header.mapId,
-                    InputAttemptIdentifier.PATH_PREFIX_MR3, InputAttemptIdentifier.PATH_PREFIX, header.forReduce);
+                    InputAttemptIdentifier.PATH_PREFIX_MR3, Constants.VERTEX_PREFIX,
+                    InputAttemptIdentifier.PATH_PREFIX, header.forReduce);
               }
               return new CompositeInputAttemptIdentifier[]{ inputAttemptIdentifier };
             } else {
@@ -679,7 +681,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       }
 
       CompositeInputAttemptIdentifier inputAttemptIdentifier = pendingInputsSeq.getInputs().get(index);
-      String pathComponent = inputAttemptIdentifier.getPathComponent();   // already in expanded form
+      String pathComponent = inputAttemptIdentifier.getPathComponent();   // map id used by shuffle fetch/cache lookup
       TezSpillRecord spillRecord = null;  // specific to each inputAttemptIdentifier/pathComponent
       Path inputFilePath = null;
       Map<Integer, TezOffsetRecord> offsetRecordMap = null;
@@ -697,8 +699,8 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
           // pathComponent == srcAttemptId.getPathComponent(), so we compute spillRecord and inputFilePath only once
           if (spillRecord == null) {
             AbstractMap.SimpleEntry<TezSpillRecord, Path> pair = ShuffleUtils.getTezSpillRecordInputFilePath(
-                taskContext, pathComponent, fetcherConfigCommon.compositeFetch,
-                shuffleScheduler.getDagIdentifier(), conf,
+                taskContext, pathComponent, inputHost.getHostPort().getEnvContainerId(),
+                fetcherConfigCommon.compositeFetch, shuffleScheduler.getDagIdentifier(), conf,
                 fetcherConfigCommon.localDirAllocator, fetcherConfigCommon.localFs);
             spillRecord = pair.getKey();
             inputFilePath = pair.getValue();

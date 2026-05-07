@@ -652,10 +652,13 @@ public class ShuffleUtils {
         TezRuntimeConfiguration.TEZ_AM_SHUFFLE_AUXILIARY_SERVICE_ID_DEFAULT);
   }
 
-  public static String adjustPathComponent(boolean compositeFetch, int dagIdentifier, String pathComponent) {
+  public static String adjustPathComponent(boolean compositeFetch, int dagIdentifier,
+      @Nullable String sourceContainerId, String pathComponent) {
     if (compositeFetch) {  // == isTezShuffleHandler
-      // pathComponent includes ${containerId}/${vertexId}/ in its prefix
-      return Constants.DAG_PREFIX + dagIdentifier + Path.SEPARATOR + pathComponent;
+      String diskPathComponent = sourceContainerId == null ||
+          pathComponent.startsWith(InputAttemptIdentifier.PATH_PREFIX_MR3) ?
+          pathComponent : sourceContainerId + Path.SEPARATOR + pathComponent;
+      return Constants.DAG_PREFIX + dagIdentifier + Path.SEPARATOR + diskPathComponent;
     } else {
       return Constants.TEZ_RUNTIME_TASK_OUTPUT_DIR + Path.SEPARATOR + pathComponent;
     }
@@ -676,7 +679,7 @@ public class ShuffleUtils {
       @Nullable Map<Integer, TezOffsetRecord> offsetRecordMap) {
     assert !(outputFilePath != null && byteArrayOutput != null);
     String pathComponent = outputContext.getUniqueIdentifier();
-    String mapId = ShuffleUtils.expandPathComponent(outputContext, true, pathComponent);
+    String mapId = ShuffleUtils.buildTezShuffleMapId(outputContext.getTaskVertexIndex(), pathComponent);
 
     IndexPathCache indexPathCache = outputContext.getIndexPathCache();
     indexPathCache.add(mapId, outputFilePath, spillRecord.getByteBuffer(), offsetRecordMap);
@@ -700,7 +703,7 @@ public class ShuffleUtils {
       @Nullable Map<Integer, TezOffsetRecord> offsetRecordMap) {
     assert !(outputFilePath != null && byteArrayOutput != null);
     String pathComponent = ShuffleUtils.getUniqueIdentifierSpillId(outputContext, spillId);
-    String mapId = ShuffleUtils.expandPathComponent(outputContext, true, pathComponent);
+    String mapId = ShuffleUtils.buildTezShuffleMapId(outputContext.getTaskVertexIndex(), pathComponent);
 
     IndexPathCache indexPathCache = outputContext.getIndexPathCache();
     indexPathCache.add(mapId, outputFilePath, spillRecord.getByteBuffer(), offsetRecordMap);
@@ -725,6 +728,16 @@ public class ShuffleUtils {
     }
   }
 
+
+  public static String buildTezShuffleMapId(int vertexId, String pathComponent) {
+    StringBuilder sb = new StringBuilder();
+    sb.append(Constants.VERTEX_PREFIX);
+    sb.append(vertexId);
+    sb.append(Path.SEPARATOR);
+    sb.append(pathComponent);
+    return sb.toString();
+  }
+
   public static String buildExpandedPathComponent(
       String containerId, int vertexId, String pathComponent) {
     StringBuilder sb = new StringBuilder();
@@ -738,7 +751,7 @@ public class ShuffleUtils {
 
   public static TezSpillRecord getTezSpillRecord(
       TaskContext taskContext,
-      String pathComponent,   // already in expanded form
+      String pathComponent,   // map id used by shuffle fetch/cache lookup
       Path finalIndexFile,
       RawLocalFileSystem localFs) throws IOException {
     IndexPathCache.MapOutputInfo mapOutputInfo = taskContext.getIndexPathCache().get(pathComponent);
@@ -753,8 +766,8 @@ public class ShuffleUtils {
 
   public static AbstractMap.SimpleEntry<TezSpillRecord, Path> getTezSpillRecordInputFilePath(
       TaskContext taskContext,
-      String pathComponent,   // already in expanded form
-      boolean compositeFetch, int dagId, Configuration conf,
+      String pathComponent,   // map id used by shuffle fetch/cache lookup
+      @Nullable String sourceContainerId, boolean compositeFetch, int dagId, Configuration conf,
       LocalDirAllocator localDirAllocator,
       RawLocalFileSystem localFs) throws IOException {
     IndexPathCache.MapOutputInfo mapOutputInfo = taskContext.getIndexPathCache().get(pathComponent);
@@ -762,7 +775,7 @@ public class ShuffleUtils {
       return new AbstractMap.SimpleEntry<>(
           new TezSpillRecord(mapOutputInfo.getSpillRecord()), mapOutputInfo.getMapOutputFilePath());
     } else {
-      String inputFile = adjustPathComponent(compositeFetch, dagId, pathComponent) +
+      String inputFile = adjustPathComponent(compositeFetch, dagId, sourceContainerId, pathComponent) +
         Path.SEPARATOR + Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING;
       String indexFile = inputFile + Constants.TEZ_RUNTIME_TASK_OUTPUT_INDEX_SUFFIX_STRING;
       Path indexFilePath = localDirAllocator.getLocalPathToRead(indexFile, conf);

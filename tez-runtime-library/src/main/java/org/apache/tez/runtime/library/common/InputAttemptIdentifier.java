@@ -31,7 +31,7 @@ public class InputAttemptIdentifier {
   // pathComponent is NOT used in equals().
   // As a result, two different CompositeInputAttemptIdentifier's originating from different source Vertexes
   // are treated equal if they happen to inputIdentifier/attemptNumber/spillEventId.
-  private final String pathComponent;   // in expanded form
+  private final String pathComponent;   // map id used by shuffle fetch/cache lookup
 
   public static final String PATH_PREFIX = "attempt";
   public static final String PATH_PREFIX_MR3 = com.datamonad.mr3.container.ContainerID$.MODULE$.prefixInContainerWorkerEnv();
@@ -63,10 +63,17 @@ public class InputAttemptIdentifier {
     this.fetchTypeInfo = (byte)fetchTypeInfo.ordinal();
     this.spillEventId = spillEventId;
 
-    if (pathComponent != null && !pathComponent.startsWith(PATH_PREFIX_MR3) && !pathComponent.startsWith(PATH_PREFIX)) {
+    if (!isValidPathComponent(pathComponent)) {
       throw new TezUncheckedException(
-          "Path component must start with: " + PATH_PREFIX_MR3 + "/" + PATH_PREFIX + ", " + this);
+          "Path component must start with: " + PATH_PREFIX_MR3 + " / " +
+              Constants.VERTEX_PREFIX + " / " + PATH_PREFIX + ", " + this);
     }
+  }
+
+
+  public static boolean isValidPathComponent(String pathComponent) {
+    return pathComponent == null || pathComponent.startsWith(PATH_PREFIX_MR3) ||
+        pathComponent.startsWith(Constants.VERTEX_PREFIX) || pathComponent.startsWith(PATH_PREFIX);
   }
 
   public int getInputIdentifier() {
