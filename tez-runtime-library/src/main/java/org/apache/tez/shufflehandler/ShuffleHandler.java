@@ -17,7 +17,6 @@ package org.apache.tez.shufflehandler;
 import org.apache.hadoop.io.DataInputByteBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.ReadaheadPool;
-import org.apache.hadoop.io.Text;
 import org.apache.hadoop.util.DiskChecker;
 
 import static io.netty.buffer.Unpooled.wrappedBuffer;
@@ -1062,15 +1061,14 @@ public class ShuffleHandler {
         if (mapOutputInfoMap.size() < mapOutputMetaInfoCacheSize) {
           mapOutputInfoMap.put(mapId, outputInfo);
         }
-        int lengthInitial = Text.encode(mapId).limit();
+        ByteBuffer mapIdBytes = ShuffleHeader.encodeMapId(mapId);
+        contentLength += ShuffleHeader.mapIdWriteLength(mapIdBytes);
         for (int reduce = reduceRange.getFirst(); reduce <= reduceRange.getLast(); reduce++) {
           TezIndexRecord indexRecord = outputInfo.getIndex(reduce);
-          // contentLength += new ShuffleHeader(mapId, indexRecord.getPartLength(), indexRecord.getRawLength(), reduce, outputInfo.getTezOffsetRecord(reduce)).writeLength();
-          int length = lengthInitial;
-          length += 4 + 8 + 8 + 4;  // encoding of mapIdLength, compressedLength, uncompressedLength, forReduce
-          length += 5 * 4;          // encoding of TezOffsetRecord
-          contentLength += length;
-
+          TezOffsetRecord offsetRecord = outputInfo.getTezOffsetRecord(reduce);
+          ShuffleHeader header = new ShuffleHeader(
+              mapId, indexRecord.getPartLength(), indexRecord.getRawLength(), reduce, offsetRecord);
+          contentLength += header.compositePartitionWriteLength();
           contentLength += indexRecord.getPartLength();
         }
       }
@@ -1202,8 +1200,10 @@ public class ShuffleHandler {
       TezIndexRecord lastIndex = null;
 
       DataOutputBuffer dob = new DataOutputBuffer();
-      // Indicate how many record to be written
+      // Indicate how many records are in this composite block, followed by the shared map id.
       dob.writeInt(reduceRange.getLast() - reduceRange.getFirst() + 1);
+      ByteBuffer mapIdBytes = ShuffleHeader.encodeMapId(mapId);
+      ShuffleHeader.writeMapId(dob, mapIdBytes);
       // DataOutputBuffer is reused below, so copy bytes before enqueuing async channel write.
       ChannelFuture writeFuture = ch.write(Unpooled.copiedBuffer(dob.getData(), 0, dob.getLength()));
       for (int reduce = reduceRange.getFirst(); reduce <= reduceRange.getLast(); reduce++) {
@@ -1220,11 +1220,16 @@ public class ShuffleHandler {
         ShuffleHeader header = new ShuffleHeader(
             mapId, index.getPartLength(), index.getRawLength(), reduce, offsetRecord);
         dob.reset();
-        header.write(dob);
+        header.writeCompositePartition(dob);
         // Free the memory needed to store the spill and index records
         writeFuture = ch.write(Unpooled.copiedBuffer(dob.getData(), 0, dob.getLength()));
       }
       outputInfo.finish();
+
+      if (firstIndex == null) {
+        ch.flush();
+        return writeFuture;
+      }
 
       final long rangeOffset = firstIndex.getStartOffset();
       final long rangePartLength = lastIndex.getStartOffset() + lastIndex.getPartLength() - firstIndex.getStartOffset();
@@ -1287,9 +1292,10 @@ public class ShuffleHandler {
 
       ShuffleHeader header = new ShuffleHeader(message, -1, -1, -1, null);
       DataOutputBuffer out = new DataOutputBuffer();
-      // TODO: check if writing a fake partitionCount is necessary
-      out.writeInt(127);  // write 127 as a fake partitionCount
-      header.write(out);
+      out.writeInt(1);
+      ByteBuffer mapIdBytes = ShuffleHeader.encodeMapId(message);
+      ShuffleHeader.writeMapId(out, mapIdBytes);
+      header.writeCompositePartition(out);
 
       sendError(ctx, wrappedBuffer(out.getData(), 0, out.getLength()), fullResponse);
     }

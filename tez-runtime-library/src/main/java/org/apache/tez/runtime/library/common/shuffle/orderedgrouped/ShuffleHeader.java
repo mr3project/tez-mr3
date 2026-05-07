@@ -93,56 +93,88 @@ public class ShuffleHeader implements Writable {
   }
 
   public void readFields(DataInput in) throws IOException {
-    if (compositeFetch) {   // ShuffleHeader created by MR3 ShuffleHandler
-      int length = in.readInt();  // Cf. WritableUtils.readStringSafely() calls readVInt()
-      if (length < 0 || length > MAX_ID_LENGTH) {
-        throw new IllegalArgumentException("Encoded byte size for String was " + length +
-                                           ", which is outside of 0.." + MAX_ID_LENGTH + " range.");
-      }
-      byte [] bytes = new byte[length];
-      in.readFully(bytes, 0, length);
-      mapId = Text.decode(bytes);
+    assert !compositeFetch;
+    // ShuffleHeader created by Hadoop shuffle service
+    mapId = WritableUtils.readStringSafely(in, MAX_ID_LENGTH);
+    compressedLength = WritableUtils.readVLong(in);
+    uncompressedLength = WritableUtils.readVLong(in);
+    forReduce = WritableUtils.readVInt(in);
+  }
 
-      compressedLength = in.readLong();
-      uncompressedLength = in.readLong();
-      forReduce = in.readInt();
-      int maxKeyLen = in.readInt();
+  public void readCompositeFields(DataInput in, String sharedMapId) throws IOException {
+    mapId = sharedMapId;
+    compressedLength = in.readLong();
+    if (compressedLength == 0) {
+      uncompressedLength = 0;
+      forReduce = -1;
+      tezOffsetRecord = null;
+      return;
+    }
+    uncompressedLength = in.readLong();
+    forReduce = in.readInt();
+    int maxKeyLen = in.readInt();
+    if (maxKeyLen < 0) {
+      tezOffsetRecord = null;
+    } else {
       int maxValLen = in.readInt();
       int firstKeyOffset = in.readInt();
       int firstValOffset = in.readInt();
       int eofPos = in.readInt();
-      if (eofPos >= 0) {
-        tezOffsetRecord = new TezOffsetRecord(maxKeyLen, maxValLen, firstKeyOffset, firstValOffset, eofPos);
-      } else {
-        tezOffsetRecord = null;
-      }
-    } else {  // ShuffleHeader created by Hadoop shuffle service
-      mapId = WritableUtils.readStringSafely(in, MAX_ID_LENGTH);
-      compressedLength = WritableUtils.readVLong(in);
-      uncompressedLength = WritableUtils.readVLong(in);
-      forReduce = WritableUtils.readVInt(in);
+      tezOffsetRecord = new TezOffsetRecord(maxKeyLen, maxValLen, firstKeyOffset, firstValOffset, eofPos);
     }
   }
 
-  // called by MR3 ShuffleHandler (but not by Hadoop shuffle service)
-  // do not use WritableUtils.writeVLong/Int()
-  public int writeLength() throws IOException {
-    int length = Text.encode(mapId).limit();
-    length += 4 + 8 + 8 + 4;  // encoding of mapIdLength, compressedLength, uncompressedLength, forReduce
-    length += 5 * 4;  // encoding of TezOffsetRecord
+  public static String readMapId(DataInput in) throws IOException {
+    int length = in.readInt();  // Cf. WritableUtils.readStringSafely() calls readVInt()
+    if (length < 0 || length > MAX_ID_LENGTH) {
+      throw new IllegalArgumentException("Encoded byte size for String was " + length +
+                                         ", which is outside of 0.." + MAX_ID_LENGTH + " range.");
+    }
+    byte [] bytes = new byte[length];
+    in.readFully(bytes, 0, length);
+    return Text.decode(bytes);
+  }
+
+  public static ByteBuffer encodeMapId(String mapId) throws IOException {
+    return Text.encode(mapId);
+  }
+
+  public static void writeMapId(DataOutput out, ByteBuffer mapIdBytes) throws IOException {
+    int length = mapIdBytes.limit();
+    out.writeInt(length);
+    out.write(mapIdBytes.array(), 0, length);
+  }
+
+  public static int mapIdWriteLength(ByteBuffer mapIdBytes) {
+    return 4 + mapIdBytes.limit();
+  }
+
+  public int compositePartitionWriteLength() {
+    int length = 8;  // compressedLength
+    if (compressedLength != 0) {
+      length += 8 + 4;  // uncompressedLength, forReduce
+      length += tezOffsetRecord != null ? 5 * 4 : 4;
+    }
     return length;
+  }
+
+  public void write(DataOutput out) throws IOException {
+    assert !compositeFetch;
+    ByteBuffer mapIdBytes = encodeMapId(mapId);
+    writeMapId(out, mapIdBytes);
+
+    out.writeLong(compressedLength);
+    out.writeLong(uncompressedLength);
+    out.writeInt(forReduce);
   }
 
   // called by MR3 ShuffleHandler (but not by Hadoop shuffle service)
   // do not use WritableUtils.writeVLong/Int()
-  public void write(DataOutput out) throws IOException {
-    // Text.writeString(out, mapId);
-    ByteBuffer bytes = Text.encode(mapId);
-    int length = bytes.limit();
-    out.writeInt(length);
-    out.write(bytes.array(), 0, length);
-
+  public void writeCompositePartition(DataOutput out) throws IOException {
     out.writeLong(compressedLength);
+    if (compressedLength == 0) {
+      return;
+    }
     out.writeLong(uncompressedLength);
     out.writeInt(forReduce);
     if (tezOffsetRecord != null) {
@@ -152,10 +184,6 @@ public class ShuffleHeader implements Writable {
       out.writeInt(tezOffsetRecord.getFirstValOffset());
       out.writeInt(tezOffsetRecord.getEofPos());
     } else {
-      out.writeInt(-1);
-      out.writeInt(-1);
-      out.writeInt(-1);
-      out.writeInt(-1);
       out.writeInt(-1);
     }
   }

@@ -463,9 +463,11 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
       long startTime = System.currentTimeMillis();
       int partitionCount = 1;   // single partition only when using Hadoop shuffle service
 
+      String sharedMapId = null;
       if (fetcherConfigCommon.compositeFetch) {
         // Multiple partitions are fetched
         partitionCount = input.readInt();
+        sharedMapId = ShuffleHeader.readMapId(input);
       }
       ArrayList<MapOutputStat> mapOutputStats = new ArrayList<>(partitionCount);
       for (int mapOutputIndex = 0; mapOutputIndex < partitionCount; mapOutputIndex++) {
@@ -474,7 +476,11 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
           // Read the shuffle header
           ShuffleHeader header = new ShuffleHeader(fetcherConfigCommon.compositeFetch);
           // TODO Review: Multiple header reads in case of status WAIT ?
-          header.readFields(input);
+          if (fetcherConfigCommon.compositeFetch) {
+            header.readCompositeFields(input, sharedMapId);
+          } else {
+            header.readFields(input);
+          }
           if (!header.mapId.startsWith(InputAttemptIdentifier.PATH_PREFIX_MR3) && !header.mapId.startsWith(InputAttemptIdentifier.PATH_PREFIX)) {
             if (!stopped) {
               shuffleErrorCounterGroup.badIdErrs.increment(1);

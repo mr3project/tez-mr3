@@ -667,10 +667,12 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       long startTime = System.currentTimeMillis();
       int partitionCount = 1;   // single partition only when using Hadoop shuffle service
 
-      // read the first part - partitionCount
+      // read the first part - partitionCount and, for composite fetches, the shared map id
+      String sharedMapId = null;
       if (fetcherConfigCommon.compositeFetch) {
         // multiple partitions are fetched
         partitionCount = input.readInt();
+        sharedMapId = ShuffleHeader.readMapId(input);
       }
 
       // read the second part - ShuffleHeader[]
@@ -684,7 +686,11 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         // build srcAttemptId and MapOutputStat
         try {
           ShuffleHeader header = new ShuffleHeader(fetcherConfigCommon.compositeFetch);
-          header.readFields(input);
+          if (fetcherConfigCommon.compositeFetch) {
+            header.readCompositeFields(input, sharedMapId);
+          } else {
+            header.readFields(input);
+          }
           pathComponent = header.getMapId();
           if (!pathComponent.startsWith(InputAttemptIdentifier.PATH_PREFIX_MR3) && !pathComponent.startsWith(InputAttemptIdentifier.PATH_PREFIX)) {
             shuffleErrorCounterGroup.badIdErrs.increment(1);
@@ -699,15 +705,15 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
                 + " while fetching " + inputAttemptIdentifier);
           }
 
+          if (header.getCompressedLength() == 0) {
+            // empty partitions are already accounted for
+            continue;
+          }
+
           srcAttemptId = pathToAttemptMap.get(new PathPartition(pathComponent, header.getPartition()));
           if (srcAttemptId == null) {
             throw new IllegalArgumentException("Source attempt not found for map id: " + header.getMapId() +
                 ", partition: " + header.getPartition() + " while fetching " + inputAttemptIdentifier);
-          }
-
-          if (header.getCompressedLength() == 0) {
-            // empty partitions are already accounted for
-            continue;
           }
 
           mapOutputStat = new MapOutputStat(srcAttemptId,
