@@ -47,6 +47,8 @@ import com.google.common.collect.Lists;
 // (multiple src-indices), modifications will be required.
 public class ShuffleManager extends ShuffleClient<FetchedInput> {
 
+  private static final long SHUFFLE_WAIT_LOG_THRESHOLD_NANOS = 20L;
+
   private final FetchedInputAllocator inputManager;
 
   private final TezCounter approximateInputRecords;
@@ -436,7 +438,19 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
 
     // block until next input or End of Input message
     // the only place where completedInputs.take() is called
-    FetchedInput fetchedInput = completedInputs.take();
+    long shuffleWaitStartTime = System.nanoTime();
+    FetchedInput fetchedInput;
+    try {
+      fetchedInput = completedInputs.take();
+    } finally {
+      long shuffleWaitFinishTime = System.nanoTime();
+      if (shuffleWaitFinishTime - shuffleWaitStartTime >= SHUFFLE_WAIT_LOG_THRESHOLD_NANOS) {
+        LOG.info("SHUFFLE_WAIT {} {}", inputContext.getUniqueIdentifier(),
+            shuffleWaitStartTime);
+        LOG.info("SHUFFLE_FINISH {} {}", inputContext.getUniqueIdentifier(),
+            shuffleWaitFinishTime);
+      }
+    }
 
     if (fetchedInput instanceof MemoryFetchedInput) {
       totalSizeOfMemoryCompletedInputs.addAndGet(-fetchedInput.getSize());

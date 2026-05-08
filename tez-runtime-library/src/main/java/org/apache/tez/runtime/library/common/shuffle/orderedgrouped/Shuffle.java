@@ -62,6 +62,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 public class Shuffle implements ExceptionReporter {
 
   private static final Logger LOG = LoggerFactory.getLogger(Shuffle.class);
+  private static final long SHUFFLE_WAIT_LOG_THRESHOLD_NANOS = 20L;
 
   private final InputContext inputContext;
 
@@ -203,8 +204,19 @@ public class Shuffle implements ExceptionReporter {
     Preconditions.checkState(runShuffleFuture != null,
         "waitForInput can only be called after run");
     TezRawKeyValueIterator kvIter = null;
+    long shuffleWaitStartTime = System.nanoTime();
     try {
-      kvIter = runShuffleFuture.get();
+      try {
+        kvIter = runShuffleFuture.get();
+      } finally {
+        long shuffleWaitFinishTime = System.nanoTime();
+        if (shuffleWaitFinishTime - shuffleWaitStartTime >= SHUFFLE_WAIT_LOG_THRESHOLD_NANOS) {
+          LOG.info("SHUFFLE_WAIT {} {}", inputContext.getUniqueIdentifier(),
+              shuffleWaitStartTime);
+          LOG.info("SHUFFLE_FINISH {} {}", inputContext.getUniqueIdentifier(),
+              shuffleWaitFinishTime);
+        }
+      }
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
       // Processor interrupted while waiting for errors, will see an InterruptedException.
