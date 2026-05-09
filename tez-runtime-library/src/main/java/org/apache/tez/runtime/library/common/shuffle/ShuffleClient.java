@@ -532,4 +532,7 @@ public abstract class ShuffleClient<T extends ShuffleInput> {
   public FetcherConfig getFetcherConfig() {
     return inputContext.getFetcherConfig(this.conf);
   }
+
+  public abstract boolean fetchToMakeInputReady();
+
 }

@@ -40,7 +40,6 @@ import org.apache.tez.runtime.library.common.shuffle.MemoryFetchedInput;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleClient;
 
 import org.apache.tez.common.Preconditions;
-import com.google.common.collect.Lists;
 
 // This only knows how to deal with a single srcIndex for a given targetIndex.
 // In case the src task generates multiple outputs for the same target Index
@@ -78,9 +77,8 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
   private final BlockingQueue<FetchedInput> completedInputs;
   private static final FetchedInput endOfInputMarker = new NullFetchedInput(null);
 
-  // sum of the sizes of all MemoryFetchedInput in completedInputs[]
-  private final AtomicLong totalSizeOfMemoryCompletedInputs = new AtomicLong(0L);
-  private final AtomicInteger numCallsGetNextInput = new AtomicInteger(0);
+  // sum of the sizes of all FetchedInput in completedInputs[]
+  private final AtomicLong totalSizeOfCompletedInputs = new AtomicLong(0L);
 
   // Use striped locks to serialize completion for a specific inputIdentifier while allowing
   // unrelated inputIdentifiers to proceed in parallel.
@@ -338,9 +336,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
   private void maybeInformInputReady(FetchedInput fetchedInput) {
     if (!(fetchedInput instanceof NullFetchedInput)) {
       completedInputs.add(fetchedInput);
-      if (fetchedInput instanceof MemoryFetchedInput) {
-        totalSizeOfMemoryCompletedInputs.addAndGet(fetchedInput.getSize());
-      }
+      totalSizeOfCompletedInputs.addAndGet(fetchedInput.getSize());
     }
     if (!inputReadyNotificationSent.getAndSet(true)) {
       // TODO Should eventually be controlled by Inputs which are processing the data.
@@ -432,34 +428,25 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
    *         but more may become available.
    */
   public FetchedInput getNextInput() throws InterruptedException {
-    numCallsGetNextInput.incrementAndGet();
-
     // block until next input or End of Input message
     // the only place where completedInputs.take() is called
     FetchedInput fetchedInput = completedInputs.take();
-
-    if (fetchedInput instanceof MemoryFetchedInput) {
-      totalSizeOfMemoryCompletedInputs.addAndGet(-fetchedInput.getSize());
-    }
-
-    if (fetchedInput == endOfInputMarker) {   // reference equality
+    if (fetchedInput != endOfInputMarker) {   // reference equality
+      // fetchedInput is not NullFetchedInput
+      totalSizeOfCompletedInputs.addAndGet(-fetchedInput.getSize());
+    } else {
       fetchedInput = null;
     }
     return fetchedInput;
-  }
-
-  public int getNumCallsGetNextInput() {
-    return numCallsGetNextInput.get();
   }
 
   public int getNumInputs() {
     return numInputs;
   }
 
-  public long getTotalSizeOfMemoryCompletedInputs() {
-    return totalSizeOfMemoryCompletedInputs.get();
+  public long getTotalSizeOfCompletedInputs() {
+    return totalSizeOfCompletedInputs.get();
   }
-
 
   /////////////////// End of methods for walking the available inputs
 
@@ -480,7 +467,7 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
 
     @Override
     public long getSize() {
-      return -1;
+      return 0L;
     }
 
     @Override
@@ -524,5 +511,10 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
       s.append(", transfer rate (KB/s) = " + transferRate);
       LOG.info(s.toString());
     }
+  }
+
+  @Override
+  public boolean fetchToMakeInputReady() {
+    return !inputReadyNotificationSent.get();
   }
 }

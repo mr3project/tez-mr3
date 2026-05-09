@@ -240,7 +240,6 @@ public class Shuffle implements ExceptionReporter {
   private class RunShuffleCallable implements Callable<TezRawKeyValueIterator> {
     @Override
     public TezRawKeyValueIterator call() throws IOException, InterruptedException {
-
       if (!isShutDown.get()) {
         try {
           shuffleScheduler.start();
@@ -283,7 +282,7 @@ public class Shuffle implements ExceptionReporter {
       }
 
       inputContext.inputIsReady();
-      LOG.info("merge complete for input vertex : " + srcNameTrimmed);
+      LOG.info("Merge complete for input vertex: {}", srcNameTrimmed);
       return kvIter;
     }
   }

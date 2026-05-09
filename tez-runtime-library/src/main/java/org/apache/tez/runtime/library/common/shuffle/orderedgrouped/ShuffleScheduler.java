@@ -344,7 +344,6 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
     exceptionReporter.killSelf(exception, message);
   }
 
-
   private void logProgress() {
     int inputsDone = numInputs - remainingMaps.get();
     if (inputsDone == numInputs || isShutdown.get()) {
@@ -360,5 +359,10 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
       s.append(", transfer rate (KB/s) = " + transferRate);
       LOG.info(s.toString());
     }
+  }
+
+  @Override
+  public boolean fetchToMakeInputReady() {
+    return remainingMaps.get() > 0;
   }
 }
