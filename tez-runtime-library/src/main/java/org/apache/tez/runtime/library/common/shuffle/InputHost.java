@@ -348,18 +348,17 @@ public class InputHost {
   // called only from ShuffleServer.call() thread
   private ShuffleClient getPriorityShuffleClient(
       ConcurrentMap<Long, ShuffleClient<?>> shuffleClients) {
-    // consider ShuffleManager over ShuffleScheduler because ShuffleManager can consume input as soon as it is ready
-    // Priority buckets:
-    // 1. ready SM with no MemoryFetchedInput (returned immediately in loop)
-    // 2. ready SM with smallest MemoryFetchedInput
-    // 3. ShuffleScheduler
-    // 4. not-ready SM with no MemoryFetchedInput
-    // 5. not-ready SM with MemoryFetchedInput
-    ShuffleManager smReadyWithMemory = null;      // priority: 2
-    long minSizeSmReadyWithMemory = Long.MAX_VALUE;
-    ShuffleScheduler ssFirst = null;              // priority: 3
-    ShuffleManager smNotReadyNoMemory = null;     // priority: 4
-    ShuffleManager smNotReadyWithMemory = null;   // priority: 5
+    // Priority scheme:
+    // 1. ShuffleScheduler.fetchToMakeInputReady() == true
+    // 2. ShuffleManager.fetchToMakeInputReady() == true
+    // 3. ShuffleManager.fetchToMakeInputReady() == false && zero fetched-input bytes (memory or disk)
+    // 4. ShuffleManager.fetchToMakeInputReady() == false && with the smalled fetched-input bytes (memory + disk)
+    // 5. ShuffleScheduler.fetchToMakeInputReady() == false (i.e., remainingMaps == 0, so nothing more to fetch)
+
+    ShuffleManager smNotReady = null;       // priority 2
+    ShuffleManager smReadyNoInput = null;   // priority 3
+    ShuffleManager smReadyMinInput = null;  // priority 4
+    long smReadyMinInputSize = Long.MAX_VALUE;
 
     Iterator<Map.Entry<Long, Map<PartitionRange, List<CompositeInputAttemptIdentifier>>>> iterator =
         partitionToInputs.entrySet().iterator();
@@ -378,48 +377,45 @@ public class InputHost {
         continue;
       }
 
-      if (shuffleClient instanceof ShuffleManager) {
-        ShuffleManager sm = (ShuffleManager)shuffleClient;
-        if (sm.getNumCallsGetNextInput() > 0L) {
-          long size = sm.getTotalSizeOfMemoryCompletedInputs();
-          if (size == 0L) {
-            return sm;  // priority: highest - LogicalInput is ready to consume FetchedInputs in ShuffleManager
-          } else if (size < minSizeSmReadyWithMemory) {
-            // update because we have found ShuffleManager with smaller size
-            smReadyWithMemory = sm;
-            minSizeSmReadyWithMemory = size;
-          }
-          // smReadyWithMemory != null
-          continue;   // because we may find another ShuffleManager with smaller size
+      if (shuffleClient instanceof ShuffleScheduler) {
+        ShuffleScheduler ss = (ShuffleScheduler)shuffleClient;
+        if (ss.fetchToMakeInputReady()) {
+          return ss;  // priority 1 - return immediately
         }
-
-        // ShuffleManager sm: not ready to consume input
-        if (smReadyWithMemory != null) {
-          // any ready SM with memory beats all not-ready SMs
-          continue;
+        // ss.remainingMaps == 0, so nothing more to fetch
+        for (int i = 0; i < partitionMap.size(); i++) {
+          ss.partitionRangeRemoved();
         }
-
-        // if smNotReadyNoMemory != null, no need to consider sm
-        // 4) and 5): record first not-ready/no-memory, or if none, the first not-ready/with-memory
-        if (smNotReadyNoMemory == null) {
-          if (sm.getTotalSizeOfMemoryCompletedInputs() == 0L) {
-            smNotReadyNoMemory = sm;
-          } else if (smNotReadyWithMemory == null) {
-            smNotReadyWithMemory = sm;
-          }
-        }
+        iterator.remove();
         continue;
       }
 
-      if (ssFirst == null) {
-        ssFirst = (ShuffleScheduler)shuffleClient;
+      if (shuffleClient instanceof ShuffleManager) {
+        ShuffleManager sm = (ShuffleManager)shuffleClient;
+        if (smNotReady == null) {
+          if (sm.fetchToMakeInputReady()) {
+            smNotReady = sm;  // priority 2
+            continue;
+          }
+        } else {
+          continue;
+        }
+
+        if (smReadyNoInput == null) {
+          long size = sm.getTotalSizeOfCompletedInputs();
+          if (size == 0L) {
+            smReadyNoInput = sm;
+          } else if (size < smReadyMinInputSize) {
+            smReadyMinInput = sm;
+            smReadyMinInputSize = size;
+          }
+        }
       }
     }
 
-    if (smReadyWithMemory != null) { return smReadyWithMemory; }
-    if (ssFirst != null) { return ssFirst; }
-    if (smNotReadyNoMemory != null) { return smNotReadyNoMemory; }
-    if (smNotReadyWithMemory != null) { return smNotReadyWithMemory; }
+    if (smNotReady != null) { return smNotReady; }
+    if (smReadyNoInput != null) { return smReadyNoInput; }
+    if (smReadyMinInput != null) { return smReadyMinInput; }
     return null;
   }
 
