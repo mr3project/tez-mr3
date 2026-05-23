@@ -60,6 +60,7 @@ import org.apache.tez.runtime.library.utils.DATA_RANGE_IN_MB;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.apache.hadoop.io.DataInputByteBuffer;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.security.token.Token;
@@ -761,6 +762,14 @@ public class ShuffleUtils {
       return new AbstractMap.SimpleEntry<>(
           new TezSpillRecord(indexFilePath, localFs),
           localDirAllocator.getLocalPathToRead(inputFile, conf));
+    }
+  }
+
+  public static void restoreMdc(Map<String, String> contextMap) {
+    if (contextMap == null || contextMap.isEmpty()) {
+      MDC.clear();
+    } else {
+      MDC.setContextMap(contextMap);
     }
   }
 }

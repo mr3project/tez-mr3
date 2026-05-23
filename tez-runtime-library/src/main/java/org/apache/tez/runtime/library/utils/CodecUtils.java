@@ -47,7 +47,6 @@ import org.apache.tez.runtime.api.FetcherConfigCommon;
 import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.ConfigUtils;
-import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.sort.impl.IFileInputStream;
 import org.slf4j.Logger;

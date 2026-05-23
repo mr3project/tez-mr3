@@ -67,6 +67,7 @@ import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.ShuffleHeade
 import org.apache.tez.runtime.library.common.sort.impl.TezIndexRecord;
 import org.apache.tez.runtime.library.common.sort.impl.TezSpillRecord;
 import org.apache.tez.runtime.library.exceptions.FetcherReadTimeoutException;
+import org.slf4j.MDC;
 
 /**
  * Responsible for fetching inputs served by the ShuffleHandler for a single host.
@@ -127,64 +128,71 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
   public FetchResult call() throws Exception {
     assert !pendingInputsSeq.getInputs().isEmpty();
 
-    startMillis = System.currentTimeMillis();
-    buildPathToAttemptMap();
+    Map<String, String> oldMdcContext = MDC.getCopyOfContextMap();
+    try {
+      ShuffleUtils.restoreMdc(taskContext.getMdcContext());
 
-    codec = codecHolder.get();
-    if (codec == null) {
-      // clone codecConf because Decompressor uses locks on the Configuration object
-      Configuration codecConf = new Configuration(fetcherConfigCommon.codecConf);
-      CompressionCodec newCodec = CodecUtils.getCodec(codecConf);
-      codec = newCodec;
-      codecHolder.set(newCodec);
-    }
+      startMillis = System.currentTimeMillis();
+      buildPathToAttemptMap();
 
-    boolean isFetchFromLocal;
-    boolean isFetchFromLocalInternal = false;   // true if inputs originate from the current ContainerWorker
-    if (host.equals(fetcherConfigCommon.localHostName)) {
-      isFetchFromLocal = true;
-      isFetchFromLocalInternal = inputHost.getHostPort().getEnvContainerId().equals(
-          taskContext.getExecutionContext().getEnvContainerId());
-    } else {
-      isFetchFromLocal = false;
-    }
-
-    HostFetchResult hostFetchResult;
-    if (isFetchFromLocal) {
-      if (fetcherConfigCommon.localDiskFetchEnabled && isFetchFromLocalInternal) {
-        hostFetchResult = doLocalDiskFetch();   // TezSpillRecord can be obtained directly
-      } else {
-        hostFetchResult = doHttpFetch(true);
+      codec = codecHolder.get();
+      if (codec == null) {
+        // clone codecConf because Decompressor uses locks on the Configuration object
+        Configuration codecConf = new Configuration(fetcherConfigCommon.codecConf);
+        CompressionCodec newCodec = CodecUtils.getCodec(codecConf);
+        codec = newCodec;
+        codecHolder.set(newCodec);
       }
-    } else {
-      hostFetchResult = doHttpFetch(false);
-    }
 
-    if (hostFetchResult.failedInputs != null && hostFetchResult.failedInputs.length > 0) {
-      if (!isShutDown.get()) {
-        LOG.warn("{}: doLocalDisk/HttpFetch() failed for tasks {}",
-            logIdentifier, Arrays.toString(hostFetchResult.failedInputs));
+      boolean isFetchFromLocal;
+      boolean isFetchFromLocalInternal = false;   // true if inputs originate from the current ContainerWorker
+      if (host.equals(fetcherConfigCommon.localHostName)) {
+        isFetchFromLocal = true;
+        isFetchFromLocalInternal = inputHost.getHostPort().getEnvContainerId().equals(
+            taskContext.getExecutionContext().getEnvContainerId());
+      } else {
+        isFetchFromLocal = false;
+      }
 
-        // never add back those InputAttemptIdentifiers that are sent to AM with InputReadError.
-        Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> pendingInputs =
-            hostFetchResult.fetchResult.getPendingInputs();
-        for (CompositeInputAttemptIdentifier failed : hostFetchResult.failedInputs) {
-          fetcherCallback.fetchFailed(shuffleClientId, failed, false, hostFetchResult.connectFailed,
-              inputHost, getPartitionRange(), this);
-          if (pendingInputs != null) {
-            pendingInputs.remove(failed);
+      HostFetchResult hostFetchResult;
+      if (isFetchFromLocal) {
+        if (fetcherConfigCommon.localDiskFetchEnabled && isFetchFromLocalInternal) {
+          hostFetchResult = doLocalDiskFetch();   // TezSpillRecord can be obtained directly
+        } else {
+          hostFetchResult = doHttpFetch(true);
+        }
+      } else {
+        hostFetchResult = doHttpFetch(false);
+      }
+
+      if (hostFetchResult.failedInputs != null && hostFetchResult.failedInputs.length > 0) {
+        if (!isShutDown.get()) {
+          LOG.warn("{}: doLocalDisk/HttpFetch() failed for tasks {}",
+              logIdentifier, Arrays.toString(hostFetchResult.failedInputs));
+
+          // never add back those InputAttemptIdentifiers that are sent to AM with InputReadError.
+          Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> pendingInputs =
+              hostFetchResult.fetchResult.getPendingInputs();
+          for (CompositeInputAttemptIdentifier failed : hostFetchResult.failedInputs) {
+            fetcherCallback.fetchFailed(shuffleClientId, failed, false, hostFetchResult.connectFailed,
+                inputHost, getPartitionRange(), this);
+            if (pendingInputs != null) {
+              pendingInputs.remove(failed);
+            }
+          }
+        } else {
+          if (isDebugEnabled) {
+            LOG.debug("Ignoring failed fetch reports for " + hostFetchResult.failedInputs.length +
+                " inputs since the fetcher has already been stopped");
           }
         }
-      } else {
-        if (isDebugEnabled) {
-          LOG.debug("Ignoring failed fetch reports for " + hostFetchResult.failedInputs.length +
-              " inputs since the fetcher has already been stopped");
-        }
       }
-    }
 
-    // skip sanity check because we check the invariant in HostFetchResult()
-    return hostFetchResult.fetchResult;
+      // skip sanity check because we check the invariant in HostFetchResult()
+      return hostFetchResult.fetchResult;
+    } finally {
+      ShuffleUtils.restoreMdc(oldMdcContext);
+    }
   }
 
   // currentIndex is only for providing pathComponents to be used in URL.

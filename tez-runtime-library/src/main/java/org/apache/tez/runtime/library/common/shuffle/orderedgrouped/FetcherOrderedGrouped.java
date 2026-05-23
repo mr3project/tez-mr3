@@ -56,6 +56,7 @@ import org.apache.tez.runtime.library.exceptions.FetcherReadTimeoutException;
 import org.apache.tez.runtime.library.utils.CodecUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
 
@@ -145,34 +146,41 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
   public FetchResult call() {
     assert !pendingInputsSeq.getInputs().isEmpty();
 
-    startMillis = System.currentTimeMillis();
-    buildPathToAttemptMap();
-
-    Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> pendingInputs = null;
+    Map<String, String> oldMdcContext = MDC.getCopyOfContextMap();
     try {
-      codec = codecHolder.get();
-      if (codec == null) {
-        // clone codecConf because Decompressor uses locks on the Configuration object
-        Configuration codecConf = new Configuration(fetcherConfigCommon.codecConf);
-        CompressionCodec newCodec = CodecUtils.getCodec(codecConf);
-        codec = newCodec;
-        codecHolder.set(newCodec);
+      ShuffleUtils.restoreMdc(taskContext.getMdcContext());
+
+      startMillis = System.currentTimeMillis();
+      buildPathToAttemptMap();
+
+      Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> pendingInputs = null;
+      try {
+        codec = codecHolder.get();
+        if (codec == null) {
+          // clone codecConf because Decompressor uses locks on the Configuration object
+          Configuration codecConf = new Configuration(fetcherConfigCommon.codecConf);
+          CompressionCodec newCodec = CodecUtils.getCodec(codecConf);
+          codec = newCodec;
+          codecHolder.set(newCodec);
+        }
+
+        pendingInputs = fetchNext();
+      } catch (InterruptedException ie) {
+        // TODO: might not be respected when fetcher is in progress / server is busy. TEZ-711
+        // set the status back
+        Thread.currentThread().interrupt();
+      } catch (Throwable t) {
+        exceptionReporter.reportException(t);
+        // Shuffle knows how to deal with failures post shutdown via the onFailure hook
       }
 
-      pendingInputs = fetchNext();
-    } catch (InterruptedException ie) {
-      // TODO: might not be respected when fetcher is in progress / server is busy. TEZ-711
-      // set the status back
-      Thread.currentThread().interrupt();
-    } catch (Throwable t) {
-      exceptionReporter.reportException(t);
-      // Shuffle knows how to deal with failures post shutdown via the onFailure hook
-    }
-
-    if (pendingInputs != null) {
-      return new FetchResult(shuffleClientId, inputHost.getHostPort(), pendingInputs);
-    } else {
-      return null;
+      if (pendingInputs != null) {
+        return new FetchResult(shuffleClientId, inputHost.getHostPort(), pendingInputs);
+      } else {
+        return null;
+      }
+    } finally {
+      ShuffleUtils.restoreMdc(oldMdcContext);
     }
   }
 

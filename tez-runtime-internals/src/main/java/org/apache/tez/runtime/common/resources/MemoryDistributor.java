@@ -70,7 +70,8 @@ public class MemoryDistributor {
    *          Tez specific task configuration
    */
   public MemoryDistributor(
-      int numTotalInputs, int numTotalOutputs, Configuration conf, long totalMemory) {
+      int numTotalInputs, int numTotalOutputs, Configuration conf, long totalMemory,
+      String taskAttemptIdStr) {
     this.conf = conf;
     isEnabled = conf.getBoolean(TezConfiguration.TEZ_TASK_SCALE_MEMORY_ENABLED,
         TezConfiguration.TEZ_TASK_SCALE_MEMORY_ENABLED_DEFAULT);
@@ -79,12 +80,8 @@ public class MemoryDistributor {
     this.numTotalOutputs = numTotalOutputs;
     this.totalJvmMemory = totalMemory;
     this.requestList = Collections.synchronizedList(new LinkedList<RequestorInfo>());
-    LOG.info("InitialMemoryDistributor (isEnabled={}): numInputs={}, numOutputs={}, JVM.maxFree={}",
-        isEnabled, numTotalInputs, numTotalOutputs, totalJvmMemory);
-  }
-
-  public MemoryDistributor(int numTotalInputs, int numTotalOutputs, Configuration conf) {
-    this(numTotalInputs, numTotalOutputs, conf, Runtime.getRuntime().maxMemory());
+    LOG.info("InitialMemoryDistributor for {}: isEnabled={}, numInputs={}, numOutputs={}, JVM.maxFree={}",
+        taskAttemptIdStr, isEnabled, numTotalInputs, numTotalOutputs, totalJvmMemory);
   }
 
   /**

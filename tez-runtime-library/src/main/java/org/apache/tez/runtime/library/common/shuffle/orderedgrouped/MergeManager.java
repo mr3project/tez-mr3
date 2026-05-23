@@ -48,6 +48,7 @@ import org.apache.tez.runtime.library.common.sort.impl.TezRawKeyValueIterator;
 import org.apache.tez.runtime.library.common.task.local.output.TezTaskOutputFiles;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -56,6 +57,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -157,6 +159,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   private final long freeMemoryThreshold;   // minimum size of free memory for useFreeMemoryFetchedInput
   private final long freeMemoryLimit;       // free memory that can be assigned to this LogicalInput
   private final boolean compositeFetch;
+
+  private final Map<String, String> mdcContext;
 
   /**
    * Construct the MergeManager. Must call start before it becomes usable.
@@ -275,7 +279,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
           + "maxSingleShuffleLimit: " + this.maxSingleShuffleLimit
           + ", mergeThreshold: " + this.mergeThreshold);
     }
-    
+
     boolean allowMemToMemMerge = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_ENABLE_MEMTOMEM,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_ENABLE_MEMTOMEM_DEFAULT);
@@ -284,9 +288,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     } else {
       this.memToMemMerger = null;
     }
-
     this.inMemoryMerger = new InMemoryMerger(this);
-
     this.onDiskMerger = new OnDiskMerger(this);
 
     this.useFreeMemoryFetchedInput = conf.getBoolean(
@@ -303,6 +305,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         + freeMemoryFactor);
     }
     this.freeMemoryLimit = (long)(maxTaskAvailableMemory * freeMemoryFactor);
+
+    this.mdcContext = inputContext.getMdcContext();
   }
 
   void setupParentThread(Thread shuffleSchedulerThread) {
@@ -701,12 +705,23 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
    */
   private class IntermediateMemoryToMemoryMerger 
   extends MergeThread<MapOutput> {
-    
-    public IntermediateMemoryToMemoryMerger(MergeManager manager, 
+
+    public IntermediateMemoryToMemoryMerger(MergeManager manager,
                                             int mergeFactor) {
       super(manager, mergeFactor, exceptionReporter);
       setName("MemToMemMerger [" + inputContext.getSourceVertexName() + "_" + inputContext.getUniqueIdentifier() + "]");
       setDaemon(true);
+    }
+
+    @Override
+    public void run() {
+      Map<String, String> oldMdcContext = MDC.getCopyOfContextMap();
+      try {
+        ShuffleUtils.restoreMdc(mdcContext);
+        super.run();
+      } finally {
+        ShuffleUtils.restoreMdc(oldMdcContext);
+      }
     }
 
     @Override
@@ -828,7 +843,18 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       setDaemon(true);
       writeBuffer = IFile.allocateWriteBuffer();
     }
-    
+
+    @Override
+    public void run() {
+      Map<String, String> oldMdcContext = MDC.getCopyOfContextMap();
+      try {
+        ShuffleUtils.restoreMdc(mdcContext);
+        super.run();
+      } finally {
+        ShuffleUtils.restoreMdc(oldMdcContext);
+      }
+    }
+
     @Override
     public void merge(List<MapOutput> inputs) throws IOException, InterruptedException {
       if (inputs == null || inputs.isEmpty()) {
@@ -931,7 +957,18 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       setDaemon(true);
       writeBuffer = IFile.allocateWriteBuffer();
     }
-    
+
+    @Override
+    public void run() {
+      Map<String, String> oldMdcContext = MDC.getCopyOfContextMap();
+      try {
+        ShuffleUtils.restoreMdc(mdcContext);
+        super.run();
+      } finally {
+        ShuffleUtils.restoreMdc(oldMdcContext);
+      }
+    }
+
     @Override
     public void merge(List<FileChunk> inputs) throws IOException, InterruptedException {
       // sanity check

@@ -21,6 +21,7 @@ package org.apache.tez.runtime.api;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.Map;
 
 import javax.annotation.Nullable;
 
@@ -28,6 +29,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.tez.common.counters.TezCounters;
 import org.apache.tez.dag.api.UserPayload;
+import org.slf4j.MDC;
 
 /**
  * Base interface for Context classes used to initialize the Input, Output
@@ -258,4 +260,6 @@ public interface TaskContext extends DecompressorPool {
   public ConcurrentByteCache getConcurrentByteCache();
 
   public FetcherConfig getFetcherConfig(Configuration conf);
+
+  public Map<String, String> getMdcContext();
 }
