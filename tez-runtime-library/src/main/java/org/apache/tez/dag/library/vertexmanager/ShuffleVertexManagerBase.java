@@ -410,17 +410,20 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
        * min.fraction is just a hint to the framework and need not be
        * honored strictly in this case.
        */
-      LOG.info("Defer scheduling tasks; vertex = {}"
-          + ", totalNumBipartiteSourceTasks = {}"
-          + ", completedSourceTasksOutputSize = {}"
-          + ", numVertexManagerEventsReceived = {}"
-          + ", numBipartiteSourceTasksCompleted = {}"
-          + ", minSourceVertexCompletedTaskFraction = {}",
-          getContext().getVertexName(), totalNumBipartiteSourceTasks,
-          completedSourceTasksOutputSize, numVertexManagerEventsReceived,
-          numBipartiteSourceTasksCompleted,
-          minSourceVertexCompletedTaskFraction);
-       return ComputeRoutingAction.WAIT;
+      if (LOG.isDebugEnabled()) {
+        // use LOG.debug() because the message is printed every time ComputeRoutingAction.WAIT is returned
+        LOG.debug("Defer scheduling tasks; vertex = {}"
+            + ", totalNumBipartiteSourceTasks = {}"
+            + ", completedSourceTasksOutputSize = {}"
+            + ", numVertexManagerEventsReceived = {}"
+            + ", numBipartiteSourceTasksCompleted = {}"
+            + ", minSourceVertexCompletedTaskFraction = {}",
+            getContext().getVertexName(), totalNumBipartiteSourceTasks,
+            completedSourceTasksOutputSize, numVertexManagerEventsReceived,
+            numBipartiteSourceTasksCompleted,
+            minSourceVertexCompletedTaskFraction);
+      }
+      return ComputeRoutingAction.WAIT;
     } else {
       return ComputeRoutingAction.COMPUTE;
     }
@@ -553,8 +556,7 @@ abstract class ShuffleVertexManagerBase extends VertexManagerPlugin {
   int getNumOfTasksToScheduleAndLog(float minFraction) {
     int numTasksToSchedule = getNumOfTasksToSchedule(minFraction);
     if (numTasksToSchedule > 0) {
-      // numTasksToSchedule can be -ve if minFraction
-      // is less than slowStartMinSrcCompletionFraction.
+      // numTasksToSchedule can be -ve if minFraction is less than slowStartMinSrcCompletionFraction.
       LOG.info("Scheduling {} tasks for vertex: {} with totalTasks: {}. " +
           "{} source tasks completed out of {}. " +
           "MinSourceTaskCompletedFraction: {} min: {} max: {}",

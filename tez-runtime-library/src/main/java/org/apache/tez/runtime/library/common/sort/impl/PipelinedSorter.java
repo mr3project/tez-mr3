@@ -1774,6 +1774,7 @@ public final class PipelinedSorter {
 
     @Override
     public SpanIterator call() {
+      // TODO: set MDC context with TaskContext.getMdcContext() and ShuffleUtils.restoreMdc()
       return sortable.sort();
     }
   }
