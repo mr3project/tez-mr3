@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.io.BoundedByteArrayOutputStream;
 import org.apache.hadoop.io.BytesWritable;
+import org.apache.tez.runtime.api.CompressorPool;
 import org.apache.tez.runtime.api.DecompressorPool;
 import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.api.TezOffsetRecord;
@@ -179,10 +180,10 @@ public class IFile {
     public FileBackedInMemIFileWriter(FileSystem fs, TezTaskOutput taskOutput,
         CompressionCodec codec, TezCounter writesCounter,
         TezCounter serializedBytesCounter, int cacheSize,
-        byte[] writeBuffer) throws IOException {
+        byte[] writeBuffer, CompressorPool taskContext) throws IOException {
       super(new FSDataOutputStream(createBoundedBuffer(cacheSize), null), null,
           writesCounter, serializedBytesCounter, false, false, -1, -1,
-          writeBuffer, null);
+          writeBuffer, null, taskContext);
       this.fs = fs;
       this.cacheStream = (BoundedByteArrayOutputStream) this.rawOut.getWrappedStream();
       this.taskOutput = taskOutput;
@@ -330,6 +331,8 @@ public class IFile {
     private int writeOffset;
 
     private final Compressor compressorExternal;  // not to be shared with concurrent threads
+    private final CompressorPool taskContext;
+    private final CompressionCodec codec;
 
     private IFileOutputStream checksumOut;
     private CompressionOutputStream compressedOut;
@@ -368,7 +371,8 @@ public class IFile {
                      boolean isRleEnabled,
                      int maxKeyLen, int maxValLen,
                      byte[] writeBuffer,
-                     @Nullable Compressor compressorExternal) throws IOException {
+                     @Nullable Compressor compressorExternal,
+                     CompressorPool taskContext) throws IOException {
       this.rawOut = outputStream;
       this.writtenRecordsCounter = writesCounter;
       this.serializedUncompressedBytes = serializedBytesCounter;
@@ -387,6 +391,8 @@ public class IFile {
       this.writeOffset = 0;
 
       this.compressorExternal = compressorExternal;
+      this.taskContext = taskContext;
+      this.codec = codec;
 
       setupOutputStream(codec);
       writeHeader(outputStream);
@@ -398,7 +404,7 @@ public class IFile {
         if (compressorExternal != null) {
           this.compressor = compressorExternal;
         } else {
-          this.compressor = CodecUtils.getCompressor(codec);
+          this.compressor = taskContext.getCompressor(codec);
         }
         if (this.compressor != null) {
           this.compressor.reset();
@@ -466,7 +472,7 @@ public class IFile {
         // if compressorExternal != null, this Writer does not own compressor, so do not return it to CodecPool
         if (compressorExternal == null) {
           // this Writer owns compressor
-          CodecPool.returnCompressor(compressor);
+          taskContext.returnCompressor(codec.getCompressorType(), compressor);
         }
         compressor = null;
       }
@@ -600,10 +606,11 @@ public class IFile {
                                  TezCounter writesCounter,
                                  TezCounter serializedBytesCounter,
                                  boolean isRleEnabled,
-                                 byte[] writeBuffer) throws IOException {
+                                 byte[] writeBuffer,
+                                 CompressorPool taskContext) throws IOException {
       this(fs.create(file), codec, writesCounter, serializedBytesCounter,
           false, isRleEnabled, -1, -1,
-          writeBuffer, null);
+          writeBuffer, null, taskContext);
       this.ownOutputStream = true;
     }
 
@@ -614,11 +621,13 @@ public class IFile {
                                  boolean useMaxKeyValLen,
                                  boolean isRleEnabled,
                                  int maxKeyLen, int maxValLen,
-                                 byte[] writeBuffer, @Nullable Compressor compressorExternal)
+                                 byte[] writeBuffer,
+                                 @Nullable Compressor compressorExternal,
+                                 CompressorPool taskContext)
         throws IOException {
       super(outputStream, codec, writesCounter, serializedBytesCounter, useMaxKeyValLen, isRleEnabled,
           maxKeyLen, maxValLen,
-          writeBuffer, compressorExternal);
+          writeBuffer, compressorExternal, taskContext);
     }
 
     public boolean isRleEnabled() {
@@ -761,10 +770,11 @@ public class IFile {
         boolean useMaxKeyValLen,
         boolean isRleEnabled,
         int maxKeyLen, int maxValLen,
-        byte[] writeBuffer) throws IOException {
+        byte[] writeBuffer,
+        CompressorPool taskContext) throws IOException {
       this(fs.create(file), codec, writesCounter, serializedBytesCounter, useMaxKeyValLen, isRleEnabled,
           maxKeyLen, maxValLen,
-          writeBuffer, null);
+          writeBuffer, null, taskContext);
       ownOutputStream = true;
     }
 
@@ -773,11 +783,12 @@ public class IFile {
         boolean useMaxKeyValLen,
         boolean isRleEnabled,
         int maxKeyLen, int maxValLen,
-        byte[] writeBuffer, @Nullable Compressor compressorExternal)
+        byte[] writeBuffer, @Nullable Compressor compressorExternal,
+        CompressorPool taskContext)
         throws IOException {
       super(outputStream, codec, writesCounter, serializedBytesCounter, useMaxKeyValLen, isRleEnabled,
           maxKeyLen, maxValLen,
-          writeBuffer, compressorExternal);
+          writeBuffer, compressorExternal, taskContext);
     }
 
     public boolean isRleEnabled() {

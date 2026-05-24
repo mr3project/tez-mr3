@@ -634,7 +634,7 @@ public final class PipelinedSorter {
                 codec, spilledRecordsCounter, null,
                 false, false,
                 -1, -1,
-                writeBuffer, null);
+                writeBuffer, null, outputContext);
           }
           // we need not check for combiner since its a single record
           if (i == partition) {
@@ -749,13 +749,13 @@ public final class PipelinedSorter {
         boolean hasNext = kvIter.hasNext();
         if (hasNext || !sendEmptyPartitionDetails) {
           if (codec != null && compressorExternal == null) {
-            compressorExternal = CodecUtils.getCompressor(codec);
+            compressorExternal = outputContext.getCompressor(codec);
           }
           writer = new WriterDataInputBuffer(
               fsOutput,
               codec, spilledRecordsCounter, null, false, isRleEnabled,
               -1, -1,
-              writeBuffer, compressorExternal);
+              writeBuffer, compressorExternal, outputContext);
         }
         if (isRleEnabled) {
           while (kvIter.next()) {
@@ -786,7 +786,7 @@ public final class PipelinedSorter {
       } // end of for loop
     } finally {
       if (compressorExternal != null) {
-        CodecPool.returnCompressor(compressorExternal);
+        outputContext.returnCompressor(codec.getCompressorType(), compressorExternal);
       }
       if (fsOutput != null) {
         fsOutput.close();
@@ -1057,7 +1057,7 @@ public final class PipelinedSorter {
                 finalOut,
                 codec, spilledRecordsCounter, null, false, isFinalMergeRleEnabled,
                 -1, -1,
-                writeBuffer, null);
+                writeBuffer, null, outputContext);
             TezMerger.writeFile(kvIter, writer,
                 TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
 

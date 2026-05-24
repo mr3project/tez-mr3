@@ -349,7 +349,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       writer = new IFile.FileBackedInMemIFileWriter(rfs,
           outputFileHandler, codec, outputRecordsCounter,
           outputRecordBytesCounter, dataViaEventsMaxSize,
-          writeBuffer);
+          writeBuffer, outputContext);
       baos = null;
       numRecordsPerPartition = null;
       reportPartitionStats = ReportPartitionStats.fromString(conf.get(
@@ -381,7 +381,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       finalOutPath = outputFileHandler.getOutputFileForWrite();
       writer = new IFile.WriterBytesWritable(rfs, finalOutPath,
           codec, outputRecordsCounter, outputRecordBytesCounter, compositeFetch, false, -1, -1,
-          writeBuffer);
+          writeBuffer, outputContext);
       ensureSpillFilePermissions(finalOutPath, rfs, rfsSpillFilePerms);
     } else {
       skipBuffers = false;
@@ -835,13 +835,13 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
               }
               if (writer == null) {
                 if (codec != null && compressorExternal == null) {
-                  compressorExternal = CodecUtils.getCompressor(codec);
+                  compressorExternal = outputContext.getCompressor(codec);
                 }
                 // all Writer instances share the same FSDataOutputStream out
                 writer = new WriterDataInputBuffer(
                     fsOutput, codec, null, null, compositeFetch, false,
                     maxKeyLen, maxValLen,
-                    writeBuffer, compressorExternal);
+                    writeBuffer, compressorExternal, outputContext);
               }
               numRecords += writePartition(buffer.partitionHeads[i], buffer, writer, key, val);
             }
@@ -873,7 +873,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
         val.close();
       } finally {
         if (compressorExternal != null) {
-          CodecPool.returnCompressor(compressorExternal);
+          outputContext.returnCompressor(codec.getCompressorType(), compressorExternal);
         }
         if (fsOutput != null) {
           fsOutput.close();
@@ -1369,7 +1369,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
         writer = new WriterDataInputBuffer(
             out, codec, null, null, compositeFetch, false,
             maxKeyLen, maxValLen,
-            writeBuffer, null);
+            writeBuffer, null, outputContext);
         try {
           for (WrappedBuffer buffer : filledBuffers) {
             if (buffer.partitionHeads[i] != WrappedBuffer.PARTITION_ABSENT_POSITION) {
@@ -1586,7 +1586,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
             writer = new IFile.WriterBytesWritable(out, codec, null, null,
                 compositeFetch, false,
                 maxKeyLen, maxValLen,
-                IFile.allocateWriteBufferSingle(), null);
+                IFile.allocateWriteBufferSingle(), null, outputContext);
             if (compositeFetch) {
               writer.appendNoRleTez(key, value);
             } else {

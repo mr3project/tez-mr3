@@ -29,14 +29,13 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.tez.common.counters.TezCounters;
 import org.apache.tez.dag.api.UserPayload;
-import org.slf4j.MDC;
 
 /**
  * Base interface for Context classes used to initialize the Input, Output
  * and Processor instances.
  * This interface is not supposed to be implemented by users
  */
-public interface TaskContext extends DecompressorPool {
+public interface TaskContext extends DecompressorPool, CompressorPool {
   /**
    * Get the {@link ApplicationId} for the running app
    * @return the {@link ApplicationId}

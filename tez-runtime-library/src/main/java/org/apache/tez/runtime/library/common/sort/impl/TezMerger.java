@@ -26,6 +26,7 @@ import java.util.List;
 
 import org.apache.tez.runtime.api.DecompressorPool;
 import org.apache.tez.util.FastByteComparisons;
+import org.apache.tez.runtime.api.TaskContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -69,11 +70,11 @@ public class TezMerger {
       TezCounter writesCounter,
       TezCounter bytesReadCounter,
       boolean checkForSameKeys,
-      DecompressorPool inputContext)
+      TaskContext taskContext)
       throws IOException, InterruptedException {
     return new MergeQueue(conf, fs, segments,
         sortSegments, codec, checkForSameKeys).merge(mergeFactor, inMemSegments, tmpDir,
-        readsCounter, writesCounter, bytesReadCounter, inputContext);
+        readsCounter, writesCounter, bytesReadCounter, taskContext);
   }
 
   public static void writeFile(TezRawKeyValueIterator records, IFile.WriterAppendDataInputBuffer writer,
@@ -202,12 +203,12 @@ public class TezMerger {
     boolean ifileReadAhead;
     int ifileReadAheadLength;
 
-    final DecompressorPool inputContext;
+    final TaskContext taskContext;
 
     public DiskSegment(FileSystem fs, Path file,
         long segmentOffset, long segmentLength, CompressionCodec codec,
         boolean ifileReadAhead, int ifileReadAheadLength,
-        boolean preserve, TezCounter mergedMapOutputsCounter, DecompressorPool inputContext) {
+        boolean preserve, TezCounter mergedMapOutputsCounter, TaskContext taskContext) {
       super(null, mergedMapOutputsCounter);
       this.fs = fs;
       this.file = file;
@@ -219,7 +220,7 @@ public class TezMerger {
       this.segmentOffset = segmentOffset;
       this.segmentLength = segmentLength;
 
-      this.inputContext = inputContext;
+      this.taskContext = taskContext;
     }
 
     @Override
@@ -228,7 +229,7 @@ public class TezMerger {
       FSDataInputStream in = fs.open(file);
       in.seek(segmentOffset);
       reader = new Reader(in, segmentLength, codec, readsCounter, bytesReadCounter, ifileReadAhead,
-          ifileReadAheadLength, inputContext);
+          ifileReadAheadLength, taskContext);
     }
 
     @Override
@@ -575,7 +576,7 @@ public class TezMerger {
                                      TezCounter readsCounter,
                                      TezCounter writesCounter,
                                      TezCounter bytesReadCounter,
-                                     DecompressorPool inputContext)
+                                     TaskContext taskContext)
         throws IOException, InterruptedException {
       if (segments.size() == 0) {
         LOG.info("Nothing to merge. Returning an empty iterator");
@@ -692,10 +693,10 @@ public class TezMerger {
             byteArrayOutput = new MultiByteArrayOutputStream(fs, outputFile);
             FSDataOutputStream outputStream = new FSDataOutputStream(byteArrayOutput, null);
             writer = new WriterDataInputBuffer(outputStream, codec, writesCounter, null,
-                false, checkForSameKeys, -1, -1, writeBuffer, null);
+                false, checkForSameKeys, -1, -1, writeBuffer, null, taskContext);
           } else {
             writer = new WriterDataInputBuffer(fs, outputFile, codec, writesCounter, null,
-                checkForSameKeys, writeBuffer);
+                checkForSameKeys, writeBuffer, taskContext);
           }
 
           writeFile(this, writer, recordsBeforeProgress);
@@ -708,12 +709,12 @@ public class TezMerger {
           Segment tempSegment;
           if (byteArrayOutput == null) {
             tempSegment = new DiskSegment(fs, outputFile, 0, fs.getFileStatus(outputFile).getLen(), codec,
-                ifileReadAhead, ifileReadAheadLength, false, null, inputContext);
+                ifileReadAhead, ifileReadAheadLength, false, null, taskContext);
           } else {
             IFile.KeyValueReaderDataInputBuffer reader = new Reader(
                 byteArrayOutput.createInputStreamFrom(0, byteArrayOutput.getTotalBytes()),
                 byteArrayOutput.getTotalBytes(),
-                codec, null, null, ifileReadAhead, ifileReadAheadLength, inputContext);
+                codec, null, null, ifileReadAhead, ifileReadAheadLength, taskContext);
             tempSegment = new IntermediateMemorySegment(reader, byteArrayOutput, true);
           }
 
