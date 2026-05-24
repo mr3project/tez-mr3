@@ -21,10 +21,13 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
+import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 abstract class MergeThread<T> extends Thread {
   
@@ -97,36 +100,44 @@ abstract class MergeThread<T> extends Thread {
     }
   }
 
+  protected abstract Map<String, String> getMdcContext();
+
   public void run() {
-    while (true) {
-      try {
-        // Wait for notification to start the merge...
-        synchronized (this) {
-          while (!inProgress) {
-            if (shuffleSchedulerThread != null&& !shuffleSchedulerThread.isAlive()) {
-              return;
+    Map<String, String> oldMdcContext = MDC.getCopyOfContextMap();
+    try {
+      ShuffleUtils.restoreMdc(getMdcContext());
+      while (true) {
+        try {
+          // Wait for notification to start the merge...
+          synchronized (this) {
+            while (!inProgress) {
+              if (shuffleSchedulerThread != null&& !shuffleSchedulerThread.isAlive()) {
+                return;
+              }
+              wait(1000);
             }
-            wait(1000);
+          }
+
+          // Merge
+          merge(inputs);
+        } catch (InterruptedException ie) {
+          // Meant to handle a shutdown of the entire fetch/merge process
+          Thread.currentThread().interrupt();
+          return;
+        } catch(Throwable t) {
+          reporter.reportException(t);
+          return;
+        } finally {
+          synchronized (this) {
+            // Clear inputs
+            inputs.clear();
+            inProgress = false;
+            notifyAll();
           }
         }
-
-        // Merge
-        merge(inputs);
-      } catch (InterruptedException ie) {
-        // Meant to handle a shutdown of the entire fetch/merge process
-        Thread.currentThread().interrupt();
-        return;
-      } catch(Throwable t) {
-        reporter.reportException(t);
-        return;
-      } finally {
-        synchronized (this) {
-          // Clear inputs
-          inputs.clear();
-          inProgress = false;        
-          notifyAll();
-        }
       }
+    } finally {
+      ShuffleUtils.restoreMdc(oldMdcContext);
     }
   }
 

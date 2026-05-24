@@ -714,14 +714,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     }
 
     @Override
-    public void run() {
-      Map<String, String> oldMdcContext = MDC.getCopyOfContextMap();
-      try {
-        ShuffleUtils.restoreMdc(mdcContext);
-        super.run();
-      } finally {
-        ShuffleUtils.restoreMdc(oldMdcContext);
-      }
+    protected Map<String, String> getMdcContext() {
+      return mdcContext;
     }
 
     @Override
@@ -845,14 +839,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     }
 
     @Override
-    public void run() {
-      Map<String, String> oldMdcContext = MDC.getCopyOfContextMap();
-      try {
-        ShuffleUtils.restoreMdc(mdcContext);
-        super.run();
-      } finally {
-        ShuffleUtils.restoreMdc(oldMdcContext);
-      }
+    protected Map<String, String> getMdcContext() {
+      return mdcContext;
     }
 
     @Override
@@ -959,14 +947,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     }
 
     @Override
-    public void run() {
-      Map<String, String> oldMdcContext = MDC.getCopyOfContextMap();
-      try {
-        ShuffleUtils.restoreMdc(mdcContext);
-        super.run();
-      } finally {
-        ShuffleUtils.restoreMdc(oldMdcContext);
-      }
+    protected Map<String, String> getMdcContext() {
+      return mdcContext;
     }
 
     @Override

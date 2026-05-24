@@ -328,13 +328,13 @@ public class Shuffle implements ExceptionReporter {
         if (ignoreErrors) {
           //Reset the status
           Thread.currentThread().interrupt();
-          LOG.info(srcNameTrimmed + ": Interrupted while attempting to close the merger during cleanup. Ignoring");
+          LOG.info("{}: Interrupted while attempting to close the merger during cleanup. Ignoring", srcNameTrimmed);
         } else {
           throw e;
         }
       } catch (Throwable e) {
         if (ignoreErrors) {
-          LOG.info(srcNameTrimmed + ": Exception while trying to shutdown merger, Ignoring", e);
+          LOG.info("{}: Exception while trying to shutdown merger, Ignoring", srcNameTrimmed, e);
         } else {
           throw e;
         }
@@ -356,7 +356,7 @@ public class Shuffle implements ExceptionReporter {
       }
       cleanupMerger(true);
     } catch (Throwable t) {
-      LOG.info(srcNameTrimmed + ": Error in cleaning up..,", t);
+      LOG.info("{}: Error in cleaning up..,", srcNameTrimmed, t);
     }
   }
 
