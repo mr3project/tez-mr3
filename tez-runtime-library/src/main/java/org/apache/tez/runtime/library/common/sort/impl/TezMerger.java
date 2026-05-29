@@ -59,7 +59,7 @@ public class TezMerger {
   private static LocalDirAllocator lDirAlloc = 
     new LocalDirAllocator(TezRuntimeFrameworkConfigs.LOCAL_DIRS);
 
-  public static <K extends Object, V extends Object>
+  public static
   TezRawKeyValueIterator merge(Configuration conf, FileSystem fs,
       CompressionCodec codec,
       List<Segment> segments,
@@ -285,7 +285,7 @@ public class TezMerger {
     }
   }
 
-  static class MergeQueue<K extends Object, V extends Object>
+  static class MergeQueue
   extends PriorityQueue<Segment> implements TezRawKeyValueIterator {
     final Configuration conf;
     final FileSystem fs;
@@ -454,7 +454,7 @@ public class TezMerger {
 
       return TezBytesComparator.compare(key1.getData(), s1, l1, key2.getData(), s2, l2) < 0;
     }
-    
+
     TezRawKeyValueIterator merge(int factor, int inMem, Path tmpDir,
                                      TezCounter readsCounter,
                                      TezCounter writesCounter,
