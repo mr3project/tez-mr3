@@ -19,6 +19,7 @@ package org.apache.tez.runtime.library.common.sort.impl;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -36,7 +37,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.hadoop.util.PriorityQueue;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.runtime.api.MultiByteArrayOutputStream;
@@ -286,11 +286,12 @@ public class TezMerger {
   }
 
   static class MergeQueue<K extends Object, V extends Object>
-  extends PriorityQueue<Segment> implements TezRawKeyValueIterator {
+  implements TezRawKeyValueIterator {
     final Configuration conf;
     final FileSystem fs;
     final CompressionCodec codec;
     final boolean checkForSameKeys;
+    private final SegmentHeap heap = new SegmentHeap();
     static final boolean ifileReadAhead = TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_DEFAULT;
     static final int ifileReadAheadLength = TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_BYTES_DEFAULT;
     static final long recordsBeforeProgress = TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT;
@@ -334,7 +335,7 @@ public class TezMerger {
 
     public void close() throws IOException {
       Segment segment;
-      while((segment = pop()) != null) {
+      while((segment = heap.pop()) != null) {
         segment.close();
       }
     }
@@ -377,10 +378,10 @@ public class TezMerger {
       }
       hasNext = reader.readRawKey(nextKey);
       if (hasNext == KeyState.NEW_KEY) {
-        adjustTop();
+        heap.updateTop();
         compareKeyWithNextTopKey(reader);
       } else if(hasNext == KeyState.NO_KEY) {
-        pop();
+        heap.pop();
         reader.close();
         compareKeyWithNextTopKey(null);
       } else if(hasNext == KeyState.SAME_KEY) {
@@ -396,7 +397,7 @@ public class TezMerger {
      * @throws IOException
      */
     void compareKeyWithNextTopKey(Segment current) throws IOException {
-      Segment nextTop = top();
+      Segment nextTop = heap.top();
       if (checkForSameKeys && nextTop != current) {
         // we have a different file. Compare it with previous key
         KeyValueBuffer nextKey = nextTop.getKey();
@@ -413,7 +414,7 @@ public class TezMerger {
         return false;
       }
 
-      minSegment = top();
+      minSegment = heap.top();
       KeyValueBuffer nextKey = minSegment.getKey();
       key.reset(nextKey.getData(), nextKey.getPosition(), nextKey.getLength());
       if (!minSegment.inMemory()) {
@@ -444,17 +445,122 @@ public class TezMerger {
       return TezBytesComparator.compare(b1, s1, l1, b2, s2, l2);
     }
 
-    protected boolean lessThan(Object a, Object b) {
-      KeyValueBuffer key1 = ((Segment)a).getKey();
-      KeyValueBuffer key2 = ((Segment)b).getKey();
-      int s1 = key1.getPosition();
-      int l1 = key1.getLength();
-      int s2 = key2.getPosition();
-      int l2 = key2.getLength();;
+    /*
+     * MergeQueue advances the top Segment and then repairs the heap. This
+     * specialized heap avoids the generic Hadoop PriorityQueue path, and
+     * secondTop() is provided for a later same-key optimization.
+     */
+    private static final class SegmentHeap {
+      private Segment[] heap = new Segment[0];
+      private int size;
 
-      return TezBytesComparator.compare(key1.getData(), s1, l1, key2.getData(), s2, l2) < 0;
+      void initialize(int capacity) {
+        clear();
+        if (heap.length < capacity) {
+          heap = new Segment[capacity];
+        }
+      }
+
+      void clear() {
+        Arrays.fill(heap, 0, size, null);
+        size = 0;
+      }
+
+      int size() {
+        return size;
+      }
+
+      Segment top() {
+        return size == 0 ? null : heap[0];
+      }
+
+      Segment pop() {
+        if (size == 0) {
+          return null;
+        }
+
+        Segment result = heap[0];
+        Segment segment = heap[--size];
+        heap[size] = null;
+        if (size > 0) {
+          siftDown(0, segment);
+        }
+        return result;
+      }
+
+      void put(Segment segment) {
+        ensureCapacity(size + 1);
+        siftUp(size++, segment);
+      }
+
+      Segment updateTop() {
+        if (size == 0) {
+          return null;
+        }
+
+        Segment segment = heap[0];
+        siftDown(0, segment);
+        return heap[0];
+      }
+
+      Segment secondTop() {
+        if (size < 2) {
+          return null;
+        }
+        if (size == 2) {
+          return heap[1];
+        }
+        return lessThan(heap[1], heap[2]) ? heap[1] : heap[2];
+      }
+
+      private void ensureCapacity(int capacity) {
+        if (heap.length < capacity) {
+          int newCapacity = Math.max(capacity, Math.max(1, heap.length * 2));
+          heap = Arrays.copyOf(heap, newCapacity);
+        }
+      }
+
+      private void siftUp(int index, Segment segment) {
+        while (index > 0) {
+          int parent = (index - 1) >>> 1;
+          Segment parentSegment = heap[parent];
+          if (!lessThan(segment, parentSegment)) {
+            break;
+          }
+          heap[index] = parentSegment;
+          index = parent;
+        }
+        heap[index] = segment;
+      }
+
+      private void siftDown(int index, Segment segment) {
+        int half = size >>> 1;
+        while (index < half) {
+          int child = (index << 1) + 1;
+          Segment childSegment = heap[child];
+          int right = child + 1;
+          if (right < size && lessThan(heap[right], childSegment)) {
+            child = right;
+            childSegment = heap[child];
+          }
+          if (lessThan(segment, childSegment)) {
+            break;
+          }
+          heap[index] = childSegment;
+          index = child;
+        }
+        heap[index] = segment;
+      }
+
+      private static boolean lessThan(Segment a, Segment b) {
+        KeyValueBuffer key1 = a.getKey();
+        KeyValueBuffer key2 = b.getKey();
+        return TezBytesComparator.compare(
+            key1.getData(), key1.getPosition(), key1.getLength(),
+            key2.getData(), key2.getPosition(), key2.getLength()) < 0;
+      }
     }
-    
+
     TezRawKeyValueIterator merge(int factor, int inMem, Path tmpDir,
                                      TezCounter readsCounter,
                                      TezCounter writesCounter,
@@ -524,11 +630,11 @@ public class TezMerger {
           numSegmentsToConsider = factor - segmentsConsidered;
         }
         
-        // feed the streams to the priority queue
-        initialize(segmentsToMerge.size());
-        clear();
+        // feed the streams to the heap
+        heap.initialize(segmentsToMerge.size());
+        heap.clear();
         for (Segment segment : segmentsToMerge) {
-          put(segment);
+          heap.put(segment);
         }
         
         // if we have lesser number of segments remaining, then just return the iterator,
@@ -585,7 +691,7 @@ public class TezMerger {
           writeFile(this, writer, recordsBeforeProgress);
           writer.close();
           
-          // we finished one single level merge; now clean up the priority queue
+          // we finished one single level merge; now clean up the heap
           this.close();
 
           // Add the newly create segment to the list of segments to be merged
@@ -656,15 +762,15 @@ public class TezMerger {
     }
 
     public boolean hasNext() throws IOException {
-      if (size() == 0)
+      if (heap.size() == 0)
         return false;
 
       if (minSegment != null) {
         // minSegment is non-null for all invocations of next except the first one.
-        // For the first invocation, the priority queue is ready for use
+        // For the first invocation, the heap is ready for use
         // but for the subsequent invocations, first adjust the queue.
         adjustPriorityQueue(minSegment);
-        if (size() == 0) {
+        if (heap.size() == 0) {
           minSegment = null;
           return false;
         }
