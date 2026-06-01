@@ -1009,8 +1009,7 @@ public class IFile {
      * Construct an IFile Reader.
      *
      * @param in   The input stream
-     * @param length Length of the data in the stream, including the checksum
-     *               bytes.
+     * @param length Length of the data in the stream, including the checksum bytes.
      * @param codec codec
      * @param readsCounter Counter for records read from disk
      * @throws IOException
@@ -1028,15 +1027,15 @@ public class IFile {
       this.readRecordsCounter = readsCounter;
       this.bytesReadCounter = bytesReadCounter;
 
-      checksumIn = new IFileInputStream(
-          in, length, readAhead, readAheadLength/* , isCompressed */);
+      checksumIn = new IFileInputStream(in, length, readAhead, readAheadLength/* , isCompressed */);
       if (isCompressed && codec != null) {
         assert taskContext != null;
         this.codec = codec;
         this.taskContext = taskContext;
         decompressor = taskContext.getDecompressor(codec);
         if (decompressor != null) {
-          this.in = CodecUtils.createInputStream(codec, checksumIn, decompressor);
+          this.in = CodecUtils.getDecompressedInputStreamWithBufferSize(
+              codec, checksumIn, decompressor, (int)Math.min(length, Integer.MAX_VALUE));
         } else {
           LOG.warn("Could not obtain decompressor from CodecPool");
           this.in = checksumIn;
@@ -1058,25 +1057,25 @@ public class IFile {
      * Read entire ifile content to memory.
      *
      * @param buffer
-     * @param in
+     * @param sourceIn
      * @param compressedLength
      * @param codec
      * @param ifileReadAhead
      * @param ifileReadAheadLength
      * @throws IOException
      */
-    public static void readToMemory(byte[] buffer, InputStream in, int compressedLength,
+    public static void readToMemory(byte[] buffer, InputStream sourceIn, int compressedLength,
         CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLength,
         TaskContext taskContext, boolean useThreadLocalDecompressor)
         throws IOException {
       byte[] header = new byte[HEADER.length];
-      byte headerFlag = readHeader(in, header);
+      byte headerFlag = readHeader(sourceIn, header);
       boolean isCompressed = (headerFlag & FLAG_COMPRESSED) != 0;
       System.arraycopy(header, 0, buffer, 0, HEADER.length);
-      IFileInputStream checksumIn = new IFileInputStream(in,
-          compressedLength - IFile.HEADER.length, ifileReadAhead,
-          ifileReadAheadLength);
-      in = checksumIn;
+      int checksumInLength = compressedLength - IFile.HEADER.length;
+      IFileInputStream checksumIn = new IFileInputStream(
+          sourceIn, checksumInLength, ifileReadAhead, ifileReadAheadLength);
+      InputStream in = checksumIn;
       Decompressor decompressor = null;
       if (isCompressed && codec != null) {
         if (useThreadLocalDecompressor) {
@@ -1093,7 +1092,7 @@ public class IFile {
         if (decompressor != null) {
           decompressor.reset();
           in = CodecUtils.getDecompressedInputStreamWithBufferSize(
-              codec, checksumIn, decompressor, compressedLength);
+              codec, checksumIn, decompressor, checksumInLength);
         } else {
           LOG.warn("Could not obtain decompressor from CodecPool");
           in = checksumIn;
@@ -1112,7 +1111,7 @@ public class IFile {
           throw new IOException("Unexpected extra bytes from input stream");
         }
       } catch (IOException ioe) {
-        if(in != null) {
+        if (in != null) {
           try {
             in.close();
           } catch(IOException e) {
