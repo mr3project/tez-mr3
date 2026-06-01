@@ -1510,7 +1510,7 @@ public final class PipelinedSorter {
       }
 
       // sort by key
-      final int cmp = TezBytesComparator.compare(
+      final int cmp = FastByteComparisons.compareTo(
           kvbufferArray, kvbufferArrayOffset + istart, ilen,
           kvbufferArray, kvbufferArrayOffset + jstart, jlen);
       if (cmp == 0) eq++;
@@ -1603,7 +1603,7 @@ public final class PipelinedSorter {
         valstart = (int) (keyValStartPair >>> Integer.SIZE);
         final byte[] buf = kvbuffer.array();
         final int off = kvbuffer.arrayOffset();
-        cmp = TezBytesComparator.compare(buf,
+        cmp = FastByteComparisons.compareTo(buf,
             keystart + off , (valstart - keystart),
             needle.getData(),
             needle.getPosition(), (needle.getLength() - needle.getPosition()));

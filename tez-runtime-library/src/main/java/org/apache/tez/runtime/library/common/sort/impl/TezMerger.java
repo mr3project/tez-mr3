@@ -25,6 +25,7 @@ import java.util.Comparator;
 import java.util.List;
 
 import org.apache.tez.runtime.api.DecompressorPool;
+import org.apache.tez.util.FastByteComparisons;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -41,7 +42,6 @@ import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.runtime.api.MultiByteArrayOutputStream;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
-import org.apache.tez.runtime.library.common.comparator.TezBytesComparator;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader.KeyState;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterDataInputBuffer;
@@ -442,7 +442,7 @@ public class TezMerger {
       int s2 = 0;
       int l1 = nextKey.getLength();
       int l2 = buf2.getLength();
-      return TezBytesComparator.compareEqual(b1, s1, l1, b2, s2, l2);
+      return FastByteComparisons.compareEqual(b1, s1, l1, b2, s2, l2);
     }
 
     /*
@@ -559,7 +559,7 @@ public class TezMerger {
       private boolean wins(int left, int right) {
         KeyValueBuffer key1 = leaves[left].getKey();
         KeyValueBuffer key2 = leaves[right].getKey();
-        int comparison = TezBytesComparator.compare(
+        int comparison = FastByteComparisons.compareTo(
             key1.getData(), key1.getPosition(), key1.getLength(),
             key2.getData(), key2.getPosition(), key2.getLength());
         return comparison < 0 || (comparison == 0 && left < right);

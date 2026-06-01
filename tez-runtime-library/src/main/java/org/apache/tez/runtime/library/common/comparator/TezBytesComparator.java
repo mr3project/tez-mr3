@@ -22,63 +22,8 @@ import org.apache.tez.util.FastByteComparisons;
 
 public final class TezBytesComparator {
 
-  private TezBytesComparator() {}
-
-  /**
-   * Compare the buffers in serialized form.
-   */
-  // copy of FastByteComparisons.UnsafeComparer.compareTo()
-  public static int compare(byte[] buffer1, int offset1, int length1,
-                            byte[] buffer2, int offset2, int length2) {
-    assert !(buffer1 == buffer2 && offset1 == offset2);
-
-    final int stride = 8;
-    int minLength = Math.min(length1, length2);
-    int strideLimit = minLength & ~(stride - 1);
-    int offset1Adj = offset1 + FastByteComparisons.BYTE_ARRAY_BASE_OFFSET;
-    int offset2Adj = offset2 + FastByteComparisons.BYTE_ARRAY_BASE_OFFSET;
-    int i;
-
-    for (i = 0; i < strideLimit; i += stride) {
-      long lw = FastByteComparisons.theUnsafe.getLong(buffer1, offset1Adj + (long) i);
-      long rw = FastByteComparisons.theUnsafe.getLong(buffer2, offset2Adj + (long) i);
-
-      if (lw != rw) {
-        long bw = Long.reverseBytes(lw);
-        long br = Long.reverseBytes(rw);
-        return Long.compareUnsigned(bw, br);
-      }
-    }
-
-    for (; i < minLength; i++) {
-      int b1 = buffer1[offset1 + i] & 0xFF;
-      int b2 = buffer2[offset2 + i] & 0xFF;
-      if (b1 != b2) {
-        return b1 - b2;
-      }
-    }
-    return length1 - length2;
-  }
-
-  // copy of FastByteComparisons.UnsafeComparer.compareEqual()
-  public static boolean compareEqual(byte[] arg1, final int s1, final int len1,
-                                     byte[] arg2, final int s2, final int len2) {
-    if (len1 != len2) return false;
-    if (len1 == 0) return true;
-    int longEnd = len1 - (len1 & 7);
-    for (int i = 0; i < longEnd; i += 8) {
-      long l1 = FastByteComparisons.theUnsafe.getLong(arg1, FastByteComparisons.BYTE_ARRAY_BASE_OFFSET + s1 + i);
-      long l2 = FastByteComparisons.theUnsafe.getLong(arg2, FastByteComparisons.BYTE_ARRAY_BASE_OFFSET + s2 + i);
-      if (l1 != l2) return false;
-    }
-    for (int i = longEnd; i < len1; i++) {
-      if (arg1[s1+i] != arg2[s2+i]) return false;
-    }
-    return true;
-  }
-
   public static int compare(BytesWritable key1, BytesWritable key2) {
-    return compare(
+    return FastByteComparisons.compareTo(
         key1.getBytesRaw(), key1.getOffset(), key1.getLength(),
         key2.getBytesRaw(), key2.getOffset(), key2.getLength());
   }
