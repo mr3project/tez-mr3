@@ -66,7 +66,22 @@ public final class CodecUtils {
   // conf is specific to each RuntimeTask
   public static FetcherConfigCommon constructFetcherConfigCommon(
       Configuration conf, TaskContext taskContext) throws IOException {
-    Configuration codecConf = CodecUtils.reduceConfForCodec(conf);
+    boolean enabled = ConfigUtils.shouldCompressIntermediateOutput(conf);
+    Configuration codecConf = CodecUtils.reduceConfForCodec(conf, enabled);
+    Class<? extends CompressionCodec> codecClass = null;
+    int bufferSize = -1;
+    if (enabled) {
+      codecClass = ConfigUtils.getIntermediateOutputCompressorClass(codecConf, DefaultCodec.class);
+      if (codecClass == SnappyCodec.class) {
+        bufferSize = codecConf.getInt(
+            CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_KEY,
+            CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_DEFAULT);
+      } else if (codecClass == ZStandardCodec.class) {
+        bufferSize = codecConf.getInt(
+            CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_KEY,
+            CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_DEFAULT);
+      }
+    }
 
     String auxiliaryService = ShuffleUtils.getTezShuffleHandlerServiceId(conf);
     SecretKey shuffleSecret = ShuffleUtils.getJobTokenSecretFromTokenBytes(
@@ -95,6 +110,8 @@ public final class CodecUtils {
 
     return new FetcherConfigCommon(
         codecConf,
+        codecClass,
+        bufferSize,
         jobTokenSecretMgr,
         httpConnectionParams,
         localFs,
@@ -138,10 +155,9 @@ public final class CodecUtils {
         maxSpeculativeFetchAttempts);
   }
 
-  private static Configuration reduceConfForCodec(Configuration conf) {
+  private static Configuration reduceConfForCodec(Configuration conf, boolean enabled) {
     Configuration newConf = new Configuration(false);
 
-    boolean enabled = ConfigUtils.shouldCompressIntermediateOutput(conf);
     newConf.setBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS, enabled);
 
     String compressionCodec = conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS_CODEC);
@@ -158,58 +174,45 @@ public final class CodecUtils {
     return newConf;
   }
 
-  // This is the only place where we call codecConf.getInt() to set the buffer size in CompressionCodec.
-  // In the current implementation, codecConf is created as: new Configuration(fetcherConfigCommon.codecConf).
-  // This implies that the buffer size is set only when ShuffleServer starts, and
-  // the buffer size for individual queries is NOT honored.
-  // TODO: pass bufferSize as an argument
-  public static CompressionCodec getCodec(Configuration codecConf) throws IOException {
-    if (ConfigUtils.shouldCompressIntermediateOutput(codecConf)) {
-      Class<? extends CompressionCodec> codecClass =
-          ConfigUtils.getIntermediateOutputCompressorClass(codecConf, DefaultCodec.class);
-      CompressionCodec codec = ReflectionUtils.newInstance(codecClass, codecConf);
+  public static CompressionCodec getCodec(Configuration codecConf,
+      Class<? extends CompressionCodec> codecClass, int bufferSize) throws IOException {
+    if (codecClass == null) {
+      return null;
+    }
 
-      if (codec != null) {
-        Class<? extends Compressor> compressorType = null;
-        Throwable cause = null;
-        try {
-          compressorType = codec.getCompressorType();
-        } catch (RuntimeException e) {
-          cause = e;
-        }
+    CompressionCodec codec = ReflectionUtils.newInstance(codecClass, codecConf);
 
-        if (compressorType == null) {
-          String errMsg = String.format(
-              "Unable to get CompressorType for codec (%s). This is most likely due to missing native libraries for the codec.",
-              codecConf.get(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS_CODEC));
-          throw new IOException(errMsg, cause);
-        }
+    if (codec != null) {
+      Class<? extends Compressor> compressorType = null;
+      Throwable cause = null;
+      try {
+        compressorType = codec.getCompressorType();
+      } catch (RuntimeException e) {
+        cause = e;
+      }
 
-        String bufferSizeProp = getBufferSizeProperty(codec);
-        if (bufferSizeProp != null) {
-          if (bufferSizeProp.equals(CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_KEY)) {
-            int bufferSize = codecConf.getInt(
-                CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_KEY,
-                CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_DEFAULT);
-            SnappyCodec snappyCodec = (SnappyCodec)codec;
-            synchronized (snappyCodec.getConf()) {
-              snappyCodec.setBufferSize(bufferSize);
-            }
-          } else if (bufferSizeProp.equals(CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_KEY)) {
-            int bufferSize = codecConf.getInt(
-                CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_KEY,
-                CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_DEFAULT);
-            ZStandardCodec zstdCodec = (ZStandardCodec)codec;
-            synchronized (zstdCodec.getConf()) {
-              zstdCodec.setBufferSize(bufferSize);
-            }
+      if (compressorType == null) {
+        String errMsg = String.format(
+            "Unable to get CompressorType for codec (%s). This is most likely due to missing native libraries for the codec.",
+            codecConf.get(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS_CODEC));
+        throw new IOException(errMsg, cause);
+      }
+
+      if (bufferSize != -1) {
+        if (codecClass == SnappyCodec.class) {
+          SnappyCodec snappyCodec = (SnappyCodec)codec;
+          synchronized (snappyCodec.getConf()) {
+            snappyCodec.setBufferSize(bufferSize);
+          }
+        } else if (codecClass == ZStandardCodec.class) {
+          ZStandardCodec zstdCodec = (ZStandardCodec)codec;
+          synchronized (zstdCodec.getConf()) {
+            zstdCodec.setBufferSize(bufferSize);
           }
         }
       }
-      return codec;
-    } else {
-      return null;
     }
+    return codec;
   }
 
   public static Compressor getCompressor(CompressionCodec codec) {

@@ -229,8 +229,12 @@ public final class PipelinedSorter {
           + ", reportPartitionStats=" + reportPartitionStats);
     }
 
-    Configuration codecConf = ShuffleServer.getCodecConf(outputContext.peekShuffleServer(), conf);
-    this.codec = CodecUtils.getCodec(codecConf);
+    Object shuffleServer = outputContext.peekShuffleServer();
+    Configuration codecConf = ShuffleServer.getCodecConf(shuffleServer, conf);
+    this.codec = CodecUtils.getCodec(
+        codecConf,
+        ShuffleServer.getCodecClass(shuffleServer),
+        ShuffleServer.getCodecBufferSize(shuffleServer));
 
     this.ifileReadAhead = this.conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD,

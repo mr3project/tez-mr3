@@ -25,6 +25,7 @@ import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.compress.CompressionCodec;
 
 import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.runtime.api.FetcherConfig;
@@ -85,6 +86,22 @@ public class ShuffleServer implements FetcherCallback {
       return new Configuration(((ShuffleServer)instance).fetcherConfigCommon.codecConf);
     } else {
       return new Configuration(conf);
+    }
+  }
+
+  public static Class<? extends CompressionCodec> getCodecClass(Object instance) {
+    if (instance != null) {
+      return ((ShuffleServer)instance).fetcherConfigCommon.codecClass;
+    } else {
+      return null;
+    }
+  }
+
+  public static int getCodecBufferSize(Object instance) {
+    if (instance != null) {
+      return ((ShuffleServer)instance).fetcherConfigCommon.bufferSize;
+    } else {
+      return -1;
     }
   }
 

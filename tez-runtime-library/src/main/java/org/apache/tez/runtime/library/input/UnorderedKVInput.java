@@ -114,8 +114,12 @@ public class UnorderedKVInput extends AbstractLogicalInput implements LogicalInp
       ////// Initial configuration
       memoryUpdateCallbackHandler.validateUpdateReceived();
 
-      Configuration codecConf = ShuffleServer.getCodecConf(getContext().peekShuffleServer(), conf);
-      CompressionCodec codec = CodecUtils.getCodec(codecConf);
+      Object shuffleServer = getContext().peekShuffleServer();
+      Configuration codecConf = ShuffleServer.getCodecConf(shuffleServer, conf);
+      CompressionCodec codec = CodecUtils.getCodec(
+          codecConf,
+          ShuffleServer.getCodecClass(shuffleServer),
+          ShuffleServer.getCodecBufferSize(shuffleServer));
 
       boolean ifileReadAhead = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD,
           TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_DEFAULT);

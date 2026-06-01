@@ -3,6 +3,7 @@ package org.apache.tez.runtime.api;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.RawLocalFileSystem;
+import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.tez.common.security.JobTokenSecretManager;
 import org.apache.tez.http.HttpConnectionParams;
 
@@ -10,6 +11,8 @@ import org.apache.tez.http.HttpConnectionParams;
 public class FetcherConfigCommon {
 
   public final Configuration codecConf;
+  public final Class<? extends CompressionCodec> codecClass;
+  public final int bufferSize;
   public final JobTokenSecretManager jobTokenSecretMgr;
   public final HttpConnectionParams httpConnectionParams;
 
@@ -24,6 +27,8 @@ public class FetcherConfigCommon {
 
   public FetcherConfigCommon(
       Configuration codecConf,
+      Class<? extends CompressionCodec> codecClass,
+      int bufferSize,
       JobTokenSecretManager jobTokenSecretMgr,
       HttpConnectionParams httpConnectionParams,
       RawLocalFileSystem localFs,
@@ -35,6 +40,8 @@ public class FetcherConfigCommon {
       boolean compositeFetch,
       boolean connectionFailAllInput) {
     this.codecConf = codecConf;
+    this.codecClass = codecClass;
+    this.bufferSize = bufferSize;
     this.jobTokenSecretMgr = jobTokenSecretMgr;
     this.httpConnectionParams = httpConnectionParams;
 
