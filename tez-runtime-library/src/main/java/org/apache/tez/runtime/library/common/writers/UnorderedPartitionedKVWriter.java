@@ -268,10 +268,12 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     try {
       Object shuffleServer = outputContext.peekShuffleServer();
       Configuration codecConf = ShuffleServer.getCodecConf(shuffleServer, conf);
+      Class<? extends CompressionCodec> codecClass =
+          ShuffleServer.getCodecClass(shuffleServer, codecConf);
       this.codec = CodecUtils.getCodec(
           codecConf,
-          ShuffleServer.getCodecClass(shuffleServer),
-          ShuffleServer.getCodecBufferSize(shuffleServer));
+          codecClass,
+          ShuffleServer.getCodecBufferSize(shuffleServer, codecConf, codecClass));
     } catch (IOException e) {
       throw new RuntimeException(e);
     }

@@ -25,7 +25,11 @@ import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.hadoop.io.compress.DefaultCodec;
+import org.apache.hadoop.io.compress.SnappyCodec;
+import org.apache.hadoop.io.compress.ZStandardCodec;
 
 import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.runtime.api.FetcherConfig;
@@ -33,6 +37,7 @@ import org.apache.tez.runtime.api.FetcherConfigCommon;
 import org.apache.tez.runtime.api.ProcessorContext;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
+import org.apache.tez.runtime.library.common.ConfigUtils;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.shuffle.impl.FetcherUnordered;
 import org.apache.tez.runtime.library.common.shuffle.impl.ShuffleManager;
@@ -89,20 +94,34 @@ public class ShuffleServer implements FetcherCallback {
     }
   }
 
-  public static Class<? extends CompressionCodec> getCodecClass(Object instance) {
+  public static Class<? extends CompressionCodec> getCodecClass(
+      Object instance, Configuration codecConf) {
     if (instance != null) {
       return ((ShuffleServer)instance).fetcherConfigCommon.codecClass;
-    } else {
-      return null;
     }
+
+    if (ConfigUtils.shouldCompressIntermediateOutput(codecConf)) {
+      return ConfigUtils.getIntermediateOutputCompressorClass(codecConf, DefaultCodec.class);
+    }
+    return null;
   }
 
-  public static int getCodecBufferSize(Object instance) {
+  public static int getCodecBufferSize(
+      Object instance, Configuration codecConf, Class<? extends CompressionCodec> codecClass) {
     if (instance != null) {
       return ((ShuffleServer)instance).fetcherConfigCommon.bufferSize;
-    } else {
-      return -1;
     }
+
+    if (codecClass == SnappyCodec.class) {
+      return codecConf.getInt(
+          CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_KEY,
+          CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_DEFAULT);
+    } else if (codecClass == ZStandardCodec.class) {
+      return codecConf.getInt(
+          CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_KEY,
+          CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_DEFAULT);
+    }
+    return -1;
   }
 
   public static class PathPartition {

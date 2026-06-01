@@ -98,10 +98,12 @@ public class Shuffle implements ExceptionReporter {
 
     Object shuffleServer = inputContext.peekShuffleServer();
     Configuration codecConf = ShuffleServer.getCodecConf(shuffleServer, conf);
+    Class<? extends CompressionCodec> codecClass =
+        ShuffleServer.getCodecClass(shuffleServer, codecConf);
     CompressionCodec codec = CodecUtils.getCodec(
         codecConf,
-        ShuffleServer.getCodecClass(shuffleServer),
-        ShuffleServer.getCodecBufferSize(shuffleServer));
+        codecClass,
+        ShuffleServer.getCodecBufferSize(shuffleServer, codecConf, codecClass));
 
     boolean ifileReadAhead = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD,
