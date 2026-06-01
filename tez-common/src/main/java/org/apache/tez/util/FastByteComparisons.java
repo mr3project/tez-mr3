@@ -74,10 +74,8 @@ public final class FastByteComparisons {
    * Lexicographically compare two byte arrays.
    */
   public static int compareTo(byte[] buffer1, int offset1, int length1, byte[] buffer2, int offset2, int length2) {
-    if (buffer1 == buffer2 &&
-        offset1 == offset2 &&
-        length1 == length2) {
-      return 0;
+    if (buffer1 == buffer2 && offset1 == offset2) {
+      return length1 - length2;
     }
 
     final int stride = 8;
