@@ -185,16 +185,43 @@ public final class CodecUtils {
     }
   }
 
+  public static Compressor getCompressor(CompressionCodec codec) {
+    synchronized (((Configurable) codec).getConf()) {
+      return CodecPool.getCompressor(codec);
+    }
+  }
+
+  // never used because MR3 TezDecompressorPool calls CodecPool.getDecompressor()
+  public static Decompressor getDecompressor(CompressionCodec codec) {
+    synchronized (((Configurable) codec).getConf()) {
+      return CodecPool.getDecompressor(codec);
+    }
+  }
+
+  public static CompressionInputStream createInputStream(CompressionCodec codec,
+      InputStream checksumIn, Decompressor decompressor) throws IOException {
+    synchronized (((Configurable) codec).getConf()) {
+      return codec.createInputStream(checksumIn, decompressor);
+    }
+  }
+
+  public static CompressionOutputStream createOutputStream(CompressionCodec codec,
+      OutputStream checksumOut, Compressor compressor) throws IOException {
+    synchronized (((Configurable) codec).getConf()) {
+      return codec.createOutputStream(checksumOut, compressor);
+    }
+  }
+
   public static InputStream getDecompressedInputStreamWithBufferSize(CompressionCodec codec,
       IFileInputStream checksumIn, Decompressor decompressor, int compressedLength)
       throws IOException {
     String bufferSizeProp = getBufferSizeProperty(codec);
     CompressionInputStream in = null;
 
-    if (bufferSizeProp != null) {
-      Configurable configurableCodec = (Configurable) codec;
-      Configuration conf = configurableCodec.getConf();
+    Configurable configurableCodec = (Configurable) codec;
+    Configuration conf = configurableCodec.getConf();
 
+    if (bufferSizeProp != null) {
       if (bufferSizeProp.equals(CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_KEY)) {
         int defaultBufferSize = CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_DEFAULT;
         int newBufSize = Math.min(compressedLength, defaultBufferSize);
@@ -235,7 +262,6 @@ public final class CodecUtils {
         if (originalSize != newBufSize) {
           conf.setInt(bufferSizeProp, newBufSize);
         }
-
         in = codec.createInputStream(checksumIn, decompressor);
         /*
          * We would better reset the original buffer size into the codec. Basically the buffer size
@@ -265,38 +291,45 @@ public final class CodecUtils {
           conf.setInt(bufferSizeProp, originalSize);
         }
       }
-    } else {
-      in = codec.createInputStream(checksumIn, decompressor);
+      return in;
     }
 
+    synchronized (conf) {
+      in = codec.createInputStream(checksumIn, decompressor);
+    }
     return in;
   }
 
-  public static Compressor getCompressor(CompressionCodec codec) {
-    synchronized (((Configurable) codec).getConf()) {
-      return CodecPool.getCompressor(codec);
-    }
-  }
-
-  // never used because MR3 TezDecompressorPool calls CodecPool.getDecompressor()
-  public static Decompressor getDecompressor(CompressionCodec codec) {
-    synchronized (((Configurable) codec).getConf()) {
-      return CodecPool.getDecompressor(codec);
-    }
-  }
-
-  public static CompressionInputStream createInputStream(CompressionCodec codec,
-      InputStream checksumIn, Decompressor decompressor) throws IOException {
-    synchronized (((Configurable) codec).getConf()) {
-      return codec.createInputStream(checksumIn, decompressor);
-    }
-  }
-
-  public static CompressionOutputStream createOutputStream(CompressionCodec codec,
+  public static CompressionOutputStream createOutputStreamWithBufferSize(CompressionCodec codec,
       OutputStream checksumOut, Compressor compressor) throws IOException {
-    synchronized (((Configurable) codec).getConf()) {
-      return codec.createOutputStream(checksumOut, compressor);
+    String bufferSizeProp = getBufferSizeProperty(codec);
+    CompressionOutputStream out = null;
+
+    Configurable configurableCodec = (Configurable) codec;
+    Configuration conf = configurableCodec.getConf();
+
+    if (bufferSizeProp != null) {
+      if (bufferSizeProp.equals(CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_KEY)) {
+        int newBufSize = CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_DEFAULT;
+        SnappyCodec snappyCodec = (SnappyCodec)codec;
+        synchronized (conf) {
+          int originalSize = snappyCodec.getBufferSize();
+          if (originalSize != newBufSize) {
+            snappyCodec.setBufferSize(newBufSize);
+          }
+          out = snappyCodec.createOutputStream(checksumOut, compressor);
+          if (originalSize != newBufSize) {
+            snappyCodec.setBufferSize(originalSize);
+          }
+        }
+        return out;
+      }
     }
+
+    synchronized (conf) {
+      out = codec.createOutputStream(checksumOut, compressor);
+    }
+    return out;
   }
 
   public static String getBufferSizeProperty(CompressionCodec codec) {

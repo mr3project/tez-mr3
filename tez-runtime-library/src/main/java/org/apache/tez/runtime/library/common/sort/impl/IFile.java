@@ -402,7 +402,8 @@ public class IFile {
         }
         if (this.compressor != null) {
           this.compressor.reset();
-          this.compressedOut = CodecUtils.createOutputStream(codec, checksumOut, compressor);
+          this.compressedOut = CodecUtils.createOutputStreamWithBufferSize(
+              codec, checksumOut, compressor);
           this.out = new DataOutputStream(this.compressedOut);
           this.compressOutput = true;
         } else {
@@ -1027,8 +1028,8 @@ public class IFile {
       this.readRecordsCounter = readsCounter;
       this.bytesReadCounter = bytesReadCounter;
 
-      checksumIn = new IFileInputStream(in, length, readAhead,
-          readAheadLength/* , isCompressed */);
+      checksumIn = new IFileInputStream(
+          in, length, readAhead, readAheadLength/* , isCompressed */);
       if (isCompressed && codec != null) {
         assert taskContext != null;
         this.codec = codec;
@@ -1091,8 +1092,8 @@ public class IFile {
         }
         if (decompressor != null) {
           decompressor.reset();
-          in = CodecUtils.getDecompressedInputStreamWithBufferSize(codec, checksumIn, decompressor,
-              compressedLength);
+          in = CodecUtils.getDecompressedInputStreamWithBufferSize(
+              codec, checksumIn, decompressor, compressedLength);
         } else {
           LOG.warn("Could not obtain decompressor from CodecPool");
           in = checksumIn;

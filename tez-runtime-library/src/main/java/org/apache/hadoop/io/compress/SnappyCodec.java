@@ -95,16 +95,12 @@ public class SnappyCodec implements Configurable, CompressionCodec, DirectDecomp
    */
   @Override
   public CompressionOutputStream createOutputStream(OutputStream out,
-                                                    Compressor compressor)
-      throws IOException {
-    int bufferSize = conf.getInt(
+                                                    Compressor compressor) {
+    int bufferSize = bufferSizeInternal != -1 ? bufferSizeInternal : conf.getInt(
         CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_KEY,
         CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_DEFAULT);
-
     int compressionOverhead = (bufferSize / 6) + 32;
-
-    return new BlockCompressorStream(out, compressor, bufferSize,
-        compressionOverhead);
+    return new BlockCompressorStream(out, compressor, bufferSize, compressionOverhead);
   }
 
   /**
