@@ -33,13 +33,14 @@ import org.apache.hadoop.fs.CommonConfigurationKeys;
  * This class creates snappy compressors/decompressors.
  */
 public class SnappyCodec implements Configurable, CompressionCodec, DirectDecompressionCodec {
+
   Configuration conf;
 
   //
   // accessed inside synchronized (conf)
   //
 
-  private int bufferSizeInternal = -1;  // -1 == not initialized, so we should read conf
+  private int bufferSizeInternal = CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_DEFAULT;
 
   public int getBufferSize() {
     return bufferSizeInternal;
@@ -80,8 +81,7 @@ public class SnappyCodec implements Configurable, CompressionCodec, DirectDecomp
   @Override
   public CompressionOutputStream createOutputStream(OutputStream out)
       throws IOException {
-    return CompressionCodec.Util.
-        createOutputStreamWithCodecPool(this, conf, out);
+    return CompressionCodec.Util.createOutputStreamWithCodecPool(this, conf, out);
   }
 
   /**
@@ -96,9 +96,7 @@ public class SnappyCodec implements Configurable, CompressionCodec, DirectDecomp
   @Override
   public CompressionOutputStream createOutputStream(OutputStream out,
                                                     Compressor compressor) {
-    int bufferSize = bufferSizeInternal != -1 ? bufferSizeInternal : conf.getInt(
-        CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_KEY,
-        CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_DEFAULT);
+    int bufferSize = bufferSizeInternal;
     int compressionOverhead = (bufferSize / 6) + 32;
     return new BlockCompressorStream(out, compressor, bufferSize, compressionOverhead);
   }
@@ -120,9 +118,7 @@ public class SnappyCodec implements Configurable, CompressionCodec, DirectDecomp
    */
   @Override
   public Compressor createCompressor() {
-    int bufferSize = conf.getInt(
-        CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_KEY,
-        CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_DEFAULT);
+    int bufferSize = bufferSizeInternal;
     return new SnappyCompressor(bufferSize);
   }
 
@@ -137,8 +133,7 @@ public class SnappyCodec implements Configurable, CompressionCodec, DirectDecomp
   @Override
   public CompressionInputStream createInputStream(InputStream in)
       throws IOException {
-    return CompressionCodec.Util.
-        createInputStreamWithCodecPool(this, conf, in);
+    return CompressionCodec.Util.createInputStreamWithCodecPool(this, conf, in);
   }
 
   /**
@@ -154,9 +149,7 @@ public class SnappyCodec implements Configurable, CompressionCodec, DirectDecomp
   public CompressionInputStream createInputStream(InputStream in,
                                                   Decompressor decompressor)
       throws IOException {
-    int bufferSize = bufferSizeInternal != -1 ? bufferSizeInternal : conf.getInt(
-          CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_KEY,
-          CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_DEFAULT);
+    int bufferSize = bufferSizeInternal;
     return new BlockDecompressorStream(in, decompressor, bufferSize);
   }
 
@@ -177,9 +170,7 @@ public class SnappyCodec implements Configurable, CompressionCodec, DirectDecomp
    */
   @Override
   public Decompressor createDecompressor() {
-    int bufferSize = conf.getInt(
-        CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_KEY,
-        CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_DEFAULT);
+    int bufferSize = bufferSizeInternal;
     return new SnappyDecompressor(bufferSize);
   }
   

@@ -33,11 +33,27 @@ import static org.apache.hadoop.fs.CommonConfigurationKeys.IO_COMPRESSION_CODEC_
 import static org.apache.hadoop.fs.CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_KEY;
 
 /**
- * This class creates zstd compressors/decompressors.
+ * This class creates ZStd compressors/decompressors.
  */
-public class ZStandardCodec implements
-    Configurable, CompressionCodec, DirectDecompressionCodec  {
+public class ZStandardCodec implements Configurable, CompressionCodec, DirectDecompressionCodec  {
+
   private Configuration conf;
+
+  //
+  // accessed inside synchronized (conf)
+  //
+
+  private int bufferSizeInternal = IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_DEFAULT;
+
+  // TODO: introduce a local field for IO_COMPRESSION_CODEC_ZSTD_LEVEL_KEY
+
+  public int getBufferSize() {
+    return bufferSizeInternal;
+  }
+
+  public void setBufferSize(int newBufferSize) {
+    bufferSizeInternal = newBufferSize;
+  }
 
   /**
    * Set the configuration to be used by this object.
@@ -101,25 +117,18 @@ public class ZStandardCodec implements
         CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_LEVEL_DEFAULT);
   }
 
-  public static int getCompressionBufferSize(Configuration conf) {
-    int bufferSize = getBufferSize(conf);
+  private int getCompressionBufferSize() {
+    int bufferSize = getBufferSize();
     return bufferSize == 0 ?
         ZStandardCompressor.getRecommendedBufferSize() :
         bufferSize;
   }
 
-  public static int getDecompressionBufferSize(Configuration conf) {
-    int bufferSize = getBufferSize(conf);
+  private int getDecompressionBufferSize() {
+    int bufferSize = getBufferSize();
     return bufferSize == 0 ?
         ZStandardDecompressor.getRecommendedBufferSize() :
         bufferSize;
-  }
-
-  private static int getBufferSize(Configuration conf) {
-    // for Zstd, we ignore IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_KEY in ShuffleServer.fetcherConfig.codecConf because
-    // CodecUtils.getDecompressedInputStreamWithBufferSize() sets it to 0 anyway
-    return true ? 0 : conf.getInt(IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_KEY,
-        IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_DEFAULT);
   }
 
   /**
@@ -131,10 +140,8 @@ public class ZStandardCodec implements
    * @throws IOException raised on errors performing I/O.
    */
   @Override
-  public CompressionOutputStream createOutputStream(OutputStream out)
-      throws IOException {
-    return Util.
-        createOutputStreamWithCodecPool(this, conf, out);
+  public CompressionOutputStream createOutputStream(OutputStream out) throws IOException {
+    return Util.createOutputStreamWithCodecPool(this, conf, out);
   }
 
   /**
@@ -147,12 +154,9 @@ public class ZStandardCodec implements
    * @throws IOException raised on errors performing I/O.
    */
   @Override
-  public CompressionOutputStream createOutputStream(OutputStream out,
-      Compressor compressor)
-      throws IOException {
+  public CompressionOutputStream createOutputStream(OutputStream out, Compressor compressor) {
     checkNativeCodeLoaded();
-    return new CompressorStream(out, compressor,
-        getCompressionBufferSize(conf));
+    return new CompressorStream(out, compressor, getCompressionBufferSize());
   }
 
   /**
@@ -174,8 +178,7 @@ public class ZStandardCodec implements
   @Override
   public Compressor createCompressor() {
     checkNativeCodeLoaded();
-    return new ZStandardCompressor(
-        getCompressionLevel(conf), getCompressionBufferSize(conf));
+    return new ZStandardCompressor(getCompressionLevel(conf), getCompressionBufferSize());
   }
 
 
@@ -188,10 +191,8 @@ public class ZStandardCodec implements
    * @throws IOException raised on errors performing I/O.
    */
   @Override
-  public CompressionInputStream createInputStream(InputStream in)
-      throws IOException {
-    return Util.
-        createInputStreamWithCodecPool(this, conf, in);
+  public CompressionInputStream createInputStream(InputStream in) throws IOException {
+    return Util.createInputStreamWithCodecPool(this, conf, in);
   }
 
   /**
@@ -205,11 +206,9 @@ public class ZStandardCodec implements
    */
   @Override
   public CompressionInputStream createInputStream(InputStream in,
-                                                  Decompressor decompressor)
-      throws IOException {
+                                                  Decompressor decompressor) throws IOException {
     checkNativeCodeLoaded();
-    return new DecompressorStream(in, decompressor,
-        getDecompressionBufferSize(conf));
+    return new DecompressorStream(in, decompressor, getDecompressionBufferSize());
   }
 
   /**
@@ -232,7 +231,7 @@ public class ZStandardCodec implements
   @Override
   public Decompressor createDecompressor() {
     checkNativeCodeLoaded();
-    return new ZStandardDecompressor(getDecompressionBufferSize(conf));
+    return new ZStandardDecompressor(getDecompressionBufferSize());
   }
 
   /**
@@ -248,7 +247,6 @@ public class ZStandardCodec implements
   @Override
   public DirectDecompressor createDirectDecompressor() {
     return new ZStandardDecompressor.ZStandardDirectDecompressor(
-        getDecompressionBufferSize(conf)
-    );
+        getDecompressionBufferSize());
   }
 }

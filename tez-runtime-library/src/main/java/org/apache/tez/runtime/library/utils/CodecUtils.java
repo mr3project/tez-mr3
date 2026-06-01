@@ -38,6 +38,7 @@ import org.apache.hadoop.io.compress.Compressor;
 import org.apache.hadoop.io.compress.Decompressor;
 import org.apache.hadoop.io.compress.DefaultCodec;
 import org.apache.hadoop.io.compress.SnappyCodec;
+import org.apache.hadoop.io.compress.ZStandardCodec;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.security.JobTokenSecretManager;
@@ -157,11 +158,16 @@ public final class CodecUtils {
     return newConf;
   }
 
-  public static CompressionCodec getCodec(Configuration conf) throws IOException {
-    if (ConfigUtils.shouldCompressIntermediateOutput(conf)) {
+  // This is the only place where we call codecConf.getInt() to set the buffer size in CompressionCodec.
+  // In the current implementation, codecConf is created as: new Configuration(fetcherConfigCommon.codecConf).
+  // This implies that the buffer size is set only when ShuffleServer starts, and
+  // the buffer size for individual queries is NOT honored.
+  // TODO: pass bufferSize as an argument
+  public static CompressionCodec getCodec(Configuration codecConf) throws IOException {
+    if (ConfigUtils.shouldCompressIntermediateOutput(codecConf)) {
       Class<? extends CompressionCodec> codecClass =
-          ConfigUtils.getIntermediateOutputCompressorClass(conf, DefaultCodec.class);
-      CompressionCodec codec = ReflectionUtils.newInstance(codecClass, conf);
+          ConfigUtils.getIntermediateOutputCompressorClass(codecConf, DefaultCodec.class);
+      CompressionCodec codec = ReflectionUtils.newInstance(codecClass, codecConf);
 
       if (codec != null) {
         Class<? extends Compressor> compressorType = null;
@@ -171,12 +177,33 @@ public final class CodecUtils {
         } catch (RuntimeException e) {
           cause = e;
         }
+
         if (compressorType == null) {
           String errMsg = String.format(
-              "Unable to get CompressorType for codec (%s). This is most"
-                  + " likely due to missing native libraries for the codec.",
-              conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS_CODEC));
+              "Unable to get CompressorType for codec (%s). This is most likely due to missing native libraries for the codec.",
+              codecConf.get(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS_CODEC));
           throw new IOException(errMsg, cause);
+        }
+
+        String bufferSizeProp = getBufferSizeProperty(codec);
+        if (bufferSizeProp != null) {
+          if (bufferSizeProp.equals(CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_KEY)) {
+            int bufferSize = codecConf.getInt(
+                CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_KEY,
+                CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_DEFAULT);
+            SnappyCodec snappyCodec = (SnappyCodec)codec;
+            synchronized (snappyCodec.getConf()) {
+              snappyCodec.setBufferSize(bufferSize);
+            }
+          } else if (bufferSizeProp.equals(CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_KEY)) {
+            int bufferSize = codecConf.getInt(
+                CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_KEY,
+                CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_DEFAULT);
+            ZStandardCodec zstdCodec = (ZStandardCodec)codec;
+            synchronized (zstdCodec.getConf()) {
+              zstdCodec.setBufferSize(bufferSize);
+            }
+          }
         }
       }
       return codec;
@@ -198,13 +225,6 @@ public final class CodecUtils {
     }
   }
 
-  public static CompressionInputStream createInputStream(CompressionCodec codec,
-      InputStream checksumIn, Decompressor decompressor) throws IOException {
-    synchronized (((Configurable) codec).getConf()) {
-      return codec.createInputStream(checksumIn, decompressor);
-    }
-  }
-
   public static CompressionOutputStream createOutputStream(CompressionCodec codec,
       OutputStream checksumOut, Compressor compressor) throws IOException {
     synchronized (((Configurable) codec).getConf()) {
@@ -216,35 +236,45 @@ public final class CodecUtils {
       IFileInputStream checksumIn, Decompressor decompressor, int compressedLength)
       throws IOException {
     String bufferSizeProp = getBufferSizeProperty(codec);
-    CompressionInputStream in = null;
-
-    Configurable configurableCodec = (Configurable) codec;
-    Configuration conf = configurableCodec.getConf();
+    CompressionInputStream in;
+    Configuration conf = ((Configurable) codec).getConf();
 
     if (bufferSizeProp != null) {
       if (bufferSizeProp.equals(CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_KEY)) {
-        int defaultBufferSize = CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_DEFAULT;
-        int newBufSize = Math.min(compressedLength, defaultBufferSize);
         SnappyCodec snappyCodec = (SnappyCodec)codec;
         synchronized (conf) {
           int originalSize = snappyCodec.getBufferSize();
+          int newBufSize = Math.min(compressedLength, originalSize);
           if (originalSize != newBufSize) {
             snappyCodec.setBufferSize(newBufSize);
-          }
-          in = snappyCodec.createInputStream(checksumIn, decompressor);
-          if (originalSize != newBufSize) {
-            snappyCodec.setBufferSize(originalSize);
+            try {
+              in = snappyCodec.createInputStream(checksumIn, decompressor);
+            } finally {
+              snappyCodec.setBufferSize(originalSize);
+            }
+          } else {
+            in = snappyCodec.createInputStream(checksumIn, decompressor);
           }
         }
         return in;
       }
 
-      // for Zstd, newBufSize is always 0 because defaultBufferSize == 0 in Math.min(compressedLength, defaultBufferSize)
-      // hence, we skip conf.getInt/setInt().
       if (bufferSizeProp.equals(CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_KEY)) {
-        assert CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_DEFAULT == 0;
+        ZStandardCodec zstdCodec = (ZStandardCodec)codec;
+        // TODO: IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_DEFAULT == 0, so we always have 'newBufSize == 0'
         synchronized (conf) {
-          in = codec.createInputStream(checksumIn, decompressor);
+          int originalSize = zstdCodec.getBufferSize();
+          int newBufSize = Math.min(compressedLength, originalSize);
+          if (originalSize != newBufSize) {
+            zstdCodec.setBufferSize(newBufSize);
+            try {
+              in = zstdCodec.createInputStream(checksumIn, decompressor);
+            } finally {
+              zstdCodec.setBufferSize(originalSize);
+            }
+          } else {
+            in = zstdCodec.createInputStream(checksumIn, decompressor);
+          }
         }
         return in;
       }
@@ -300,59 +330,24 @@ public final class CodecUtils {
     return in;
   }
 
-  public static CompressionOutputStream createOutputStreamWithBufferSize(CompressionCodec codec,
-      OutputStream checksumOut, Compressor compressor) throws IOException {
-    String bufferSizeProp = getBufferSizeProperty(codec);
-    CompressionOutputStream out = null;
-
-    Configurable configurableCodec = (Configurable) codec;
-    Configuration conf = configurableCodec.getConf();
-
-    if (bufferSizeProp != null) {
-      if (bufferSizeProp.equals(CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_KEY)) {
-        int newBufSize = CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_DEFAULT;
-        SnappyCodec snappyCodec = (SnappyCodec)codec;
-        synchronized (conf) {
-          int originalSize = snappyCodec.getBufferSize();
-          if (originalSize != newBufSize) {
-            snappyCodec.setBufferSize(newBufSize);
-          }
-          out = snappyCodec.createOutputStream(checksumOut, compressor);
-          if (originalSize != newBufSize) {
-            snappyCodec.setBufferSize(originalSize);
-          }
-        }
-        return out;
-      }
-    }
-
-    synchronized (conf) {
-      out = codec.createOutputStream(checksumOut, compressor);
-    }
-    return out;
-  }
-
   public static String getBufferSizeProperty(CompressionCodec codec) {
-    return getBufferSizeProperty(codec.getClass().getName());
-  }
-
-  public static String getBufferSizeProperty(String codecClassName) {
+    String codecClassName = codec.getClass().getName();
     switch (codecClassName) {
-    case "org.apache.hadoop.io.compress.SnappyCodec":
-      return CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_KEY;
-    case "org.apache.hadoop.io.compress.ZStandardCodec":
-      return CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_KEY;
-    case "org.apache.hadoop.io.compress.DefaultCodec":
-    case "org.apache.hadoop.io.compress.BZip2Codec":
-    case "org.apache.hadoop.io.compress.GzipCodec":
-      return CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_KEY;
-    case "org.apache.hadoop.io.compress.LzoCodec":
-    case "com.hadoop.compression.lzo.LzoCodec":
-      return CommonConfigurationKeys.IO_COMPRESSION_CODEC_LZO_BUFFERSIZE_KEY;
-    case "org.apache.hadoop.io.compress.Lz4Codec":
-      return CommonConfigurationKeys.IO_COMPRESSION_CODEC_LZ4_BUFFERSIZE_KEY;
-    default:
-      return null;
+      case "org.apache.hadoop.io.compress.SnappyCodec":
+        return CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_KEY;
+      case "org.apache.hadoop.io.compress.ZStandardCodec":
+        return CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_KEY;
+      case "org.apache.hadoop.io.compress.DefaultCodec":
+      case "org.apache.hadoop.io.compress.BZip2Codec":
+      case "org.apache.hadoop.io.compress.GzipCodec":
+        return CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_KEY;
+      case "org.apache.hadoop.io.compress.LzoCodec":
+      case "com.hadoop.compression.lzo.LzoCodec":
+        return CommonConfigurationKeys.IO_COMPRESSION_CODEC_LZO_BUFFERSIZE_KEY;
+      case "org.apache.hadoop.io.compress.Lz4Codec":
+        return CommonConfigurationKeys.IO_COMPRESSION_CODEC_LZ4_BUFFERSIZE_KEY;
+      default:
+        return null;
     }
   }
 

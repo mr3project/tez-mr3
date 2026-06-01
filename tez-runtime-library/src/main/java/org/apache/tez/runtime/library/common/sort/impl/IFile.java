@@ -402,8 +402,7 @@ public class IFile {
         }
         if (this.compressor != null) {
           this.compressor.reset();
-          this.compressedOut = CodecUtils.createOutputStreamWithBufferSize(
-              codec, checksumOut, compressor);
+          this.compressedOut = CodecUtils.createOutputStream(codec, checksumOut, compressor);
           this.out = new DataOutputStream(this.compressedOut);
           this.compressOutput = true;
         } else {
