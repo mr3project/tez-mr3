@@ -60,6 +60,23 @@ public final class TezBytesComparator {
     return length1 - length2;
   }
 
+  // copy of FastByteComparisons.UnsafeComparer.compareEqual()
+  public static boolean compareEqual(byte[] arg1, final int s1, final int len1,
+                                     byte[] arg2, final int s2, final int len2) {
+    if (len1 != len2) return false;
+    if (len1 == 0) return true;
+    int longEnd = len1 - (len1 & 7);
+    for (int i = 0; i < longEnd; i += 8) {
+      long l1 = FastByteComparisons.theUnsafe.getLong(arg1, FastByteComparisons.BYTE_ARRAY_BASE_OFFSET + s1 + i);
+      long l2 = FastByteComparisons.theUnsafe.getLong(arg2, FastByteComparisons.BYTE_ARRAY_BASE_OFFSET + s2 + i);
+      if (l1 != l2) return false;
+    }
+    for (int i = longEnd; i < len1; i++) {
+      if (arg1[s1+i] != arg2[s2+i]) return false;
+    }
+    return true;
+  }
+
   public static int compare(BytesWritable key1, BytesWritable key2) {
     return compare(
         key1.getBytesRaw(), key1.getOffset(), key1.getLength(),

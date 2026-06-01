@@ -396,13 +396,13 @@ public class TezMerger {
      * @param current
      * @throws IOException
      */
-    void compareKeyWithNextTopKey(Segment current) throws IOException {
+    void compareKeyWithNextTopKey(Segment current) {
       Segment nextTop = heap.top();
-      if (checkForSameKeys && nextTop != current) {
+      if (checkForSameKeys && nextTop != null && nextTop != current) {
         // we have a different file. Compare it with previous key
         KeyValueBuffer nextKey = nextTop.getKey();
-        int compare = compare(nextKey, prevKey);
-        if (compare == 0) {
+        boolean isEqual = compare(nextKey, prevKey);
+        if (isEqual) {
           // Same key is available in the next segment.
           hasNext = KeyState.SAME_KEY;
         }
@@ -435,20 +435,19 @@ public class TezMerger {
       return true;
     }
 
-    int compare(KeyValueBuffer nextKey, DataOutputBuffer buf2) {
+    boolean compare(KeyValueBuffer nextKey, DataOutputBuffer buf2) {
       byte[] b1 = nextKey.getData();
       byte[] b2 = buf2.getData();
       int s1 = nextKey.getPosition();
       int s2 = 0;
       int l1 = nextKey.getLength();
       int l2 = buf2.getLength();
-      return TezBytesComparator.compare(b1, s1, l1, b2, s2, l2);
+      return TezBytesComparator.compareEqual(b1, s1, l1, b2, s2, l2);
     }
 
     /*
      * MergeQueue advances the top Segment and then repairs the heap. This
-     * specialized heap avoids the generic Hadoop PriorityQueue path, and
-     * secondTop() is provided for a later same-key optimization.
+     * specialized heap avoids the generic Hadoop PriorityQueue path.
      */
     private static final class SegmentHeap {
       private Segment[] heap = new Segment[0];
