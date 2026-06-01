@@ -291,7 +291,7 @@ public class TezMerger {
     final FileSystem fs;
     final CompressionCodec codec;
     final boolean checkForSameKeys;
-    private final SegmentHeap heap = new SegmentHeap();
+    private final SegmentLoserTree loserTree = new SegmentLoserTree();
     static final boolean ifileReadAhead = TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_DEFAULT;
     static final int ifileReadAheadLength = TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_BYTES_DEFAULT;
     static final long recordsBeforeProgress = TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT;
@@ -335,7 +335,7 @@ public class TezMerger {
 
     public void close() throws IOException {
       Segment segment;
-      while((segment = heap.pop()) != null) {
+      while((segment = loserTree.pop()) != null) {
         segment.close();
       }
     }
@@ -378,10 +378,10 @@ public class TezMerger {
       }
       hasNext = reader.readRawKey(nextKey);
       if (hasNext == KeyState.NEW_KEY) {
-        heap.updateTop();
+        loserTree.updateTop();
         compareKeyWithNextTopKey(reader);
       } else if(hasNext == KeyState.NO_KEY) {
-        heap.pop();
+        loserTree.pop();
         reader.close();
         compareKeyWithNextTopKey(null);
       } else if(hasNext == KeyState.SAME_KEY) {
@@ -397,7 +397,7 @@ public class TezMerger {
      * @throws IOException
      */
     void compareKeyWithNextTopKey(Segment current) {
-      Segment nextTop = heap.top();
+      Segment nextTop = loserTree.top();
       if (checkForSameKeys && nextTop != null && nextTop != current) {
         // we have a different file. Compare it with previous key
         KeyValueBuffer nextKey = nextTop.getKey();
@@ -414,7 +414,7 @@ public class TezMerger {
         return false;
       }
 
-      minSegment = heap.top();
+      minSegment = loserTree.top();
       KeyValueBuffer nextKey = minSegment.getKey();
       key.reset(nextKey.getData(), nextKey.getPosition(), nextKey.getLength());
       if (!minSegment.inMemory()) {
@@ -446,23 +446,36 @@ public class TezMerger {
     }
 
     /*
-     * MergeQueue advances the top Segment and then repairs the heap. This
-     * specialized heap avoids the generic Hadoop PriorityQueue path.
+     * MergeQueue advances the top Segment and then replays that leaf through
+     * the loser tree. Unlike a binary heap repair, each replay level compares
+     * the changed Segment only with the loser stored at that level.
      */
-    private static final class SegmentHeap {
-      private Segment[] heap = new Segment[0];
+    private static final class SegmentLoserTree {
+      private static final int NO_SEGMENT = -1;
+
+      private Segment[] leaves = new Segment[0];
+      private int[] losers = new int[0];
+      private int leafCapacity;
+      private int leafCount;
       private int size;
+      private int winner = NO_SEGMENT;
 
       void initialize(int capacity) {
         clear();
-        if (heap.length < capacity) {
-          heap = new Segment[capacity];
+        int requiredCapacity = nextPowerOfTwo(Math.max(1, capacity));
+        if (leafCapacity < requiredCapacity) {
+          leafCapacity = requiredCapacity;
+          leaves = new Segment[leafCapacity];
+          losers = new int[leafCapacity];
         }
       }
 
       void clear() {
-        Arrays.fill(heap, 0, size, null);
+        Arrays.fill(leaves, null);
+        Arrays.fill(losers, NO_SEGMENT);
+        leafCount = 0;
         size = 0;
+        winner = NO_SEGMENT;
       }
 
       int size() {
@@ -470,95 +483,91 @@ public class TezMerger {
       }
 
       Segment top() {
-        return size == 0 ? null : heap[0];
+        return winner == NO_SEGMENT ? null : leaves[winner];
       }
 
       Segment pop() {
-        if (size == 0) {
+        if (winner == NO_SEGMENT) {
           return null;
         }
 
-        Segment result = heap[0];
-        Segment segment = heap[--size];
-        heap[size] = null;
-        if (size > 0) {
-          siftDown(segment);
-        }
+        int winnerIndex = winner;
+        Segment result = leaves[winnerIndex];
+        leaves[winnerIndex] = null;
+        size--;
+        replay(winnerIndex);
         return result;
       }
 
       void put(Segment segment) {
-        ensureCapacity(size + 1);
-        siftUp(size++, segment);
+        leaves[leafCount++] = segment;
+        size++;
+      }
+
+      void build() {
+        Arrays.fill(losers, NO_SEGMENT);
+        winner = build(1);
       }
 
       Segment updateTop() {
-        if (size == 0) {
+        if (winner == NO_SEGMENT) {
           return null;
         }
 
-        Segment segment = heap[0];
-        siftDown(segment);
-        return heap[0];
+        replay(winner);
+        return top();
       }
 
-      Segment secondTop() {
-        if (size < 2) {
-          return null;
+      private int build(int node) {
+        if (node >= leafCapacity) {
+          int leafIndex = node - leafCapacity;
+          return leafIndex < leafCount && leaves[leafIndex] != null ? leafIndex : NO_SEGMENT;
         }
-        if (size == 2) {
-          return heap[1];
-        }
-        return lessThan(heap[1], heap[2]) ? heap[1] : heap[2];
+
+        int leftWinner = build(node << 1);
+        int rightWinner = build((node << 1) + 1);
+        return storeLoserAndReturnWinner(node, leftWinner, rightWinner);
       }
 
-      private void ensureCapacity(int capacity) {
-        if (heap.length < capacity) {
-          int newCapacity = Math.max(capacity, Math.max(1, heap.length * 2));
-          heap = Arrays.copyOf(heap, newCapacity);
+      private void replay(int leafIndex) {
+        int candidate = leaves[leafIndex] == null ? NO_SEGMENT : leafIndex;
+        int node = (leafIndex + leafCapacity) >>> 1;
+        while (node > 0) {
+          candidate = storeLoserAndReturnWinner(node, candidate, losers[node]);
+          node >>>= 1;
         }
+        winner = candidate;
       }
 
-      private void siftUp(int index, Segment segment) {
-        while (index > 0) {
-          int parent = (index - 1) >>> 1;
-          Segment parentSegment = heap[parent];
-          if (!lessThan(segment, parentSegment)) {
-            break;
-          }
-          heap[index] = parentSegment;
-          index = parent;
+      private int storeLoserAndReturnWinner(int node, int left, int right) {
+        if (left == NO_SEGMENT) {
+          losers[node] = NO_SEGMENT;
+          return right;
         }
-        heap[index] = segment;
+        if (right == NO_SEGMENT) {
+          losers[node] = NO_SEGMENT;
+          return left;
+        }
+        if (wins(left, right)) {
+          losers[node] = right;
+          return left;
+        }
+        losers[node] = left;
+        return right;
       }
 
-      private void siftDown(Segment segment) {
-        int index = 0;
-        int half = size >>> 1;
-        while (index < half) {
-          int child = (index << 1) + 1;
-          Segment childSegment = heap[child];
-          int right = child + 1;
-          if (right < size && lessThan(heap[right], childSegment)) {
-            child = right;
-            childSegment = heap[child];
-          }
-          // move the child only when it is strictly smaller than the segment being sifted down
-          if (!lessThan(childSegment, segment)) {
-            break;
-          }
-          heap[index] = childSegment;
-          index = child;
-        }
-        heap[index] = segment;
-      }
-
-      private static boolean lessThan(Segment a, Segment b) {
-        KeyValueBuffer key1 = a.getKey();
-        KeyValueBuffer key2 = b.getKey();
-        return TezBytesComparator.compare(
+      private boolean wins(int left, int right) {
+        KeyValueBuffer key1 = leaves[left].getKey();
+        KeyValueBuffer key2 = leaves[right].getKey();
+        int comparison = TezBytesComparator.compare(
             key1.getData(), key1.getPosition(), key1.getLength(),
-            key2.getData(), key2.getPosition(), key2.getLength()) < 0;
+            key2.getData(), key2.getPosition(), key2.getLength());
+        return comparison < 0 || (comparison == 0 && left < right);
+      }
+
+      private static int nextPowerOfTwo(int value) {
+        int highestOneBit = Integer.highestOneBit(value);
+        return value == highestOneBit ? value : highestOneBit << 1;
       }
     }
 
@@ -631,12 +640,12 @@ public class TezMerger {
           numSegmentsToConsider = factor - segmentsConsidered;
         }
         
-        // feed the streams to the heap
-        heap.initialize(segmentsToMerge.size());
-        heap.clear();
+        // feed the streams to the loser tree
+        loserTree.initialize(segmentsToMerge.size());
         for (Segment segment : segmentsToMerge) {
-          heap.put(segment);
+          loserTree.put(segment);
         }
+        loserTree.build();
         
         // if we have lesser number of segments remaining, then just return the iterator,
         // else do another single level merge
@@ -692,7 +701,7 @@ public class TezMerger {
           writeFile(this, writer, recordsBeforeProgress);
           writer.close();
           
-          // we finished one single level merge; now clean up the heap
+          // we finished one single level merge; now clean up the loser tree
           this.close();
 
           // Add the newly create segment to the list of segments to be merged
@@ -763,15 +772,15 @@ public class TezMerger {
     }
 
     public boolean hasNext() throws IOException {
-      if (heap.size() == 0)
+      if (loserTree.size() == 0)
         return false;
 
       if (minSegment != null) {
         // minSegment is non-null for all invocations of next except the first one.
-        // For the first invocation, the heap is ready for use
+        // For the first invocation, the loser tree is ready for use
         // but for the subsequent invocations, first adjust the queue.
         adjustPriorityQueue(minSegment);
-        if (heap.size() == 0) {
+        if (loserTree.size() == 0) {
           minSegment = null;
           return false;
         }
