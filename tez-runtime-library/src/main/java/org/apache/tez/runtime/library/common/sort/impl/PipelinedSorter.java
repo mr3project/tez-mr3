@@ -23,10 +23,10 @@ import java.io.OutputStream;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.PriorityQueue;
 import java.util.concurrent.*;
 import java.util.zip.Deflater;
 
@@ -1630,39 +1630,34 @@ public final class PipelinedSorter {
   private static class SpanIterator implements PartitionedRawKeyValueIterator, Comparable<SpanIterator> {
     private int kvindex = -1;
     private final int maxindex;
-    private final ByteBuffer kvbuffer;
+    private final byte[] kvbufferArray;
+    private final int kvbufferArrayOffset;
     private final SortSpan span;
     private final InputByteBuffer key = new InputByteBuffer();
     private final InputByteBuffer value = new InputByteBuffer();
+    private int partition;
+    private int keyStart;
+    private int keyLength;
+    private int valueStart;
+    private int valueLength;
 
     private static final int minrun = (1 << 4);
 
     public SpanIterator(SortSpan span) {
-      this.kvbuffer = span.kvbuffer;
+      ByteBuffer kvbuffer = span.kvbuffer;
+      this.kvbufferArray = kvbuffer.array();
+      this.kvbufferArrayOffset = kvbuffer.arrayOffset();
       this.span = span;
       this.maxindex = span.length() - 1;
     }
 
     public DataInputBuffer getKey()  {
-      long keyValStartPair = FastByteComparisons.theUnsafe.getLong(
-          span.kvmetaArray, span.offsetForLongIndex(span.longOffsetFor(kvindex)));
-      final int keystart = (int) keyValStartPair;
-      final int valstart = (int) (keyValStartPair >>> Integer.SIZE);
-      final byte[] buf = kvbuffer.array();
-      final int off = kvbuffer.arrayOffset();
-      key.reset(buf, off + keystart, valstart - keystart);
+      key.reset(kvbufferArray, kvbufferArrayOffset + keyStart, keyLength);
       return key;
     }
 
     public DataInputBuffer getValue() {
-      long keyValStartPair = FastByteComparisons.theUnsafe.getLong(
-          span.kvmetaArray, span.offsetForLongIndex(span.longOffsetFor(kvindex)));
-      final int valstart = (int) (keyValStartPair >>> Integer.SIZE);
-      final int vallen = FastByteComparisons.theUnsafe.getInt(
-          span.kvmetaArray, span.offsetForIntIndex(span.offsetFor(kvindex) + VALLEN));
-      final byte[] buf = kvbuffer.array();
-      final int off = kvbuffer.arrayOffset();
-      value.reset(buf, off + valstart, vallen);
+      value.reset(kvbufferArray, kvbufferArrayOffset + valueStart, valueLength);
       return value;
     }
 
@@ -1670,12 +1665,26 @@ public final class PipelinedSorter {
       // caveat: since we use this as a comparable in the merger 
       if (kvindex == maxindex) return false;
       kvindex += 1;
+      loadCurrentRecordMetadata();
       return true;
+    }
+
+    private void loadCurrentRecordMetadata() {
+      final long keyValStartPair = FastByteComparisons.theUnsafe.getLong(
+          span.kvmetaArray, span.offsetForLongIndex(span.longOffsetFor(kvindex)));
+      keyStart = (int) keyValStartPair;
+      valueStart = (int) (keyValStartPair >>> Integer.SIZE);
+      keyLength = valueStart - keyStart;
+      int kvindexOffset = span.offsetFor(kvindex);
+      valueLength = FastByteComparisons.theUnsafe.getInt(
+          span.kvmetaArray, span.offsetForIntIndex(kvindexOffset + VALLEN));
+      partition = FastByteComparisons.theUnsafe.getInt(
+          span.kvmetaArray, span.offsetForIntIndex(kvindexOffset + PARTITION));
     }
 
     @Override
     public boolean hasNext() {
-      return (kvindex == maxindex);
+      return (kvindex < maxindex);
     }
 
     public void close() {
@@ -1687,8 +1696,6 @@ public final class PipelinedSorter {
     }
 
     public int getPartition() {
-      final int partition = FastByteComparisons.theUnsafe.getInt(
-          span.kvmetaArray, span.offsetForIntIndex(span.offsetFor(kvindex) + PARTITION));
       return partition;
     }
 
@@ -1707,7 +1714,12 @@ public final class PipelinedSorter {
     }
 
     public int compareTo(SpanIterator other) {
-      return span.compareInternal(other.getKey(), other.getPartition(), kvindex);
+      if (partition != other.partition) {
+        return partition - other.partition;
+      }
+      return FastByteComparisons.compareTo(
+          kvbufferArray, kvbufferArrayOffset + keyStart, keyLength,
+          other.kvbufferArray, other.kvbufferArrayOffset + other.keyStart, other.keyLength);
     }
     
     @Override
@@ -1748,8 +1760,9 @@ public final class PipelinedSorter {
       
       boolean found = false;
       
-      // we sort 100k items, the max it can do is 20 loops, but break early
-      for (int i = 0; start < end && i < 16; i++) {
+      // Bound the search work: the span can be large, but this bisection is an
+      // optimization only, and minrun already defines the minimum profitable run.
+      for (int i = 0; start < end && i < minrun; i++) {
         mid = start + (end - start)/2;
         cmp = span.compareInternal(needle, needlePart, mid);
         if (cmp == 0) {
@@ -1842,18 +1855,206 @@ public final class PipelinedSorter {
     }
   }
 
-  private static class SpanHeap extends java.util.PriorityQueue<SpanIterator> {
-    private static final long serialVersionUID = 1L;
+  private static class SpanHeap implements Iterable<SpanIterator> {
+    private SpanIterator[] spans;
+    private boolean[] active;
+    private int[] losers;
+    private int leafCount;
+    private int spanCount;
+    private int activeCount;
+    private int winner = -1;
+    private int lastPopped = -1;
+    private boolean built = false;
 
     public SpanHeap() {
-      super(256);
+      leafCount = 256;
+      spans = new SpanIterator[leafCount];
+      active = new boolean[leafCount];
+      losers = new int[leafCount];
+      clearLosers();
     }
+
+    public boolean add(SpanIterator iter) {
+      if (lastPopped >= 0 && spans[lastPopped] == iter) {
+        if (!active[lastPopped]) {
+          active[lastPopped] = true;
+          activeCount++;
+        }
+        replay(lastPopped);
+        lastPopped = -1;
+        return true;
+      }
+
+      ensureCapacity(spanCount + 1);
+      spans[spanCount] = iter;
+      active[spanCount] = true;
+      spanCount++;
+      activeCount++;
+      built = false;
+      return true;
+    }
+
+    public boolean isEmpty() {
+      return activeCount == 0;
+    }
+
+    public int size() {
+      return activeCount;
+    }
+
     /**
-     * {@link PriorityQueue}.poll() by a different name 
-     * @return
+     * Returns the current winner. The winner remains in the tree until
+     * replaceTop() replays the winner's leaf with its next record or removes it.
+     * @return the smallest SpanIterator, or null if the tree is empty
      */
     public SpanIterator pop() {
-      return this.poll();
+      buildIfNeeded();
+      if (winner < 0) {
+        return null;
+      }
+      lastPopped = winner;
+      return spans[winner];
+    }
+
+    public SpanIterator peek() {
+      buildIfNeeded();
+      if (lastPopped >= 0) {
+        return peekAfterPop();
+      }
+      return winner < 0 ? null : spans[winner];
+    }
+
+    public void replaceTop(boolean hasNext) {
+      if (lastPopped < 0) {
+        return;
+      }
+      if (!hasNext && active[lastPopped]) {
+        active[lastPopped] = false;
+        activeCount--;
+      }
+      replay(lastPopped);
+      lastPopped = -1;
+    }
+
+    @Override
+    public Iterator<SpanIterator> iterator() {
+      return new Iterator<SpanIterator>() {
+        private int index = 0;
+
+        @Override
+        public boolean hasNext() {
+          while (index < spanCount && !active[index]) {
+            index++;
+          }
+          return index < spanCount;
+        }
+
+        @Override
+        public SpanIterator next() {
+          hasNext();
+          return spans[index++];
+        }
+
+        @Override
+        public void remove() {
+          throw new UnsupportedOperationException();
+        }
+      };
+    }
+
+    private void ensureCapacity(int capacity) {
+      if (capacity <= leafCount) {
+        return;
+      }
+      int newLeafCount = leafCount;
+      while (newLeafCount < capacity) {
+        newLeafCount <<= 1;
+      }
+
+      SpanIterator[] newSpans = new SpanIterator[newLeafCount];
+      boolean[] newActive = new boolean[newLeafCount];
+      System.arraycopy(spans, 0, newSpans, 0, spanCount);
+      System.arraycopy(active, 0, newActive, 0, spanCount);
+      spans = newSpans;
+      active = newActive;
+      leafCount = newLeafCount;
+      losers = new int[leafCount];
+      built = false;
+    }
+
+    private void buildIfNeeded() {
+      if (built) {
+        return;
+      }
+      clearLosers();
+      winner = build(1);
+      built = true;
+    }
+
+    private int build(int node) {
+      if (node >= leafCount) {
+        int index = node - leafCount;
+        return index < spanCount && active[index] ? index : -1;
+      }
+
+      int left = build(node << 1);
+      int right = build((node << 1) + 1);
+      if (left < 0) {
+        return right;
+      }
+      if (right < 0) {
+        return left;
+      }
+      if (lessThanOrEqual(left, right)) {
+        losers[node] = right;
+        return left;
+      }
+      losers[node] = left;
+      return right;
+    }
+
+    private void replay(int index) {
+      buildIfNeeded();
+      int candidate = active[index] ? index : -1;
+      for (int node = (index + leafCount) >> 1; node > 0; node >>= 1) {
+        int challenger = losers[node];
+        if (challenger < 0) {
+          continue;
+        }
+        if (candidate < 0) {
+          losers[node] = -1;
+          candidate = challenger;
+        } else if (lessThanOrEqual(candidate, challenger)) {
+          losers[node] = challenger;
+        } else {
+          losers[node] = candidate;
+          candidate = challenger;
+        }
+      }
+      winner = candidate;
+    }
+
+    private SpanIterator peekAfterPop() {
+      int next = -1;
+      for (int node = (lastPopped + leafCount) >> 1; node > 0; node >>= 1) {
+        int challenger = losers[node];
+        if (challenger < 0 || challenger == lastPopped || !active[challenger]) {
+          continue;
+        }
+        if (next < 0 || lessThanOrEqual(challenger, next)) {
+          next = challenger;
+        }
+      }
+      return next < 0 ? null : spans[next];
+    }
+
+    private boolean lessThanOrEqual(int left, int right) {
+      int cmp = spans[left].compareTo(spans[right]);
+      return cmp < 0 || (cmp == 0 && left <= right);
+    }
+
+    private void clearLosers() {
+      Arrays.fill(losers, -1);
     }
   }
 
@@ -1977,7 +2178,7 @@ public final class PipelinedSorter {
         value.reset(current.getValue());
         if (gallop <= 0) {
           // since all keys and values are references to the kvbuffer, no more deep copies
-          this.add(current);
+          heap.replaceTop(current.next());
         } else {
           // galloping, no deep copies required anyway
           current.next();
