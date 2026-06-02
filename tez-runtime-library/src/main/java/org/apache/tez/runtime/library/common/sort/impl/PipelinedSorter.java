@@ -32,7 +32,6 @@ import java.util.zip.Deflater;
 
 import com.google.common.collect.Maps;
 import org.apache.hadoop.io.BytesWritable;
-import org.apache.hadoop.io.compress.CodecPool;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.io.compress.Compressor;
 import org.apache.tez.common.Preconditions;
@@ -748,7 +747,7 @@ public final class PipelinedSorter {
         if (isThreadInterrupted()) {
           return false;
         }
-        TezRawKeyValueIterator kvIter = merger.filter(i);
+        PartitionFilter kvIter = merger.filter(i);
         // write merged output to disk
         long segmentStart = fsOutput.getPos();
         WriterDataInputBuffer writer = null;
@@ -763,14 +762,8 @@ public final class PipelinedSorter {
               -1, -1,
               writeBuffer, compressorExternal, outputContext);
         }
-        if (isRleEnabled) {
-          while (kvIter.next()) {
-            writer.appendRle(kvIter.getKey(), kvIter.getValue());
-          }
-        } else {
-          while (kvIter.next()) {
-            writer.appendNoRle(kvIter.getKey(), kvIter.getValue());
-          }
+        while (kvIter.next()) {
+          kvIter.appendCurrentTo(writer);
         }
 
         long rawLength = 0;
@@ -1224,11 +1217,6 @@ public final class PipelinedSorter {
   }
 
 
-  private interface PartitionedRawKeyValueIterator extends TezRawKeyValueIterator {
-    int getPartition();
-    Integer peekPartition();
-  }
-
   private static class BufferStreamWrapper extends OutputStream
   {
     private final ByteBuffer out;
@@ -1627,7 +1615,8 @@ public final class PipelinedSorter {
     }
   }
 
-  private static class SpanIterator implements PartitionedRawKeyValueIterator, Comparable<SpanIterator> {
+  private static class SpanIterator implements Comparable<SpanIterator> {
+
     private int kvindex = -1;
     private final int maxindex;
     private final byte[] kvbufferArray;
@@ -1655,19 +1644,6 @@ public final class PipelinedSorter {
       return key;
     }
 
-    public DataInputBuffer getValue() {
-      assert false;
-      return null;
-    }
-
-    private void resetKeyTo(InputByteBuffer target) {
-      target.reset(kvbufferArray, kvbufferArrayOffset + keyStart, keyLength);
-    }
-
-    private void resetValueTo(InputByteBuffer target) {
-      target.reset(kvbufferArray, kvbufferArrayOffset + valueStart, valueLength);
-    }
-
     public boolean next() {
       // caveat: since we use this as a comparable in the merger 
       if (kvindex == maxindex) return false;
@@ -1689,35 +1665,8 @@ public final class PipelinedSorter {
           span.kvmetaArray, span.offsetForIntIndex(kvindexOffset + PARTITION));
     }
 
-    @Override
-    public boolean hasNext() {
-      return (kvindex < maxindex);
-    }
-
-    public void close() {
-    }
-
-    @Override
-    public boolean isSameKey() {
-      return false;
-    }
-
     public int getPartition() {
       return partition;
-    }
-
-    public Integer peekPartition() {
-      if (!hasNext()) {
-        return null;
-      } else {
-          return FastByteComparisons.theUnsafe.getInt(
-              span.kvmetaArray, span.offsetForIntIndex(span.offsetFor(kvindex + 1) + PARTITION));
-      }
-    }
-
-    @SuppressWarnings("unused")
-    public int size() {
-      return (maxindex - kvindex);
     }
 
     public int compareTo(SpanIterator other) {
@@ -1805,23 +1754,21 @@ public final class PipelinedSorter {
     }
   }
 
-  private class PartitionFilter implements TezRawKeyValueIterator {
-    private final PartitionedRawKeyValueIterator iter;
+  private class PartitionFilter {
+
+    private final SpanMerger iter;
     private int partition;
     private boolean dirty = false;
-    public PartitionFilter(PartitionedRawKeyValueIterator iter) {
+
+    public PartitionFilter(SpanMerger iter) {
       this.iter = iter;
     }
-    public DataInputBuffer getKey() throws IOException { return iter.getKey(); }
-    public DataInputBuffer getValue() throws IOException { return iter.getValue(); }
-    public void close() throws IOException { }
 
-    @Override
-    public boolean isSameKey() {
-      return iter.isSameKey();
+    public void appendCurrentTo(WriterDataInputBuffer writer) throws IOException {
+      iter.appendCurrentTo(writer);
     }
 
-    public boolean next() throws IOException {
+    public boolean next() {
       if (dirty || iter.next()) {
         int prefix = iter.getPartition();
 
@@ -1835,8 +1782,7 @@ public final class PipelinedSorter {
       return false;
     }
 
-    @Override
-    public boolean hasNext() throws IOException {
+    public boolean hasNext() {
       if (dirty || iter.hasNext()) {
         Integer part;
         if (dirty) {
@@ -1854,11 +1800,6 @@ public final class PipelinedSorter {
 
     public void reset(int partition) {
       this.partition = partition;
-    }
-
-    @SuppressWarnings("unused")
-    public int getPartition() {
-      return this.partition;
     }
   }
 
@@ -2065,20 +2006,21 @@ public final class PipelinedSorter {
     }
   }
 
-  public boolean needsRLE() {
-    return merger.needsRLE();
-  }
-
   private void cancelActiveSortTasks() {
     merger.cancelOutstandingSorts();
   }
 
-  private final class SpanMerger implements PartitionedRawKeyValueIterator {
-    InputByteBuffer key = new InputByteBuffer();
-    InputByteBuffer value = new InputByteBuffer();
-    int partition;
+  private final class SpanMerger {
 
-    private ArrayList< Future<SpanIterator>> futures = new ArrayList< Future<SpanIterator>>();
+    int partition;
+    private byte[] currentKeyData;
+    private int currentKeyOffset;
+    private int currentKeyLength;
+    private byte[] currentValueData;
+    private int currentValueOffset;
+    private int currentValueLength;
+
+    private ArrayList<Future<SpanIterator>> futures = new ArrayList< Future<SpanIterator>>();
 
     private SpanHeap heap = new SpanHeap();
     private PartitionFilter partIter;
@@ -2168,7 +2110,6 @@ public final class PipelinedSorter {
       return (eq > 0.1 * total);
     }
 
-    @SuppressWarnings("unused")
     private SpanIterator peek() {
       if (gallop > 0) {
         return horse;
@@ -2181,8 +2122,7 @@ public final class PipelinedSorter {
 
       if (current != null) {
         partition = current.getPartition();
-        current.resetKeyTo(key);
-        current.resetValueTo(value);
+        setCurrentRecord(current);
         if (gallop <= 0) {
           // since all keys and values are references to the kvbuffer, no more deep copies
           heap.replaceTop(current.next());
@@ -2195,7 +2135,6 @@ public final class PipelinedSorter {
       return false;
     }
 
-    @Override
     public boolean hasNext() {
       return peek() != null;
     }
@@ -2209,22 +2148,30 @@ public final class PipelinedSorter {
       }
     }
 
-    public DataInputBuffer getKey() { return key; }
-    public DataInputBuffer getValue() { return value; }
     public int getPartition() { return partition; }
 
-    public void close() throws IOException {
+    private void setCurrentRecord(SpanIterator current) {
+      currentKeyData = current.kvbufferArray;
+      currentKeyOffset = current.kvbufferArrayOffset + current.keyStart;
+      currentKeyLength = current.keyLength;
+      currentValueData = current.kvbufferArray;
+      currentValueOffset = current.kvbufferArrayOffset + current.valueStart;
+      currentValueLength = current.valueLength;
     }
 
-    @Override
-    public boolean isSameKey() {
-      return false;
+    private void appendCurrentTo(WriterDataInputBuffer writer) throws IOException {
+      if (writer.isRleEnabled()) {
+        writer.appendRle(currentKeyData, currentKeyOffset, currentKeyLength,
+            currentValueData, currentValueOffset, currentValueLength);
+      } else {
+        writer.appendNoRle(currentKeyData, currentKeyOffset, currentKeyLength,
+            currentValueData, currentValueOffset, currentValueLength);
+      }
     }
 
-    public TezRawKeyValueIterator filter(int partition) {
+    public PartitionFilter filter(int partition) {
       partIter.reset(partition);
       return partIter;
     }
-
   }
 }
