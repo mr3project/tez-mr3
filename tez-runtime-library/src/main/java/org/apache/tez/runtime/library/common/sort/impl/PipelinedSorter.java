@@ -1470,20 +1470,24 @@ public final class PipelinedSorter {
     private void swap(final int mi, final int mj) {
       final int kvi = longOffsetFor(mi);
       final int kvj = longOffsetFor(mj);
-      final long l1 = FastByteComparisons.theUnsafe.getLong(kvmetaArray, offsetForLongIndex(kvi));
-      final long l2 = FastByteComparisons.theUnsafe.getLong(kvmetaArray, offsetForLongIndex(kvi + 1));
+      final long kviOffset = offsetForLongIndex(kvi);
+      final long kviNextOffset = offsetForLongIndex(kvi + 1);
+      final long kvjOffset = offsetForLongIndex(kvj);
+      final long kvjNextOffset = offsetForLongIndex(kvj + 1);
+      final long l1 = FastByteComparisons.theUnsafe.getLong(kvmetaArray, kviOffset);
+      final long l2 = FastByteComparisons.theUnsafe.getLong(kvmetaArray, kviNextOffset);
 
       FastByteComparisons.theUnsafe.putLong(
           kvmetaArray,
-          offsetForLongIndex(kvi),
-          FastByteComparisons.theUnsafe.getLong(kvmetaArray, offsetForLongIndex(kvj)));
+          kviOffset,
+          FastByteComparisons.theUnsafe.getLong(kvmetaArray, kvjOffset));
       FastByteComparisons.theUnsafe.putLong(
           kvmetaArray,
-          offsetForLongIndex(kvi + 1),
-          FastByteComparisons.theUnsafe.getLong(kvmetaArray, offsetForLongIndex(kvj + 1)));
+          kviNextOffset,
+          FastByteComparisons.theUnsafe.getLong(kvmetaArray, kvjNextOffset));
 
-      FastByteComparisons.theUnsafe.putLong(kvmetaArray, offsetForLongIndex(kvj), l1);
-      FastByteComparisons.theUnsafe.putLong(kvmetaArray, offsetForLongIndex(kvj + 1), l2);
+      FastByteComparisons.theUnsafe.putLong(kvmetaArray, kvjOffset, l1);
+      FastByteComparisons.theUnsafe.putLong(kvmetaArray, kvjNextOffset, l2);
     }
 
     private int compareKeys(final int kvi, final int kvj) {
