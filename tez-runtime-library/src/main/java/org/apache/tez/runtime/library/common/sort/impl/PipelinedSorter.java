@@ -1634,7 +1634,6 @@ public final class PipelinedSorter {
     private final int kvbufferArrayOffset;
     private final SortSpan span;
     private final InputByteBuffer key = new InputByteBuffer();
-    private final InputByteBuffer value = new InputByteBuffer();
     private int partition;
     private int keyStart;
     private int keyLength;
@@ -1657,8 +1656,16 @@ public final class PipelinedSorter {
     }
 
     public DataInputBuffer getValue() {
-      value.reset(kvbufferArray, kvbufferArrayOffset + valueStart, valueLength);
-      return value;
+      assert false;
+      return null;
+    }
+
+    private void resetKeyTo(InputByteBuffer target) {
+      target.reset(kvbufferArray, kvbufferArrayOffset + keyStart, keyLength);
+    }
+
+    private void resetValueTo(InputByteBuffer target) {
+      target.reset(kvbufferArray, kvbufferArrayOffset + valueStart, valueLength);
     }
 
     public boolean next() {
@@ -2174,8 +2181,8 @@ public final class PipelinedSorter {
 
       if (current != null) {
         partition = current.getPartition();
-        key.reset(current.getKey());
-        value.reset(current.getValue());
+        current.resetKeyTo(key);
+        current.resetValueTo(value);
         if (gallop <= 0) {
           // since all keys and values are references to the kvbuffer, no more deep copies
           heap.replaceTop(current.next());
