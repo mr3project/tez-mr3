@@ -1640,6 +1640,8 @@ public final class PipelinedSorter {
     private int keyLength;
     private int valueStart;
     private int valueLength;
+    private int keyAbsoluteStart;
+    private long keyPrefix8;
 
     private static final int minrun = (1 << 4);
 
@@ -1680,6 +1682,20 @@ public final class PipelinedSorter {
           span.kvmetaArray, span.offsetForIntIndex(kvindexOffset + VALLEN));
       partition = FastByteComparisons.theUnsafe.getInt(
           span.kvmetaArray, span.offsetForIntIndex(kvindexOffset + PARTITION));
+      keyAbsoluteStart = kvbufferArrayOffset + keyStart;
+      keyPrefix8 = loadKeyPrefix8();
+    }
+
+    private long loadKeyPrefix8() {
+      if (keyLength >= Long.BYTES) {
+        return Long.reverseBytes(FastByteComparisons.theUnsafe.getLong(
+            kvbufferArray, FastByteComparisons.BYTE_ARRAY_BASE_OFFSET + keyAbsoluteStart));
+      }
+      long prefix = 0;
+      for (int i = 0; i < keyLength; i++) {
+        prefix = (prefix << Byte.SIZE) | (kvbufferArray[keyAbsoluteStart + i] & 0xFFL);
+      }
+      return prefix << ((Long.BYTES - keyLength) * Byte.SIZE);
     }
 
     @Override
@@ -1717,9 +1733,18 @@ public final class PipelinedSorter {
       if (partition != other.partition) {
         return partition - other.partition;
       }
+      if (keyPrefix8 != other.keyPrefix8) {
+        return Long.compareUnsigned(keyPrefix8, other.keyPrefix8);
+      }
+      if (keyLength >= Long.BYTES && other.keyLength >= Long.BYTES) {
+        return FastByteComparisons.compareTo(
+            kvbufferArray, keyAbsoluteStart + Long.BYTES, keyLength - Long.BYTES,
+            other.kvbufferArray, other.keyAbsoluteStart + Long.BYTES,
+            other.keyLength - Long.BYTES);
+      }
       return FastByteComparisons.compareTo(
-          kvbufferArray, kvbufferArrayOffset + keyStart, keyLength,
-          other.kvbufferArray, other.kvbufferArrayOffset + other.keyStart, other.keyLength);
+          kvbufferArray, keyAbsoluteStart, keyLength,
+          other.kvbufferArray, other.keyAbsoluteStart, other.keyLength);
     }
     
     @Override
