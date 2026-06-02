@@ -110,18 +110,27 @@ public final class FastByteComparisons {
     return length1 - length2;
   }
 
-  // JMH benchmark shows that compareEqual() is about 10 percent faster than compareEqualSIMD().
+  // JMH benchmark: compareEqual() is about 10 percent faster than compareEqualSIMD().
+  // TODO: Keep benchmarking with Arrays.equal() on different platforms.
+  //   java.util.Arrays.equals(arg1, s1, s1 + len1, arg2, s2, s2 + len2)
   public static boolean compareEqual(byte[] arg1, final int s1, final int len1,
                                      byte[] arg2, final int s2, final int len2) {
     if (len1 != len2) return false;
     if (len1 == 0) return true;
     int longEnd = len1 - (len1 & 7);
-    for (int i = 0; i < longEnd; i += 8) {
+    int i = 0;
+    for (; i < longEnd; i += 8) {
       long l1 = theUnsafe.getLong(arg1, BYTE_ARRAY_BASE_OFFSET + s1 + i);
       long l2 = theUnsafe.getLong(arg2, BYTE_ARRAY_BASE_OFFSET + s2 + i);
       if (l1 != l2) return false;
     }
-    for (int i = longEnd; i < len1; i++) {
+    if (len1 - i >= 4) {
+      int v1 = theUnsafe.getInt(arg1, BYTE_ARRAY_BASE_OFFSET + s1 + i);
+      int v2 = theUnsafe.getInt(arg2, BYTE_ARRAY_BASE_OFFSET + s2 + i);
+      if (v1 != v2) return false;
+      i += 4;
+    }
+    for (; i < len1; i++) {
       if (arg1[s1+i] != arg2[s2+i]) return false;
     }
     return true;
