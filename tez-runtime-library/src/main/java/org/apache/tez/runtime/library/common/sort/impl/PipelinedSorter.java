@@ -748,7 +748,7 @@ public final class PipelinedSorter {
         if (isThreadInterrupted()) {
           return false;
         }
-        TezRawKeyValueIterator kvIter = merger.filter(i);
+        PartitionFilter kvIter = merger.filter(i);
         // write merged output to disk
         long segmentStart = fsOutput.getPos();
         WriterDataInputBuffer writer = null;
@@ -763,14 +763,8 @@ public final class PipelinedSorter {
               -1, -1,
               writeBuffer, compressorExternal, outputContext);
         }
-        if (isRleEnabled) {
-          while (kvIter.next()) {
-            writer.appendRle(kvIter.getKey(), kvIter.getValue());
-          }
-        } else {
-          while (kvIter.next()) {
-            writer.appendNoRle(kvIter.getKey(), kvIter.getValue());
-          }
+        while (kvIter.next()) {
+          kvIter.appendCurrentTo(writer);
         }
 
         long rawLength = 0;
@@ -1224,11 +1218,6 @@ public final class PipelinedSorter {
   }
 
 
-  private interface PartitionedRawKeyValueIterator extends TezRawKeyValueIterator {
-    int getPartition();
-    Integer peekPartition();
-  }
-
   private static class BufferStreamWrapper extends OutputStream
   {
     private final ByteBuffer out;
@@ -1627,7 +1616,7 @@ public final class PipelinedSorter {
     }
   }
 
-  private static class SpanIterator implements PartitionedRawKeyValueIterator, Comparable<SpanIterator> {
+  private static class SpanIterator implements Comparable<SpanIterator> {
     private int kvindex = -1;
     private final int maxindex;
     private final byte[] kvbufferArray;
@@ -1655,18 +1644,6 @@ public final class PipelinedSorter {
       return key;
     }
 
-    public DataInputBuffer getValue() {
-      assert false;
-      return null;
-    }
-
-    private void resetKeyTo(InputByteBuffer target) {
-      target.reset(kvbufferArray, kvbufferArrayOffset + keyStart, keyLength);
-    }
-
-    private void resetValueTo(InputByteBuffer target) {
-      target.reset(kvbufferArray, kvbufferArrayOffset + valueStart, valueLength);
-    }
 
     public boolean next() {
       // caveat: since we use this as a comparable in the merger 
@@ -1689,17 +1666,8 @@ public final class PipelinedSorter {
           span.kvmetaArray, span.offsetForIntIndex(kvindexOffset + PARTITION));
     }
 
-    @Override
     public boolean hasNext() {
       return (kvindex < maxindex);
-    }
-
-    public void close() {
-    }
-
-    @Override
-    public boolean isSameKey() {
-      return false;
     }
 
     public int getPartition() {
@@ -1806,10 +1774,10 @@ public final class PipelinedSorter {
   }
 
   private class PartitionFilter implements TezRawKeyValueIterator {
-    private final PartitionedRawKeyValueIterator iter;
+    private final SpanMerger iter;
     private int partition;
     private boolean dirty = false;
-    public PartitionFilter(PartitionedRawKeyValueIterator iter) {
+    public PartitionFilter(SpanMerger iter) {
       this.iter = iter;
     }
     public DataInputBuffer getKey() throws IOException { return iter.getKey(); }
@@ -1818,7 +1786,11 @@ public final class PipelinedSorter {
 
     @Override
     public boolean isSameKey() {
-      return iter.isSameKey();
+      return false;
+    }
+
+    public void appendCurrentTo(WriterDataInputBuffer writer) throws IOException {
+      iter.appendCurrentTo(writer);
     }
 
     public boolean next() throws IOException {
@@ -2073,10 +2045,16 @@ public final class PipelinedSorter {
     merger.cancelOutstandingSorts();
   }
 
-  private final class SpanMerger implements PartitionedRawKeyValueIterator {
+  private final class SpanMerger {
     InputByteBuffer key = new InputByteBuffer();
     InputByteBuffer value = new InputByteBuffer();
     int partition;
+    private byte[] currentKeyData;
+    private int currentKeyOffset;
+    private int currentKeyLength;
+    private byte[] currentValueData;
+    private int currentValueOffset;
+    private int currentValueLength;
 
     private ArrayList< Future<SpanIterator>> futures = new ArrayList< Future<SpanIterator>>();
 
@@ -2181,8 +2159,7 @@ public final class PipelinedSorter {
 
       if (current != null) {
         partition = current.getPartition();
-        current.resetKeyTo(key);
-        current.resetValueTo(value);
+        setCurrentRecord(current);
         if (gallop <= 0) {
           // since all keys and values are references to the kvbuffer, no more deep copies
           heap.replaceTop(current.next());
@@ -2195,7 +2172,6 @@ public final class PipelinedSorter {
       return false;
     }
 
-    @Override
     public boolean hasNext() {
       return peek() != null;
     }
@@ -2209,19 +2185,38 @@ public final class PipelinedSorter {
       }
     }
 
-    public DataInputBuffer getKey() { return key; }
-    public DataInputBuffer getValue() { return value; }
+    public DataInputBuffer getKey() {
+      key.reset(currentKeyData, currentKeyOffset, currentKeyLength);
+      return key;
+    }
+
+    public DataInputBuffer getValue() {
+      value.reset(currentValueData, currentValueOffset, currentValueLength);
+      return value;
+    }
+
     public int getPartition() { return partition; }
 
-    public void close() throws IOException {
+    private void setCurrentRecord(SpanIterator current) {
+      currentKeyData = current.kvbufferArray;
+      currentKeyOffset = current.kvbufferArrayOffset + current.keyStart;
+      currentKeyLength = current.keyLength;
+      currentValueData = current.kvbufferArray;
+      currentValueOffset = current.kvbufferArrayOffset + current.valueStart;
+      currentValueLength = current.valueLength;
     }
 
-    @Override
-    public boolean isSameKey() {
-      return false;
+    private void appendCurrentTo(WriterDataInputBuffer writer) throws IOException {
+      if (writer.isRleEnabled()) {
+        writer.appendRle(currentKeyData, currentKeyOffset, currentKeyLength,
+            currentValueData, currentValueOffset, currentValueLength);
+      } else {
+        writer.appendNoRle(currentKeyData, currentKeyOffset, currentKeyLength,
+            currentValueData, currentValueOffset, currentValueLength);
+      }
     }
 
-    public TezRawKeyValueIterator filter(int partition) {
+    public PartitionFilter filter(int partition) {
       partIter.reset(partition);
       return partIter;
     }

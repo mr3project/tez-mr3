@@ -41,8 +41,8 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
-import org.apache.tez.runtime.library.utils.BufferUtils;
 import org.apache.tez.runtime.library.utils.CodecUtils;
+import org.apache.tez.util.FastByteComparisons;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.compress.CodecPool;
 import org.apache.hadoop.io.compress.CompressionCodec;
@@ -593,7 +593,7 @@ public class IFile {
   public static class WriterDataInputBuffer extends Writer implements WriterAppendDataInputBuffer {
 
     private final DataOutputBuffer previous = new DataOutputBuffer();
-    private DataInputBuffer prevKey = null;
+    private boolean previousSameKey = false;
 
     private long rleWritten = 0;      //number of RLE markers written
     private long totalKeySaving = 0;  //number of keys saved due to multi KV writes + RLE
@@ -639,8 +639,14 @@ public class IFile {
       int keyLength = key.getLength() - key.getPosition();
       int valueLength = value.getLength() - value.getPosition();
 
-      super.writeKVPair(key.getData(), key.getPosition(), keyLength,
+      appendNoRle(key.getData(), key.getPosition(), keyLength,
           value.getData(), value.getPosition(), valueLength);
+    }
+
+    public void appendNoRle(byte[] keyData, int keyOffset, int keyLength,
+                            byte[] valueData, int valueOffset, int valueLength) throws IOException {
+      assert !isRleEnabled && !useMaxKeyValLen;
+      super.writeKVPair(keyData, keyOffset, keyLength, valueData, valueOffset, valueLength);
       ++numRecordsWritten;
     }
 
@@ -686,31 +692,54 @@ public class IFile {
       int keyLength = key.getLength() - key.getPosition();
       int valueLength = value.getLength() - value.getPosition();
 
-      boolean sameKey = key == REPEAT_KEY;
-      if (!sameKey) {
-        sameKey = (keyLength != 0) && BufferUtils.compareEqual(previous, key);
+      if (key == REPEAT_KEY) {
+        appendRepeatValue(value.getData(), value.getPosition(), valueLength);
+        ++numRecordsWritten;
+        return;
       }
 
+      appendRle(key.getData(), key.getPosition(), keyLength,
+          value.getData(), value.getPosition(), valueLength);
+    }
+
+    public void appendRle(byte[] keyData, int keyOffset, int keyLength,
+                          byte[] valueData, int valueOffset, int valueLength) throws IOException {
+      assert isRleEnabled && !useMaxKeyValLen;
+      boolean sameKey = keyLength != 0 && comparePrevious(keyData, keyOffset, keyLength);
       if (!sameKey) {
         writeValueMarker();
-        super.writeKVPair(key.getData(), key.getPosition(), keyLength,
-            value.getData(), value.getPosition(), valueLength);
-        BufferUtils.copy(key, previous);
+        super.writeKVPair(keyData, keyOffset, keyLength, valueData, valueOffset, valueLength);
+        copyPrevious(keyData, keyOffset, keyLength);
+        previousSameKey = false;
       } else {
-        if (prevKey != REPEAT_KEY) {
-          bufferWriteInt(RLE_MARKER);
-          incrementDecompressedBytesWritten(RLE_MARKER_SIZE);
-          rleWritten++;
-        }
-        super.writeValue(value.getData(), value.getPosition(), valueLength);
-        totalKeySaving++;
+        appendRepeatValue(valueData, valueOffset, valueLength);
       }
-      prevKey = sameKey ? REPEAT_KEY : key;
       ++numRecordsWritten;
     }
 
+    private void appendRepeatValue(byte[] valueData, int valueOffset, int valueLength) throws IOException {
+      if (!previousSameKey) {
+        bufferWriteInt(RLE_MARKER);
+        incrementDecompressedBytesWritten(RLE_MARKER_SIZE);
+        rleWritten++;
+      }
+      super.writeValue(valueData, valueOffset, valueLength);
+      totalKeySaving++;
+      previousSameKey = true;
+    }
+
+    private boolean comparePrevious(byte[] keyData, int keyOffset, int keyLength) {
+      return FastByteComparisons.compareEqual(
+          previous.getData(), 0, previous.getLength(), keyData, keyOffset, keyLength);
+    }
+
+    private void copyPrevious(byte[] keyData, int keyOffset, int keyLength) throws IOException {
+      previous.reset();
+      previous.write(keyData, keyOffset, keyLength);
+    }
+
     private void writeValueMarker() throws IOException {
-      if (prevKey == REPEAT_KEY) {
+      if (previousSameKey) {
         bufferWriteInt(V_END_MARKER);
         incrementDecompressedBytesWritten(V_END_MARKER_SIZE);
       }
