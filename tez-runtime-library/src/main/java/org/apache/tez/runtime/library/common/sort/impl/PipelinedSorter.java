@@ -124,6 +124,7 @@ public final class PipelinedSorter {
   private final static int APPROX_HEADER_LENGTH = 150;
 
   private final int partitionBits;
+  private final int fullKeyPrefixBytes;
 
   private static final int KEYSTART = 0;         // key offset in acct
   private static final int VALSTART = 1;         // val offset in acct
@@ -275,7 +276,9 @@ public final class PipelinedSorter {
 
     this.finalIndexComputed = false;
 
-    this.partitionBits = bitcount(partitions) + 1;
+    int leadingZeros = Integer.numberOfLeadingZeros(partitions);
+    this.partitionBits = Integer.SIZE - leadingZeros + 1;
+    this.fullKeyPrefixBytes = Math.max(0, (leadingZeros - 1) / Byte.SIZE);
 
     this.lazyAllocateMem = this.conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_LAZY_ALLOCATE_MEMORY,
@@ -450,15 +453,6 @@ public final class PipelinedSorter {
       }
     }
     return maxBlockSize;
-  }
-
-  private int bitcount(int n) {
-    int bit = 0;
-    while(n!=0) {
-      bit++;
-      n >>= 1;
-    }
-    return bit;
   }
 
   private void sort() throws IOException {
@@ -1272,6 +1266,7 @@ public final class PipelinedSorter {
     final byte[] kvbufferArray;
     final int kvbufferArrayOffset;
     final NonSyncDataOutputStream out;
+    final int fullKeyPrefixBytes;
 
     private int index = 0;
     private long eq = 0;
@@ -1305,6 +1300,7 @@ public final class PipelinedSorter {
       kvmetaCapacity = metasize;
       kvmetaPosition = 0;
       kvmetaLimit = metasize;
+      fullKeyPrefixBytes = PipelinedSorter.this.fullKeyPrefixBytes;
       out = new NonSyncDataOutputStream(
               new BufferStreamWrapper(kvbuffer));
     }
@@ -1507,10 +1503,12 @@ public final class PipelinedSorter {
         return ilen - jlen;
       }
 
-      // sort by key
+      // sort by key. The partition/prefix metadata matched, so skip the full
+      // key bytes that the retained prefix already compared.
+      final int skip = Math.min(fullKeyPrefixBytes, Math.min(ilen, jlen));
       final int cmp = FastByteComparisons.compareTo(
-          kvbufferArray, kvbufferArrayOffset + istart, ilen,
-          kvbufferArray, kvbufferArrayOffset + jstart, jlen);
+          kvbufferArray, kvbufferArrayOffset + istart + skip, ilen - skip,
+          kvbufferArray, kvbufferArrayOffset + jstart + skip, jlen - skip);
       if (cmp == 0) eq++;
       return cmp;
     }
@@ -1586,23 +1584,23 @@ public final class PipelinedSorter {
     }
 
     private int compareInternal(final DataInputBuffer needle, final int needlePart, final int index) {
-      int cmp = 0;
-      final int keystart;
-      final int valstart;
-      final int partition;
-      partition = FastByteComparisons.theUnsafe.getInt(
+      int cmp;
+      final int partition = FastByteComparisons.theUnsafe.getInt(
           kvmetaArray, offsetForIntIndex(this.offsetFor(index) + PARTITION));
       if (partition != needlePart) {
-          cmp = (partition-needlePart);
+          cmp = partition - needlePart;
       } else {
         long keyValStartPair = FastByteComparisons.theUnsafe.getLong(
             kvmetaArray, offsetForLongIndex(longOffsetFor(index)));
-        keystart = (int) keyValStartPair;
-        valstart = (int) (keyValStartPair >>> Integer.SIZE);
+        final int keyStart = (int) keyValStartPair;
+        final int valStart = (int) (keyValStartPair >>> Integer.SIZE);
+        final int keyLength = valStart - keyStart;
+        final int needleLength = needle.getLength() - needle.getPosition();
+        final int skip = Math.min(fullKeyPrefixBytes, Math.min(keyLength, needleLength));
         cmp = FastByteComparisons.compareTo(kvbufferArray,
-            kvbufferArrayOffset + keystart, (valstart - keystart),
+            kvbufferArrayOffset + keyStart + skip, keyLength - skip,
             needle.getData(),
-            needle.getPosition(), (needle.getLength() - needle.getPosition()));
+            needle.getPosition() + skip, needleLength - skip);
       }
       return cmp;
     }
@@ -1675,9 +1673,11 @@ public final class PipelinedSorter {
       if (partition != other.partition) {
         return partition - other.partition;
       }
+      final int skip = Math.min(span.fullKeyPrefixBytes, Math.min(keyLength, other.keyLength));
       return FastByteComparisons.compareTo(
-          kvbufferArray, kvbufferArrayOffset + keyStart, keyLength,
-          other.kvbufferArray, other.kvbufferArrayOffset + other.keyStart, other.keyLength);
+          kvbufferArray, kvbufferArrayOffset + keyStart + skip, keyLength - skip,
+          other.kvbufferArray, other.kvbufferArrayOffset + other.keyStart + skip,
+          other.keyLength - skip);
     }
     
     @Override
