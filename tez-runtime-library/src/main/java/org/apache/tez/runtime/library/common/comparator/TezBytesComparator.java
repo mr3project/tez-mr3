@@ -64,4 +64,49 @@ public final class TezBytesComparator {
         return 0;
     }
   }
+
+  private static long getProxyLongFromInt(byte[] content, int offset) {
+    return (Integer.reverseBytes(FastByteComparisons.theUnsafe.getInt(
+        content, FastByteComparisons.BYTE_ARRAY_BASE_OFFSET + (long) offset)) & 0xffffffffL)
+        << Integer.SIZE;
+  }
+
+  public static long getProxyLong(BytesWritable key) {
+    final int len = key.getLength();
+    final byte[] content = key.getBytesRaw();
+    final int offset = key.getOffset();
+
+    switch (len) {
+      default:
+        return Long.reverseBytes(FastByteComparisons.theUnsafe.getLong(
+            content, FastByteComparisons.BYTE_ARRAY_BASE_OFFSET + (long) offset))
+            & 0xffffffffffffff00L;
+      case 7:
+        return getProxyLongFromInt(content, offset)
+            | ((long) (content[offset + 4] & 0xff) << 24)
+            | ((long) (content[offset + 5] & 0xff) << 16)
+            | ((long) (content[offset + 6] & 0xff) << 8);
+      case 6:
+        return getProxyLongFromInt(content, offset)
+            | ((long) (content[offset + 4] & 0xff) << 24)
+            | ((long) (content[offset + 5] & 0xff) << 16);
+      case 5:
+        return getProxyLongFromInt(content, offset)
+            | ((long) (content[offset + 4] & 0xff) << 24);
+      case 4:
+        return getProxyLongFromInt(content, offset);
+      case 3:
+        return ((long) (content[offset] & 0xff) << 56)
+            | ((long) (content[offset + 1] & 0xff) << 48)
+            | ((long) (content[offset + 2] & 0xff) << 40);
+      case 2:
+        return ((long) (content[offset] & 0xff) << 56)
+            | ((long) (content[offset + 1] & 0xff) << 48);
+      case 1:
+        return (long) (content[offset] & 0xff) << 56;
+      case 0:
+        return 0L;
+    }
+  }
+
 }

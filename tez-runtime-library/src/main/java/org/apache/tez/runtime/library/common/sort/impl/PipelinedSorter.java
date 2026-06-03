@@ -125,12 +125,12 @@ public final class PipelinedSorter {
 
   private final int partitionBits;
 
-  private static final int KEYSTART = 0;         // key offset in acct
-  private static final int VALSTART = 1;         // val offset in acct
-  private static final int PARTITION = 2;        // partition offset in acct
-  private static final int VALLEN = 3;           // val len in acct
-  private static final int NMETA = 4;            // num meta ints
-  private static final int METASIZE = NMETA * 4; // size in bytes
+  private static final int KEYSTART = 0;         // key offset in acct, packed with VALSTART
+  private static final int VALSTART = 4;         // val offset in acct, packed with KEYSTART
+  private static final int VALLEN = 8;           // val len in acct
+  private static final int PARTITION = 12;       // partition and key prefix offset in acct
+  // size in bytes
+  private static final int METASIZE = Long.BYTES + Integer.BYTES + Long.BYTES;
 
   // Assume: ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN
   // This is checked in the static block of FastByteComparisons, so no need to check here again.
@@ -586,12 +586,13 @@ public final class PipelinedSorter {
       bufferOverflowRecursion--;
     }
 
-    int prefix = TezBytesComparator.getProxy(key);
-    prefix = (partition << (32 - partitionBits)) | (prefix >>> partitionBits);
+    long prefix = TezBytesComparator.getProxyLong(key);
+    prefix = ((long) partition << (Long.SIZE - partitionBits)) | (prefix >>> partitionBits);
 
-    /* maintain order as in KEYSTART, VALSTART, PARTITION, VALLEN */
-    span.putMetaLong(keystart, valstart);
-    span.putMetaLong(prefix, valend - valstart);
+    /* maintain order as in KEYSTART, VALSTART, VALLEN, PARTITION */
+    span.putMetaLongPair(keystart, valstart);
+    span.putMetaInt(valend - valstart);
+    span.putMetaLong(prefix);
     outputRecordsCounter.increment(1);
     outputRecordBytesCounter.increment(valend - keystart);
   }
@@ -1440,71 +1441,95 @@ public final class PipelinedSorter {
     }
 
     private int offsetFor(int i) {
-      return (i * NMETA);
+      return i * METASIZE;
     }
 
-    private int longOffsetFor(int i) {
-      return i * (NMETA / 2);
-    }
-
-    private long offsetForIntIndex(int intIndex) {
-      return kvmetaBaseOffset + (((long) intIndex) << 2);
-    }
-
-    private long offsetForLongIndex(int longIndex) {
-      return kvmetaBaseOffset + (((long) longIndex) << 3);
+    private long offsetForMetaOffset(int metaOffset) {
+      return kvmetaBaseOffset + metaOffset;
     }
 
     private int metaRemaining() {
       return kvmetaLimit - kvmetaPosition;
     }
 
-    private void putMetaLong(int first, int second) {
-      long firstBits = first & 0xFFFFFFFFL;
-      long secondBits = second & 0xFFFFFFFFL;
+    private void putMetaLongPair(int first, int second) {
+      assert first >= 0 && second >= 0;
+      long firstBits = first;
+      long secondBits = second;
       FastByteComparisons.theUnsafe.putLong(
-          kvmetaArray, kvmetaBaseOffset + kvmetaPosition, firstBits | (secondBits << Integer.SIZE));
+          kvmetaArray, kvmetaBaseOffset + kvmetaPosition,
+          firstBits | (secondBits << Integer.SIZE));
+      kvmetaPosition += Long.BYTES;
+    }
+
+    private void putMetaInt(int value) {
+      FastByteComparisons.theUnsafe.putInt(
+          kvmetaArray, kvmetaBaseOffset + kvmetaPosition, value);
+      kvmetaPosition += Integer.BYTES;
+    }
+
+    private void putMetaLong(long value) {
+      FastByteComparisons.theUnsafe.putLong(
+          kvmetaArray, kvmetaBaseOffset + kvmetaPosition, value);
       kvmetaPosition += Long.BYTES;
     }
 
     private void swap(final int mi, final int mj) {
-      final int kvi = longOffsetFor(mi);
-      final int kvj = longOffsetFor(mj);
-      final long l1 = FastByteComparisons.theUnsafe.getLong(kvmetaArray, offsetForLongIndex(kvi));
-      final long l2 = FastByteComparisons.theUnsafe.getLong(kvmetaArray, offsetForLongIndex(kvi + 1));
+      final int kvi = offsetFor(mi);
+      final int kvj = offsetFor(mj);
+      final long l1 = FastByteComparisons.theUnsafe.getLong(kvmetaArray, offsetForMetaOffset(kvi));
+      final long l2 = FastByteComparisons.theUnsafe.getLong(
+          kvmetaArray, offsetForMetaOffset(kvi + Long.BYTES));
+      final int i1 = FastByteComparisons.theUnsafe.getInt(
+          kvmetaArray, offsetForMetaOffset(kvi + Long.BYTES + Long.BYTES));
 
       FastByteComparisons.theUnsafe.putLong(
           kvmetaArray,
-          offsetForLongIndex(kvi),
-          FastByteComparisons.theUnsafe.getLong(kvmetaArray, offsetForLongIndex(kvj)));
+          offsetForMetaOffset(kvi),
+          FastByteComparisons.theUnsafe.getLong(kvmetaArray, offsetForMetaOffset(kvj)));
       FastByteComparisons.theUnsafe.putLong(
           kvmetaArray,
-          offsetForLongIndex(kvi + 1),
-          FastByteComparisons.theUnsafe.getLong(kvmetaArray, offsetForLongIndex(kvj + 1)));
+          offsetForMetaOffset(kvi + Long.BYTES),
+          FastByteComparisons.theUnsafe.getLong(kvmetaArray, offsetForMetaOffset(kvj + Long.BYTES)));
+      FastByteComparisons.theUnsafe.putInt(
+          kvmetaArray,
+          offsetForMetaOffset(kvi + Long.BYTES + Long.BYTES),
+          FastByteComparisons.theUnsafe.getInt(
+              kvmetaArray, offsetForMetaOffset(kvj + Long.BYTES + Long.BYTES)));
 
-      FastByteComparisons.theUnsafe.putLong(kvmetaArray, offsetForLongIndex(kvj), l1);
-      FastByteComparisons.theUnsafe.putLong(kvmetaArray, offsetForLongIndex(kvj + 1), l2);
+      FastByteComparisons.theUnsafe.putLong(kvmetaArray, offsetForMetaOffset(kvj), l1);
+      FastByteComparisons.theUnsafe.putLong(kvmetaArray, offsetForMetaOffset(kvj + Long.BYTES), l2);
+      FastByteComparisons.theUnsafe.putInt(
+          kvmetaArray, offsetForMetaOffset(kvj + Long.BYTES + Long.BYTES), i1);
+    }
+
+    private int keyPrefixBytes() {
+      return (Long.SIZE - partitionBits) >>> 3;
+    }
+
+    private int compareKeyBytes(byte[] left, int leftOffset, int leftLength,
+        byte[] right, int rightOffset, int rightLength) {
+      final int prefixBytes = Math.min(keyPrefixBytes(), Math.min(leftLength, rightLength));
+      if (prefixBytes == leftLength || prefixBytes == rightLength) {
+        return leftLength - rightLength;
+      }
+      return FastByteComparisons.compareTo(
+          left, leftOffset + prefixBytes, leftLength - prefixBytes,
+          right, rightOffset + prefixBytes, rightLength - prefixBytes);
     }
 
     private int compareKeys(final int kvi, final int kvj) {
       final long ipair = FastByteComparisons.theUnsafe.getLong(
-          kvmetaArray, offsetForLongIndex(longOffsetFor(kvi >>> 2)));
+          kvmetaArray, offsetForMetaOffset(kvi + KEYSTART));
       final int istart = (int) ipair;
       final int ilen   = ((int) (ipair >>> Integer.SIZE)) - istart;
       final long jpair = FastByteComparisons.theUnsafe.getLong(
-          kvmetaArray, offsetForLongIndex(longOffsetFor(kvj >>> 2)));
+          kvmetaArray, offsetForMetaOffset(kvj + KEYSTART));
       final int jstart = (int) jpair;
       final int jlen   = ((int) (jpair >>> Integer.SIZE)) - jstart;
 
-      if (ilen == 0 || jlen == 0) {
-        if (ilen == jlen) {
-          eq++;
-        }
-        return ilen - jlen;
-      }
-
-      // sort by key
-      final int cmp = FastByteComparisons.compareTo(
+      // sort by key, skipping the full prefix bytes that the long proxy already matched
+      final int cmp = compareKeyBytes(
           kvbufferArray, kvbufferArrayOffset + istart, ilen,
           kvbufferArray, kvbufferArrayOffset + jstart, jlen);
       if (cmp == 0) eq++;
@@ -1514,13 +1539,13 @@ public final class PipelinedSorter {
     private int compare(final int mi, final int mj) {
       final int kvi = offsetFor(mi);
       final int kvj = offsetFor(mj);
-      final int kvip = FastByteComparisons.theUnsafe.getInt(
-          kvmetaArray, offsetForIntIndex(kvi + PARTITION));
-      final int kvjp = FastByteComparisons.theUnsafe.getInt(
-          kvmetaArray, offsetForIntIndex(kvj + PARTITION));
-      // sort by partition      
+      final long kvip = FastByteComparisons.theUnsafe.getLong(
+          kvmetaArray, offsetForMetaOffset(kvi + PARTITION));
+      final long kvjp = FastByteComparisons.theUnsafe.getLong(
+          kvmetaArray, offsetForMetaOffset(kvj + PARTITION));
+      // sort by partition and key prefix
       if (kvip != kvjp) {
-        return kvip - kvjp;
+        return Long.compare(kvip, kvjp);
       }
       return compareKeys(kvi, kvj);
     }
@@ -1581,23 +1606,23 @@ public final class PipelinedSorter {
       return remaining;
     }
 
-    private int compareInternal(final DataInputBuffer needle, final int needlePart, final int index) {
+    private int compareInternal(final DataInputBuffer needle, final long needlePart, final int index) {
       int cmp = 0;
       final int keystart;
       final int valstart;
-      final int partition;
-      partition = FastByteComparisons.theUnsafe.getInt(
-          kvmetaArray, offsetForIntIndex(this.offsetFor(index) + PARTITION));
+      final long partition;
+      partition = FastByteComparisons.theUnsafe.getLong(
+          kvmetaArray, offsetForMetaOffset(this.offsetFor(index) + PARTITION));
       if (partition != needlePart) {
-          cmp = (partition-needlePart);
+          cmp = Long.compare(partition, needlePart);
       } else {
         long keyValStartPair = FastByteComparisons.theUnsafe.getLong(
-            kvmetaArray, offsetForLongIndex(longOffsetFor(index)));
+            kvmetaArray, offsetForMetaOffset(this.offsetFor(index) + KEYSTART));
         keystart = (int) keyValStartPair;
         valstart = (int) (keyValStartPair >>> Integer.SIZE);
         final byte[] buf = kvbuffer.array();
         final int off = kvbuffer.arrayOffset();
-        cmp = FastByteComparisons.compareTo(buf,
+        cmp = compareKeyBytes(buf,
             keystart + off , (valstart - keystart),
             needle.getData(),
             needle.getPosition(), (needle.getLength() - needle.getPosition()));
@@ -1623,7 +1648,7 @@ public final class PipelinedSorter {
     private final int kvbufferArrayOffset;
     private final SortSpan span;
     private final InputByteBuffer key = new InputByteBuffer();
-    private int partition;
+    private long partition;
     private int keyStart;
     private int keyLength;
     private int valueStart;
@@ -1654,26 +1679,26 @@ public final class PipelinedSorter {
 
     private void loadCurrentRecordMetadata() {
       final long keyValStartPair = FastByteComparisons.theUnsafe.getLong(
-          span.kvmetaArray, span.offsetForLongIndex(span.longOffsetFor(kvindex)));
+          span.kvmetaArray, span.offsetForMetaOffset(span.offsetFor(kvindex) + KEYSTART));
       keyStart = (int) keyValStartPair;
       valueStart = (int) (keyValStartPair >>> Integer.SIZE);
       keyLength = valueStart - keyStart;
       int kvindexOffset = span.offsetFor(kvindex);
       valueLength = FastByteComparisons.theUnsafe.getInt(
-          span.kvmetaArray, span.offsetForIntIndex(kvindexOffset + VALLEN));
-      partition = FastByteComparisons.theUnsafe.getInt(
-          span.kvmetaArray, span.offsetForIntIndex(kvindexOffset + PARTITION));
+          span.kvmetaArray, span.offsetForMetaOffset(kvindexOffset + VALLEN));
+      partition = FastByteComparisons.theUnsafe.getLong(
+          span.kvmetaArray, span.offsetForMetaOffset(kvindexOffset + PARTITION));
     }
 
-    public int getPartition() {
+    public long getPartition() {
       return partition;
     }
 
     public int compareTo(SpanIterator other) {
       if (partition != other.partition) {
-        return partition - other.partition;
+        return Long.compare(partition, other.partition);
       }
-      return FastByteComparisons.compareTo(
+      return span.compareKeyBytes(
           kvbufferArray, kvbufferArrayOffset + keyStart, keyLength,
           other.kvbufferArray, other.kvbufferArrayOffset + other.keyStart, other.keyLength);
     }
@@ -1691,7 +1716,7 @@ public final class PipelinedSorter {
      * @param needlePart
      * @return
      */
-    int bisect(DataInputBuffer needle, int needlePart) {
+    int bisect(DataInputBuffer needle, long needlePart) {
       int start = kvindex;
       int end = maxindex-1;
       int mid;
@@ -1770,9 +1795,9 @@ public final class PipelinedSorter {
 
     public boolean next() {
       if (dirty || iter.next()) {
-        int prefix = iter.getPartition();
+        long prefix = iter.getPartition();
 
-        if ((prefix >>> (32 - partitionBits)) == partition) {
+        if ((prefix >>> (Long.SIZE - partitionBits)) == partition) {
           dirty = false; // we found what we were looking for, good
           return true;
         } else if (!dirty) {
@@ -1784,7 +1809,7 @@ public final class PipelinedSorter {
 
     public boolean hasNext() {
       if (dirty || iter.hasNext()) {
-        Integer part;
+        Long part;
         if (dirty) {
           part = iter.getPartition();
         } else {
@@ -1792,7 +1817,7 @@ public final class PipelinedSorter {
         }
 
         if (part != null) {
-          return (part >>> (32 - partitionBits)) == partition;
+          return (part >>> (Long.SIZE - partitionBits)) == partition;
         }
       }
       return false;
@@ -2012,7 +2037,7 @@ public final class PipelinedSorter {
 
   private final class SpanMerger {
 
-    int partition;
+    long partition;
     private byte[] currentKeyData;
     private int currentKeyOffset;
     private int currentKeyLength;
@@ -2139,7 +2164,7 @@ public final class PipelinedSorter {
       return peek() != null;
     }
 
-    public Integer peekPartition() {
+    public Long peekPartition() {
       if (!hasNext()) {
         return null;
       } else {
@@ -2148,7 +2173,7 @@ public final class PipelinedSorter {
       }
     }
 
-    public int getPartition() { return partition; }
+    public long getPartition() { return partition; }
 
     private void setCurrentRecord(SpanIterator current) {
       currentKeyData = current.kvbufferArray;
