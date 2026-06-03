@@ -40,8 +40,9 @@ public class TezTaskOutputFiles implements TezTaskOutput {
 
   private static final Logger LOG = LoggerFactory.getLogger(TezTaskOutputFiles.class);
 
-  private static final String SPILL_FILE_DIR_PATTERN = "%s_%d";
-  private static final String SPILL_FILE_PATTERN = "%s_src_%d_spill_%d.out";
+  private static final String SPILL_FILE_SRC_SEPARATOR = "_src_";
+  private static final String SPILL_FILE_SPILL_SEPARATOR = "_spill_";
+  private static final String SPILL_FILE_EXTENSION = ".out";
 
   private final Configuration conf;
   private final String uniqueId;
@@ -219,8 +220,7 @@ public class TezTaskOutputFiles implements TezTaskOutput {
       throws IOException {
     Preconditions.checkArgument(spillNumber >= 0, "Provide a valid spill number {}", spillNumber);
     String dagPath = getDagOutputDir(this.outputDir);
-    Path taskAttemptDir = new Path(dagPath,
-        String.format(SPILL_FILE_DIR_PATTERN, uniqueId, spillNumber));
+    Path taskAttemptDir = new Path(dagPath, uniqueId + '_' + spillNumber);
     Path outputDir = new Path(taskAttemptDir, Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING);
     return lDirAlloc.getLocalPathForWrite(outputDir.toString(), size, conf);
   }
@@ -241,8 +241,7 @@ public class TezTaskOutputFiles implements TezTaskOutput {
       throws IOException {
     Preconditions.checkArgument(spillNumber >= 0, "Provide a valid spill number {}", spillNumber);
     String dagPath = getDagOutputDir(this.outputDir);
-    Path taskAttemptDir = new Path(dagPath, String.format(
-        SPILL_FILE_DIR_PATTERN, uniqueId, spillNumber));
+    Path taskAttemptDir = new Path(dagPath, uniqueId + '_' + spillNumber);
     Path outputDir = new Path(taskAttemptDir, Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING +
         Constants.TEZ_RUNTIME_TASK_OUTPUT_INDEX_SUFFIX_STRING);
     return lDirAlloc.getLocalPathForWrite(outputDir.toString(), size, conf);
@@ -283,7 +282,8 @@ public class TezTaskOutputFiles implements TezTaskOutput {
    */
   @Override
   public String getSpillFileName(int srcId, int spillNum) {
-    return String.format(SPILL_FILE_PATTERN, uniqueId, srcId, spillNum);
+    return uniqueId + SPILL_FILE_SRC_SEPARATOR + srcId + SPILL_FILE_SPILL_SEPARATOR
+        + spillNum + SPILL_FILE_EXTENSION;
   }
 
   public String getDagOutputDir(String child) {

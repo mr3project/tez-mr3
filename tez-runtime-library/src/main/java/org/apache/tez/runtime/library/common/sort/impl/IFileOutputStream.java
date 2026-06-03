@@ -80,23 +80,29 @@ public class IFileOutputStream extends FilterOutputStream {
       return;
     }
     finished = true;
-    sum.update(buffer, 0, offset);
+    if (offset > 0) {
+      sum.update(buffer, 0, offset);
+    }
     sum.writeValue(barray, 0, false);
     out.write(barray, 0, sum.getChecksumSize());
     out.flush();
   }
 
   private void checksum(byte[] b, int off, int len) {
-    if(len >= buffer.length) {
-      sum.update(buffer, 0, offset);
-      offset = 0;
+    if (len >= buffer.length) {
+      if (offset > 0) {
+        sum.update(buffer, 0, offset);
+        offset = 0;
+      }
       sum.update(b, off, len);
       return;
     }
     final int remaining = buffer.length - offset;
-    if(len > remaining) {
-      sum.update(buffer, 0, offset);
-      offset = 0;
+    if (len > remaining) {
+      if (offset > 0) {
+        sum.update(buffer, 0, offset);
+        offset = 0;
+      }
     }
     /*
     // FIXME if needed re-enable this in debug mode

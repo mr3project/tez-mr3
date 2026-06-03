@@ -1490,13 +1490,13 @@ public final class PipelinedSorter {
       FastByteComparisons.theUnsafe.putLong(kvmetaArray, kvjNextOffset, l2);
     }
 
-    private int compareKeys(final int kvi, final int kvj) {
+    private int compareKeys(final int mi, final int mj) {
       final long ipair = FastByteComparisons.theUnsafe.getLong(
-          kvmetaArray, offsetForLongIndex(longOffsetFor(kvi >>> 2)));
+          kvmetaArray, offsetForLongIndex(longOffsetFor(mi)));
       final int istart = (int) ipair;
       final int ilen   = ((int) (ipair >>> Integer.SIZE)) - istart;
       final long jpair = FastByteComparisons.theUnsafe.getLong(
-          kvmetaArray, offsetForLongIndex(longOffsetFor(kvj >>> 2)));
+          kvmetaArray, offsetForLongIndex(longOffsetFor(mj)));
       final int jstart = (int) jpair;
       final int jlen   = ((int) (jpair >>> Integer.SIZE)) - jstart;
 
@@ -1526,7 +1526,7 @@ public final class PipelinedSorter {
       if (kvip != kvjp) {
         return kvip - kvjp;
       }
-      return compareKeys(kvi, kvj);
+      return compareKeys(mi, mj);
     }
 
     private SortSpan next() {
@@ -1599,10 +1599,8 @@ public final class PipelinedSorter {
             kvmetaArray, offsetForLongIndex(longOffsetFor(index)));
         keystart = (int) keyValStartPair;
         valstart = (int) (keyValStartPair >>> Integer.SIZE);
-        final byte[] buf = kvbuffer.array();
-        final int off = kvbuffer.arrayOffset();
-        cmp = FastByteComparisons.compareTo(buf,
-            keystart + off , (valstart - keystart),
+        cmp = FastByteComparisons.compareTo(kvbufferArray,
+            kvbufferArrayOffset + keystart, (valstart - keystart),
             needle.getData(),
             needle.getPosition(), (needle.getLength() - needle.getPosition()));
       }
