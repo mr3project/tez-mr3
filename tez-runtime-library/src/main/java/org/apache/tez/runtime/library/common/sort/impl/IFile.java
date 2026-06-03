@@ -1181,7 +1181,8 @@ public class IFile {
         boolean ifileReadAhead, int ifileReadAheadLength)
         throws IOException {
       final int BYTES_TO_READ = 64 * 1024;
-      byte[] buf = new byte[BYTES_TO_READ];
+      int checksumSize = IFileOutputStream.getCheckSumSize();
+      byte[] buf = new byte[BYTES_TO_READ + checksumSize];
 
       // copy the IFile header
       if (length < HEADER.length) {
@@ -1192,11 +1193,17 @@ public class IFile {
       System.arraycopy(header, 0, buf, 0, HEADER.length);
       out.write(buf, 0, HEADER.length);
       long bytesLeft = length - HEADER.length;
+      if (bytesLeft < checksumSize) {
+        throw new IOException("Missing IFile checksum");
+      }
       @SuppressWarnings("resource")
       IFileInputStream ifInput = new IFileInputStream(in, bytesLeft,
           ifileReadAhead, ifileReadAheadLength);
       while (bytesLeft > 0) {
-        int n = ifInput.readWithChecksum(buf, 0, (int) Math.min(bytesLeft, BYTES_TO_READ));
+        long dataBytesLeft = bytesLeft - checksumSize;
+        int bytesToRead = dataBytesLeft <= BYTES_TO_READ ?
+            (int) bytesLeft : BYTES_TO_READ;
+        int n = ifInput.readWithChecksum(buf, 0, bytesToRead);
         if (n < 0) {
           throw new IOException("read past end of stream");
         }

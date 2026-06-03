@@ -21,8 +21,7 @@ package org.apache.tez.runtime.library.common.sort.impl;
 import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-
-import org.apache.hadoop.util.DataChecksum;
+import java.util.zip.CRC32;
 
 /**
  * A Checksum output stream.
@@ -32,13 +31,13 @@ import org.apache.hadoop.util.DataChecksum;
  */
 public class IFileOutputStream extends FilterOutputStream {
 
+  private static final int CHECKSUM_SIZE = Integer.BYTES;
+
   /**
    * The output stream to be checksummed.
    */
-  private final DataChecksum sum;
-  private byte[] barray;
-  private byte[] buffer;
-  private int offset;
+  private final CRC32 sum;
+  private final byte[] checksum = new byte[CHECKSUM_SIZE];
   private boolean closed = false;
   private boolean finished = false;
 
@@ -49,15 +48,11 @@ public class IFileOutputStream extends FilterOutputStream {
    */
   public IFileOutputStream(OutputStream out) {
     super(out);
-    sum = DataChecksum.newDataChecksum(DataChecksum.Type.CRC32,
-        Integer.MAX_VALUE);
-    barray = new byte[sum.getChecksumSize()];
-    buffer = new byte[4096];
-    offset = 0;
+    sum = new CRC32();
   }
 
   public static int getCheckSumSize() {
-    return DataChecksum.Type.CRC32.size;
+    return CHECKSUM_SIZE;
   }
 
   @Override
@@ -80,36 +75,24 @@ public class IFileOutputStream extends FilterOutputStream {
       return;
     }
     finished = true;
-    sum.update(buffer, 0, offset);
-    sum.writeValue(barray, 0, false);
-    out.write(barray, 0, sum.getChecksumSize());
+    writeChecksumValue(checksum, 0, sum.getValue());
+    out.write(checksum, 0, CHECKSUM_SIZE);
     out.flush();
   }
 
-  private void checksum(byte[] b, int off, int len) {
-    if(len >= buffer.length) {
-      sum.update(buffer, 0, offset);
-      offset = 0;
-      sum.update(b, off, len);
-      return;
+  static void writeChecksumValue(byte[] b, int off, long value) {
+    for (int i = 0; i < CHECKSUM_SIZE; i++) {
+      b[off + i] = (byte) (value >>> (Byte.SIZE * i));
     }
-    final int remaining = buffer.length - offset;
-    if(len > remaining) {
-      sum.update(buffer, 0, offset);
-      offset = 0;
+  }
+
+  static boolean checksumMatches(byte[] b, int off, long value) {
+    for (int i = 0; i < CHECKSUM_SIZE; i++) {
+      if (b[off + i] != (byte) (value >>> (Byte.SIZE * i))) {
+        return false;
+      }
     }
-    /*
-    // FIXME if needed re-enable this in debug mode
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("XXX checksum" +
-          " b=" + b + " off=" + off +
-          " buffer=" + " offset=" + offset +
-          " len=" + len);
-    }
-    */
-    /* now we should have len < buffer.length */
-    System.arraycopy(b, off, buffer, offset, len);
-    offset += len;
+    return true;
   }
 
   /**
@@ -117,14 +100,14 @@ public class IFileOutputStream extends FilterOutputStream {
    */
   @Override
   public void write(byte[] b, int off, int len) throws IOException {
-    checksum(b, off, len);
-    out.write(b,off,len);
+    sum.update(b, off, len);
+    out.write(b, off, len);
   }
 
   @Override
   public void write(int b) throws IOException {
-    barray[0] = (byte) (b & 0xFF);
-    write(barray,0,1);
+    sum.update(b & 0xff);
+    out.write(b);
   }
 
 }
