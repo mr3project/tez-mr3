@@ -126,7 +126,7 @@ public class IFile {
     void close() throws IOException;
   }
 
-  private static final int checksumSize = IFileOutputStream.getCheckSumSize();
+  private static final int checksumSize = IFileOutputStream.CHECKSUM_SIZE;
 
   /**
    * For basic cache size checks: header + checksum + EOF marker
@@ -1181,22 +1181,24 @@ public class IFile {
         boolean ifileReadAhead, int ifileReadAheadLength)
         throws IOException {
       final int BYTES_TO_READ = 64 * 1024;
-      byte[] buf = new byte[BYTES_TO_READ];
+      final int checksumSize = IFileOutputStream.CHECKSUM_SIZE;
+      byte[] buf = new byte[BYTES_TO_READ + checksumSize];
 
       // copy the IFile header
-      if (length < HEADER.length) {
-        throw new IOException("Missing IFile header");
+      if (length < HEADER.length + checksumSize) {
+        throw new IOException("Missing IFile header/checksum");
       }
       byte[] header = new byte[HEADER.length];
       readHeader(in, header);
       System.arraycopy(header, 0, buf, 0, HEADER.length);
       out.write(buf, 0, HEADER.length);
       long bytesLeft = length - HEADER.length;
-      @SuppressWarnings("resource")
-      IFileInputStream ifInput = new IFileInputStream(in, bytesLeft,
-          ifileReadAhead, ifileReadAheadLength);
+      IFileInputStream ifInput = new IFileInputStream(
+          in, bytesLeft, ifileReadAhead, ifileReadAheadLength);
       while (bytesLeft > 0) {
-        int n = ifInput.readWithChecksum(buf, 0, (int) Math.min(bytesLeft, BYTES_TO_READ));
+        long dataBytesLeft = bytesLeft - checksumSize;
+        int bytesToRead = dataBytesLeft <= BYTES_TO_READ ? (int) bytesLeft : BYTES_TO_READ;
+        int n = ifInput.readWithChecksum(buf, 0, bytesToRead);
         if (n < 0) {
           throw new IOException("read past end of stream");
         }

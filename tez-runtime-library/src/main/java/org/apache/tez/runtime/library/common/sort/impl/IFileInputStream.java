@@ -24,6 +24,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
+import java.util.zip.CRC32;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,7 +33,7 @@ import org.apache.hadoop.fs.HasFileDescriptor;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.ReadaheadPool;
 import org.apache.hadoop.io.ReadaheadPool.ReadaheadRequest;
-import org.apache.hadoop.util.DataChecksum;
+
 /**
  * A checksum input stream, used for IFiles.
  * Used to validate the checksum of files created by {@link IFileOutputStream}. 
@@ -43,13 +44,11 @@ public class IFileInputStream extends InputStream {
   private final FileDescriptor inFd; // the file descriptor, if it is known
   private final long length; //The total length of the input file
   private final long dataLength;
-  private DataChecksum sum;
+  private final CRC32 sum = new CRC32();
   private long currentOffset = 0;
   private final byte b[] = new byte[1];
   private byte csum[] = null;
-  private int checksumSize;
-  private byte[] buffer;
-  private int offset;
+  private final int checksumSize;
 
   private ReadaheadRequest curReadahead = null;
   private ReadaheadPool raPool = ReadaheadPool.getInstance();
@@ -57,17 +56,6 @@ public class IFileInputStream extends InputStream {
   private final int readaheadLength;
 
   public static final Logger LOG = LoggerFactory.getLogger(IFileInputStream.class);
-
-  private boolean disableChecksumValidation = false;
-
-  /**
-   * Create a checksum input stream that reads without readAhead.
-   * @param in
-   * @param len
-   */
-  public IFileInputStream(InputStream in, long len) {
-    this(in, len, false, 0);
-  }
 
   /**
    * Create a checksum input stream that reads
@@ -78,11 +66,7 @@ public class IFileInputStream extends InputStream {
    */
   public IFileInputStream(InputStream in, long len, boolean readAhead, int readAheadLength) {
     this.in = in;
-    sum = DataChecksum.newDataChecksum(DataChecksum.Type.CRC32,
-        Integer.MAX_VALUE);
-    checksumSize = sum.getChecksumSize();
-    buffer = new byte[4096];
-    offset = 0;
+    checksumSize = IFileOutputStream.CHECKSUM_SIZE;
     length = len;
     dataLength = length - checksumSize;
 
@@ -117,13 +101,11 @@ public class IFileInputStream extends InputStream {
    */
   @Override
   public void close() throws IOException {
-
     if (curReadahead != null) {
       curReadahead.cancel();
     }
-    if (currentOffset < dataLength && !disableChecksumValidation) {
-      byte[] t = new byte[Math.min((int)
-            (Integer.MAX_VALUE & (dataLength - currentOffset)), 32 * 1024)];
+    if (currentOffset < dataLength) {
+      byte[] t = new byte[Math.min((int) (Integer.MAX_VALUE & (dataLength - currentOffset)), 32 * 1024)];
       while (currentOffset < dataLength) {
         int n = read(t, 0, t.length);
         if (0 == n) {
@@ -140,30 +122,13 @@ public class IFileInputStream extends InputStream {
   }
   
   public long getPosition() {
-    return (currentOffset >= dataLength) ? dataLength : currentOffset;
+    return Math.min(dataLength, currentOffset);
   }
   
   public long getSize() {
     return checksumSize;
   }
 
-  private void checksum(byte[] b, int off, int len) {
-    if(len >= buffer.length) {
-      sum.update(buffer, 0, offset);
-      offset = 0;
-      sum.update(b, off, len);
-      return;
-    }
-    final int remaining = buffer.length - offset;
-    if(len > remaining) {
-      sum.update(buffer, 0, offset);
-      offset = 0;
-    }
-    /* now we should have len < buffer.length */
-    System.arraycopy(b, off, buffer, offset, len);
-    offset += len;
-  }
-  
   /**
    * Read bytes from the stream.
    * At EOF, checksum is validated, but the checksum
@@ -171,14 +136,11 @@ public class IFileInputStream extends InputStream {
    */
   @Override
   public int read(byte[] b, int off, int len) throws IOException {
-
     if (currentOffset >= dataLength) {
       return -1;
     }
-
     doReadahead();
-
-    return doRead(b,off,len);
+    return doRead(b, off, len, false);
   }
 
   private void doReadahead() {
@@ -197,11 +159,9 @@ public class IFileInputStream extends InputStream {
    * these bytes appropriately
    */
   public int readWithChecksum(byte[] b, int off, int len) throws IOException {
-
     if (currentOffset == length) {
       return -1;
-    }
-    else if (currentOffset >= dataLength) {
+    } else if (currentOffset >= dataLength) {
       // If the previous read drained off all the data, then just return
       // the checksum now. Note that checksum validation would have 
       // happened in the earlier read
@@ -209,26 +169,15 @@ public class IFileInputStream extends InputStream {
       if (len < lenToCopy) {
         lenToCopy = len;
       }
-      System.arraycopy(csum, (int) (currentOffset - dataLength), b, off, 
-          lenToCopy);
+      System.arraycopy(csum, (int) (currentOffset - dataLength), b, off, lenToCopy);
       currentOffset += lenToCopy;
       return lenToCopy;
     }
 
-    int bytesRead = doRead(b,off,len);
-
-    if (currentOffset == dataLength) {
-      if (len >= bytesRead + checksumSize) {
-        System.arraycopy(csum, 0, b, off + bytesRead, checksumSize);
-        bytesRead += checksumSize;
-        currentOffset += checksumSize;
-      }
-    }
-    return bytesRead;
+    return doRead(b, off, len, true);
   }
 
-  private int doRead(byte[]b, int off, int len) throws IOException {
-    
+  private int doRead(byte[] b, int off, int len, boolean readChecksumWithData) throws IOException {
     // If we are trying to read past the end of data, just read
     // the left over data
     int origLen = len;
@@ -240,59 +189,67 @@ public class IFileInputStream extends InputStream {
 
     if (bytesRead < 0) {
       String mesg = " CurrentOffset=" + currentOffset +
-          ", offset=" + offset +
           ", off=" + off +
           ", dataLength=" + dataLength + 
           ", origLen=" + origLen +
           ", len=" + len +
           ", length=" + length +
           ", checksumSize=" + checksumSize;
-      LOG.info(mesg);
+      LOG.error(mesg);
       throw new ChecksumException("Checksum Error: " + mesg, 0);
     }
 
-    checksum(b, off, bytesRead);
+    sum.update(b, off, bytesRead);
 
     currentOffset += bytesRead;
 
-    if (disableChecksumValidation) {
-      return bytesRead;
-    }
-    
     if (currentOffset == dataLength) {
-      //TODO: add checksumSize to currentOffset.
-      // The last four bytes are checksum. Strip them and verify
-      sum.update(buffer, 0, offset);
-      csum = new byte[checksumSize];
-      IOUtils.readFully(in, csum, 0, checksumSize);
-      if (!sum.compare(csum, 0)) {
+      boolean checksumInOutputBuffer = readChecksumWithData && origLen >= bytesRead + checksumSize;
+      byte[] checksumBuffer;
+      int checksumOffset = 0;
+      if (checksumInOutputBuffer) {
+        checksumBuffer = b;
+        checksumOffset = off + bytesRead;
+      } else {
+        csum = new byte[checksumSize];
+        checksumBuffer = csum;
+      }
+      IOUtils.readFully(in, checksumBuffer, checksumOffset, checksumSize);
+      if (!verifyChecksum(checksumBuffer, checksumOffset)) {
         String mesg = "CurrentOffset=" + currentOffset +
-            ", off=" + offset +
-            ", dataLength=" + dataLength + 
+            ", dataLength=" + dataLength +
             ", origLen=" + origLen +
             ", len=" + len +
             ", length=" + length +
-            ", checksumSize=" + checksumSize+
-            ", csum=" + Arrays.toString(csum) +
-            ", sum=" + sum; 
+            ", checksumSize=" + checksumSize +
+            ", csum=" + Arrays.toString(Arrays.copyOfRange(checksumBuffer, checksumOffset,
+                checksumOffset + checksumSize)) +
+            ", sum=" + sum.getValue();
         LOG.info(mesg);
 
         throw new ChecksumException("Checksum Error: " + mesg, 0);
       }
+      if (checksumInOutputBuffer) {
+        currentOffset += checksumSize;
+        return bytesRead + checksumSize;
+      }
     }
     return bytesRead;
+  }
+
+  private boolean verifyChecksum(byte[] checksumBuffer, int checksumOffset) {
+    return IFileOutputStream.checksumMatches(checksumBuffer, checksumOffset, sum.getValue());
   }
 
 
   @Override
   public int read() throws IOException {    
     b[0] = 0;
-    int l = read(b,0,1);
-    if (l < 0)  return l;
+    int l = read(b, 0, 1);
+    if (l < 0) return l;
     
     // Upgrade the b[0] to an int so as not to misinterpret the
     // first bit of the byte as a sign bit
-    int result = 0xFF & b[0];
-    return result;
+    return 0xFF & b[0];
   }
 }
