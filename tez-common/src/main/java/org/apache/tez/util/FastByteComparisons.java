@@ -73,6 +73,7 @@ public final class FastByteComparisons {
   /**
    * Lexicographically compare two byte arrays.
    */
+  // TODO: Use java.util.Arrays.compareUnsigned() if -XX:UseAVX=3 is available.
   public static int compareTo(byte[] buffer1, int offset1, int length1, byte[] buffer2, int offset2, int length2) {
     if (buffer1 == buffer2 && offset1 == offset2) {
       return length1 - length2;
@@ -99,6 +100,18 @@ public final class FastByteComparisons {
       }
     }
 
+    // JMH benchmark: slightly faster with the following block
+    if (minLength - i >= 4) {
+      int lw = theUnsafe.getInt(buffer1, offset1Adj + i);
+      int rw = theUnsafe.getInt(buffer2, offset2Adj + i);
+      if (lw != rw) {
+        int bw = Integer.reverseBytes(lw);
+        int br = Integer.reverseBytes(rw);
+        return Integer.compareUnsigned(bw, br);
+      }
+      i += 4;
+    }
+
     for (; i < minLength; i++) {
       // do not use UnsignedBytes.compare() because we want to avoid Guava
       int b1 = buffer1[offset1 + i] & 0xFF;
@@ -111,8 +124,7 @@ public final class FastByteComparisons {
   }
 
   // JMH benchmark: compareEqual() is about 10 percent faster than compareEqualSIMD().
-  // TODO: Keep benchmarking with Arrays.equal() on different platforms.
-  //   java.util.Arrays.equals(arg1, s1, s1 + len1, arg2, s2, s2 + len2)
+  // TODO: use java.util.Arrays.equals() if -XX:UseAVX=3 is available.
   public static boolean compareEqual(byte[] arg1, final int s1, final int len1,
                                      byte[] arg2, final int s2, final int len2) {
     if (len1 != len2) return false;
