@@ -1595,10 +1595,8 @@ public final class PipelinedSorter {
             kvmetaArray, offsetForLongIndex(longOffsetFor(index)));
         keystart = (int) keyValStartPair;
         valstart = (int) (keyValStartPair >>> Integer.SIZE);
-        final byte[] buf = kvbuffer.array();
-        final int off = kvbuffer.arrayOffset();
-        cmp = FastByteComparisons.compareTo(buf,
-            keystart + off , (valstart - keystart),
+        cmp = FastByteComparisons.compareTo(kvbufferArray,
+            kvbufferArrayOffset + keystart, (valstart - keystart),
             needle.getData(),
             needle.getPosition(), (needle.getLength() - needle.getPosition()));
       }
