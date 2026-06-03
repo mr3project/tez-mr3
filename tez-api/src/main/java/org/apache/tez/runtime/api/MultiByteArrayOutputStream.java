@@ -433,9 +433,6 @@ public class MultiByteArrayOutputStream extends OutputStream {
       if (closed) {
         throw new IOException("Stream closed");
       }
-      if (b == null) {
-        throw new NullPointerException("b");
-      }
       if (off < 0 || len < 0 || len > b.length - off) {
         throw new IndexOutOfBoundsException();
       }
