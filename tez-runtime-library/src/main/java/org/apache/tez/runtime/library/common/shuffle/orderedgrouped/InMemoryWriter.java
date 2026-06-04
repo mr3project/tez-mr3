@@ -17,27 +17,21 @@
  */
 package org.apache.tez.runtime.library.common.shuffle.orderedgrouped;
 
-import java.io.DataOutputStream;
 import java.io.IOException;
+import java.util.zip.CRC32;
 
-import org.apache.hadoop.io.BoundedByteArrayOutputStream;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.DataInputBuffer;
-import org.apache.tez.common.io.NonSyncDataOutputStream;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.apache.tez.runtime.library.common.sort.impl.IFileOutputStream;
 import org.apache.tez.runtime.library.utils.BufferUtils;
+import org.apache.tez.util.FastByteComparisons;
 
 public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
 
-  // BoundedByteArrayOutputStream(array, 0, array.length) is protected and cannot be used directly
-  private static class InMemoryBoundedByteArrayOutputStream extends BoundedByteArrayOutputStream {
-    InMemoryBoundedByteArrayOutputStream(byte[] array) {
-      super(array, 0, array.length);
-    }
-  }
-
-  private DataOutputStream out;
+  private final byte[] array;
+  private final CRC32 checksum = new CRC32();
+  private int pos;
 
   private DataInputBuffer prevKey = null;
   private final DataOutputBuffer previous = new DataOutputBuffer();
@@ -47,14 +41,13 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
 
   // InMemoryWriter does not use another byte[] buffer, unlike IFile.Writer
   public InMemoryWriter(byte[] array) throws IOException {
-    BoundedByteArrayOutputStream arrayStream = new InMemoryBoundedByteArrayOutputStream(array);
-    this.out = new NonSyncDataOutputStream(new IFileOutputStream(arrayStream));
-    this.out.write(IFile.HEADER, 0, IFile.HEADER.length - 1);
+    this.array = array;
+    writeBytes(IFile.HEADER, 0, IFile.HEADER.length - 1);
     byte flag = 0;
     if (isRleEnabled) {
       flag |= IFile.FLAG_RLE_ENABLED;
     }
-    this.out.write(flag);
+    writeByte(flag);
   }
 
   public boolean isRleEnabled() {
@@ -83,24 +76,24 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
       // Normal key-value pair
       // Write V_END_MARKER if needed (if previous was a REPEAT_KEY)
       if (prevKey == IFile.REPEAT_KEY) {
-        out.writeInt(IFile.V_END_MARKER);
+        writeInt(IFile.V_END_MARKER);
       }
 
-      long combined = ((long) keyLength << 32) | (valueLength & 0xFFFFFFFFL);
-      out.writeLong(combined);
-      out.write(key.getData(), key.getPosition(), keyLength);
-      out.write(value.getData(), value.getPosition(), valueLength);
+      long combined = ((long) valueLength << 32) | (keyLength & 0xFFFFFFFFL);
+      writeLong(combined);
+      writeBytes(key.getData(), key.getPosition(), keyLength);
+      writeBytes(value.getData(), value.getPosition(), valueLength);
       BufferUtils.copy(key, previous);
     } else {
       // Repeated key
       if (prevKey != IFile.REPEAT_KEY) {
         // First repeated key, write RLE marker
-        out.writeInt(IFile.RLE_MARKER);
+        writeInt(IFile.RLE_MARKER);
       }
 
       // Write just the value length and value
-      out.writeInt(valueLength);
-      out.write(value.getData(), value.getPosition(), valueLength);
+      writeInt(valueLength);
+      writeBytes(value.getData(), value.getPosition(), valueLength);
     }
 
     prevKey = sameKey ? IFile.REPEAT_KEY : key;
@@ -113,16 +106,58 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
 
     // Write EOF_MARKER for key/value length
     long combined = ((long) IFile.EOF_MARKER << 32) | (IFile.EOF_MARKER & 0xFFFFFFFFL);
-    out.writeLong(combined);
-
-    out.close();
-    out = null;
+    writeLong(combined);
+    writeChecksum();
   }
 
   private void closeRle() throws IOException {
     // Write V_END_MARKER if needed
     if (prevKey == IFile.REPEAT_KEY) {
-      out.writeInt(IFile.V_END_MARKER);
+      writeInt(IFile.V_END_MARKER);
+    }
+  }
+
+  private void writeByte(int value) throws IOException {
+    ensureAvailable(1);
+    array[pos] = (byte) value;
+    checksum.update(value & 0xff);
+    pos++;
+  }
+
+  private void writeBytes(byte[] data, int offset, int length) throws IOException {
+    ensureAvailable(length);
+    System.arraycopy(data, offset, array, pos, length);
+    checksum.update(array, pos, length);
+    pos += length;
+  }
+
+  private void writeInt(int value) throws IOException {
+    ensureAvailable(Integer.BYTES);
+    FastByteComparisons.theUnsafe.putInt(array,
+        FastByteComparisons.BYTE_ARRAY_BASE_OFFSET + (long) pos, value);
+    checksum.update(array, pos, Integer.BYTES);
+    pos += Integer.BYTES;
+  }
+
+  private void writeLong(long value) throws IOException {
+    ensureAvailable(Long.BYTES);
+    FastByteComparisons.theUnsafe.putLong(array,
+        FastByteComparisons.BYTE_ARRAY_BASE_OFFSET + (long) pos, value);
+    checksum.update(array, pos, Long.BYTES);
+    pos += Long.BYTES;
+  }
+
+  private void writeChecksum() throws IOException {
+    ensureAvailable(IFileOutputStream.CHECKSUM_SIZE);
+    long value = checksum.getValue();
+    for (int i = 0; i < IFileOutputStream.CHECKSUM_SIZE; i++) {
+      array[pos++] = (byte) (value >>> (Byte.SIZE * i));
+    }
+  }
+
+  private void ensureAvailable(int length) throws IOException {
+    if (length < 0 || pos > array.length - length) {
+      throw new IOException("Insufficient space in in-memory IFile buffer");
     }
   }
 }

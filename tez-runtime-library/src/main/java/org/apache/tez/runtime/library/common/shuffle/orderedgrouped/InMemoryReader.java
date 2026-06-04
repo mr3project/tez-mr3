@@ -38,16 +38,12 @@ public class InMemoryReader implements IFile.KeyValueReader {
 
   private static class ByteArrayDataInput extends NonSyncByteArrayInputStream {
 
-    public ByteArrayDataInput(byte buf[], int offset, int length) {
+    public ByteArrayDataInput(byte[] buf, int offset, int length) {
       super(buf, offset, length);
     }
 
     public byte[] getData() { return buf; }
     public int getPosition() { return pos; }
-
-    public byte readByte() {
-      return (byte)read();
-    }
 
     public int readInt() {
       if (pos + 4 > count) {

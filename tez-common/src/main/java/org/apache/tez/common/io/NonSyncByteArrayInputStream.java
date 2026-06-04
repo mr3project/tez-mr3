@@ -32,19 +32,13 @@ public class NonSyncByteArrayInputStream extends ByteArrayInputStream {
     super(buf, offset, length);
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
   public int read() {
     return (pos < count) ? (buf[pos++] & 0xff) : -1;
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
-  public int read(byte b[], int off, int len) {
+  public int read(byte[] b, int off, int len) {
     if (off < 0 || len < 0 || len > b.length - off) {
       throw new IndexOutOfBoundsException();
     }
@@ -65,9 +59,6 @@ public class NonSyncByteArrayInputStream extends ByteArrayInputStream {
     return len;
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
   public long skip(long n) {
     long k = count - pos;
@@ -79,17 +70,11 @@ public class NonSyncByteArrayInputStream extends ByteArrayInputStream {
     return k;
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
   public int available() {
     return count - pos;
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
   public void reset() {
     pos = mark;
