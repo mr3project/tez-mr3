@@ -125,6 +125,8 @@ public final class PipelinedSorter {
 
   private final int partitionBits;
   private final int commonKeyPrefixBytes;
+  private final ThreadLocal<RadixWorkspace> radixWorkspace =
+      ThreadLocal.withInitial(RadixWorkspace::new);
 
   private static final int KEYSTART = 0;         // key offset in acct
   private static final int VALSTART = 1;         // val offset in acct
@@ -132,6 +134,16 @@ public final class PipelinedSorter {
   private static final int VALLEN = 3;           // val len in acct
   private static final int NMETA = 4;            // num meta ints
   private static final int METASIZE = NMETA * 4; // size in bytes
+  private static final int RADIX_BITS = 16;
+  private static final int RADIX_SIZE = 1 << RADIX_BITS;
+  private static final int RADIX_MASK = RADIX_SIZE - 1;
+  private static final int RADIX_MAX_RECORDS = 1024 * 1024;
+  private static final int RADIX_SCRATCH_BYTES = RADIX_MAX_RECORDS * METASIZE;
+
+  private static final class RadixWorkspace {
+    private final int[] counts = new int[RADIX_SIZE];
+    private final byte[] scratch = new byte[RADIX_SCRATCH_BYTES];
+  }
 
   // Assume: ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN
   // This is checked in the static block of FastByteComparisons, so no need to check here again.
@@ -1375,11 +1387,12 @@ public final class PipelinedSorter {
     }
 
     private void radixsort(int r) {
-      final int radixBits = 16;
-      final int radixSize = 1 << radixBits;
-      final int radixMask = radixSize - 1;
-      final int[] counts = new int[radixSize];
-      final byte[] scratch = new byte[r * METASIZE];
+      final RadixWorkspace workspace = radixWorkspace.get();
+      final int[] counts = workspace.counts;
+      final byte[] scratch = workspace.scratch;
+      final int scratchLength = r * METASIZE;
+      Preconditions.checkArgument(scratchLength <= scratch.length,
+          "Radix scratch buffer is too small for %s records", r);
       final long scratchBaseOffset = FastByteComparisons.BYTE_ARRAY_BASE_OFFSET;
 
       byte[] src = kvmetaArray;
@@ -1387,22 +1400,22 @@ public final class PipelinedSorter {
       byte[] dst = scratch;
       long dstBaseOffset = scratchBaseOffset;
 
-      for (int shift = 0; shift < Integer.SIZE; shift += radixBits) {
+      for (int shift = 0; shift < Integer.SIZE; shift += RADIX_BITS) {
         Arrays.fill(counts, 0);
 
         for (int i = 0; i < r; i++) {
-          counts[getRadixDigit(src, srcBaseOffset, i, shift, radixMask)]++;
+          counts[getRadixDigit(src, srcBaseOffset, i, shift)]++;
         }
 
         int sum = 0;
-        for (int i = 0; i < radixSize; i++) {
+        for (int i = 0; i < RADIX_SIZE; i++) {
           final int count = counts[i];
           counts[i] = sum;
           sum += count;
         }
 
         for (int i = 0; i < r; i++) {
-          final int bucket = getRadixDigit(src, srcBaseOffset, i, shift, radixMask);
+          final int bucket = getRadixDigit(src, srcBaseOffset, i, shift);
           copyMetaRecord(src, srcBaseOffset, i, dst, dstBaseOffset, counts[bucket]++);
         }
 
@@ -1425,9 +1438,8 @@ public final class PipelinedSorter {
       sortEqualPrefixRuns(r);
     }
 
-    private int getRadixDigit(byte[] metaArray, long baseOffset, int index, int shift,
-        int radixMask) {
-      return ((getPrefix(metaArray, baseOffset, index) ^ Integer.MIN_VALUE) >>> shift) & radixMask;
+    private int getRadixDigit(byte[] metaArray, long baseOffset, int index, int shift) {
+      return ((getPrefix(metaArray, baseOffset, index) ^ Integer.MIN_VALUE) >>> shift) & RADIX_MASK;
     }
 
     private int getPrefix(byte[] metaArray, long baseOffset, int index) {
