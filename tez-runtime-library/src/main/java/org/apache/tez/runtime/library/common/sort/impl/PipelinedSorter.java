@@ -124,6 +124,7 @@ public final class PipelinedSorter {
   private final static int APPROX_HEADER_LENGTH = 150;
 
   private final int partitionBits;
+  private final int commonKeyPrefixBytes;
 
   private static final int KEYSTART = 0;         // key offset in acct
   private static final int VALSTART = 1;         // val offset in acct
@@ -276,6 +277,11 @@ public final class PipelinedSorter {
     this.finalIndexComputed = false;
 
     this.partitionBits = bitcount(partitions) + 1;
+    // TezBytesComparator.getProxy() contains at most the first three key bytes.
+    // Equal radix prefixes also lose partitionBits from the proxy, so skip only
+    // the complete key bytes that are guaranteed equal.
+    this.commonKeyPrefixBytes = Math.max(0, Math.min(3,
+        (Integer.SIZE - partitionBits) / Byte.SIZE));
 
     this.lazyAllocateMem = this.conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_LAZY_ALLOCATE_MEMORY,
@@ -1311,44 +1317,48 @@ public final class PipelinedSorter {
 
     public SpanIterator sort() {
       if (length() > 1) {
-        quicksort(length());
+        radixsort(length());
       }
-      if (isDebugEnabled) { LOG.debug("{}: done sorting span={}, length={}",
-          outputContext.getDestinationVertexName(), index, length()); }
+      if (isDebugEnabled) {
+        // verify that records are sorted (for debugging)
+        checksort();
+        LOG.debug("{}: done sorting span={}, length={}",
+            outputContext.getDestinationVertexName(), index, length());
+      }
       return new SpanIterator(this);
     }
 
-    private void downHeap(final int b, int i, final int N) {
+    private void downHeap(final int b, int i, final int N, final int commonKeyPrefixBytes) {
       for (int idx = i << 1; idx < N; idx = i << 1) {
-        if (idx + 1 < N && this.compare(b + idx, b + idx + 1) < 0) {
-          if (this.compare(b + i, b + idx + 1) < 0) {
+        if (idx + 1 < N && this.compare(b + idx, b + idx + 1, commonKeyPrefixBytes) < 0) {
+          if (this.compare(b + i, b + idx + 1, commonKeyPrefixBytes) < 0) {
             this.swap(b + i, b + idx + 1);
           } else return;
           i = idx + 1;
-        } else if (this.compare(b + i, b + idx) < 0) {
+        } else if (this.compare(b + i, b + idx, commonKeyPrefixBytes) < 0) {
           this.swap(b + i, b + idx);
           i = idx;
         } else return;
       }
     }
 
-    private void heapSort(final int p, final int r) {
+    private void heapSort(final int p, final int r, final int commonKeyPrefixBytes) {
       final int N = r - p;
       // build heap w/ reverse comparator, then write in-place from end
       final int t = Integer.highestOneBit(N);
       for (int i = t; i > 1; i >>>= 1) {
         for (int j = i >>> 1; j < i; ++j) {
-          downHeap(p-1, j, N + 1);
+          downHeap(p-1, j, N + 1, commonKeyPrefixBytes);
         }
       }
       for (int i = r - 1; i > p; --i) {
         this.swap(p, i);
-        downHeap(p - 1, 1, i - p + 1);
+        downHeap(p - 1, 1, i - p + 1, commonKeyPrefixBytes);
       }
     }
 
-    private void fix(int p, int r) {
-      if (this.compare(p, r) > 0) {
+    private void fix(int p, int r, final int commonKeyPrefixBytes) {
+      if (this.compare(p, r, commonKeyPrefixBytes) > 0) {
         this.swap(p, r);
       }
     }
@@ -1364,21 +1374,114 @@ public final class PipelinedSorter {
       return (32 - Integer.numberOfLeadingZeros(x - 1)) << 2;
     }
 
-    /**
-     * Sort the given range of items using quick sort.
-     * {@inheritDoc} If the recursion depth falls below {@link #getMaxDepth},
-     * then switch to {@link HeapSort}.
-     */
-    private void quicksort(int r) {
-      sortInternal(0, r, getMaxDepth(r));
+    private void radixsort(int r) {
+      final int radixBits = 16;
+      final int radixSize = 1 << radixBits;
+      final int radixMask = radixSize - 1;
+      final int[] counts = new int[radixSize];
+      final byte[] scratch = new byte[r * METASIZE];
+      final long scratchBaseOffset = FastByteComparisons.BYTE_ARRAY_BASE_OFFSET;
+
+      byte[] src = kvmetaArray;
+      long srcBaseOffset = kvmetaBaseOffset;
+      byte[] dst = scratch;
+      long dstBaseOffset = scratchBaseOffset;
+
+      for (int shift = 0; shift < Integer.SIZE; shift += radixBits) {
+        Arrays.fill(counts, 0);
+
+        for (int i = 0; i < r; i++) {
+          counts[getRadixDigit(src, srcBaseOffset, i, shift, radixMask)]++;
+        }
+
+        int sum = 0;
+        for (int i = 0; i < radixSize; i++) {
+          final int count = counts[i];
+          counts[i] = sum;
+          sum += count;
+        }
+
+        for (int i = 0; i < r; i++) {
+          final int bucket = getRadixDigit(src, srcBaseOffset, i, shift, radixMask);
+          copyMetaRecord(src, srcBaseOffset, i, dst, dstBaseOffset, counts[bucket]++);
+        }
+
+        final byte[] tmpArray = src;
+        src = dst;
+        dst = tmpArray;
+        final long tmpBaseOffset = srcBaseOffset;
+        srcBaseOffset = dstBaseOffset;
+        dstBaseOffset = tmpBaseOffset;
+      }
+
+      // Two 16-bit passes move the sorted metadata back into kvmetaArray. Keep this
+      // copy for safety if the number of passes changes later.
+      if (src != kvmetaArray) {
+        for (int i = 0; i < r; i++) {
+          copyMetaRecord(src, srcBaseOffset, i, kvmetaArray, kvmetaBaseOffset, i);
+        }
+      }
+
+      sortEqualPrefixRuns(r);
     }
 
-    private void sortInternal(int p, int r, int depth) {
+    private int getRadixDigit(byte[] metaArray, long baseOffset, int index, int shift,
+        int radixMask) {
+      return ((getPrefix(metaArray, baseOffset, index) ^ Integer.MIN_VALUE) >>> shift) & radixMask;
+    }
+
+    private int getPrefix(byte[] metaArray, long baseOffset, int index) {
+      return FastByteComparisons.theUnsafe.getInt(
+          metaArray, baseOffset + ((long) offsetFor(index) + PARTITION) * Integer.BYTES);
+    }
+
+    private void copyMetaRecord(byte[] src, long srcBaseOffset, int srcIndex,
+        byte[] dst, long dstBaseOffset, int dstIndex) {
+      final long srcOffset = srcBaseOffset + (long) srcIndex * METASIZE;
+      final long dstOffset = dstBaseOffset + (long) dstIndex * METASIZE;
+      FastByteComparisons.theUnsafe.putLong(dst, dstOffset,
+          FastByteComparisons.theUnsafe.getLong(src, srcOffset));
+      FastByteComparisons.theUnsafe.putLong(dst, dstOffset + Long.BYTES,
+          FastByteComparisons.theUnsafe.getLong(src, srcOffset + Long.BYTES));
+    }
+
+    private void sortEqualPrefixRuns(int r) {
+      int p = 0;
+      while (p < r) {
+        final int prefix = getPrefix(kvmetaArray, kvmetaBaseOffset, p);
+        int q = p + 1;
+        while (q < r && getPrefix(kvmetaArray, kvmetaBaseOffset, q) == prefix) {
+          q++;
+        }
+        if (q - p > 1) {
+          sortInternal(p, q, getMaxDepth(q - p), commonKeyPrefixBytes);
+        }
+        p = q;
+      }
+    }
+
+    private void checksort() {
+      final long savedEq = eq;
+      try {
+        for (int i = 1; i < length(); i++) {
+          if (compare(i - 1, i) > 0) {
+            throw new IllegalStateException(String.format(
+                "SortSpan is not sorted at index %d for destination vertex %s",
+                i, outputContext.getDestinationVertexName()));
+          }
+        }
+      } finally {
+        eq = savedEq;
+      }
+    }
+
+    private void sortInternal(int p, int r, int depth, final int commonKeyPrefixBytes) {
       // from org/apache/hadoop/util/QuickSort.java
       while (true) {
       if (r-p < 13) {
         for (int i = p; i < r; ++i) {
-          for (int j = i; j > p && this.compare(j-1, j) > 0; --j) {
+          for (int j = i; j > p
+              && this.compare(j-1, j, commonKeyPrefixBytes) > 0; --j) {
             this.swap(j, j-1);
           }
         }
@@ -1386,14 +1489,14 @@ public final class PipelinedSorter {
       }
       if (--depth < 0) {
         // give up
-        heapSort(p, r);
+        heapSort(p, r, commonKeyPrefixBytes);
         return;
       }
 
       // select, move pivot into first position
-      fix((p+r) >>> 1, p);
-      fix((p+r) >>> 1, r - 1);
-      fix(p, r-1);
+      fix((p+r) >>> 1, p, commonKeyPrefixBytes);
+      fix((p+r) >>> 1, r - 1, commonKeyPrefixBytes);
+      fix(p, r-1, commonKeyPrefixBytes);
 
       // Divide
       int i = p;
@@ -1403,13 +1506,13 @@ public final class PipelinedSorter {
       int cr;
       while(true) {
         while (++i < j) {
-          if ((cr = this.compare(i, p)) > 0) break;
+          if ((cr = this.compare(i, p, commonKeyPrefixBytes)) > 0) break;
           if (0 == cr && ++ll != i) {
             this.swap(ll, i);
           }
         }
         while (--j > i) {
-          if ((cr = this.compare(p, j)) > 0) break;
+          if ((cr = this.compare(p, j, commonKeyPrefixBytes)) > 0) break;
           if (0 == cr && --rr != j) {
             this.swap(rr, j);
           }
@@ -1430,10 +1533,10 @@ public final class PipelinedSorter {
       // Recurse on smaller interval first to keep stack shallow
       assert i != j;
       if (i - p < r - j) {
-        sortInternal(p, i, depth);
+        sortInternal(p, i, depth, commonKeyPrefixBytes);
         p = j;
       } else {
-        sortInternal(j, r, depth);
+        sortInternal(j, r, depth, commonKeyPrefixBytes);
         r = i;
       }
       }
@@ -1491,6 +1594,10 @@ public final class PipelinedSorter {
     }
 
     private int compareKeys(final int kvi, final int kvj) {
+      return compareKeys(kvi, kvj, 0);
+    }
+
+    private int compareKeys(final int kvi, final int kvj, final int commonKeyPrefixBytes) {
       final long ipair = FastByteComparisons.theUnsafe.getLong(
           kvmetaArray, offsetForLongIndex(longOffsetFor(kvi >>> 2)));
       final int istart = (int) ipair;
@@ -1499,8 +1606,9 @@ public final class PipelinedSorter {
           kvmetaArray, offsetForLongIndex(longOffsetFor(kvj >>> 2)));
       final int jstart = (int) jpair;
       final int jlen   = ((int) (jpair >>> Integer.SIZE)) - jstart;
+      final int skip = Math.min(commonKeyPrefixBytes, Math.min(ilen, jlen));
 
-      if (ilen == 0 || jlen == 0) {
+      if (ilen == skip || jlen == skip) {
         if (ilen == jlen) {
           eq++;
         }
@@ -1509,15 +1617,22 @@ public final class PipelinedSorter {
 
       // sort by key
       final int cmp = FastByteComparisons.compareTo(
-          kvbufferArray, kvbufferArrayOffset + istart, ilen,
-          kvbufferArray, kvbufferArrayOffset + jstart, jlen);
+          kvbufferArray, kvbufferArrayOffset + istart + skip, ilen - skip,
+          kvbufferArray, kvbufferArrayOffset + jstart + skip, jlen - skip);
       if (cmp == 0) eq++;
       return cmp;
     }
 
     private int compare(final int mi, final int mj) {
+      return compare(mi, mj, -1);
+    }
+
+    private int compare(final int mi, final int mj, final int commonKeyPrefixBytes) {
       final int kvi = offsetFor(mi);
       final int kvj = offsetFor(mj);
+      if (commonKeyPrefixBytes >= 0) {
+        return compareKeys(kvi, kvj, commonKeyPrefixBytes);
+      }
       final int kvip = FastByteComparisons.theUnsafe.getInt(
           kvmetaArray, offsetForIntIndex(kvi + PARTITION));
       final int kvjp = FastByteComparisons.theUnsafe.getInt(
