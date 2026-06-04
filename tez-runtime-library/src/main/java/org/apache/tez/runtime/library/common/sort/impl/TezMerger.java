@@ -109,7 +109,7 @@ public class TezMerger {
     private int position;
     private int length;
 
-    public KeyValueBuffer(byte buf[], int position, int length) {
+    public KeyValueBuffer(byte[] buf, int position, int length) {
       reset(buf, position, length);
     }
 
