@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.io.BoundedByteArrayOutputStream;
@@ -327,7 +326,6 @@ public class IFile {
     // to reduce the number of writes to 'compressedOut'.
     private final byte[] writeBuffer;
     private final int writeBufferLength;        // must be larger than 8 (# of bytes in long)
-    private final ByteBuffer writeByteBuffer;
     private int writeOffset;
 
     private final Compressor compressorExternal;  // not to be shared with concurrent threads
@@ -387,7 +385,6 @@ public class IFile {
 
       this.writeBuffer = writeBuffer;
       this.writeBufferLength = writeBuffer.length;
-      this.writeByteBuffer = ByteBuffer.wrap(writeBuffer).order(ByteOrder.BIG_ENDIAN);
       this.writeOffset = 0;
 
       this.compressorExternal = compressorExternal;
@@ -496,7 +493,7 @@ public class IFile {
 
     protected void writeKVPair(byte[] keyData, int keyPos, int keyLength,
         byte[] valueData, int valPos, int valueLength) throws IOException {
-      long combined = ((long) keyLength << 32) | (valueLength & 0xFFFFFFFFL);
+      long combined = ((long) valueLength << 32) | (keyLength & 0xFFFFFFFFL);
       bufferWriteLong(combined);
 
       bufferWriteBytes(keyData, keyPos, keyLength);
@@ -537,7 +534,8 @@ public class IFile {
       if (len > remaining) {
         flushWriteBuffer();
       }
-      writeByteBuffer.putInt(writeOffset, val);
+      FastByteComparisons.theUnsafe.putInt(writeBuffer,
+          FastByteComparisons.BYTE_ARRAY_BASE_OFFSET + (long) writeOffset, val);
       writeOffset += len;
     }
 
@@ -547,7 +545,8 @@ public class IFile {
       if (len > remaining) {
         flushWriteBuffer();
       }
-      writeByteBuffer.putLong(writeOffset, val);
+      FastByteComparisons.theUnsafe.putLong(writeBuffer,
+          FastByteComparisons.BYTE_ARRAY_BASE_OFFSET + (long) writeOffset, val);
       writeOffset += len;
     }
 
