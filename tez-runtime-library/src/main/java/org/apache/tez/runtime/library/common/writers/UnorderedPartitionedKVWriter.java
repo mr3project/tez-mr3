@@ -1690,6 +1690,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
 
     @Override
     public void write(int v) {
+      assert false;
       scratch[0] = (byte) v;
       write(scratch, 0, 1);
     }
