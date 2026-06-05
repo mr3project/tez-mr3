@@ -37,7 +37,6 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.DataInputBuffer;
-import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.counters.TezCounter;
@@ -46,7 +45,6 @@ import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader.KeyState;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterDataInputBuffer;
-import org.apache.tez.runtime.library.utils.BufferUtils;
 
 /**
  * Merger is an utility class used by the Map and Reduce tasks for merging
@@ -321,7 +319,8 @@ public class TezMerger {
     };
 
     KeyState hasNext;
-    DataOutputBuffer prevKey = new DataOutputBuffer();
+    KeyValueBuffer prevKey = new KeyValueBuffer(Segment.EMPTY_BYTES, 0, 0);
+    byte[] prevKeyCopy = Segment.EMPTY_BYTES;
 
     public MergeQueue(Configuration conf, FileSystem fs,
         List<Segment> segments,
@@ -352,9 +351,20 @@ public class TezMerger {
       return value;
     }
 
-    private void populatePreviousKey() throws IOException {
-      key.reset();
-      BufferUtils.copy(key, prevKey);
+    private void populatePreviousKey(Segment currentSegment) {
+      KeyValueBuffer currentKey = currentSegment.getKey();
+      byte[] keyData = currentKey.getData();
+      int keyPosition = currentKey.getPosition();
+      int keyLength = currentKey.getLength();
+      if (currentSegment.isCurrentRecordStable()) {
+        prevKey.reset(keyData, keyPosition, keyLength);
+      } else {
+        if (prevKeyCopy.length < keyLength) {
+          prevKeyCopy = new byte[keyLength];
+        }
+        System.arraycopy(keyData, keyPosition, prevKeyCopy, 0, keyLength);
+        prevKey.reset(prevKeyCopy, 0, keyLength);
+      }
     }
 
     private void adjustPriorityQueue(Segment reader) throws IOException{
@@ -366,17 +376,18 @@ public class TezMerger {
            * during this process, we need to compare keys for RLE across segment boundaries.
            * prevKey can't be empty at that time (e.g custom comparators)
            */
-          populatePreviousKey();
+          populatePreviousKey(reader);
         } else {
           // indicates a key has been read already
           if (hasNext != KeyState.SAME_KEY) {
             /**
              * Store previous key before reading next for later key comparisons.
-             * If all keys in a segment are unique, it would always hit this code path and key copies
-             * are wasteful in such condition, as these comparisons are mainly done for RLE.
+             * If all keys in a segment are unique, it would always hit this code path. For
+             * volatile records this still requires a fallback key copy, which is wasteful in
+             * such condition, as these comparisons are mainly done for RLE.
              * TODO: When better stats are available, this condition can be avoided.
              */
-            populatePreviousKey();
+            populatePreviousKey(reader);
           }
         }
       }
@@ -441,14 +452,10 @@ public class TezMerger {
           : TezRawKeyValueIterator.NEXT_KEY_VALUE_VOLATILE;
     }
 
-    boolean compare(KeyValueBuffer nextKey, DataOutputBuffer buf2) {
-      byte[] b1 = nextKey.getData();
-      byte[] b2 = buf2.getData();
-      int s1 = nextKey.getPosition();
-      int s2 = 0;
-      int l1 = nextKey.getLength();
-      int l2 = buf2.getLength();
-      return FastByteComparisons.compareEqual(b1, s1, l1, b2, s2, l2);
+    boolean compare(KeyValueBuffer key1, KeyValueBuffer key2) {
+      return FastByteComparisons.compareEqual(
+          key1.getData(), key1.getPosition(), key1.getLength(),
+          key2.getData(), key2.getPosition(), key2.getLength());
     }
 
     /*
