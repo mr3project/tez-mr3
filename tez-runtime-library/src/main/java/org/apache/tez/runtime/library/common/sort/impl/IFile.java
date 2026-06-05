@@ -941,6 +941,23 @@ public class IFile {
   public interface KeyValueReaderDataInputBuffer extends KeyValueReaderBase {
     Reader.KeyState readRawKey(DataInputBuffer key) throws IOException;
     void nextRawValue(DataInputBuffer value) throws IOException;
+
+    /**
+     * Reports whether the most recently loaded current record returned through
+     * readRawKey(DataInputBuffer) and nextRawValue(DataInputBuffer)
+     * has stable backing byte arrays.
+     *
+     * Stable means the byte[] slices exposed through DataInputBuffer may be
+     * retained by the caller without being overwritten or reused by this reader.
+     * The result must be safe for both the key and the value of the current
+     * record, based on the invariant that current merge-based records are not
+     * assembled from different segments. If a reader cannot prove backing-array
+     * stability, it must return false.
+     *
+     * @return true if both key and value backing arrays for the current record
+     *         are stable; false otherwise.
+     */
+    boolean isCurrentRecordStable();
   }
 
   public interface KeyValueReaderBytesWritable extends KeyValueReaderBase {
@@ -1425,6 +1442,12 @@ public class IFile {
         newLength = currentLength << 1;
       }
       return new byte[newLength];
+    }
+
+
+    @Override
+    public boolean isCurrentRecordStable() {
+      return false;
     }
 
     public KeyState readRawKey(DataInputBuffer key) throws IOException {

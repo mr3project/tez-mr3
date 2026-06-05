@@ -267,6 +267,11 @@ public class InMemoryReader implements IFile.KeyValueReader {
   }
 
   @Override
+  public boolean isCurrentRecordStable() {
+    return true;
+  }
+
+  @Override
   public KeyState readRawKey(DataInputBuffer key) throws IOException {
     if (isRleEnabled) {
       return readRawKeyRle(key);

@@ -44,6 +44,7 @@ public class ValuesIterator {
   private BytesWritable nextKey;
   private BytesWritable value;          // current value
   private boolean more;                 // more in file
+  private boolean currentRecordStable;
   private final TezCounter inputKeyCounter;
   private final TezCounter inputValueCounter;
   
@@ -152,11 +153,13 @@ public class ValuesIterator {
    * read the next key - which may be the same as the current key.
    */
   private void readNextKey() throws IOException {
-    more = in.next();
+    int nextResult = in.next();
+    more = nextResult != TezRawKeyValueIterator.NO_MORE_KEY_VALUE;
+    currentRecordStable = nextResult == TezRawKeyValueIterator.NEXT_KEY_VALUE_STABLE;
     if (more) {      
       DataInputBuffer nextKeyBytes = in.getKey();
       if (!in.isSameKey()) {
-        nextKey = copyToWritable(nextKey, nextKeyBytes);
+        nextKey = copyToWritable(nextKey, nextKeyBytes, currentRecordStable);
         // hasMoreValues = is it first key or is key the same?
         hasMoreValues = (key == null) || (TezBytesComparator.compare(key, nextKey) == 0);
         if (key == null || !hasMoreValues) {
@@ -181,10 +184,10 @@ public class ValuesIterator {
    */
   private void readNextValue() throws IOException {
     DataInputBuffer nextValueBytes = in.getValue();
-    value = copyToWritable(value, nextValueBytes);
+    value = copyToWritable(value, nextValueBytes, currentRecordStable);
   }
 
-  private BytesWritable copyToWritable(BytesWritable writable, DataInputBuffer source) {
+  private BytesWritable copyToWritable(BytesWritable writable, DataInputBuffer source, boolean stable) {
     BytesWritable target = writable;
     if (target == null) {
       target = new BytesWritable();
@@ -192,8 +195,12 @@ public class ValuesIterator {
 
     int pos = source.getPosition();
     int length = source.getLength() - pos;
-    byte[] bytes = target.reinitialize(length);
-    System.arraycopy(source.getData(), pos, bytes, 0, length);
+    if (stable) {
+      target.setDirect(source.getData(), pos, length);
+    } else {
+      byte[] bytes = target.reinitialize(length);
+      System.arraycopy(source.getData(), pos, bytes, 0, length);
+    }
 
     return target;
   }

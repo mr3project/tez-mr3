@@ -436,7 +436,8 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
 
           @Override
           public boolean next() throws IOException {
-            boolean hasMore = rIter.next();
+            int nextResult = rIter.next();
+            boolean hasMore = nextResult != TezRawKeyValueIterator.NO_MORE_KEY_VALUE;
             done = !hasMore;
             return hasMore;
           }
