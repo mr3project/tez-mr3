@@ -17,7 +17,6 @@
  */
 package org.apache.tez.runtime.library.common.sort.impl;
 
-import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -986,7 +985,7 @@ public class IFile {
     private final InputStream in;        // Possibly decompressed stream that we read
     private final long startPos;
 
-    private DataInputStream dataIn;
+    private final byte[] primitiveReadBuffer = new byte[Long.BYTES];
     private final long fileLength;
     private final boolean isRleEnabled;
 
@@ -1076,7 +1075,6 @@ public class IFile {
       }
       startPos = checksumIn.getPosition();
 
-      this.dataIn = new DataInputStream(this.in);
       this.fileLength = length;
       this.isRleEnabled = isRleEnabled;
 
@@ -1231,8 +1229,26 @@ public class IFile {
       return len;
     }
 
+    private int readIntNative() throws IOException {
+      int bytes = readData(primitiveReadBuffer, Integer.BYTES);
+      if (bytes != Integer.BYTES) {
+        throw new IOException(String.format(INCOMPLETE_READ, Integer.BYTES, bytes));
+      }
+      return FastByteComparisons.theUnsafe.getInt(primitiveReadBuffer,
+          FastByteComparisons.BYTE_ARRAY_BASE_OFFSET);
+    }
+
+    private long readLongNative() throws IOException {
+      int bytes = readData(primitiveReadBuffer, Long.BYTES);
+      if (bytes != Long.BYTES) {
+        throw new IOException(String.format(INCOMPLETE_READ, Long.BYTES, bytes));
+      }
+      return FastByteComparisons.theUnsafe.getLong(primitiveReadBuffer,
+          FastByteComparisons.BYTE_ARRAY_BASE_OFFSET);
+    }
+
     private void readValueLengthRle() throws IOException {
-      currentValueLength = dataIn.readInt();
+      currentValueLength = readIntNative();
       bytesRead += INT_SIZE;
       if (currentValueLength == V_END_MARKER) {
         readKeyValueLengthRle();
@@ -1243,8 +1259,9 @@ public class IFile {
       if (tezOffsetRecord != null) {
         readKeyValueLengthNoRleWithTezOffsetRecord();
       } else {
-        currentKeyLength = dataIn.readInt();
-        currentValueLength = dataIn.readInt();
+        long combined = readLongNative();
+        currentKeyLength = (int) combined;
+        currentValueLength = (int) (combined >>> 32);
         bytesRead += INT_SIZE + INT_SIZE;
       }
       originalKeyLength = currentKeyLength;
@@ -1254,8 +1271,9 @@ public class IFile {
       int recordOffset = (int) bytesRead;
 
       if (recordOffset == tezOffsetRecord.getEofPos()) {
-        currentKeyLength = dataIn.readInt();
-        currentValueLength = dataIn.readInt();
+        long combined = readLongNative();
+        currentKeyLength = (int) combined;
+        currentValueLength = (int) (combined >>> 32);
         bytesRead += INT_SIZE + INT_SIZE;
         return;
       }
@@ -1265,26 +1283,33 @@ public class IFile {
       int maxKeyLen = tezOffsetRecord.getMaxKeyLen();
       int maxValLen = tezOffsetRecord.getMaxValLen();
 
-      if (recordOffset < firstKeyOffset) {
-        currentKeyLength = maxKeyLen;
+      boolean readKeyLength = recordOffset >= firstKeyOffset;
+      boolean readValueLength = recordOffset >= firstValOffset;
+      if (readKeyLength && readValueLength) {
+        long combined = readLongNative();
+        currentKeyLength = (int) combined;
+        currentValueLength = (int) (combined >>> 32);
+        bytesRead += INT_SIZE + INT_SIZE;
       } else {
-        currentKeyLength = dataIn.readInt();
-        bytesRead += INT_SIZE;
-      }
-      if (recordOffset < firstValOffset) {
-        currentValueLength = maxValLen;
-      } else {
-        currentValueLength = dataIn.readInt();
-        bytesRead += INT_SIZE;
+        if (readKeyLength) {
+          currentKeyLength = readIntNative();
+          bytesRead += INT_SIZE;
+        } else {
+          currentKeyLength = maxKeyLen;
+        }
+        if (readValueLength) {
+          currentValueLength = readIntNative();
+          bytesRead += INT_SIZE;
+        } else {
+          currentValueLength = maxValLen;
+        }
       }
     }
 
     private void readKeyValueLengthRle() throws IOException {
-      currentKeyLength = dataIn.readInt();
-      currentValueLength = dataIn.readInt();
-      // long combined = dataIn.readLong();
-      // currentKeyLength = (int) (combined >> 32);
-      // currentValueLength = (int) combined;
+      long combined = readLongNative();
+      currentKeyLength = (int) combined;
+      currentValueLength = (int) (combined >>> 32);
 
       if (currentKeyLength != RLE_MARKER) {
         // original key length
@@ -1546,8 +1571,6 @@ public class IFile {
       // Close the underlying stream
       in.close();
 
-      // Release the buffer
-      dataIn = null;
       if (readRecordsCounter != null) {
         readRecordsCounter.increment(numRecordsRead);
       }
