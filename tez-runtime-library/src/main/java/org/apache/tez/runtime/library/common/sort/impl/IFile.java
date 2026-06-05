@@ -985,7 +985,11 @@ public class IFile {
     private final InputStream in;        // Possibly decompressed stream that we read
     private final long startPos;
 
-    private final byte[] primitiveReadBuffer = new byte[Long.BYTES];
+    private static final int READ_BUFFER_SIZE = 64 * 1024;
+
+    private final byte[] readBuffer = new byte[READ_BUFFER_SIZE];
+    private int readBufferPos = 0;
+    private int readBufferLimit = 0;
     private final long fileLength;
     private final boolean isRleEnabled;
 
@@ -1218,9 +1222,9 @@ public class IFile {
      * @throws IOException
      */
     private int readData(byte[] buf, int len) throws IOException {
-      int bytesRead = 0;
+      int bytesRead = copyFromReadBuffer(buf, 0, len);
       while (bytesRead < len) {
-        int n = IOUtils.wrappedReadForCompressedData(in, buf, bytesRead, len - bytesRead);
+        int n = readFromInput(buf, bytesRead, len - bytesRead);
         if (n < 0) {
           return bytesRead;
         }
@@ -1229,22 +1233,56 @@ public class IFile {
       return len;
     }
 
-    private int readIntNative() throws IOException {
-      int bytes = readData(primitiveReadBuffer, Integer.BYTES);
-      if (bytes != Integer.BYTES) {
-        throw new IOException(String.format(INCOMPLETE_READ, Integer.BYTES, bytes));
+    private int readFromInput(byte[] buf, int offset, int len) throws IOException {
+      return IOUtils.wrappedReadForCompressedData(in, buf, offset, len);
+    }
+
+    private int copyFromReadBuffer(byte[] buf, int offset, int len) {
+      int bytesToCopy = Math.min(len, readBufferLimit - readBufferPos);
+      if (bytesToCopy > 0) {
+        System.arraycopy(readBuffer, readBufferPos, buf, offset, bytesToCopy);
+        readBufferPos += bytesToCopy;
       }
-      return FastByteComparisons.theUnsafe.getInt(primitiveReadBuffer,
-          FastByteComparisons.BYTE_ARRAY_BASE_OFFSET);
+      return bytesToCopy;
+    }
+
+    private int availableInReadBuffer() {
+      return readBufferLimit - readBufferPos;
+    }
+
+    private void ensureReadBuffer(int len) throws IOException {
+      int available = availableInReadBuffer();
+      if (available >= len) {
+        return;
+      }
+      if (available > 0) {
+        System.arraycopy(readBuffer, readBufferPos, readBuffer, 0, available);
+      }
+      readBufferPos = 0;
+      readBufferLimit = available;
+      while (readBufferLimit < len) {
+        int n = readFromInput(readBuffer, readBufferLimit, readBuffer.length - readBufferLimit);
+        if (n < 0) {
+          throw new IOException(String.format(INCOMPLETE_READ, len, readBufferLimit));
+        }
+        readBufferLimit += n;
+      }
+    }
+
+    private int readIntNative() throws IOException {
+      ensureReadBuffer(Integer.BYTES);
+      int value = FastByteComparisons.theUnsafe.getInt(readBuffer,
+          FastByteComparisons.BYTE_ARRAY_BASE_OFFSET + (long) readBufferPos);
+      readBufferPos += Integer.BYTES;
+      return value;
     }
 
     private long readLongNative() throws IOException {
-      int bytes = readData(primitiveReadBuffer, Long.BYTES);
-      if (bytes != Long.BYTES) {
-        throw new IOException(String.format(INCOMPLETE_READ, Long.BYTES, bytes));
-      }
-      return FastByteComparisons.theUnsafe.getLong(primitiveReadBuffer,
-          FastByteComparisons.BYTE_ARRAY_BASE_OFFSET);
+      ensureReadBuffer(Long.BYTES);
+      long value = FastByteComparisons.theUnsafe.getLong(readBuffer,
+          FastByteComparisons.BYTE_ARRAY_BASE_OFFSET + (long) readBufferPos);
+      readBufferPos += Long.BYTES;
+      return value;
     }
 
     private void readValueLengthRle() throws IOException {
