@@ -37,18 +37,12 @@ public class NonSyncDataOutputStream extends DataOutputStream {
     }
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
   public void write(int b) throws IOException {
     out.write(b);
     incrementWritten(1);
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
   public void write(byte b[], int off, int len) throws IOException {
     out.write(b, off, len);

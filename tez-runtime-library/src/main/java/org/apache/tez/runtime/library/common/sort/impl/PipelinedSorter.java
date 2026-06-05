@@ -19,7 +19,6 @@ package org.apache.tez.runtime.library.common.sort.impl;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -49,7 +48,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.DataInputBuffer;
-import org.apache.tez.common.io.NonSyncDataOutputStream;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.counters.TaskCounter;
 import org.apache.tez.common.counters.TezCounter;
@@ -556,9 +554,9 @@ public final class PipelinedSorter {
     int valstart = -1;
     int valend = -1;
     try {
-      span.out.write(key.getBytesRaw(), key.getOffset(), key.getLength());
+      span.kvbuffer.put(key.getBytesRaw(), key.getOffset(), key.getLength());
       valstart = span.kvbuffer.position();      
-      span.out.write(value.getBytesRaw(), value.getOffset(), value.getLength());
+      span.kvbuffer.put(value.getBytesRaw(), value.getOffset(), value.getLength());
       valend = span.kvbuffer.position();
     } catch (BufferOverflowException overflow) {
       // restore limit
@@ -1211,21 +1209,6 @@ public final class PipelinedSorter {
   }
 
 
-  private static class BufferStreamWrapper extends OutputStream
-  {
-    private final ByteBuffer out;
-    public BufferStreamWrapper(ByteBuffer out) {
-      this.out = out;
-    }
-    
-    @Override
-    public void write(int b) throws IOException { out.put((byte)b); }
-    @Override
-    public void write(byte[] b) throws IOException { out.put(b); }
-    @Override
-    public void write(byte[] b, int off, int len) throws IOException { out.put(b, off, len); }
-  }
-
   private static final class InputByteBuffer extends DataInputBuffer {
     private byte[] buffer = new byte[256]; 
     private ByteBuffer wrapped = ByteBuffer.wrap(buffer);
@@ -1265,7 +1248,6 @@ public final class PipelinedSorter {
     final ByteBuffer kvbuffer;
     final byte[] kvbufferArray;
     final int kvbufferArrayOffset;
-    final NonSyncDataOutputStream out;
     final int fullKeyPrefixBytes;
 
     private int index = 0;
@@ -1301,8 +1283,6 @@ public final class PipelinedSorter {
       kvmetaPosition = 0;
       kvmetaLimit = metasize;
       fullKeyPrefixBytes = PipelinedSorter.this.fullKeyPrefixBytes;
-      out = new NonSyncDataOutputStream(
-              new BufferStreamWrapper(kvbuffer));
     }
 
     public SpanIterator sort() {

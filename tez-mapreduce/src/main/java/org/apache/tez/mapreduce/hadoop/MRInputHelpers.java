@@ -239,8 +239,7 @@ public class MRInputHelpers {
 
     builder.setSplitClassName(oldSplit.getClass().getName());
 
-    ByteString.Output os = ByteString
-        .newOutput(SPLIT_SERIALIZED_LENGTH_ESTIMATE);
+    ByteString.Output os = ByteString.newOutput(SPLIT_SERIALIZED_LENGTH_ESTIMATE);
     oldSplit.write(new NonSyncDataOutputStream(os));
     ByteString splitBs = os.toByteString();
     builder.setSplitBytes(splitBs);
