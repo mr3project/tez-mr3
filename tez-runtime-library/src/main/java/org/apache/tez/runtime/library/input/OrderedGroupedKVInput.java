@@ -281,9 +281,7 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
     shuffleLocalRef.handleEvents(inputEvents);
   }
 
-  @SuppressWarnings({ "rawtypes", "unchecked" })
-  protected synchronized void createValuesIterator()
-      throws IOException {
+  private synchronized void createValuesIterator() {
     // Not used by ReduceProcessor
     Class<?> keyClass = SerializationContext.getKeyClass();
     Class<?> valClass = SerializationContext.getValueClass();

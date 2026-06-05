@@ -26,6 +26,15 @@ import org.apache.hadoop.io.DataInputBuffer;
  * the raw keys and values during sort/merge of intermediate data. 
  */
 public interface TezRawKeyValueIterator {
+
+  // Invariant for current merge-based implementations:
+  //   For any record loaded with next(),
+  //    - getKey() and getValue() describe data from the same current record source/segment.
+  //    - A record is not assembled from a key from one segment and a value from another segment.
+  //
+  // This provenance invariant does not by itself imply that the returned backing arrays are stable/immutable.
+  // Segment/source-specific stability must be reported separately.
+
   /** 
    * Gets the current raw key.
    * 

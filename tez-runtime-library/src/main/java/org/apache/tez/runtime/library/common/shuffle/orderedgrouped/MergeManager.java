@@ -1144,9 +1144,9 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   }
 
   private TezRawKeyValueIterator finalMerge(Configuration job, FileSystem fs,
-                                       List<MapOutput> inMemoryMapOutputs,
-                                       List<FileChunk> onDiskMapOutputs
-                                       ) throws IOException, InterruptedException {
+      List<MapOutput> inMemoryMapOutputs,
+      List<FileChunk> onDiskMapOutputs)
+    throws IOException, InterruptedException {
 
     logFinalMergeStart(inMemoryMapOutputs, onDiskMapOutputs);
 

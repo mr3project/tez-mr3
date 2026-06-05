@@ -72,9 +72,8 @@ public class TezMerger {
       boolean checkForSameKeys,
       TaskContext taskContext)
       throws IOException, InterruptedException {
-    return new MergeQueue(conf, fs, segments,
-        sortSegments, codec, checkForSameKeys).merge(mergeFactor, inMemSegments, tmpDir,
-        readsCounter, writesCounter, bytesReadCounter, taskContext);
+    return new MergeQueue(conf, fs, segments, sortSegments, codec, checkForSameKeys).merge(
+      mergeFactor, inMemSegments, tmpDir, readsCounter, writesCounter, bytesReadCounter, taskContext);
   }
 
   public static void writeFile(TezRawKeyValueIterator records, IFile.WriterAppendDataInputBuffer writer,
@@ -573,10 +572,10 @@ public class TezMerger {
     }
 
     TezRawKeyValueIterator merge(int factor, int inMem, Path tmpDir,
-                                     TezCounter readsCounter,
-                                     TezCounter writesCounter,
-                                     TezCounter bytesReadCounter,
-                                     TaskContext taskContext)
+                                 TezCounter readsCounter,
+                                 TezCounter writesCounter,
+                                 TezCounter bytesReadCounter,
+                                 TaskContext taskContext)
         throws IOException, InterruptedException {
       if (segments.size() == 0) {
         LOG.info("Nothing to merge. Returning an empty iterator");
@@ -655,10 +654,9 @@ public class TezMerger {
             LOG.debug("Down to the last merge-pass, with " + numSegments +
                 " segments left");
           }
-          // At this point, Factor Segments have not been physically
-          // materialized. The merge will be done dynamically. Some of them may
-          // be in-memory segments, other on-disk semgnets. Decision to be made
-          // by a finalMerge is that is required.
+          // At this point, Factor Segments have not been physically materialized.
+          // The merge will be done dynamically. Some of them may be in-memory segments, other on-disk semgnets.
+          // Decision to be made by a finalMerge is that is required.
           return this;
         } else {
           if (LOG.isDebugEnabled()) {
@@ -674,9 +672,7 @@ public class TezMerger {
           }
           Path tmpFilename = new Path(tmpDir, "intermediate").suffix("." + passNo);
 
-          Path outputFile =  lDirAlloc.getLocalPathForWrite(
-                                              tmpFilename.toString(),
-                                              approxOutputSize, conf);
+          Path outputFile = lDirAlloc.getLocalPathForWrite(tmpFilename.toString(), approxOutputSize, conf);
 
           boolean useFreeMemoryWriterOutput = conf.getBoolean(
               TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT,

@@ -98,7 +98,6 @@ public class ValuesIterator {
 
       @Override
       public Iterator<BytesWritable> iterator() {
-        
         return new Iterator<BytesWritable>() {
 
           private final int keyNumber = keyCtr;
@@ -113,10 +112,8 @@ public class ValuesIterator {
             if (!hasMoreValues) {
               throw new NoSuchElementException("iterate past last value");
             }
-            Preconditions
-                .checkState(
-                    keyNumber == keyCtr,
-                    "Cannot use values iterator on the previous K-V pair after moveToNext has been invoked to move to the next K-V pair");
+            Preconditions.checkState(keyNumber == keyCtr,
+                "Cannot use values iterator on the previous K-V pair after moveToNext has been invoked to move to the next K-V pair");
             
             try {
               readNextValue();

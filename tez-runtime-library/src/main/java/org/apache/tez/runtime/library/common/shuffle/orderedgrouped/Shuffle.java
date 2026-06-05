@@ -253,8 +253,7 @@ public class Shuffle implements ExceptionReporter {
   // Not handling any shutdown logic here. That's handled by the callback from this invocation.
   private class RunShuffleCallable implements Callable<TezRawKeyValueIterator> {
 
-    RunShuffleCallable() {
-    }
+    RunShuffleCallable() { }
 
     @Override
     public TezRawKeyValueIterator call() throws IOException, InterruptedException {
