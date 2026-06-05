@@ -25,52 +25,58 @@ import java.io.IOException;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.tez.runtime.api.TezOffsetRecord;
-import org.apache.tez.common.io.NonSyncByteArrayInputStream;
 import org.apache.tez.runtime.library.api.KeyValueReaderEdge;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader.KeyState;
+import org.apache.tez.util.FastByteComparisons;
 
 /**
  * <code>IFile.InMemoryReader</code> to read map-outputs present in-memory.
  */
 public class InMemoryReader implements IFile.KeyValueReader {
 
-  private static class ByteArrayDataInput extends NonSyncByteArrayInputStream {
+  private static class ByteArrayDataInput {
+    private final byte[] buf;
+    private final int count;
+    private int pos;
 
     public ByteArrayDataInput(byte[] buf, int offset, int length) {
-      super(buf, offset, length);
+      this.buf = buf;
+      this.pos = offset;
+      this.count = Math.min(offset + length, buf.length);
     }
 
     public byte[] getData() { return buf; }
     public int getPosition() { return pos; }
 
     public int readInt() {
-      if (pos + 4 > count) {
+      if (pos + Integer.BYTES > count) {
         throw new RuntimeException("Not enough bytes to read an int");
       }
-      int value = ((buf[pos] & 0xFF) << 24) |
-                  ((buf[pos + 1] & 0xFF) << 16) |
-                  ((buf[pos + 2] & 0xFF) << 8) |
-                  (buf[pos + 3] & 0xFF);
-      pos += 4;
+      int value = FastByteComparisons.theUnsafe.getInt(buf,
+          FastByteComparisons.BYTE_ARRAY_BASE_OFFSET + (long) pos);
+      pos += Integer.BYTES;
       return value;
     }
 
     public long readLong() {
-      if (pos + 8 > count) {
+      if (pos + Long.BYTES > count) {
         throw new RuntimeException("Not enough bytes to read a long");
       }
-      long value = ((long)(buf[pos] & 0xFF) << 56) |
-                   ((long)(buf[pos + 1] & 0xFF) << 48) |
-                   ((long)(buf[pos + 2] & 0xFF) << 40) |
-                   ((long)(buf[pos + 3] & 0xFF) << 32) |
-                   ((long)(buf[pos + 4] & 0xFF) << 24) |
-                   ((long)(buf[pos + 5] & 0xFF) << 16) |
-                   ((long)(buf[pos + 6] & 0xFF) << 8) |
-                   (buf[pos + 7] & 0xFF);
-      pos += 8;
+      long value = FastByteComparisons.theUnsafe.getLong(buf,
+          FastByteComparisons.BYTE_ARRAY_BASE_OFFSET + (long) pos);
+      pos += Long.BYTES;
       return value;
+    }
+
+    public long skip(long n) {
+      long skipped = count - pos;
+      if (n < skipped) {
+        skipped = n < 0 ? 0 : n;
+      }
+      pos += (int) skipped;
+      return skipped;
     }
   }
 
@@ -152,35 +158,47 @@ public class InMemoryReader implements IFile.KeyValueReader {
       int recordOffset = (int) bytesRead;
 
       if (recordOffset == tezOffsetRecord.getEofPos()) {
-        currentKeyLength = memDataIn.readInt();
-        currentValueLength = memDataIn.readInt();
+        long combined = memDataIn.readLong();
+        currentKeyLength = (int) combined;
+        currentValueLength = (int) (combined >>> 32);
         bytesRead += Integer.BYTES + Integer.BYTES;
         return;
       }
 
-      if (recordOffset < tezOffsetRecord.getFirstKeyOffset()) {
-        currentKeyLength = tezOffsetRecord.getMaxKeyLen();
+      boolean readKeyLength = recordOffset >= tezOffsetRecord.getFirstKeyOffset();
+      boolean readValueLength = recordOffset >= tezOffsetRecord.getFirstValOffset();
+      if (readKeyLength && readValueLength) {
+        long combined = memDataIn.readLong();
+        currentKeyLength = (int) combined;
+        currentValueLength = (int) (combined >>> 32);
+        bytesRead += Integer.BYTES + Integer.BYTES;
       } else {
-        currentKeyLength = memDataIn.readInt();
-        bytesRead += Integer.BYTES;
-      }
+        if (readKeyLength) {
+          currentKeyLength = memDataIn.readInt();
+          bytesRead += Integer.BYTES;
+        } else {
+          currentKeyLength = tezOffsetRecord.getMaxKeyLen();
+        }
 
-      if (recordOffset < tezOffsetRecord.getFirstValOffset()) {
-        currentValueLength = tezOffsetRecord.getMaxValLen();
-      } else {
-        currentValueLength = memDataIn.readInt();
-        bytesRead += Integer.BYTES;
+        if (readValueLength) {
+          currentValueLength = memDataIn.readInt();
+          bytesRead += Integer.BYTES;
+        } else {
+          currentValueLength = tezOffsetRecord.getMaxValLen();
+        }
       }
     } else {
-      currentKeyLength = memDataIn.readInt();
-      currentValueLength = memDataIn.readInt();
+      long combined = memDataIn.readLong();
+      currentKeyLength = (int) combined;
+      currentValueLength = (int) (combined >>> 32);
       bytesRead += Integer.BYTES + Integer.BYTES;
     }
   }
 
   private void readKeyValueLengthRle() {
-    currentKeyLength = memDataIn.readInt();
-    currentValueLength = memDataIn.readInt();
+    long combined = memDataIn.readLong();
+    currentKeyLength = (int) combined;
+    currentValueLength = (int) (combined >>> 32);
     if (currentKeyLength != IFile.RLE_MARKER) {
       originalKeyLength = currentKeyLength;
       originalKeyPos = memDataIn.getPosition();
