@@ -47,8 +47,8 @@ public class OrderedGroupedInputLegacy extends OrderedGroupedKVInput {
           }
 
           @Override
-          public boolean next() throws IOException {
-            return false;
+          public int next() throws IOException {
+            return TezRawKeyValueIterator.NO_MORE_KEY_VALUE;
           }
 
           @Override

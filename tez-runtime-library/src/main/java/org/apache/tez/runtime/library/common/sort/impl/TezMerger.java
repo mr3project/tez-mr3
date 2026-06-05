@@ -83,14 +83,14 @@ public class TezMerger {
 
     long recordCtr = 0;
     if (isRleEnabled) {
-      while (records.next()) {
+      while (records.next() != TezRawKeyValueIterator.NO_MORE_KEY_VALUE) {
         // Even if records.isSameKey() is false, the two keys may be the same.
         DataInputBuffer key = records.isSameKey() ? IFile.REPEAT_KEY : records.getKey();
         writer.appendRle(key, records.getValue());
         if (((recordCtr++) % recordsBeforeProgress) == 0) { checkProgress(); }
       }
     } else {
-      while (records.next()) {
+      while (records.next() != TezRawKeyValueIterator.NO_MORE_KEY_VALUE) {
         writer.appendNoRle(records.getKey(), records.getValue());
         if (((recordCtr++) % recordsBeforeProgress) == 0) { checkProgress(); }
       }
@@ -177,6 +177,10 @@ public class TezMerger {
 
     void nextRawValue(DataInputBuffer value) throws IOException {
       reader.nextRawValue(value);
+    }
+
+    boolean isCurrentRecordStable() {
+      return reader.isCurrentRecordStable();
     }
 
     void closeReader() throws IOException {
@@ -409,9 +413,9 @@ public class TezMerger {
       }
     }
 
-    public boolean next() throws IOException {
+    public int next() throws IOException {
       if (!hasNext()) {
-        return false;
+        return TezRawKeyValueIterator.NO_MORE_KEY_VALUE;
       }
 
       minSegment = loserTree.top();
@@ -432,7 +436,9 @@ public class TezMerger {
         minSegment.getValue(value);
       }
 
-      return true;
+      return minSegment.isCurrentRecordStable()
+          ? TezRawKeyValueIterator.NEXT_KEY_VALUE_STABLE
+          : TezRawKeyValueIterator.NEXT_KEY_VALUE_VOLATILE;
     }
 
     boolean compare(KeyValueBuffer nextKey, DataOutputBuffer buf2) {
@@ -800,8 +806,8 @@ public class TezMerger {
     }
 
     @Override
-    public boolean next() throws IOException {
-      return false;
+    public int next() throws IOException {
+      return TezRawKeyValueIterator.NO_MORE_KEY_VALUE;
     }
 
     @Override

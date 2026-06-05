@@ -27,6 +27,10 @@ import org.apache.hadoop.io.DataInputBuffer;
  */
 public interface TezRawKeyValueIterator {
 
+  int NO_MORE_KEY_VALUE = 0;
+  int NEXT_KEY_VALUE_VOLATILE = 1;
+  int NEXT_KEY_VALUE_STABLE = 2;
+
   // Invariant for current merge-based implementations:
   //   For any record loaded with next(),
   //    - getKey() and getValue() describe data from the same current record source/segment.
@@ -53,12 +57,26 @@ public interface TezRawKeyValueIterator {
   
   /** 
    * Sets up the current key and value (for getKey and getValue).
-   * 
-   * @return <code>true</code> if there exists a key/value, 
-   *         <code>false</code> otherwise. 
+   * <p>
+   * The returned stability code describes backing-array stability for both the
+   * key and the value of the current record. A stable result means the byte[]
+   * slices returned through {@link #getKey()} and {@link #getValue()} may be
+   * retained by callers without being overwritten or reused by this iterator. A
+   * volatile result means the current record exists, but the backing arrays must
+   * not be retained without copying.
+   * <p>
+   * For current merge-based implementations, for any record loaded with this
+   * method, {@link #getKey()} and {@link #getValue()} describe data from the
+   * same current record source/segment. A record is not assembled from a key
+   * from one segment and a value from another segment.
+   *
+   * @return {@link #NO_MORE_KEY_VALUE} if no key/value remains,
+   *         {@link #NEXT_KEY_VALUE_VOLATILE} if a key/value exists but its
+   *         backing arrays are not stable, or {@link #NEXT_KEY_VALUE_STABLE} if
+   *         a key/value exists and both key and value backing arrays are stable.
    * @throws IOException
    */
-  boolean next() throws IOException;
+  int next() throws IOException;
 
   /**
    * Returns true if any items are left in the iterator.
