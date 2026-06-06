@@ -57,7 +57,6 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.io.compress.CodecPool;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.io.compress.Compressor;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -666,63 +665,63 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       updateGlobalStats(currentBuffer);
 
       filledBuffers.add(currentBuffer);
-      mayBeSpill(false);
+      mayBeSpill();
 
       currentBuffer = getNextAvailableBuffer();
 
       // in case spill threads are free, check if spilling is needed
-      mayBeSpill(false);
+      mayBeSpill();
     }
   }
 
-  private void mayBeSpill(boolean shouldBlock) throws IOException {
+  private void mayBeSpill() {
     if (filledBuffers.size() >= spillLimit) {
       // Do not block; possible that there are more buffers
-      scheduleSpill(shouldBlock);
+      tryScheduleSpill();
     }
   }
 
-  private boolean scheduleSpill(boolean block) {
+  private void tryScheduleSpill() {
     if (filledBuffers.isEmpty()) {
-      return false;
+      return;
     }
-
-    try {
-      if (block) {
-        availableSlots.acquire();
-      } else {
-        if (!availableSlots.tryAcquire()) {
-          // Data in filledBuffers would be spilled in subsequent iteration.
-          return false;
-        }
-      }
-
-      final int filledBufferCount = filledBuffers.size();
-      if (isDebugEnabled || (filledBufferCount % 10) == 0) {
-        LOG.info("{}: triggering spill. filledBuffers.size={}", destNameTrimmed, filledBufferCount);
-      }
-      pendingSpillCount.incrementAndGet();
-      int spillNumber = numSpills.getAndIncrement();
-
-      // spill to free memory only in pipelined shuffling:
-      //   - In non-pipelined shuffling, spilling to free memory causes too much memory pressure before merging.
-      //   - E.g., query 5 and query 17
-      // TODO: introduce a runtime configuration key for controlling spillToFreeMemory in non-pipelined shuffling
-      boolean spillToFreeMemory = isPipelinedShuffle && useFreeMemoryWriterOutput;
-
-      CompressionCodec spillCodec = spillCompressed ? codec : null;
-      WrappedBuffer oldestBuffer = filledBuffers.remove(0);
-      ListenableFuture<SpillResult> future = spillExecutor.submit(new SpillCallable(
-          Collections.singletonList(oldestBuffer), spillCodec, spilledRecordsCounter,
-          spillNumber, spillToFreeMemory));
-      Futures.addCallback(future, new SpillCallback(spillNumber));
-      // Update once per buffer (instead of every record)
-      updateTezCountersAndNotify();
-      return true;
-    } catch(InterruptedException ie) {
-      Thread.currentThread().interrupt(); // reset interrupt status
+    // Data in filledBuffers would be spilled in a subsequent iteration if no slot is available.
+    if (!availableSlots.tryAcquire()) {
+      return;
     }
-    return false;
+    scheduleSpillAfterSlotAcquired();
+  }
+
+  private void scheduleSpillBlocking(int minFilledBufferSize) throws InterruptedException {
+    if (filledBuffers.size() < minFilledBufferSize) {
+      return;
+    }
+    availableSlots.acquire();
+    scheduleSpillAfterSlotAcquired();
+  }
+
+  private void scheduleSpillAfterSlotAcquired() {
+    final int filledBufferCount = filledBuffers.size();
+    if (isDebugEnabled || (filledBufferCount % 10) == 0) {
+      LOG.info("{}: triggering spill. filledBuffers.size={}", destNameTrimmed, filledBufferCount);
+    }
+    pendingSpillCount.incrementAndGet();
+    int spillNumber = numSpills.getAndIncrement();
+
+    // spill to free memory only in pipelined shuffling:
+    //   - In non-pipelined shuffling, spilling to free memory causes too much memory pressure before merging.
+    //   - E.g., query 5 and query 17
+    // TODO: introduce a runtime configuration key for controlling spillToFreeMemory in non-pipelined shuffling
+    boolean spillToFreeMemory = isPipelinedShuffle && useFreeMemoryWriterOutput;
+
+    CompressionCodec spillCodec = spillCompressed ? codec : null;
+    WrappedBuffer oldestBuffer = filledBuffers.remove(0);
+    ListenableFuture<SpillResult> future = spillExecutor.submit(new SpillCallable(
+        Collections.singletonList(oldestBuffer), spillCodec, spilledRecordsCounter,
+        spillNumber, spillToFreeMemory));
+    Futures.addCallback(future, new SpillCallback(spillNumber));
+    // Update once per buffer (instead of every record)
+    updateTezCountersAndNotify();
   }
 
   private boolean reportPartitionStats() {
@@ -749,7 +748,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
         // All buffers initialized, and none available right now. Wait
         try {
           // Ensure that spills are triggered so that buffers can be released.
-          mayBeSpill(true);
+          scheduleSpillBlocking(spillLimit);
           return availableBuffers.take();
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
@@ -975,16 +974,22 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
   }
 
   public List<Event> close() throws IOException, InterruptedException {
-    // In case there are buffers to be spilled, schedule spilling.
-    // For final-merge mode, filledBuffers are merged directly in mergeAll(), so skip scheduleSpill().
-    if (isPipelinedShuffle) {
-      scheduleSpill(true);
-    }
     spillLock.lock();
     try {
       if (writerState == WriterState.RUNNING) {
         writerState = WriterState.CLOSED;
       }
+    } finally {
+      spillLock.unlock();
+    }
+
+    // In case there are buffers to be spilled, schedule spilling.
+    // For final-merge mode, filledBuffers are merged directly in mergeAll(), so skip scheduling.
+    if (isPipelinedShuffle) {
+      scheduleSpillBlocking(1);
+    }
+    spillLock.lock();
+    try {
       if (pendingSpillCount.get() != 0) {
         LOG.info("{}: Waiting for all spills to complete : Pending : {}", destNameTrimmed, pendingSpillCount.get());
       }
@@ -1061,7 +1066,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
         //   - When lots of spills are there, mergeAll, generate events and return
         //   - If there is no data and no existing spills, skip final output generation
         // Keep the same no-data fast path in finalSpill() if there were no prior spills.
-        // filledBuffers may NOT be empty because we did not call scheduleSpill() earlier.
+        // filledBuffers may NOT be empty because we did not schedule spills earlier.
         boolean noDataWithNoSpills =
           (numSpills.get() == 0) && filledBuffers.isEmpty() && (currentBuffer.nextPosition == 0);
         if (!noDataWithNoSpills) {
@@ -1945,8 +1950,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
 
   int[] getShufflePort() throws IOException {
     ByteBuffer shuffleMetadata = outputContext.getServiceProviderMetaData(auxiliaryService);
-    int[] shufflePorts = ShuffleUtils.deserializeShuffleProviderMetaData(shuffleMetadata);
-    return shufflePorts;
+    return ShuffleUtils.deserializeShuffleProviderMetaData(shuffleMetadata);
   }
 
   static class SpillPathDetails {
