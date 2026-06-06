@@ -40,7 +40,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
@@ -231,8 +230,18 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     }
   };
 
-  private Throwable spillException;
-  private final AtomicBoolean isShutdown = new AtomicBoolean(false);
+  private enum WriterState {
+    RUNNING,
+    CLOSED,
+    SPILL_FAILED
+  }
+
+  // Valid transitions:
+  //   1. RUNNING -> CLOSED -> SPILL_FAILED (terminal)
+  //   2. RUNNING -> SPILL_FAILED (terminal)
+  // Lock-free reads are allowed, but transitions must be updated inside spillLock.lock().
+  private volatile WriterState writerState = WriterState.RUNNING;
+
   private final AtomicInteger numSpills = new AtomicInteger(0);
   private final AtomicInteger pendingSpillCount = new AtomicInteger(0);
   private final ReentrantLock spillLock = new ReentrantLock();
@@ -524,13 +533,8 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     // Skipping checks for key-value types.
     // IFile takes care of these, but should be removed from there as well.
 
-    // How expensive are checks like these ?
-    if (isShutdown.get()) {
-      throw new RuntimeException("Writer already closed");
-    }
-    if (spillException != null) {
-      // Already reported as a fatalError - report to the user code
-      throw new IOException("Exception during spill", new IOException(spillException));
+    if (writerState != WriterState.RUNNING) {
+      throw new IOException("Write already closed or spill failed");
     }
 
     if (trackMaxKeyValLen) {
@@ -976,30 +980,27 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     if (isPipelinedShuffle) {
       scheduleSpill(true);
     }
-    isShutdown.set(true);
-
     spillLock.lock();
     try {
+      if (writerState == WriterState.RUNNING) {
+        writerState = WriterState.CLOSED;
+      }
       if (pendingSpillCount.get() != 0) {
         LOG.info("{}: Waiting for all spills to complete : Pending : {}", destNameTrimmed, pendingSpillCount.get());
       }
-      while (pendingSpillCount.get() != 0 && spillException == null) {
+      while (pendingSpillCount.get() != 0 && writerState != WriterState.SPILL_FAILED) {
         spillInProgress.await();
       }
     } finally {
       spillLock.unlock();
     }
 
-    if (spillException != null) {
+    if (writerState == WriterState.SPILL_FAILED) {
       LOG.error(destNameTrimmed + ": Error during spill, throwing");
       // Assuming close will be called on the same thread as the write
       cleanup();
       cleanupCurrentBuffer();
-      if (spillException instanceof IOException) {
-        throw (IOException) spillException;
-      } else {
-        throw new IOException(spillException);
-      }
+      throw new IOException("Exception during spill");
     }
 
     List<Event> eventList = Lists.newLinkedList();
@@ -1898,13 +1899,11 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
 
     @Override
     public void onFailure(Throwable t) {
-      // spillException setup to throw an exception back to the user. Requires synchronization.
-      // Consider removing it in favor of having Tez kill the task
-      LOG.error(destNameTrimmed + ": Failure while spilling to disk", t);
-      spillException = t;
+      LOG.error("{}: Failure while spilling to disk", destNameTrimmed, t);
       outputContext.reportFailure(TaskFailureType.NON_FATAL, t, "Failure while spilling to disk");
       spillLock.lock();
       try {
+        writerState = WriterState.SPILL_FAILED;
         spillInProgress.signal();
       } finally {
         spillLock.unlock();
