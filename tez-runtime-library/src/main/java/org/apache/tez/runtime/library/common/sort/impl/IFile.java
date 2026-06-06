@@ -109,6 +109,10 @@ public class IFile {
     // if key != IFile.REPEAT_KEY, perform key comparison to check whether 'key' is a new key or not
     void appendRle(DataInputBuffer key, DataInputBuffer value) throws IOException;
 
+    default void appendRle(DataInputBuffer key, DataInputBuffer value, boolean keyStable) throws IOException {
+      appendRle(key, value);
+    }
+
     void close() throws IOException;
   }
 
@@ -590,7 +594,10 @@ public class IFile {
 
   public static class WriterDataInputBuffer extends Writer implements WriterAppendDataInputBuffer {
 
-    private final DataOutputBuffer previous = new DataOutputBuffer();
+    private byte[] previousKeyData = new byte[0];
+    private int previousKeyOffset = 0;
+    private int previousKeyLength = 0;
+    private byte[] previousKeyCopy = new byte[0];
     private boolean previousSameKey = false;
 
     private long rleWritten = 0;      //number of RLE markers written
@@ -687,6 +694,11 @@ public class IFile {
     }
 
     public void appendRle(DataInputBuffer key, DataInputBuffer value) throws IOException {
+      appendRle(key, value, false);
+    }
+
+    @Override
+    public void appendRle(DataInputBuffer key, DataInputBuffer value, boolean keyStable) throws IOException {
       assert isRleEnabled && !useMaxKeyValLen;
       int keyLength = key.getLength() - key.getPosition();
       int valueLength = value.getLength() - value.getPosition();
@@ -698,24 +710,45 @@ public class IFile {
       }
 
       appendRle(key.getData(), key.getPosition(), keyLength,
-          value.getData(), value.getPosition(), valueLength);
+          value.getData(), value.getPosition(), valueLength, keyStable);
     }
 
     public void appendRle(byte[] keyData, int keyOffset, int keyLength,
                           byte[] valueData, int valueOffset, int valueLength) throws IOException {
+      appendRle(keyData, keyOffset, keyLength, valueData, valueOffset, valueLength, false);
+    }
+
+    private void appendRle(byte[] keyData, int keyOffset, int keyLength,
+                           byte[] valueData, int valueOffset, int valueLength, boolean keyStable)
+        throws IOException {
       assert isRleEnabled && !useMaxKeyValLen;
       boolean sameKey = keyLength != 0 && FastByteComparisons.compareEqual(
-          previous.getData(), 0, previous.getLength(), keyData, keyOffset, keyLength);
+          previousKeyData, previousKeyOffset, previousKeyLength, keyData, keyOffset, keyLength);
       if (sameKey) {
         appendRepeatValue(valueData, valueOffset, valueLength);
       } else {
         writeValueMarker();
         super.writeKVPair(keyData, keyOffset, keyLength, valueData, valueOffset, valueLength);
-        previous.reset();
-        previous.write(keyData, keyOffset, keyLength);
+        populatePreviousKey(keyData, keyOffset, keyLength, keyStable);
         previousSameKey = false;
       }
       ++numRecordsWritten;
+    }
+
+    private void populatePreviousKey(byte[] keyData, int keyOffset, int keyLength, boolean keyStable) {
+      if (keyStable) {
+        previousKeyData = keyData;
+        previousKeyOffset = keyOffset;
+        previousKeyLength = keyLength;
+      } else {
+        if (previousKeyCopy.length < keyLength) {
+          previousKeyCopy = new byte[keyLength];
+        }
+        System.arraycopy(keyData, keyOffset, previousKeyCopy, 0, keyLength);
+        previousKeyData = previousKeyCopy;
+        previousKeyOffset = 0;
+        previousKeyLength = keyLength;
+      }
     }
 
     private void appendRepeatValue(byte[] valueData, int valueOffset, int valueLength) throws IOException {

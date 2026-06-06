@@ -81,10 +81,12 @@ public class TezMerger {
 
     long recordCtr = 0;
     if (isRleEnabled) {
-      while (records.next() != TezRawKeyValueIterator.NO_MORE_KEY_VALUE) {
+      int nextResult;
+      while ((nextResult = records.next()) != TezRawKeyValueIterator.NO_MORE_KEY_VALUE) {
         // Even if records.isSameKey() is false, the two keys may be the same.
         DataInputBuffer key = records.isSameKey() ? IFile.REPEAT_KEY : records.getKey();
-        writer.appendRle(key, records.getValue());
+        writer.appendRle(key, records.getValue(),
+            nextResult == TezRawKeyValueIterator.NEXT_KEY_VALUE_STABLE);
         if (((recordCtr++) % recordsBeforeProgress) == 0) { checkProgress(); }
       }
     } else {
