@@ -154,6 +154,11 @@ public class TezRuntimeConfiguration {
       TEZ_RUNTIME_PREFIX + "pipelined.sorter.lazy-allocate.memory";
   public static final boolean TEZ_RUNTIME_PIPELINED_SORTER_LAZY_ALLOCATE_MEMORY_DEFAULT = false;
 
+  @ConfigurationProperty(type = "float")
+  public static final String TEZ_RUNTIME_PIPELINED_SORTER_RLE_THRESHOLD_FRACTION =
+      TEZ_RUNTIME_PREFIX + "pipelined.sorter.rle.threshold";
+  public static final float TEZ_RUNTIME_PIPELINED_SORTER_RLE_THRESHOLD_FRACTION_DEFAULT = 0.1f;
+
   @ConfigurationProperty(type = "integer")
   public static final String TEZ_RUNTIME_UNORDERED_PARTITIONED_NON_PIPELINED_NUM_BUFFERS =
       TEZ_RUNTIME_PREFIX + "unordered.partitioned.non.pipelined.num.buffers";
@@ -187,8 +192,7 @@ public class TezRuntimeConfiguration {
   @ConfigurationProperty(type = "float")
   public static final String TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT =
       TEZ_RUNTIME_PREFIX + "shuffle.fetch.buffer.percent";
-  public static final float TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT_DEFAULT =
-      0.90f;
+  public static final float TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT_DEFAULT = 0.90f;
 
   @ConfigurationProperty(type = "float")
   public static final String TEZ_RUNTIME_SHUFFLE_MEMORY_LIMIT_PERCENT =
@@ -431,6 +435,7 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SORTER_MIN_BLOCK_SIZE_IN_MB);
     tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SORTER_USE_SOFT_REFERENCE);
     tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SORTER_LAZY_ALLOCATE_MEMORY);
+    tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SORTER_RLE_THRESHOLD_FRACTION);
     tezRuntimeKeys.add(TEZ_RUNTIME_UNORDERED_PARTITIONED_NON_PIPELINED_NUM_BUFFERS);
     tezRuntimeKeys.add(TEZ_RUNTIME_UNORDERED_OUTPUT_BUFFER_SIZE_MB);
     tezRuntimeKeys.add(TEZ_RUNTIME_REPORT_PARTITION_STATS);

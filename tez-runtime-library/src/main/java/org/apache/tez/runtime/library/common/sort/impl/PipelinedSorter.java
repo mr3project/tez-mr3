@@ -141,6 +141,8 @@ public final class PipelinedSorter {
   private final boolean isPipelinedShuffle;
   private final boolean isFinalMergeEnabled;
 
+  private final double rleThresholdFraction;
+
   private long currentAllocatableMemory;
   final int maxNumberOfBlocks;
   //total memory capacity allocated to sorter
@@ -308,6 +310,10 @@ public final class PipelinedSorter {
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ORDERED_ENABLED_DEFAULT);
     // We do not use TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT.
     this.isFinalMergeEnabled = !this.isPipelinedShuffle;
+
+    this.rleThresholdFraction = this.conf.getFloat(
+        TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_RLE_THRESHOLD_FRACTION,
+        TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_RLE_THRESHOLD_FRACTION_DEFAULT);
 
     LOG.info("Setting up PipelinedSorter for {}", outputContext.getDestinationVertexName());
 
@@ -2089,7 +2095,7 @@ public final class PipelinedSorter {
     }
     
     public boolean needsRLE() {
-      return (eq > 0.1 * total);
+      return (eq > rleThresholdFraction * total);
     }
 
     private SpanIterator peek() {
