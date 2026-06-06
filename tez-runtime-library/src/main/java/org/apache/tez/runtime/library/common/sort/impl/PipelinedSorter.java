@@ -62,7 +62,7 @@ import org.apache.tez.runtime.library.common.serializer.SerializationContext;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterBytesWritable;
-import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterRawDataBuffer;
+import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterDataInputBuffer;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger.DiskSegment;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger.Segment;
 import org.apache.tez.runtime.library.common.TezRuntimeUtils;
@@ -747,13 +747,13 @@ public final class PipelinedSorter {
         PartitionFilter kvIter = merger.filter(i);
         // write merged output to disk
         long segmentStart = fsOutput.getPos();
-        WriterRawDataBuffer writer = null;
+        WriterDataInputBuffer writer = null;
         boolean hasNext = kvIter.hasNext();
         if (hasNext || !sendEmptyPartitionDetails) {
           if (codec != null && compressorExternal == null) {
             compressorExternal = outputContext.getCompressor(codec);
           }
-          writer = new WriterRawDataBuffer(
+          writer = new WriterDataInputBuffer(
               fsOutput,
               codec, spilledRecordsCounter, null, false, isRleEnabled,
               -1, -1,
@@ -845,7 +845,7 @@ public final class PipelinedSorter {
     InputStream input = byteArrayOutput.createInputStreamFrom(
         indexRecord.getStartOffset(), indexRecord.getPartLength());
 
-    IFile.KeyValueReaderRawDataBuffer reader = new IFile.Reader(input, indexRecord.getPartLength(),
+    IFile.KeyValueReaderDataInputBuffer reader = new IFile.Reader(input, indexRecord.getPartLength(),
         codec, null, null, ifileReadAhead, ifileReadAheadLength, outputContext, null);
     // This spill output (byteArrayOutput) can be consumed for multiple partitions during the final merge.
     // Keep it alive across partition segments and clean once all partitions are merged in cleanSpillOutputBuffers().
@@ -1047,9 +1047,9 @@ public final class PipelinedSorter {
           long segmentStart = finalOut.getPos();
           long rawLength = 0;
           long partLength = 0;
-          WriterRawDataBuffer writer = null;
+          WriterDataInputBuffer writer = null;
           if (shouldWrite) {
-            writer = new WriterRawDataBuffer(
+            writer = new WriterDataInputBuffer(
                 finalOut,
                 codec, spilledRecordsCounter, null, false, isFinalMergeRleEnabled,
                 -1, -1,
@@ -1751,7 +1751,7 @@ public final class PipelinedSorter {
       this.iter = iter;
     }
 
-    public void appendCurrentTo(WriterRawDataBuffer writer) throws IOException {
+    public void appendCurrentTo(WriterDataInputBuffer writer) throws IOException {
       iter.appendCurrentTo(writer);
     }
 
@@ -2146,7 +2146,7 @@ public final class PipelinedSorter {
       currentValueLength = current.valueLength;
     }
 
-    private void appendCurrentTo(WriterRawDataBuffer writer) throws IOException {
+    private void appendCurrentTo(WriterDataInputBuffer writer) throws IOException {
       if (writer.isRleEnabled()) {
         writer.appendRle(currentKeyData, currentKeyOffset, currentKeyLength,
             currentValueData, currentValueOffset, currentValueLength, true);

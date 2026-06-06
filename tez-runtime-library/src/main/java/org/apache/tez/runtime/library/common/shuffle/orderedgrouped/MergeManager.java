@@ -39,7 +39,7 @@ import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleClient;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
-import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterRawDataBuffer;
+import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterDataInputBuffer;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger.DiskSegment;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger.InputStreamSegment;
@@ -782,7 +782,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
       int noInMemorySegments = inMemorySegments.size();
 
-      IFile.WriterAppendRawDataBuffer writer = new InMemoryWriter(mergedMapOutputs.getMemory());
+      IFile.WriterAppendDataInputBuffer writer = new InMemoryWriter(mergedMapOutputs.getMemory());
 
       if (isDebugEnabled) {
         LOG.debug("{}: Initiating Memory-to-Memory merge with {} segments of total-size: {}",
@@ -874,10 +874,10 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
           srcTaskIdentifier.getInputIdentifier(), srcTaskIdentifier.getSpillEventId(),
           mergeOutputSize).suffix(Constants.MERGED_OUTPUT_PREFIX);
 
-      WriterRawDataBuffer writer = null;
+      WriterDataInputBuffer writer = null;
       long outFileLen = 0;
       try {
-        writer = new WriterRawDataBuffer(rfs, outputPath, codec, null, null,
+        writer = new WriterDataInputBuffer(rfs, outputPath, codec, null, null,
             true, writeBuffer, inputContext);
 
         TezRawKeyValueIterator rIter = null;
@@ -1005,7 +1005,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       outputPath = localDirAllocator.getLocalPathForWrite(outputPathString, approxOutputSize, conf);
       outputPath = outputPath.suffix(Constants.MERGED_OUTPUT_PREFIX + mergeFileSequenceId.getAndIncrement());
 
-      WriterRawDataBuffer writer = new WriterRawDataBuffer(rfs, outputPath, codec, null, null,
+      WriterDataInputBuffer writer = new WriterDataInputBuffer(rfs, outputPath, codec, null, null,
           true, writeBuffer, inputContext);
       tmpDir = new Path(inputContext.getUniqueIdentifier());
       try {
@@ -1070,7 +1070,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   }
 
   private Segment createMapOutputSegment(MapOutput mapOutput) throws IOException {
-    IFile.KeyValueReaderRawDataBuffer reader = createMapOutputReader(mapOutput);
+    IFile.KeyValueReaderDataInputBuffer reader = createMapOutputReader(mapOutput);
     TezCounter mapOutputsCounter = mapOutput.isPrimaryMapOutput() ? mergedMapOutputsCounter : null;
     if (mapOutput.getType() == ShuffleClient.Type.LOCAL_BYTE_CACHE) {
       return new InputStreamSegment(reader, mapOutputsCounter);
@@ -1078,7 +1078,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     return new Segment(reader, mapOutputsCounter);
   }
 
-  private IFile.KeyValueReaderRawDataBuffer createMapOutputReader(MapOutput mapOutput) throws IOException {
+  private IFile.KeyValueReaderDataInputBuffer createMapOutputReader(MapOutput mapOutput) throws IOException {
     assert mapOutput.getType() == ShuffleClient.Type.MEMORY || mapOutput.getType() == ShuffleClient.Type.LOCAL_BYTE_CACHE;
     if (mapOutput.getType() == ShuffleClient.Type.LOCAL_BYTE_CACHE) {
       java.io.InputStream inputStream = mapOutput.getInputStream();
@@ -1103,7 +1103,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         (int) mapOutput.getUsedMemoryForMergeManager(), null);
   }
 
-  static class RawKVIteratorReader implements IFile.KeyValueReaderRawDataBuffer {
+  static class RawKVIteratorReader implements IFile.KeyValueReaderDataInputBuffer {
 
     private final TezRawKeyValueIterator kvIter;
     private final long size;
@@ -1185,7 +1185,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
             false, spilledRecordsCounter, null,
             additionalSpillBytesRead, true, inputContext);
         final byte[] writeBuffer = IFile.allocateWriteBuffer();
-        final WriterRawDataBuffer writer = new WriterRawDataBuffer(fs, outputPath, codec, null, null,
+        final WriterDataInputBuffer writer = new WriterDataInputBuffer(fs, outputPath, codec, null, null,
             true, writeBuffer, inputContext);
         try {
           TezMerger.writeFile(rIter, writer,

@@ -25,7 +25,7 @@ import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.apache.tez.runtime.library.common.sort.impl.IFileOutputStream;
 import org.apache.tez.util.FastByteComparisons;
 
-public class InMemoryWriter implements IFile.WriterAppendRawDataBuffer {
+public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
 
   private final byte[] array;
   private final CRC32 checksum = new CRC32();

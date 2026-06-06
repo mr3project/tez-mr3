@@ -43,7 +43,7 @@ import org.apache.tez.runtime.api.MultiByteArrayOutputStream;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader.KeyState;
-import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterRawDataBuffer;
+import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterDataInputBuffer;
 
 /**
  * Merger is an utility class used by the Map and Reduce tasks for merging
@@ -73,7 +73,7 @@ public class TezMerger {
       mergeFactor, inMemSegments, tmpDir, readsCounter, writesCounter, bytesReadCounter, taskContext);
   }
 
-  public static void writeFile(TezRawKeyValueIterator records, IFile.WriterAppendRawDataBuffer writer,
+  public static void writeFile(TezRawKeyValueIterator records, IFile.WriterAppendDataInputBuffer writer,
       long recordsBeforeProgress)
       throws IOException, InterruptedException {
     boolean isRleEnabled = writer.isRleEnabled();
@@ -132,11 +132,11 @@ public class TezMerger {
 
   public static class Segment {
     static final byte[] EMPTY_BYTES = new byte[0];
-    IFile.KeyValueReaderRawDataBuffer reader;
+    IFile.KeyValueReaderDataInputBuffer reader;
     final KeyValueBuffer key = new KeyValueBuffer(EMPTY_BYTES, 0, 0);
     TezCounter mapOutputsCounter;
 
-    public Segment(IFile.KeyValueReaderRawDataBuffer reader, TezCounter mapOutputsCounter) {
+    public Segment(IFile.KeyValueReaderDataInputBuffer reader, TezCounter mapOutputsCounter) {
       this.reader = reader;
       this.mapOutputsCounter = mapOutputsCounter;
     }
@@ -255,7 +255,7 @@ public class TezMerger {
   }
 
   public static final class InputStreamSegment extends Segment {
-    public InputStreamSegment(IFile.KeyValueReaderRawDataBuffer reader, TezCounter mapOutputsCounter) {
+    public InputStreamSegment(IFile.KeyValueReaderDataInputBuffer reader, TezCounter mapOutputsCounter) {
       super(reader, mapOutputsCounter);
     }
 
@@ -269,7 +269,7 @@ public class TezMerger {
     private final MultiByteArrayOutputStream byteArrayOutput;
     private final boolean cleanupOnClose;
 
-    IntermediateMemorySegment(IFile.KeyValueReaderRawDataBuffer reader,
+    IntermediateMemorySegment(IFile.KeyValueReaderDataInputBuffer reader,
                               MultiByteArrayOutputStream byteArrayOutput, boolean cleanupOnClose) {
       super(reader, null);
       this.byteArrayOutput = byteArrayOutput;
@@ -698,14 +698,14 @@ public class TezMerger {
               && MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold);
 
           MultiByteArrayOutputStream byteArrayOutput = null;
-          IFile.WriterAppendRawDataBuffer writer;
+          IFile.WriterAppendDataInputBuffer writer;
           if (writeIntermediateToMemory) {
             byteArrayOutput = new MultiByteArrayOutputStream(fs, outputFile);
             FSDataOutputStream outputStream = new FSDataOutputStream(byteArrayOutput, null);
-            writer = new WriterRawDataBuffer(outputStream, codec, writesCounter, null,
+            writer = new WriterDataInputBuffer(outputStream, codec, writesCounter, null,
                 false, checkForSameKeys, -1, -1, writeBuffer, null, taskContext);
           } else {
-            writer = new WriterRawDataBuffer(fs, outputFile, codec, writesCounter, null,
+            writer = new WriterDataInputBuffer(fs, outputFile, codec, writesCounter, null,
                 checkForSameKeys, writeBuffer, taskContext);
           }
 
@@ -721,7 +721,7 @@ public class TezMerger {
             tempSegment = new DiskSegment(fs, outputFile, 0, fs.getFileStatus(outputFile).getLen(), codec,
                 ifileReadAhead, ifileReadAheadLength, false, null, taskContext);
           } else {
-            IFile.KeyValueReaderRawDataBuffer reader = new Reader(
+            IFile.KeyValueReaderDataInputBuffer reader = new Reader(
                 byteArrayOutput.createInputStreamFrom(0, byteArrayOutput.getTotalBytes()),
                 byteArrayOutput.getTotalBytes(),
                 codec, null, null, ifileReadAhead, ifileReadAheadLength, taskContext);

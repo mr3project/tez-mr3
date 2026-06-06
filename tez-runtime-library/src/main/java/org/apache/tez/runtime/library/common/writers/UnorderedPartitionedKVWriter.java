@@ -83,7 +83,7 @@ import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.apache.tez.runtime.library.common.sort.impl.IFileInputStream;
 import org.apache.tez.runtime.library.common.sort.impl.TezIndexRecord;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterBytesWritable;
-import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterRawDataBuffer;
+import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterDataInputBuffer;
 import org.apache.tez.runtime.library.common.sort.impl.TezSpillRecord;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
@@ -833,7 +833,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
         byte[] writeBuffer = IFile.allocateWriteBuffer();
 
         for (int i = 0; i < numPartitions; i++) {
-          WriterRawDataBuffer writer = null;
+          WriterDataInputBuffer writer = null;
           try {
             long segmentStart = fsOutput.getPos();
             long numRecords = 0;
@@ -847,7 +847,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
                   compressorExternal = outputContext.getCompressor(codec);
                 }
                 // all Writer instances share the same FSDataOutputStream out
-                writer = new WriterRawDataBuffer(
+                writer = new WriterDataInputBuffer(
                     fsOutput, codec, null, null, compositeFetch, false,
                     maxKeyLen, maxValLen,
                     writeBuffer, compressorExternal, outputContext);
@@ -901,7 +901,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     }
   }
 
-  private long writePartition(int pos, WrappedBuffer wrappedBuffer, WriterRawDataBuffer writer,
+  private long writePartition(int pos, WrappedBuffer wrappedBuffer, WriterDataInputBuffer writer,
       TezRawDataBuffer keyBuffer, TezRawDataBuffer valBuffer) throws IOException {
     long numRecords = 0;
     while (pos != WrappedBuffer.PARTITION_ABSENT_POSITION) {
@@ -1366,7 +1366,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       } else {
         out = new FSDataOutputStream(byteArrayOutput, null);
       }
-      WriterRawDataBuffer writer;
+      WriterDataInputBuffer writer;
 
       byte[] writeBuffer = IFile.allocateWriteBuffer();
       for (int i = 0; i < numPartitions; i++) {
@@ -1378,7 +1378,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
           continue;
         }
         // inside close()
-        writer = new WriterRawDataBuffer(
+        writer = new WriterDataInputBuffer(
             out, codec, null, null, compositeFetch, false,
             maxKeyLen, maxValLen,
             writeBuffer, null, outputContext);
@@ -1401,7 +1401,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
                 // Skip empty partitions within a spill
                 continue;
               }
-              IFile.KeyValueReaderRawDataBuffer reader = null;
+              IFile.KeyValueReaderDataInputBuffer reader = null;
               TezOffsetRecord spillOffsetRecord =
                   spillInfo.offsetRecordMap != null ? spillInfo.offsetRecordMap.get(i) : null;
               if (!spillCompressed && !compositeFetch) {

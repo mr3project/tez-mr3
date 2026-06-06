@@ -98,7 +98,7 @@ public class IFile {
     return 2 * INT_SIZE;
   }
 
-  public interface WriterAppendRawDataBuffer {
+  public interface WriterAppendDataInputBuffer {
     boolean isRleEnabled();
 
     // call when isRleEnabled is not statically known
@@ -582,7 +582,7 @@ public class IFile {
     }
   }
 
-  public static class WriterRawDataBuffer extends Writer implements WriterAppendRawDataBuffer {
+  public static class WriterDataInputBuffer extends Writer implements WriterAppendDataInputBuffer {
 
     private byte[] previousKeyData = new byte[0];
     private int previousKeyOffset = 0;
@@ -596,7 +596,7 @@ public class IFile {
     private static final int RLE_MARKER_SIZE = INT_SIZE;
     private static final int V_END_MARKER_SIZE = INT_SIZE;
 
-    public WriterRawDataBuffer(FileSystem fs, Path file,
+    public WriterDataInputBuffer(FileSystem fs, Path file,
                                  CompressionCodec codec,
                                  TezCounter writesCounter,
                                  TezCounter serializedBytesCounter,
@@ -609,7 +609,7 @@ public class IFile {
       this.ownOutputStream = true;
     }
 
-    public WriterRawDataBuffer(FSDataOutputStream outputStream,
+    public WriterDataInputBuffer(FSDataOutputStream outputStream,
                                  CompressionCodec codec,
                                  TezCounter writesCounter,
                                  TezCounter serializedBytesCounter,
@@ -871,7 +871,7 @@ public class IFile {
     void close() throws IOException;
   }
 
-  public interface KeyValueReaderRawDataBuffer extends KeyValueReaderBase {
+  public interface KeyValueReaderDataInputBuffer extends KeyValueReaderBase {
     Reader.KeyState readRawKey(TezRawDataBuffer key) throws IOException;
     void nextRawValue(TezRawDataBuffer value) throws IOException;
 
@@ -907,7 +907,7 @@ public class IFile {
     long consumeAll(KeyValueReaderEdge.ThrowingBiConsumer<BytesWritable, BytesWritable> consumer) throws Exception;
   }
 
-  public interface KeyValueReader extends KeyValueReaderRawDataBuffer, KeyValueReaderBytesWritable {
+  public interface KeyValueReader extends KeyValueReaderDataInputBuffer, KeyValueReaderBytesWritable {
   }
 
   /**
