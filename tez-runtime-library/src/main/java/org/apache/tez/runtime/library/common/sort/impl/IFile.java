@@ -37,7 +37,6 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.tez.runtime.library.utils.CodecUtils;
 import org.apache.tez.util.FastByteComparisons;
@@ -55,7 +54,7 @@ import javax.annotation.Nullable;
  * <code>IFile</code> is the simple <key-len, value-len, key, value> format
  * for the intermediate map-outputs in Map-Reduce.
  *
- * There is a <code>Writer</code> to write out map-outputs in this format and 
+ * There is a <code>Writer</code> to write out map-outputs in this format and
  * a <code>Reader</code> to read files of this format.
  */
 public class IFile {
@@ -70,7 +69,7 @@ public class IFile {
   public static final byte FLAG_RLE_ENABLED = 0x02;
 
   // REPEAT_KEY is primarily an ordered-path optimization, and never used for unordered output.
-  public static final DataInputBuffer REPEAT_KEY = new DataInputBuffer();
+  public static final TezRawDataBuffer REPEAT_KEY = new TezRawDataBuffer();
   public static final byte[] HEADER = new byte[] { (byte) 'T', (byte) 'I', (byte) 'F', (byte) 0};
 
   private static final String INCOMPLETE_READ = "Requested to read %d got %d";
@@ -103,11 +102,11 @@ public class IFile {
     boolean isRleEnabled();
 
     // call when isRleEnabled is not statically known
-    void appendNoRle(DataInputBuffer key, DataInputBuffer value) throws IOException;
-    void appendNoRleTez(DataInputBuffer key, DataInputBuffer value) throws IOException;
+    void appendNoRle(TezRawDataBuffer key, TezRawDataBuffer value) throws IOException;
+    void appendNoRleTez(TezRawDataBuffer key, TezRawDataBuffer value) throws IOException;
 
     // if key != IFile.REPEAT_KEY, perform key comparison to check whether 'key' is a new key or not
-    void appendRle(DataInputBuffer key, DataInputBuffer value) throws IOException;
+    void appendRle(TezRawDataBuffer key, TezRawDataBuffer value) throws IOException;
 
     void close() throws IOException;
   }
@@ -632,7 +631,7 @@ public class IFile {
       return isRleEnabled;
     }
 
-    public void appendNoRle(DataInputBuffer key, DataInputBuffer value) throws IOException {
+    public void appendNoRle(TezRawDataBuffer key, TezRawDataBuffer value) throws IOException {
       assert !isRleEnabled && !useMaxKeyValLen;
       int keyLength = key.getLength() - key.getPosition();
       int valueLength = value.getLength() - value.getPosition();
@@ -649,7 +648,7 @@ public class IFile {
       ++numRecordsWritten;
     }
 
-    public void appendNoRleTez(DataInputBuffer key, DataInputBuffer value) throws IOException {
+    public void appendNoRleTez(TezRawDataBuffer key, TezRawDataBuffer value) throws IOException {
       assert !isRleEnabled && useMaxKeyValLen;
       int keyLength = key.getLength() - key.getPosition();
       int valueLength = value.getLength() - value.getPosition();
@@ -686,7 +685,7 @@ public class IFile {
       ++numRecordsWritten;
     }
 
-    public void appendRle(DataInputBuffer key, DataInputBuffer value) throws IOException {
+    public void appendRle(TezRawDataBuffer key, TezRawDataBuffer value) throws IOException {
       assert isRleEnabled && !useMaxKeyValLen;
       int keyLength = key.getLength() - key.getPosition();
       int valueLength = value.getLength() - value.getPosition();
@@ -939,15 +938,15 @@ public class IFile {
   }
 
   public interface KeyValueReaderDataInputBuffer extends KeyValueReaderBase {
-    Reader.KeyState readRawKey(DataInputBuffer key) throws IOException;
-    void nextRawValue(DataInputBuffer value) throws IOException;
+    Reader.KeyState readRawKey(TezRawDataBuffer key) throws IOException;
+    void nextRawValue(TezRawDataBuffer value) throws IOException;
 
     /**
      * Reports whether the most recently loaded current record returned through
-     * readRawKey(DataInputBuffer) and nextRawValue(DataInputBuffer)
+     * readRawKey(TezRawDataBuffer) and nextRawValue(TezRawDataBuffer)
      * has stable backing byte arrays.
      *
-     * Stable means the byte[] slices exposed through DataInputBuffer may be
+     * Stable means the byte[] slices exposed through TezRawDataBuffer may be
      * retained by the caller without being overwritten or reused by this reader.
      * The result must be safe for both the key and the value of the current
      * record, based on the invariant that current merge-based records are not
@@ -1016,7 +1015,7 @@ public class IFile {
     private int currentValueLength;
     private boolean eof = false;
     private int originalKeyLength;
-    private byte[] keyBytes = new byte[0];  // backing array for DataInputBuffer in readRawKey()
+    private byte[] keyBytes = new byte[0];  // backing array for TezRawDataBuffer in readRawKey()
 
     // for reporting errors
     private long bytesRead = 0;
@@ -1450,7 +1449,7 @@ public class IFile {
       return false;
     }
 
-    public KeyState readRawKey(DataInputBuffer key) throws IOException {
+    public KeyState readRawKey(TezRawDataBuffer key) throws IOException {
       if (isRleEnabled) {
         return readRawKeyRle(key);
       } else {
@@ -1458,7 +1457,7 @@ public class IFile {
       }
     }
 
-    private KeyState readRawKeyNoRle(DataInputBuffer key) throws IOException {
+    private KeyState readRawKeyNoRle(TezRawDataBuffer key) throws IOException {
       if (!positionToNextRecordNoRle()) {
         return KeyState.NO_KEY;
       }
@@ -1474,7 +1473,7 @@ public class IFile {
       return KeyState.NEW_KEY;
     }
 
-    private KeyState readRawKeyRle(DataInputBuffer key) throws IOException {
+    private KeyState readRawKeyRle(TezRawDataBuffer key) throws IOException {
       if (!positionToNextRecordRle()) {
         return KeyState.NO_KEY;
       }
@@ -1536,7 +1535,7 @@ public class IFile {
       return KeyState.NEW_KEY;
     }
 
-    public void nextRawValue(DataInputBuffer value) throws IOException {
+    public void nextRawValue(TezRawDataBuffer value) throws IOException {
       final byte[] valBytes;
       if ((value.getData().length < currentValueLength) || (value.getData() == keyBytes)) {
         valBytes = createLargerArray(currentValueLength);

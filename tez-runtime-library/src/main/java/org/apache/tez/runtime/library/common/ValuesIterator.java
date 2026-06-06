@@ -23,7 +23,7 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 import org.apache.hadoop.io.BytesWritable;
-import org.apache.hadoop.io.DataInputBuffer;
+import org.apache.tez.runtime.library.common.sort.impl.TezRawDataBuffer;
 import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.runtime.library.common.comparator.TezBytesComparator;
 import org.apache.tez.runtime.library.common.sort.impl.TezRawKeyValueIterator;
@@ -32,10 +32,10 @@ import org.apache.tez.common.Preconditions;
 
 /**
  * Iterates values while keys match in sorted input.
- * 
+ *
  * This class is not thread safe. Accessing methods from multiple threads will
  * lead to corrupt data.
- * 
+ *
  */
 public class ValuesIterator {
 
@@ -47,13 +47,13 @@ public class ValuesIterator {
   private boolean currentRecordStable;
   private final TezCounter inputKeyCounter;
   private final TezCounter inputValueCounter;
-  
+
   private int keyCtr = 0;
   private boolean hasMoreValues; // For the current key.
   private boolean isFirstRecord = true;
 
   private boolean completedProcessing;
-  
+
   public ValuesIterator(TezRawKeyValueIterator in,
                         TezCounter inputKeyCounter,
                         TezCounter inputValueCounter) {
@@ -67,7 +67,7 @@ public class ValuesIterator {
   /**
    * Move to the next K-Vs pair
    * @return true if another pair exists, otherwise false.
-   * @throws IOException 
+   * @throws IOException
    */
   public boolean moveToNext() throws IOException {
     if (isFirstRecord) {
@@ -89,7 +89,7 @@ public class ValuesIterator {
   // Invariant:
   //   The backing byte[] array of BytesWritable is immutable, so the consumer may keep pointers to it.
   public BytesWritable getKey() {
-    return key; 
+    return key;
   }
 
   // Invariant:
@@ -102,7 +102,7 @@ public class ValuesIterator {
         return new Iterator<BytesWritable>() {
 
           private final int keyNumber = keyCtr;
-          
+
           @Override
           public boolean hasNext() {
             return hasMoreValues;
@@ -115,7 +115,7 @@ public class ValuesIterator {
             }
             Preconditions.checkState(keyNumber == keyCtr,
                 "Cannot use values iterator on the previous K-V pair after moveToNext has been invoked to move to the next K-V pair");
-            
+
             try {
               readNextValue();
               readNextKey();
@@ -138,7 +138,7 @@ public class ValuesIterator {
   /** Start processing next unique key. */
   private void nextKey() throws IOException {
     // read until we find a new key
-    while (hasMoreValues) { 
+    while (hasMoreValues) {
       readNextKey();
     }
 
@@ -149,15 +149,15 @@ public class ValuesIterator {
     hasMoreValues = more;
   }
 
-  /** 
+  /**
    * read the next key - which may be the same as the current key.
    */
   private void readNextKey() throws IOException {
     int nextResult = in.next();
     more = nextResult != TezRawKeyValueIterator.NO_MORE_KEY_VALUE;
     currentRecordStable = nextResult == TezRawKeyValueIterator.NEXT_KEY_VALUE_STABLE;
-    if (more) {      
-      DataInputBuffer nextKeyBytes = in.getKey();
+    if (more) {
+      TezRawDataBuffer nextKeyBytes = in.getKey();
       if (!in.isSameKey()) {
         nextKey = copyToWritable(nextKey, nextKeyBytes, currentRecordStable);
         // hasMoreValues = is it first key or is key the same?
@@ -183,11 +183,11 @@ public class ValuesIterator {
    * @throws IOException
    */
   private void readNextValue() throws IOException {
-    DataInputBuffer nextValueBytes = in.getValue();
+    TezRawDataBuffer nextValueBytes = in.getValue();
     value = copyToWritable(value, nextValueBytes, currentRecordStable);
   }
 
-  private BytesWritable copyToWritable(BytesWritable writable, DataInputBuffer source, boolean stable) {
+  private BytesWritable copyToWritable(BytesWritable writable, TezRawDataBuffer source, boolean stable) {
     BytesWritable target = writable;
     if (target == null) {
       target = new BytesWritable();

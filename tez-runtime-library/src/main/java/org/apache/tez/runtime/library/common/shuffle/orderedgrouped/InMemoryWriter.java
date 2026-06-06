@@ -21,7 +21,7 @@ import java.io.IOException;
 import java.util.zip.CRC32;
 
 import org.apache.hadoop.io.DataOutputBuffer;
-import org.apache.hadoop.io.DataInputBuffer;
+import org.apache.tez.runtime.library.common.sort.impl.TezRawDataBuffer;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.apache.tez.runtime.library.common.sort.impl.IFileOutputStream;
 import org.apache.tez.runtime.library.utils.BufferUtils;
@@ -33,7 +33,7 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
   private final CRC32 checksum = new CRC32();
   private int pos;
 
-  private DataInputBuffer prevKey = null;
+  private TezRawDataBuffer prevKey = null;
   private final DataOutputBuffer previous = new DataOutputBuffer();
 
   // InMemoryWriter is used only in MergeManager.IntermediateMemoryToMemoryMerger with isRleEnabled = true.
@@ -54,15 +54,15 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
       return isRleEnabled;
   }
 
-  public void appendNoRle(DataInputBuffer key, DataInputBuffer value) throws IOException {
+  public void appendNoRle(TezRawDataBuffer key, TezRawDataBuffer value) throws IOException {
     assert false;
   }
 
-  public void appendNoRleTez(DataInputBuffer key, DataInputBuffer value) throws IOException {
+  public void appendNoRleTez(TezRawDataBuffer key, TezRawDataBuffer value) throws IOException {
     assert false;
   }
 
-  public void appendRle(DataInputBuffer key, DataInputBuffer value) throws IOException {
+  public void appendRle(TezRawDataBuffer key, TezRawDataBuffer value) throws IOException {
     assert isRleEnabled;
     int keyLength = key.getLength() - key.getPosition();
     int valueLength = value.getLength() - value.getPosition();

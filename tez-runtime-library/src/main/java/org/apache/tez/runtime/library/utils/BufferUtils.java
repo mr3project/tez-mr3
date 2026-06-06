@@ -20,13 +20,13 @@ package org.apache.tez.runtime.library.utils;
 
 import java.io.IOException;
 
-import org.apache.hadoop.io.DataInputBuffer;
+import org.apache.tez.runtime.library.common.sort.impl.TezRawDataBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.tez.util.FastByteComparisons;
 
 public class BufferUtils {
 
-  public static int compare(DataInputBuffer buf1, DataInputBuffer buf2) {
+  public static int compare(TezRawDataBuffer buf1, TezRawDataBuffer buf2) {
     byte[] b1 = buf1.getData();
     byte[] b2 = buf2.getData();
     int s1 = buf1.getPosition();
@@ -56,7 +56,7 @@ public class BufferUtils {
     return FastByteComparisons.compareEqual(b1, s1, l1, b2, s2, l2);
   }
 
-  public static int compare(DataInputBuffer buf1, DataOutputBuffer buf2) {
+  public static int compare(TezRawDataBuffer buf1, DataOutputBuffer buf2) {
     byte[] b1 = buf1.getData();
     byte[] b2 = buf2.getData();
     int s1 = buf1.getPosition();
@@ -66,11 +66,11 @@ public class BufferUtils {
     return FastByteComparisons.compareTo(b1, s1, (l1 - s1), b2, s2, l2);
   }
 
-  public static int compare(DataOutputBuffer buf1, DataInputBuffer buf2) {
+  public static int compare(DataOutputBuffer buf1, TezRawDataBuffer buf2) {
     return compare(buf2, buf1);
   }
 
-  public static boolean compareEqual(DataOutputBuffer buf2, DataInputBuffer buf1) {
+  public static boolean compareEqual(DataOutputBuffer buf2, TezRawDataBuffer buf1) {
     byte[] b1 = buf1.getData();
     byte[] b2 = buf2.getData();
     int s1 = buf1.getPosition();
@@ -80,7 +80,7 @@ public class BufferUtils {
     return FastByteComparisons.compareEqual(b1, s1, (l1 - s1), b2, s2, l2);
   }
 
-  public static void copy(DataInputBuffer src, DataOutputBuffer dst) throws IOException {
+  public static void copy(TezRawDataBuffer src, DataOutputBuffer dst) throws IOException {
     byte[] b1 = src.getData();
     int s1 = src.getPosition();
     int l1 = src.getLength();

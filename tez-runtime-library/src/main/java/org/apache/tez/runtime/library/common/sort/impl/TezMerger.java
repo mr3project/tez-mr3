@@ -36,7 +36,6 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.counters.TezCounter;
@@ -55,7 +54,7 @@ public class TezMerger {
   private static final Logger LOG = LoggerFactory.getLogger(TezMerger.class);
 
   // Local directories
-  private static LocalDirAllocator lDirAlloc = 
+  private static LocalDirAllocator lDirAlloc =
     new LocalDirAllocator(TezRuntimeFrameworkConfigs.LOCAL_DIRS);
 
   public static
@@ -83,7 +82,7 @@ public class TezMerger {
     if (isRleEnabled) {
       while (records.next() != TezRawKeyValueIterator.NO_MORE_KEY_VALUE) {
         // Even if records.isSameKey() is false, the two keys may be the same.
-        DataInputBuffer key = records.isSameKey() ? IFile.REPEAT_KEY : records.getKey();
+        TezRawDataBuffer key = records.isSameKey() ? IFile.REPEAT_KEY : records.getKey();
         writer.appendRle(key, records.getValue());
         if (((recordCtr++) % recordsBeforeProgress) == 0) { checkProgress(); }
       }
@@ -152,7 +151,7 @@ public class TezMerger {
 
     KeyValueBuffer getKey() { return key; }
 
-    DataInputBuffer getValue(DataInputBuffer value) throws IOException {
+    TezRawDataBuffer getValue(TezRawDataBuffer value) throws IOException {
       nextRawValue(value);
       return value;
     }
@@ -161,19 +160,19 @@ public class TezMerger {
       return reader.getLength();
     }
 
-    KeyState readRawKey(DataInputBuffer nextKey) throws IOException {
+    KeyState readRawKey(TezRawDataBuffer nextKey) throws IOException {
       KeyState keyState = reader.readRawKey(nextKey);
       key.reset(nextKey.getData(), nextKey.getPosition(), nextKey.getLength() - nextKey.getPosition());
       return keyState;
     }
 
-    boolean nextRawKey(DataInputBuffer nextKey) throws IOException {
+    boolean nextRawKey(TezRawDataBuffer nextKey) throws IOException {
       boolean hasNext = reader.readRawKey(nextKey) != KeyState.NO_KEY;
       key.reset(nextKey.getData(), nextKey.getPosition(), nextKey.getLength() - nextKey.getPosition());
       return hasNext;
     }
 
-    void nextRawValue(DataInputBuffer value) throws IOException {
+    void nextRawValue(TezRawDataBuffer value) throws IOException {
       reader.nextRawValue(value);
     }
 
@@ -300,14 +299,14 @@ public class TezMerger {
 
     // Invariant: Segment.close() is called for all Segment objects
     List<Segment> segments = new ArrayList<Segment>();
-    
-    final DataInputBuffer key = new DataInputBuffer();
-    final DataInputBuffer value = new DataInputBuffer();
-    final DataInputBuffer nextKey = new DataInputBuffer();
-    final DataInputBuffer diskIFileValue = new DataInputBuffer();
-    
+
+    final TezRawDataBuffer key = new TezRawDataBuffer();
+    final TezRawDataBuffer value = new TezRawDataBuffer();
+    final TezRawDataBuffer nextKey = new TezRawDataBuffer();
+    final TezRawDataBuffer diskIFileValue = new TezRawDataBuffer();
+
     Segment minSegment;
-    Comparator<Segment> segmentComparator =   
+    Comparator<Segment> segmentComparator =
       new Comparator<Segment>() {
       public int compare(Segment o1, Segment o2) {
         if (o1.getLength() == o2.getLength()) {
@@ -343,11 +342,11 @@ public class TezMerger {
       }
     }
 
-    public DataInputBuffer getKey() throws IOException {
+    public TezRawDataBuffer getKey() throws IOException {
       return key;
     }
 
-    public DataInputBuffer getValue() throws IOException {
+    public TezRawDataBuffer getValue() throws IOException {
       return value;
     }
 
@@ -607,7 +606,7 @@ public class TezMerger {
       int numSegments = segments.size();
       int origFactor = factor;
       int passNo = 1;
-      
+
       // create the MergeStreams from the sorted map created in the constructor
       // and dump the final output to a file
       byte[] writeBuffer = IFile.allocateWriteBuffer();
@@ -625,7 +624,7 @@ public class TezMerger {
         while (true) {
           // extract the smallest 'factor' number of segments
           // Call cleanup on the empty segments (no key/value data)
-          List<Segment> mStream = 
+          List<Segment> mStream =
             getSegmentDescriptors(numSegmentsToConsider);
           for (Segment segment : mStream) {
             // Initialize the segment at the last possible moment;
@@ -633,7 +632,7 @@ public class TezMerger {
 
             segment.init(readsCounter, bytesReadCounter);
             boolean hasNext = segment.nextRawKey(nextKey);
-            
+
             if (hasNext) {
               segmentsToMerge.add(segment);
               segmentsConsidered++;
@@ -644,7 +643,7 @@ public class TezMerger {
             }
           }
           // if we have the desired number of segments or looked at all available segments, we break
-          if (segmentsConsidered == factor || 
+          if (segmentsConsidered == factor ||
               segments.size() == 0) {
             break;
           }
@@ -652,14 +651,14 @@ public class TezMerger {
           // Get the correct # of segments in case some of them were empty.
           numSegmentsToConsider = factor - segmentsConsidered;
         }
-        
+
         // feed the streams to the loser tree
         loserTree.initialize(segmentsToMerge.size());
         for (Segment segment : segmentsToMerge) {
           loserTree.put(segment);
         }
         loserTree.build();
-        
+
         // if we have lesser number of segments remaining, then just return the iterator,
         // else do another single level merge
         if (numSegments <= factor) { // Will always kick in if only in-mem segments are provided.
@@ -677,9 +676,9 @@ public class TezMerger {
                 " intermediate segments out of a total of " +
                 (segments.size() + segmentsToMerge.size()));
           }
-          
+
           // we want to spread the creation of temp files on multiple disks if available under the space constraints
-          long approxOutputSize = 0; 
+          long approxOutputSize = 0;
           for (Segment s : segmentsToMerge) {
             approxOutputSize += s.getLength() + (long)ChecksumFileSystem.getApproxChkSumLength(s.getLength());
           }
@@ -710,7 +709,7 @@ public class TezMerger {
 
           writeFile(this, writer, recordsBeforeProgress);
           writer.close();
-          
+
           // we finished one single level merge; now clean up the loser tree
           this.close();
 
@@ -742,7 +741,7 @@ public class TezMerger {
         factor = origFactor;
       } while(true);
     }
-    
+
     /**
      * Determine the number of segments to merge in a given pass. Assuming more
      * than factor segments, the first pass should attempt to bring the total
@@ -751,14 +750,14 @@ public class TezMerger {
      */
     private static int getPassFactor(int factor, int passNo, int numSegments) {
       // passNo > 1 in the OR list - is that correct ?
-      if (passNo > 1 || numSegments <= factor || factor == 1) 
+      if (passNo > 1 || numSegments <= factor || factor == 1)
         return factor;
       int mod = (numSegments - 1) % (factor - 1);
       if (mod == 0)
         return factor;
       return mod + 1;
     }
-    
+
     /** Return (& remove) the requested number of segment descriptors from the
      * sorted map.
      */
@@ -775,7 +774,7 @@ public class TezMerger {
       subList.clear();
       return subListCopy;
     }
-    
+
     @Override
     public boolean isSameKey() {
       return (hasNext != null) && (hasNext == KeyState.SAME_KEY);
@@ -803,12 +802,12 @@ public class TezMerger {
 
   private static class EmptyIterator implements TezRawKeyValueIterator {
     @Override
-    public DataInputBuffer getKey() throws IOException {
+    public TezRawDataBuffer getKey() throws IOException {
       throw new RuntimeException("No keys on an empty iterator");
     }
 
     @Override
-    public DataInputBuffer getValue() throws IOException {
+    public TezRawDataBuffer getValue() throws IOException {
       throw new RuntimeException("No values on an empty iterator");
     }
 

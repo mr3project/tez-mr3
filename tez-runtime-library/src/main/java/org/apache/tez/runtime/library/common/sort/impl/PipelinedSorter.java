@@ -47,7 +47,6 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.counters.TaskCounter;
 import org.apache.tez.common.counters.TezCounter;
@@ -73,7 +72,7 @@ import static org.apache.tez.runtime.library.common.sort.impl.TezSpillRecord.ens
 
 @SuppressWarnings({"unchecked", "rawtypes"})
 public final class PipelinedSorter {
-  
+
   private static final Logger LOG = LoggerFactory.getLogger(PipelinedSorter.class);
   private static final boolean isDebugEnabled = LOG.isDebugEnabled();
 
@@ -555,7 +554,7 @@ public final class PipelinedSorter {
     int valend = -1;
     try {
       span.kvbuffer.put(key.getBytesRaw(), key.getOffset(), key.getLength());
-      valstart = span.kvbuffer.position();      
+      valstart = span.kvbuffer.position();
       span.kvbuffer.put(value.getBytesRaw(), value.getOffset(), value.getLength());
       valend = span.kvbuffer.position();
     } catch (BufferOverflowException overflow) {
@@ -1209,8 +1208,8 @@ public final class PipelinedSorter {
   }
 
 
-  private static final class InputByteBuffer extends DataInputBuffer {
-    private byte[] buffer = new byte[256]; 
+  private static final class InputByteBuffer extends TezRawDataBuffer {
+    private byte[] buffer = new byte[256];
     private ByteBuffer wrapped = ByteBuffer.wrap(buffer);
     private void resize(int length) {
       if (length > buffer.length || (buffer.length > 10 * (1+length))) {
@@ -1222,7 +1221,7 @@ public final class PipelinedSorter {
     }
 
     // shallow copy
-    public void reset(DataInputBuffer clone) {
+    public void reset(TezRawDataBuffer clone) {
       byte[] data = clone.getData();
       int start = clone.getPosition();
       int length = clone.getLength() - start;
@@ -1231,7 +1230,7 @@ public final class PipelinedSorter {
 
     // deep copy
     @SuppressWarnings("unused")
-    public void copy(DataInputBuffer clone) {
+    public void copy(TezRawDataBuffer clone) {
       byte[] data = clone.getData();
       int start = clone.getPosition();
       int length = clone.getLength() - start;
@@ -1500,7 +1499,7 @@ public final class PipelinedSorter {
           kvmetaArray, offsetForIntIndex(kvi + PARTITION));
       final int kvjp = FastByteComparisons.theUnsafe.getInt(
           kvmetaArray, offsetForIntIndex(kvj + PARTITION));
-      // sort by partition      
+      // sort by partition
       if (kvip != kvjp) {
         return kvip - kvjp;
       }
@@ -1563,7 +1562,7 @@ public final class PipelinedSorter {
       return remaining;
     }
 
-    private int compareInternal(final DataInputBuffer needle, final int needlePart, final int index) {
+    private int compareInternal(final TezRawDataBuffer needle, final int needlePart, final int index) {
       int cmp;
       final int partition = FastByteComparisons.theUnsafe.getInt(
           kvmetaArray, offsetForIntIndex(this.offsetFor(index) + PARTITION));
@@ -1584,11 +1583,11 @@ public final class PipelinedSorter {
       }
       return cmp;
     }
-    
+
     private long getEq() {
       return eq;
     }
-    
+
     @Override
     public String toString() {
         return String.format("Span[%d,%d]", kvmetaCapacity, kvbuffer.limit());
@@ -1619,13 +1618,13 @@ public final class PipelinedSorter {
       this.maxindex = span.length() - 1;
     }
 
-    public DataInputBuffer getKey()  {
+    public TezRawDataBuffer getKey()  {
       key.reset(kvbufferArray, kvbufferArrayOffset + keyStart, keyLength);
       return key;
     }
 
     public boolean next() {
-      // caveat: since we use this as a comparable in the merger 
+      // caveat: since we use this as a comparable in the merger
       if (kvindex == maxindex) return false;
       kvindex += 1;
       loadCurrentRecordMetadata();
@@ -1659,7 +1658,7 @@ public final class PipelinedSorter {
           other.kvbufferArray, other.kvbufferArrayOffset + other.keyStart + skip,
           other.keyLength - skip);
     }
-    
+
     @Override
     public String toString() {
       return String.format("SpanIterator<%d:%d> (span=%s)", kvindex, maxindex, span.toString());
@@ -1669,11 +1668,11 @@ public final class PipelinedSorter {
      * bisect returns the next insertion point for a given raw key, skipping keys
      * which are <= needle using a binary search instead of a linear comparison.
      * This is massively efficient when long strings of identical keys occur.
-     * @param needle 
+     * @param needle
      * @param needlePart
      * @return
      */
-    int bisect(DataInputBuffer needle, int needlePart) {
+    int bisect(TezRawDataBuffer needle, int needlePart) {
       int start = kvindex;
       int end = maxindex-1;
       int mid;
@@ -1686,8 +1685,8 @@ public final class PipelinedSorter {
       if (span.compareInternal(needle, needlePart, start) > 0) {
         return kvindex;
       }
-      
-      // bail out early if we haven't got a min run 
+
+      // bail out early if we haven't got a min run
       if (span.compareInternal(needle, needlePart, start+minrun) > 0) {
         return 0;
       }
@@ -1695,9 +1694,9 @@ public final class PipelinedSorter {
       if (span.compareInternal(needle, needlePart, end) < 0) {
         return end - kvindex;
       }
-      
+
       boolean found = false;
-      
+
       // Bound the search work: the span can be large, but this bisection is an
       // optimization only, and minrun already defines the minimum profitable run.
       for (int i = 0; start < end && i < minrun; i++) {
@@ -1707,7 +1706,7 @@ public final class PipelinedSorter {
           start = mid;
           found = true;
         } else if (cmp < 0) {
-          start = mid; 
+          start = mid;
           found = true;
         }
         if (cmp > 0) {
@@ -2011,7 +2010,7 @@ public final class PipelinedSorter {
     private SpanIterator horse;
     private long total = 0;
     private long eq = 0;
-    
+
     public SpanMerger() {
       // SpanIterators are comparable
       partIter = new PartitionFilter(this);
@@ -2087,7 +2086,7 @@ public final class PipelinedSorter {
       horse = current;
       return current;
     }
-    
+
     public boolean needsRLE() {
       return (eq > 0.1 * total);
     }

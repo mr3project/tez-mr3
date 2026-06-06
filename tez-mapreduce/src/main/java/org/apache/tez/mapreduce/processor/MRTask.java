@@ -75,6 +75,7 @@ import org.apache.tez.runtime.api.AbstractLogicalIOProcessor;
 import org.apache.tez.runtime.api.LogicalOutput;
 import org.apache.tez.runtime.api.ProcessorContext;
 import org.apache.tez.runtime.library.common.Constants;
+import org.apache.tez.runtime.library.common.sort.impl.TezRawDataBuffer;
 import org.apache.tez.runtime.library.common.sort.impl.TezRawKeyValueIterator;
 
 public abstract class MRTask extends AbstractLogicalIOProcessor {
@@ -90,7 +91,7 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
   protected ProcessorContext processorContext;
   protected TaskAttemptID taskAttemptId;
   protected SecretKey jobTokenSecret;
-  
+
   LogicalOutput output;
 
   boolean isMap;
@@ -432,6 +433,8 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
     RawKeyValueIterator r =
         new RawKeyValueIterator() {
           private final Progress progress = new Progress();
+          private final DataInputBuffer keyBuffer = new DataInputBuffer();
+          private final DataInputBuffer valueBuffer = new DataInputBuffer();
           private boolean done = false;
 
           @Override
@@ -444,7 +447,8 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
 
           @Override
           public DataInputBuffer getValue() throws IOException {
-            return rIter.getValue();
+            resetDataInputBuffer(valueBuffer, rIter.getValue());
+            return valueBuffer;
           }
 
           @Override
@@ -455,12 +459,17 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
 
           @Override
           public DataInputBuffer getKey() throws IOException {
-            return rIter.getKey();
+            resetDataInputBuffer(keyBuffer, rIter.getKey());
+            return keyBuffer;
           }
 
           @Override
           public void close() throws IOException {
             rIter.close();
+          }
+
+          private void resetDataInputBuffer(DataInputBuffer target, TezRawDataBuffer source) {
+            target.reset(source.getData(), source.getPosition(), source.getRemaining());
           }
         };
     org.apache.hadoop.mapreduce.ReduceContext<INKEY, INVALUE, OUTKEY, OUTVALUE>
@@ -508,13 +517,13 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
     jobConf.setInt(JobContext.TASK_PARTITION,
         taskAttemptId.getTaskID().getId());
     jobConf.set(JobContext.ID, taskAttemptId.getJobID().toString());
-    
+
     jobConf.setBoolean(MRJobConfig.TASK_ISMAP, isMap);
-    
+
     Path outputPath = FileOutputFormat.getOutputPath(jobConf);
     if (outputPath != null) {
       if ((committer instanceof FileOutputCommitter)) {
-        FileOutputFormat.setWorkOutputPath(jobConf, 
+        FileOutputFormat.setWorkOutputPath(jobConf,
           ((FileOutputCommitter)committer).getTaskAttemptPath(taskAttemptContext));
       } else {
         FileOutputFormat.setWorkOutputPath(jobConf, outputPath);

@@ -19,11 +19,10 @@ package org.apache.tez.runtime.library.common.sort.impl;
 
 import java.io.IOException;
 
-import org.apache.hadoop.io.DataInputBuffer;
 
 /**
  * <code>TezRawKeyValueIterator</code> is an iterator used to iterate over
- * the raw keys and values during sort/merge of intermediate data. 
+ * the raw keys and values during sort/merge of intermediate data.
  */
 public interface TezRawKeyValueIterator {
 
@@ -39,23 +38,23 @@ public interface TezRawKeyValueIterator {
   // This provenance invariant does not by itself imply that the returned backing arrays are stable/immutable.
   // Segment/source-specific stability must be reported separately.
 
-  /** 
+  /**
    * Gets the current raw key.
-   * 
-   * @return Gets the current raw key as a DataInputBuffer
+   *
+   * @return Gets the current raw key as a TezRawDataBuffer
    * @throws IOException
    */
-  DataInputBuffer getKey() throws IOException;
-  
-  /** 
+  TezRawDataBuffer getKey() throws IOException;
+
+  /**
    * Gets the current raw value.
-   * 
-   * @return Gets the current raw value as a DataInputBuffer 
+   *
+   * @return Gets the current raw value as a TezRawDataBuffer
    * @throws IOException
    */
-  DataInputBuffer getValue() throws IOException;
-  
-  /** 
+  TezRawDataBuffer getValue() throws IOException;
+
+  /**
    * Sets up the current key and value (for getKey and getValue).
    *
    * The returned stability code describes backing-array stability for both the
@@ -84,13 +83,13 @@ public interface TezRawKeyValueIterator {
    */
   boolean hasNext() throws IOException;
 
-  /** 
+  /**
    * Closes the iterator so that the underlying streams can be closed.
-   * 
+   *
    * @throws IOException
    */
   void close() throws IOException;
-  
+
   /**
    * Whether the current key is same as the previous key
    *

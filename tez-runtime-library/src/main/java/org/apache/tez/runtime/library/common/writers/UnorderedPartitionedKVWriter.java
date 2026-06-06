@@ -56,7 +56,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.BytesWritable;
-import org.apache.hadoop.io.DataInputBuffer;
+import org.apache.tez.runtime.library.common.sort.impl.TezRawDataBuffer;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.compress.CodecPool;
 import org.apache.hadoop.io.compress.CompressionCodec;
@@ -825,8 +825,8 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
               spillNumber, spillPathDetails.outputFilePath.toString(), canUseBuffers);
         }
 
-        DataInputBuffer key = new DataInputBuffer();
-        DataInputBuffer val = new DataInputBuffer();
+        TezRawDataBuffer key = new TezRawDataBuffer();
+        TezRawDataBuffer val = new TezRawDataBuffer();
         byte[] writeBuffer = IFile.allocateWriteBuffer();
 
         for (int i = 0; i < numPartitions; i++) {
@@ -899,7 +899,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
   }
 
   private long writePartition(int pos, WrappedBuffer wrappedBuffer, WriterDataInputBuffer writer,
-      DataInputBuffer keyBuffer, DataInputBuffer valBuffer) throws IOException {
+      TezRawDataBuffer keyBuffer, TezRawDataBuffer valBuffer) throws IOException {
     long numRecords = 0;
     while (pos != WrappedBuffer.PARTITION_ABSENT_POSITION) {
       int metaIndex = pos / INT_SIZE;
@@ -1338,11 +1338,11 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     final Map<Integer, TezOffsetRecord> spillOffsetRecordMap =
         (compositeFetch && !isFinalMergeRleEnabled) ? new HashMap<>() : null;
 
-    DataInputBuffer keyBuffer = new DataInputBuffer();
-    DataInputBuffer valBuffer = new DataInputBuffer();
+    TezRawDataBuffer keyBuffer = new TezRawDataBuffer();
+    TezRawDataBuffer valBuffer = new TezRawDataBuffer();
 
-    DataInputBuffer keyBufferIFile = new DataInputBuffer();
-    DataInputBuffer valBufferIFile = new DataInputBuffer();
+    TezRawDataBuffer keyBufferIFile = new TezRawDataBuffer();
+    TezRawDataBuffer valBufferIFile = new TezRawDataBuffer();
 
     MultiByteArrayOutputStream byteArrayOutput = null;
     if (useFreeMemoryWriterOutput) {
