@@ -37,8 +37,6 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.DataInputBuffer;
-import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.tez.runtime.library.utils.CodecUtils;
 import org.apache.tez.util.FastByteComparisons;
 import org.apache.hadoop.io.IOUtils;
@@ -70,11 +68,10 @@ public class IFile {
   public static final byte FLAG_RLE_ENABLED = 0x02;
 
   // REPEAT_KEY is primarily an ordered-path optimization, and never used for unordered output.
-  public static final DataInputBuffer REPEAT_KEY = new DataInputBuffer();
+  public static final RawDataBuffer REPEAT_KEY = new RawDataBuffer();
   public static final byte[] HEADER = new byte[] { (byte) 'T', (byte) 'I', (byte) 'F', (byte) 0};
 
   private static final String INCOMPLETE_READ = "Requested to read %d got %d";
-  private static final String REQ_BUFFER_SIZE_TOO_LARGE = "Size of data %d is greater than the max allowed of %d";
 
   private static final ThreadLocal<Decompressor> decompressorHolder = new ThreadLocal<>();
 
@@ -103,10 +100,10 @@ public class IFile {
     boolean isRleEnabled();
 
     // call when isRleEnabled is not statically known
-    void appendNoRle(DataInputBuffer key, DataInputBuffer value) throws IOException;
-    void appendNoRleTez(DataInputBuffer key, DataInputBuffer value) throws IOException;
+    void appendNoRle(RawDataBuffer key, RawDataBuffer value) throws IOException;
+    void appendNoRleTez(RawDataBuffer key, RawDataBuffer value) throws IOException;
 
-    void appendRle(DataInputBuffer key, DataInputBuffer value, boolean keyStable) throws IOException;
+    void appendRle(RawDataBuffer key, RawDataBuffer value, boolean keyStable) throws IOException;
 
     void close() throws IOException;
   }
@@ -630,10 +627,10 @@ public class IFile {
       return isRleEnabled;
     }
 
-    public void appendNoRle(DataInputBuffer key, DataInputBuffer value) throws IOException {
+    public void appendNoRle(RawDataBuffer key, RawDataBuffer value) throws IOException {
       assert !isRleEnabled && !useMaxKeyValLen;
-      int keyLength = key.getLength() - key.getPosition();
-      int valueLength = value.getLength() - value.getPosition();
+      int keyLength = key.getLength();
+      int valueLength = value.getLength();
 
       super.writeKVPair(key.getData(), key.getPosition(), keyLength,
           value.getData(), value.getPosition(), valueLength);
@@ -647,10 +644,10 @@ public class IFile {
       ++numRecordsWritten;
     }
 
-    public void appendNoRleTez(DataInputBuffer key, DataInputBuffer value) throws IOException {
+    public void appendNoRleTez(RawDataBuffer key, RawDataBuffer value) throws IOException {
       assert !isRleEnabled && useMaxKeyValLen;
-      int keyLength = key.getLength() - key.getPosition();
-      int valueLength = value.getLength() - value.getPosition();
+      int keyLength = key.getLength();
+      int valueLength = value.getLength();
 
       if (maxKeyLen < 0 || maxValLen < 0) {
         maxKeyLen = keyLength;
@@ -684,10 +681,10 @@ public class IFile {
       ++numRecordsWritten;
     }
 
-    public void appendRle(DataInputBuffer key, DataInputBuffer value, boolean keyStable) throws IOException {
+    public void appendRle(RawDataBuffer key, RawDataBuffer value, boolean keyStable) throws IOException {
       assert isRleEnabled && !useMaxKeyValLen;
-      int keyLength = key.getLength() - key.getPosition();
-      int valueLength = value.getLength() - value.getPosition();
+      int keyLength = key.getLength();
+      int valueLength = value.getLength();
 
       if (key == REPEAT_KEY) {
         appendRepeatValue(value.getData(), value.getPosition(), valueLength);
@@ -873,15 +870,15 @@ public class IFile {
   }
 
   public interface KeyValueReaderDataInputBuffer extends KeyValueReaderBase {
-    Reader.KeyState readRawKey(DataInputBuffer key) throws IOException;
-    void nextRawValue(DataInputBuffer value) throws IOException;
+    Reader.KeyState readRawKey(RawDataBuffer key) throws IOException;
+    void nextRawValue(RawDataBuffer value) throws IOException;
 
     /**
      * Reports whether the most recently loaded current record returned through
-     * readRawKey(DataInputBuffer) and nextRawValue(DataInputBuffer)
+     * readRawKey(TezRawDataBuffer) and nextRawValue(TezRawDataBuffer)
      * has stable backing byte arrays.
      *
-     * Stable means the byte[] slices exposed through DataInputBuffer may be
+     * Stable means the byte[] slices exposed through TezRawDataBuffer may be
      * retained by the caller without being overwritten or reused by this reader.
      * The result must be safe for both the key and the value of the current
      * record, based on the invariant that current merge-based records are not
@@ -918,11 +915,10 @@ public class IFile {
 
     public enum KeyState {NO_KEY, NEW_KEY, SAME_KEY}
 
-    private static final int MAX_BUFFER_SIZE
-            = Integer.MAX_VALUE - 8;  // The maximum array size is a little less than the
-                                      // max integer value. Trying to create a larger array
-                                      // will result in an OOM exception. The exact value
-                                      // is JVM dependent so setting it to max int - 8 to be safe.
+    // The maximum array size is a little less than the max integer value.
+    // Trying to create a larger array will result in an OOM exception.
+    // The exact value is JVM dependent so setting it to max int - 8 to be safe.
+    private static final int MAX_BUFFER_SIZE = Integer.MAX_VALUE - 8;
 
     // Count records read from disk
     private long numRecordsRead = 0;
@@ -950,7 +946,7 @@ public class IFile {
     private int currentValueLength;
     private boolean eof = false;
     private int originalKeyLength;
-    private byte[] keyBytes = new byte[0];  // backing array for DataInputBuffer in readRawKey()
+    private byte[] keyBytes = new byte[0];  // backing array for TezRawDataBuffer in readRawKey()
 
     // for reporting errors
     private long bytesRead = 0;
@@ -1365,8 +1361,7 @@ public class IFile {
 
     private static byte[] createLargerArray(int currentLength) {
       if (currentLength > MAX_BUFFER_SIZE) {
-        throw new IllegalArgumentException(
-                String.format(REQ_BUFFER_SIZE_TOO_LARGE, currentLength, MAX_BUFFER_SIZE));
+        throw new IllegalArgumentException("Size of data is greater than the max allowed: " + currentLength);
       }
       int newLength;
       if (currentLength > (MAX_BUFFER_SIZE - currentLength)) {
@@ -1384,7 +1379,7 @@ public class IFile {
       return false;
     }
 
-    public KeyState readRawKey(DataInputBuffer key) throws IOException {
+    public KeyState readRawKey(RawDataBuffer key) throws IOException {
       if (isRleEnabled) {
         return readRawKeyRle(key);
       } else {
@@ -1392,7 +1387,7 @@ public class IFile {
       }
     }
 
-    private KeyState readRawKeyNoRle(DataInputBuffer key) throws IOException {
+    private KeyState readRawKeyNoRle(RawDataBuffer key) throws IOException {
       if (!positionToNextRecordNoRle()) {
         return KeyState.NO_KEY;
       }
@@ -1408,7 +1403,7 @@ public class IFile {
       return KeyState.NEW_KEY;
     }
 
-    private KeyState readRawKeyRle(DataInputBuffer key) throws IOException {
+    private KeyState readRawKeyRle(RawDataBuffer key) throws IOException {
       if (!positionToNextRecordRle()) {
         return KeyState.NO_KEY;
       }
@@ -1470,7 +1465,7 @@ public class IFile {
       return KeyState.NEW_KEY;
     }
 
-    public void nextRawValue(DataInputBuffer value) throws IOException {
+    public void nextRawValue(RawDataBuffer value) throws IOException {
       final byte[] valBytes;
       if ((value.getData().length < currentValueLength) || (value.getData() == keyBytes)) {
         valBytes = createLargerArray(currentValueLength);

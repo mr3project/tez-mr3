@@ -24,7 +24,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
-import org.apache.tez.runtime.api.DecompressorPool;
 import org.apache.tez.util.FastByteComparisons;
 import org.apache.tez.runtime.api.TaskContext;
 import org.slf4j.Logger;
@@ -36,7 +35,6 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.counters.TezCounter;
@@ -84,7 +82,7 @@ public class TezMerger {
       int nextResult;
       while ((nextResult = records.next()) != TezRawKeyValueIterator.NO_MORE_KEY_VALUE) {
         // Even if records.isSameKey() is false, the two keys may be the same.
-        DataInputBuffer key = records.isSameKey() ? IFile.REPEAT_KEY : records.getKey();
+        RawDataBuffer key = records.isSameKey() ? IFile.REPEAT_KEY : records.getKey();
         writer.appendRle(key, records.getValue(),
             nextResult == TezRawKeyValueIterator.NEXT_KEY_VALUE_STABLE);
         if (((recordCtr++) % recordsBeforeProgress) == 0) { checkProgress(); }
@@ -154,7 +152,7 @@ public class TezMerger {
 
     KeyValueBuffer getKey() { return key; }
 
-    DataInputBuffer getValue(DataInputBuffer value) throws IOException {
+    RawDataBuffer getValue(RawDataBuffer value) throws IOException {
       nextRawValue(value);
       return value;
     }
@@ -163,19 +161,19 @@ public class TezMerger {
       return reader.getLength();
     }
 
-    KeyState readRawKey(DataInputBuffer nextKey) throws IOException {
+    KeyState readRawKey(RawDataBuffer nextKey) throws IOException {
       KeyState keyState = reader.readRawKey(nextKey);
-      key.reset(nextKey.getData(), nextKey.getPosition(), nextKey.getLength() - nextKey.getPosition());
+      key.reset(nextKey.getData(), nextKey.getPosition(), nextKey.getLength());
       return keyState;
     }
 
-    boolean nextRawKey(DataInputBuffer nextKey) throws IOException {
+    boolean nextRawKey(RawDataBuffer nextKey) throws IOException {
       boolean hasNext = reader.readRawKey(nextKey) != KeyState.NO_KEY;
-      key.reset(nextKey.getData(), nextKey.getPosition(), nextKey.getLength() - nextKey.getPosition());
+      key.reset(nextKey.getData(), nextKey.getPosition(), nextKey.getLength());
       return hasNext;
     }
 
-    void nextRawValue(DataInputBuffer value) throws IOException {
+    void nextRawValue(RawDataBuffer value) throws IOException {
       reader.nextRawValue(value);
     }
 
@@ -303,10 +301,10 @@ public class TezMerger {
     // Invariant: Segment.close() is called for all Segment objects
     List<Segment> segments = new ArrayList<Segment>();
     
-    final DataInputBuffer key = new DataInputBuffer();
-    final DataInputBuffer value = new DataInputBuffer();
-    final DataInputBuffer nextKey = new DataInputBuffer();
-    final DataInputBuffer diskIFileValue = new DataInputBuffer();
+    final RawDataBuffer key = new RawDataBuffer();
+    final RawDataBuffer value = new RawDataBuffer();
+    final RawDataBuffer nextKey = new RawDataBuffer();
+    final RawDataBuffer diskIFileValue = new RawDataBuffer();
     
     Segment minSegment;
     Comparator<Segment> segmentComparator =   
@@ -345,11 +343,11 @@ public class TezMerger {
       }
     }
 
-    public DataInputBuffer getKey() throws IOException {
+    public RawDataBuffer getKey() throws IOException {
       return key;
     }
 
-    public DataInputBuffer getValue() throws IOException {
+    public RawDataBuffer getValue() throws IOException {
       return value;
     }
 
@@ -444,7 +442,8 @@ public class TezMerger {
         // we reset the "value" DIB to the byte[] in that (so we reuse the disk segment DIB
         // whenever we consider a disk segment).
         minSegment.getValue(diskIFileValue);
-        value.reset(diskIFileValue.getData(), diskIFileValue.getLength());
+        value.reset(diskIFileValue.getData(), diskIFileValue.getPosition(),
+            diskIFileValue.getLength());
       } else {
         minSegment.getValue(value);
       }
@@ -805,12 +804,12 @@ public class TezMerger {
 
   private static class EmptyIterator implements TezRawKeyValueIterator {
     @Override
-    public DataInputBuffer getKey() throws IOException {
+    public RawDataBuffer getKey() throws IOException {
       throw new RuntimeException("No keys on an empty iterator");
     }
 
     @Override
-    public DataInputBuffer getValue() throws IOException {
+    public RawDataBuffer getValue() throws IOException {
       throw new RuntimeException("No values on an empty iterator");
     }
 

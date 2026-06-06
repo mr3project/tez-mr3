@@ -26,7 +26,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.DataInputBuffer;
+import org.apache.tez.runtime.library.common.sort.impl.RawDataBuffer;
 import org.apache.hadoop.io.FileChunk;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.tez.common.counters.TaskCounter;
@@ -48,7 +48,6 @@ import org.apache.tez.runtime.library.common.sort.impl.TezRawKeyValueIterator;
 import org.apache.tez.runtime.library.common.task.local.output.TezTaskOutputFiles;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -1115,24 +1114,24 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     }
 
     @Override
-    public IFile.Reader.KeyState readRawKey(DataInputBuffer key) throws IOException {
+    public IFile.Reader.KeyState readRawKey(RawDataBuffer key) throws IOException {
       lastNextResult = kvIter.next();
       if (lastNextResult == TezRawKeyValueIterator.NO_MORE_KEY_VALUE) {
         return IFile.Reader.KeyState.NO_KEY;
       }
 
-      final DataInputBuffer kb = kvIter.getKey();
+      final RawDataBuffer kb = kvIter.getKey();
       final int kp = kb.getPosition();
-      final int klen = kb.getLength() - kp;
+      final int klen = kb.getLength();
       key.reset(kb.getData(), kp, klen);
       return kvIter.isSameKey() ? IFile.Reader.KeyState.SAME_KEY : IFile.Reader.KeyState.NEW_KEY;
     }
 
     @Override
-    public void nextRawValue(DataInputBuffer value) throws IOException {
-      final DataInputBuffer vb = kvIter.getValue();
+    public void nextRawValue(RawDataBuffer value) throws IOException {
+      final RawDataBuffer vb = kvIter.getValue();
       final int vp = vb.getPosition();
-      final int vlen = vb.getLength() - vp;
+      final int vlen = vb.getLength();
       value.reset(vb.getData(), vp, vlen);
     }
 

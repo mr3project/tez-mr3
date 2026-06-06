@@ -55,7 +55,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.BytesWritable;
-import org.apache.hadoop.io.DataInputBuffer;
+import org.apache.tez.runtime.library.common.sort.impl.RawDataBuffer;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.io.compress.Compressor;
@@ -828,8 +828,8 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
               spillNumber, spillPathDetails.outputFilePath.toString(), canUseBuffers);
         }
 
-        DataInputBuffer key = new DataInputBuffer();
-        DataInputBuffer val = new DataInputBuffer();
+        RawDataBuffer key = new RawDataBuffer();
+        RawDataBuffer val = new RawDataBuffer();
         byte[] writeBuffer = IFile.allocateWriteBuffer();
 
         for (int i = 0; i < numPartitions; i++) {
@@ -878,8 +878,6 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
             }
           }
         }
-        key.close();
-        val.close();
       } finally {
         if (compressorExternal != null) {
           outputContext.returnCompressor(codec.getCompressorType(), compressorExternal);
@@ -902,7 +900,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
   }
 
   private long writePartition(int pos, WrappedBuffer wrappedBuffer, WriterDataInputBuffer writer,
-      DataInputBuffer keyBuffer, DataInputBuffer valBuffer) throws IOException {
+                              RawDataBuffer keyBuffer, RawDataBuffer valBuffer) throws IOException {
     long numRecords = 0;
     while (pos != WrappedBuffer.PARTITION_ABSENT_POSITION) {
       int metaIndex = pos / INT_SIZE;
@@ -1344,11 +1342,11 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     final Map<Integer, TezOffsetRecord> spillOffsetRecordMap =
         (compositeFetch && !isFinalMergeRleEnabled) ? new HashMap<>() : null;
 
-    DataInputBuffer keyBuffer = new DataInputBuffer();
-    DataInputBuffer valBuffer = new DataInputBuffer();
+    RawDataBuffer keyBuffer = new RawDataBuffer();
+    RawDataBuffer valBuffer = new RawDataBuffer();
 
-    DataInputBuffer keyBufferIFile = new DataInputBuffer();
-    DataInputBuffer valBufferIFile = new DataInputBuffer();
+    RawDataBuffer keyBufferIFile = new RawDataBuffer();
+    RawDataBuffer valBufferIFile = new RawDataBuffer();
 
     MultiByteArrayOutputStream byteArrayOutput = null;
     if (useFreeMemoryWriterOutput) {
