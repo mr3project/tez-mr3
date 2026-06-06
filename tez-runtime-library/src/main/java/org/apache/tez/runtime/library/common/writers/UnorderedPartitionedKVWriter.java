@@ -875,8 +875,6 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
             }
           }
         }
-        key.close();
-        val.close();
       } finally {
         if (compressorExternal != null) {
           outputContext.returnCompressor(codec.getCompressorType(), compressorExternal);
