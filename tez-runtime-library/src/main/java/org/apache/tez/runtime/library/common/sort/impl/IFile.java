@@ -109,9 +109,7 @@ public class IFile {
     // if key != IFile.REPEAT_KEY, perform key comparison to check whether 'key' is a new key or not
     void appendRle(DataInputBuffer key, DataInputBuffer value) throws IOException;
 
-    default void appendRle(DataInputBuffer key, DataInputBuffer value, boolean keyStable) throws IOException {
-      appendRle(key, value);
-    }
+    void appendRle(DataInputBuffer key, DataInputBuffer value, boolean keyStable) throws IOException;
 
     void close() throws IOException;
   }
