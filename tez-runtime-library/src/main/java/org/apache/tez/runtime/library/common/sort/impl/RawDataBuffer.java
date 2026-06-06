@@ -20,8 +20,7 @@ package org.apache.tez.runtime.library.common.sort.impl;
 /**
  * Minimal holder for a raw byte-array slice.
  *
- * <p>The length is the exclusive end offset, matching the raw-slice semantics used by the
- * runtime-library sort and merge paths.</p>
+ * <p>The position is the start offset and the length is the number of bytes in the slice.</p>
  */
 public class RawDataBuffer {
   private static final byte[] EMPTY_BYTES = new byte[0];
@@ -50,7 +49,7 @@ public class RawDataBuffer {
   public void reset(byte[] input, int position, int length) {
     this.data = input;
     this.position = position;
-    this.length = position + length;
+    this.length = length;
   }
 
   public byte[] getData() {
@@ -63,9 +62,5 @@ public class RawDataBuffer {
 
   public int getLength() {
     return length;
-  }
-
-  public int getRemaining() {
-    return length - position;
   }
 }

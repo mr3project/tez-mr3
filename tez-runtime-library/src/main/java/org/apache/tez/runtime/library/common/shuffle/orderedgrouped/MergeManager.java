@@ -1122,7 +1122,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
       final RawDataBuffer kb = kvIter.getKey();
       final int kp = kb.getPosition();
-      final int klen = kb.getRemaining();
+      final int klen = kb.getLength();
       key.reset(kb.getData(), kp, klen);
       return kvIter.isSameKey() ? IFile.Reader.KeyState.SAME_KEY : IFile.Reader.KeyState.NEW_KEY;
     }
@@ -1131,7 +1131,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     public void nextRawValue(RawDataBuffer value) throws IOException {
       final RawDataBuffer vb = kvIter.getValue();
       final int vp = vb.getPosition();
-      final int vlen = vb.getRemaining();
+      final int vlen = vb.getLength();
       value.reset(vb.getData(), vp, vlen);
     }
 

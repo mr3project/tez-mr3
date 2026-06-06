@@ -630,8 +630,8 @@ public class IFile {
 
     public void appendNoRle(RawDataBuffer key, RawDataBuffer value) throws IOException {
       assert !isRleEnabled && !useMaxKeyValLen;
-      int keyLength = key.getRemaining();
-      int valueLength = value.getRemaining();
+      int keyLength = key.getLength();
+      int valueLength = value.getLength();
 
       super.writeKVPair(key.getData(), key.getPosition(), keyLength,
           value.getData(), value.getPosition(), valueLength);
@@ -647,8 +647,8 @@ public class IFile {
 
     public void appendNoRleTez(RawDataBuffer key, RawDataBuffer value) throws IOException {
       assert !isRleEnabled && useMaxKeyValLen;
-      int keyLength = key.getRemaining();
-      int valueLength = value.getRemaining();
+      int keyLength = key.getLength();
+      int valueLength = value.getLength();
 
       if (maxKeyLen < 0 || maxValLen < 0) {
         maxKeyLen = keyLength;
@@ -684,8 +684,8 @@ public class IFile {
 
     public void appendRle(RawDataBuffer key, RawDataBuffer value, boolean keyStable) throws IOException {
       assert isRleEnabled && !useMaxKeyValLen;
-      int keyLength = key.getRemaining();
-      int valueLength = value.getRemaining();
+      int keyLength = key.getLength();
+      int valueLength = value.getLength();
 
       if (key == REPEAT_KEY) {
         appendRepeatValue(value.getData(), value.getPosition(), valueLength);

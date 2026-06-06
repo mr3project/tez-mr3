@@ -67,8 +67,8 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
   public void appendRle(RawDataBuffer key, RawDataBuffer value, boolean keyStable) throws IOException {
     assert isRleEnabled;
     int keyPosition = key.getPosition();
-    int keyLength = key.getRemaining();
-    int valueLength = value.getRemaining();
+    int keyLength = key.getLength();
+    int valueLength = value.getLength();
 
     boolean sameKey = key == IFile.REPEAT_KEY;
     if (!sameKey) {

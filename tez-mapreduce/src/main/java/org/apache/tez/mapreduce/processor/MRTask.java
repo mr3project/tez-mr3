@@ -448,7 +448,7 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
           @Override
           public DataInputBuffer getValue() throws IOException {
             RawDataBuffer value = rIter.getValue();
-            valueBuffer.reset(value.getData(), value.getPosition(), value.getRemaining());
+            valueBuffer.reset(value.getData(), value.getPosition(), value.getLength());
             return valueBuffer;
           }
 
@@ -461,7 +461,7 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
           @Override
           public DataInputBuffer getKey() throws IOException {
             RawDataBuffer key = rIter.getKey();
-            keyBuffer.reset(key.getData(), key.getPosition(), key.getRemaining());
+            keyBuffer.reset(key.getData(), key.getPosition(), key.getLength());
             return keyBuffer;
           }
 

@@ -163,13 +163,13 @@ public class TezMerger {
 
     KeyState readRawKey(RawDataBuffer nextKey) throws IOException {
       KeyState keyState = reader.readRawKey(nextKey);
-      key.reset(nextKey.getData(), nextKey.getPosition(), nextKey.getRemaining());
+      key.reset(nextKey.getData(), nextKey.getPosition(), nextKey.getLength());
       return keyState;
     }
 
     boolean nextRawKey(RawDataBuffer nextKey) throws IOException {
       boolean hasNext = reader.readRawKey(nextKey) != KeyState.NO_KEY;
-      key.reset(nextKey.getData(), nextKey.getPosition(), nextKey.getRemaining());
+      key.reset(nextKey.getData(), nextKey.getPosition(), nextKey.getLength());
       return hasNext;
     }
 
@@ -442,7 +442,8 @@ public class TezMerger {
         // we reset the "value" DIB to the byte[] in that (so we reuse the disk segment DIB
         // whenever we consider a disk segment).
         minSegment.getValue(diskIFileValue);
-        value.reset(diskIFileValue.getData(), diskIFileValue.getLength());
+        value.reset(diskIFileValue.getData(), diskIFileValue.getPosition(),
+            diskIFileValue.getLength());
       } else {
         minSegment.getValue(value);
       }

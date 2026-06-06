@@ -194,7 +194,7 @@ public class ValuesIterator {
     }
 
     int pos = source.getPosition();
-    int length = source.getRemaining();
+    int length = source.getLength();
     if (stable) {
       target.setDirect(source.getData(), pos, length);
     } else {

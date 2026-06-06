@@ -1230,7 +1230,7 @@ public final class PipelinedSorter {
     public void reset(RawDataBuffer clone) {
       byte[] data = clone.getData();
       int start = clone.getPosition();
-      int length = clone.getRemaining();
+      int length = clone.getLength();
       super.reset(data, start, length);
     }
 
@@ -1239,7 +1239,7 @@ public final class PipelinedSorter {
     public void copy(RawDataBuffer clone) {
       byte[] data = clone.getData();
       int start = clone.getPosition();
-      int length = clone.getRemaining();
+      int length = clone.getLength();
       resize(length);
       System.arraycopy(data, start, buffer, 0, length);
       super.reset(buffer, 0, length);
@@ -1580,7 +1580,7 @@ public final class PipelinedSorter {
         final int keyStart = (int) keyValStartPair;
         final int valStart = (int) (keyValStartPair >>> Integer.SIZE);
         final int keyLength = valStart - keyStart;
-        final int needleLength = needle.getRemaining();
+        final int needleLength = needle.getLength();
         final int skip = Math.min(fullKeyPrefixBytes, Math.min(keyLength, needleLength));
         cmp = FastByteComparisons.compareTo(kvbufferArray,
             kvbufferArrayOffset + keyStart + skip, keyLength - skip,
