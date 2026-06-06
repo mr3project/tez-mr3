@@ -106,9 +106,6 @@ public class IFile {
     void appendNoRle(DataInputBuffer key, DataInputBuffer value) throws IOException;
     void appendNoRleTez(DataInputBuffer key, DataInputBuffer value) throws IOException;
 
-    // if key != IFile.REPEAT_KEY, perform key comparison to check whether 'key' is a new key or not
-    void appendRle(DataInputBuffer key, DataInputBuffer value) throws IOException;
-
     void appendRle(DataInputBuffer key, DataInputBuffer value, boolean keyStable) throws IOException;
 
     void close() throws IOException;
@@ -121,6 +118,7 @@ public class IFile {
     void appendNoRleTez(BytesWritable key, BytesWritable value) throws IOException;
 
     // if key != IFile.REPEAT_KEY, perform key comparison to check whether 'key' is a new key or not
+    // TODO: currently unused, and does not have 'boolean keyStable'
     void appendRle(BytesWritable key, BytesWritable value) throws IOException;
 
     void close() throws IOException;
@@ -691,11 +689,6 @@ public class IFile {
       ++numRecordsWritten;
     }
 
-    public void appendRle(DataInputBuffer key, DataInputBuffer value) throws IOException {
-      appendRle(key, value, false);
-    }
-
-    @Override
     public void appendRle(DataInputBuffer key, DataInputBuffer value, boolean keyStable) throws IOException {
       assert isRleEnabled && !useMaxKeyValLen;
       int keyLength = key.getLength() - key.getPosition();
@@ -712,12 +705,7 @@ public class IFile {
     }
 
     public void appendRle(byte[] keyData, int keyOffset, int keyLength,
-                          byte[] valueData, int valueOffset, int valueLength) throws IOException {
-      appendRle(keyData, keyOffset, keyLength, valueData, valueOffset, valueLength, false);
-    }
-
-    private void appendRle(byte[] keyData, int keyOffset, int keyLength,
-                           byte[] valueData, int valueOffset, int valueLength, boolean keyStable)
+                          byte[] valueData, int valueOffset, int valueLength, boolean keyStable)
         throws IOException {
       assert isRleEnabled && !useMaxKeyValLen;
       boolean sameKey = keyLength != 0 && FastByteComparisons.compareEqual(

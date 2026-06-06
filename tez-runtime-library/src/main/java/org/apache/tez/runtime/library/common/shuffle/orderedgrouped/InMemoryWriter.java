@@ -63,10 +63,6 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
     assert false;
   }
 
-  public void appendRle(DataInputBuffer key, DataInputBuffer value) throws IOException {
-    appendRle(key, value, false);
-  }
-
   @Override
   public void appendRle(DataInputBuffer key, DataInputBuffer value, boolean keyStable) throws IOException {
     assert isRleEnabled;

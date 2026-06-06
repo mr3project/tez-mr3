@@ -2144,7 +2144,7 @@ public final class PipelinedSorter {
     private void appendCurrentTo(WriterDataInputBuffer writer) throws IOException {
       if (writer.isRleEnabled()) {
         writer.appendRle(currentKeyData, currentKeyOffset, currentKeyLength,
-            currentValueData, currentValueOffset, currentValueLength);
+            currentValueData, currentValueOffset, currentValueLength, true);
       } else {
         writer.appendNoRle(currentKeyData, currentKeyOffset, currentKeyLength,
             currentValueData, currentValueOffset, currentValueLength);
