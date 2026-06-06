@@ -47,7 +47,6 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.counters.TaskCounter;
 import org.apache.tez.common.counters.TezCounter;
@@ -63,7 +62,7 @@ import org.apache.tez.runtime.library.common.serializer.SerializationContext;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterBytesWritable;
-import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterDataInputBuffer;
+import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterRawDataBuffer;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger.DiskSegment;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger.Segment;
 import org.apache.tez.runtime.library.common.TezRuntimeUtils;
@@ -748,13 +747,13 @@ public final class PipelinedSorter {
         PartitionFilter kvIter = merger.filter(i);
         // write merged output to disk
         long segmentStart = fsOutput.getPos();
-        WriterDataInputBuffer writer = null;
+        WriterRawDataBuffer writer = null;
         boolean hasNext = kvIter.hasNext();
         if (hasNext || !sendEmptyPartitionDetails) {
           if (codec != null && compressorExternal == null) {
             compressorExternal = outputContext.getCompressor(codec);
           }
-          writer = new WriterDataInputBuffer(
+          writer = new WriterRawDataBuffer(
               fsOutput,
               codec, spilledRecordsCounter, null, false, isRleEnabled,
               -1, -1,
@@ -846,7 +845,7 @@ public final class PipelinedSorter {
     InputStream input = byteArrayOutput.createInputStreamFrom(
         indexRecord.getStartOffset(), indexRecord.getPartLength());
 
-    IFile.KeyValueReaderDataInputBuffer reader = new IFile.Reader(input, indexRecord.getPartLength(),
+    IFile.KeyValueReaderRawDataBuffer reader = new IFile.Reader(input, indexRecord.getPartLength(),
         codec, null, null, ifileReadAhead, ifileReadAheadLength, outputContext, null);
     // This spill output (byteArrayOutput) can be consumed for multiple partitions during the final merge.
     // Keep it alive across partition segments and clean once all partitions are merged in cleanSpillOutputBuffers().
@@ -1048,9 +1047,9 @@ public final class PipelinedSorter {
           long segmentStart = finalOut.getPos();
           long rawLength = 0;
           long partLength = 0;
-          WriterDataInputBuffer writer = null;
+          WriterRawDataBuffer writer = null;
           if (shouldWrite) {
-            writer = new WriterDataInputBuffer(
+            writer = new WriterRawDataBuffer(
                 finalOut,
                 codec, spilledRecordsCounter, null, false, isFinalMergeRleEnabled,
                 -1, -1,
@@ -1215,7 +1214,7 @@ public final class PipelinedSorter {
   }
 
 
-  private static final class InputByteBuffer extends DataInputBuffer {
+  private static final class InputByteBuffer extends TezRawDataBuffer {
     private byte[] buffer = new byte[256]; 
     private ByteBuffer wrapped = ByteBuffer.wrap(buffer);
     private void resize(int length) {
@@ -1228,19 +1227,19 @@ public final class PipelinedSorter {
     }
 
     // shallow copy
-    public void reset(DataInputBuffer clone) {
+    public void reset(TezRawDataBuffer clone) {
       byte[] data = clone.getData();
       int start = clone.getPosition();
-      int length = clone.getLength() - start;
+      int length = clone.getRemaining();
       super.reset(data, start, length);
     }
 
     // deep copy
     @SuppressWarnings("unused")
-    public void copy(DataInputBuffer clone) {
+    public void copy(TezRawDataBuffer clone) {
       byte[] data = clone.getData();
       int start = clone.getPosition();
-      int length = clone.getLength() - start;
+      int length = clone.getRemaining();
       resize(length);
       System.arraycopy(data, start, buffer, 0, length);
       super.reset(buffer, 0, length);
@@ -1569,7 +1568,7 @@ public final class PipelinedSorter {
       return remaining;
     }
 
-    private int compareInternal(final DataInputBuffer needle, final int needlePart, final int index) {
+    private int compareInternal(final TezRawDataBuffer needle, final int needlePart, final int index) {
       int cmp;
       final int partition = FastByteComparisons.theUnsafe.getInt(
           kvmetaArray, offsetForIntIndex(this.offsetFor(index) + PARTITION));
@@ -1581,7 +1580,7 @@ public final class PipelinedSorter {
         final int keyStart = (int) keyValStartPair;
         final int valStart = (int) (keyValStartPair >>> Integer.SIZE);
         final int keyLength = valStart - keyStart;
-        final int needleLength = needle.getLength() - needle.getPosition();
+        final int needleLength = needle.getRemaining();
         final int skip = Math.min(fullKeyPrefixBytes, Math.min(keyLength, needleLength));
         cmp = FastByteComparisons.compareTo(kvbufferArray,
             kvbufferArrayOffset + keyStart + skip, keyLength - skip,
@@ -1625,7 +1624,7 @@ public final class PipelinedSorter {
       this.maxindex = span.length() - 1;
     }
 
-    public DataInputBuffer getKey()  {
+    public TezRawDataBuffer getKey()  {
       key.reset(kvbufferArray, kvbufferArrayOffset + keyStart, keyLength);
       return key;
     }
@@ -1679,7 +1678,7 @@ public final class PipelinedSorter {
      * @param needlePart
      * @return
      */
-    int bisect(DataInputBuffer needle, int needlePart) {
+    int bisect(TezRawDataBuffer needle, int needlePart) {
       int start = kvindex;
       int end = maxindex-1;
       int mid;
@@ -1752,7 +1751,7 @@ public final class PipelinedSorter {
       this.iter = iter;
     }
 
-    public void appendCurrentTo(WriterDataInputBuffer writer) throws IOException {
+    public void appendCurrentTo(WriterRawDataBuffer writer) throws IOException {
       iter.appendCurrentTo(writer);
     }
 
@@ -2147,7 +2146,7 @@ public final class PipelinedSorter {
       currentValueLength = current.valueLength;
     }
 
-    private void appendCurrentTo(WriterDataInputBuffer writer) throws IOException {
+    private void appendCurrentTo(WriterRawDataBuffer writer) throws IOException {
       if (writer.isRleEnabled()) {
         writer.appendRle(currentKeyData, currentKeyOffset, currentKeyLength,
             currentValueData, currentValueOffset, currentValueLength, true);

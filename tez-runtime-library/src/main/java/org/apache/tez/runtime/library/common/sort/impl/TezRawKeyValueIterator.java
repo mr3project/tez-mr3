@@ -19,8 +19,6 @@ package org.apache.tez.runtime.library.common.sort.impl;
 
 import java.io.IOException;
 
-import org.apache.hadoop.io.DataInputBuffer;
-
 /**
  * <code>TezRawKeyValueIterator</code> is an iterator used to iterate over
  * the raw keys and values during sort/merge of intermediate data. 
@@ -42,18 +40,18 @@ public interface TezRawKeyValueIterator {
   /** 
    * Gets the current raw key.
    * 
-   * @return Gets the current raw key as a DataInputBuffer
+   * @return Gets the current raw key as a TezRawDataBuffer
    * @throws IOException
    */
-  DataInputBuffer getKey() throws IOException;
+  TezRawDataBuffer getKey() throws IOException;
   
   /** 
    * Gets the current raw value.
    * 
-   * @return Gets the current raw value as a DataInputBuffer 
+   * @return Gets the current raw value as a TezRawDataBuffer
    * @throws IOException
    */
-  DataInputBuffer getValue() throws IOException;
+  TezRawDataBuffer getValue() throws IOException;
   
   /** 
    * Sets up the current key and value (for getKey and getValue).

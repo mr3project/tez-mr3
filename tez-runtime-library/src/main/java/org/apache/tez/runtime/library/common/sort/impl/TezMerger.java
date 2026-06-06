@@ -36,7 +36,6 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.counters.TezCounter;
@@ -44,7 +43,7 @@ import org.apache.tez.runtime.api.MultiByteArrayOutputStream;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader.KeyState;
-import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterDataInputBuffer;
+import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterRawDataBuffer;
 
 /**
  * Merger is an utility class used by the Map and Reduce tasks for merging
@@ -74,7 +73,7 @@ public class TezMerger {
       mergeFactor, inMemSegments, tmpDir, readsCounter, writesCounter, bytesReadCounter, taskContext);
   }
 
-  public static void writeFile(TezRawKeyValueIterator records, IFile.WriterAppendDataInputBuffer writer,
+  public static void writeFile(TezRawKeyValueIterator records, IFile.WriterAppendRawDataBuffer writer,
       long recordsBeforeProgress)
       throws IOException, InterruptedException {
     boolean isRleEnabled = writer.isRleEnabled();
@@ -84,7 +83,7 @@ public class TezMerger {
       int nextResult;
       while ((nextResult = records.next()) != TezRawKeyValueIterator.NO_MORE_KEY_VALUE) {
         // Even if records.isSameKey() is false, the two keys may be the same.
-        DataInputBuffer key = records.isSameKey() ? IFile.REPEAT_KEY : records.getKey();
+        TezRawDataBuffer key = records.isSameKey() ? IFile.REPEAT_KEY : records.getKey();
         writer.appendRle(key, records.getValue(),
             nextResult == TezRawKeyValueIterator.NEXT_KEY_VALUE_STABLE);
         if (((recordCtr++) % recordsBeforeProgress) == 0) { checkProgress(); }
@@ -133,11 +132,11 @@ public class TezMerger {
 
   public static class Segment {
     static final byte[] EMPTY_BYTES = new byte[0];
-    IFile.KeyValueReaderDataInputBuffer reader;
+    IFile.KeyValueReaderRawDataBuffer reader;
     final KeyValueBuffer key = new KeyValueBuffer(EMPTY_BYTES, 0, 0);
     TezCounter mapOutputsCounter;
 
-    public Segment(IFile.KeyValueReaderDataInputBuffer reader, TezCounter mapOutputsCounter) {
+    public Segment(IFile.KeyValueReaderRawDataBuffer reader, TezCounter mapOutputsCounter) {
       this.reader = reader;
       this.mapOutputsCounter = mapOutputsCounter;
     }
@@ -154,7 +153,7 @@ public class TezMerger {
 
     KeyValueBuffer getKey() { return key; }
 
-    DataInputBuffer getValue(DataInputBuffer value) throws IOException {
+    TezRawDataBuffer getValue(TezRawDataBuffer value) throws IOException {
       nextRawValue(value);
       return value;
     }
@@ -163,19 +162,19 @@ public class TezMerger {
       return reader.getLength();
     }
 
-    KeyState readRawKey(DataInputBuffer nextKey) throws IOException {
+    KeyState readRawKey(TezRawDataBuffer nextKey) throws IOException {
       KeyState keyState = reader.readRawKey(nextKey);
-      key.reset(nextKey.getData(), nextKey.getPosition(), nextKey.getLength() - nextKey.getPosition());
+      key.reset(nextKey.getData(), nextKey.getPosition(), nextKey.getRemaining());
       return keyState;
     }
 
-    boolean nextRawKey(DataInputBuffer nextKey) throws IOException {
+    boolean nextRawKey(TezRawDataBuffer nextKey) throws IOException {
       boolean hasNext = reader.readRawKey(nextKey) != KeyState.NO_KEY;
-      key.reset(nextKey.getData(), nextKey.getPosition(), nextKey.getLength() - nextKey.getPosition());
+      key.reset(nextKey.getData(), nextKey.getPosition(), nextKey.getRemaining());
       return hasNext;
     }
 
-    void nextRawValue(DataInputBuffer value) throws IOException {
+    void nextRawValue(TezRawDataBuffer value) throws IOException {
       reader.nextRawValue(value);
     }
 
@@ -256,7 +255,7 @@ public class TezMerger {
   }
 
   public static final class InputStreamSegment extends Segment {
-    public InputStreamSegment(IFile.KeyValueReaderDataInputBuffer reader, TezCounter mapOutputsCounter) {
+    public InputStreamSegment(IFile.KeyValueReaderRawDataBuffer reader, TezCounter mapOutputsCounter) {
       super(reader, mapOutputsCounter);
     }
 
@@ -270,7 +269,7 @@ public class TezMerger {
     private final MultiByteArrayOutputStream byteArrayOutput;
     private final boolean cleanupOnClose;
 
-    IntermediateMemorySegment(IFile.KeyValueReaderDataInputBuffer reader,
+    IntermediateMemorySegment(IFile.KeyValueReaderRawDataBuffer reader,
                               MultiByteArrayOutputStream byteArrayOutput, boolean cleanupOnClose) {
       super(reader, null);
       this.byteArrayOutput = byteArrayOutput;
@@ -303,10 +302,10 @@ public class TezMerger {
     // Invariant: Segment.close() is called for all Segment objects
     List<Segment> segments = new ArrayList<Segment>();
     
-    final DataInputBuffer key = new DataInputBuffer();
-    final DataInputBuffer value = new DataInputBuffer();
-    final DataInputBuffer nextKey = new DataInputBuffer();
-    final DataInputBuffer diskIFileValue = new DataInputBuffer();
+    final TezRawDataBuffer key = new TezRawDataBuffer();
+    final TezRawDataBuffer value = new TezRawDataBuffer();
+    final TezRawDataBuffer nextKey = new TezRawDataBuffer();
+    final TezRawDataBuffer diskIFileValue = new TezRawDataBuffer();
     
     Segment minSegment;
     Comparator<Segment> segmentComparator =   
@@ -345,11 +344,11 @@ public class TezMerger {
       }
     }
 
-    public DataInputBuffer getKey() throws IOException {
+    public TezRawDataBuffer getKey() throws IOException {
       return key;
     }
 
-    public DataInputBuffer getValue() throws IOException {
+    public TezRawDataBuffer getValue() throws IOException {
       return value;
     }
 
@@ -699,14 +698,14 @@ public class TezMerger {
               && MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold);
 
           MultiByteArrayOutputStream byteArrayOutput = null;
-          IFile.WriterAppendDataInputBuffer writer;
+          IFile.WriterAppendRawDataBuffer writer;
           if (writeIntermediateToMemory) {
             byteArrayOutput = new MultiByteArrayOutputStream(fs, outputFile);
             FSDataOutputStream outputStream = new FSDataOutputStream(byteArrayOutput, null);
-            writer = new WriterDataInputBuffer(outputStream, codec, writesCounter, null,
+            writer = new WriterRawDataBuffer(outputStream, codec, writesCounter, null,
                 false, checkForSameKeys, -1, -1, writeBuffer, null, taskContext);
           } else {
-            writer = new WriterDataInputBuffer(fs, outputFile, codec, writesCounter, null,
+            writer = new WriterRawDataBuffer(fs, outputFile, codec, writesCounter, null,
                 checkForSameKeys, writeBuffer, taskContext);
           }
 
@@ -722,7 +721,7 @@ public class TezMerger {
             tempSegment = new DiskSegment(fs, outputFile, 0, fs.getFileStatus(outputFile).getLen(), codec,
                 ifileReadAhead, ifileReadAheadLength, false, null, taskContext);
           } else {
-            IFile.KeyValueReaderDataInputBuffer reader = new Reader(
+            IFile.KeyValueReaderRawDataBuffer reader = new Reader(
                 byteArrayOutput.createInputStreamFrom(0, byteArrayOutput.getTotalBytes()),
                 byteArrayOutput.getTotalBytes(),
                 codec, null, null, ifileReadAhead, ifileReadAheadLength, taskContext);
@@ -805,12 +804,12 @@ public class TezMerger {
 
   private static class EmptyIterator implements TezRawKeyValueIterator {
     @Override
-    public DataInputBuffer getKey() throws IOException {
+    public TezRawDataBuffer getKey() throws IOException {
       throw new RuntimeException("No keys on an empty iterator");
     }
 
     @Override
-    public DataInputBuffer getValue() throws IOException {
+    public TezRawDataBuffer getValue() throws IOException {
       throw new RuntimeException("No values on an empty iterator");
     }
 

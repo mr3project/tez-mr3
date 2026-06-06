@@ -23,7 +23,7 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 import org.apache.hadoop.io.BytesWritable;
-import org.apache.hadoop.io.DataInputBuffer;
+import org.apache.tez.runtime.library.common.sort.impl.TezRawDataBuffer;
 import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.runtime.library.common.comparator.TezBytesComparator;
 import org.apache.tez.runtime.library.common.sort.impl.TezRawKeyValueIterator;
@@ -157,7 +157,7 @@ public class ValuesIterator {
     more = nextResult != TezRawKeyValueIterator.NO_MORE_KEY_VALUE;
     currentRecordStable = nextResult == TezRawKeyValueIterator.NEXT_KEY_VALUE_STABLE;
     if (more) {      
-      DataInputBuffer nextKeyBytes = in.getKey();
+      TezRawDataBuffer nextKeyBytes = in.getKey();
       if (!in.isSameKey()) {
         nextKey = copyToWritable(nextKey, nextKeyBytes, currentRecordStable);
         // hasMoreValues = is it first key or is key the same?
@@ -183,18 +183,18 @@ public class ValuesIterator {
    * @throws IOException
    */
   private void readNextValue() throws IOException {
-    DataInputBuffer nextValueBytes = in.getValue();
+    TezRawDataBuffer nextValueBytes = in.getValue();
     value = copyToWritable(value, nextValueBytes, currentRecordStable);
   }
 
-  private BytesWritable copyToWritable(BytesWritable writable, DataInputBuffer source, boolean stable) {
+  private BytesWritable copyToWritable(BytesWritable writable, TezRawDataBuffer source, boolean stable) {
     BytesWritable target = writable;
     if (target == null) {
       target = new BytesWritable();
     }
 
     int pos = source.getPosition();
-    int length = source.getLength() - pos;
+    int length = source.getRemaining();
     if (stable) {
       target.setDirect(source.getData(), pos, length);
     } else {

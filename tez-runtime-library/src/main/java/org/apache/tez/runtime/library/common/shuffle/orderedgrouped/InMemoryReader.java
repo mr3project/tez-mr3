@@ -23,7 +23,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 
 import org.apache.hadoop.io.BytesWritable;
-import org.apache.hadoop.io.DataInputBuffer;
+import org.apache.tez.runtime.library.common.sort.impl.TezRawDataBuffer;
 import org.apache.tez.runtime.api.TezOffsetRecord;
 import org.apache.tez.runtime.library.api.KeyValueReaderEdge;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
@@ -272,7 +272,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
   }
 
   @Override
-  public KeyState readRawKey(DataInputBuffer key) throws IOException {
+  public KeyState readRawKey(TezRawDataBuffer key) throws IOException {
     if (isRleEnabled) {
       return readRawKeyRle(key);
     } else {
@@ -280,7 +280,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
     }
   }
 
-  private KeyState readRawKeyNoRle(DataInputBuffer key) throws IOException {
+  private KeyState readRawKeyNoRle(TezRawDataBuffer key) throws IOException {
     if (!positionToNextRecordNoRle()) {
       return KeyState.NO_KEY;
     }
@@ -297,7 +297,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
     return KeyState.NEW_KEY;
   }
 
-  private KeyState readRawKeyRle(DataInputBuffer key) throws IOException {
+  private KeyState readRawKeyRle(TezRawDataBuffer key) throws IOException {
     if (!positionToNextRecordRle()) {
       return KeyState.NO_KEY;
     }
@@ -371,7 +371,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
   }
 
   @Override
-  public void nextRawValue(DataInputBuffer value) throws IOException {
+  public void nextRawValue(TezRawDataBuffer value) throws IOException {
     int pos = memDataIn.getPosition();
     byte[] data = memDataIn.getData();
     value.reset(data, pos, currentValueLength);

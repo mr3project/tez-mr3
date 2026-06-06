@@ -23,7 +23,6 @@ import java.io.DataOutput;
 import java.io.IOException;
 import java.io.OutputStream;
 
-import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.Writable;
 import org.apache.tez.common.ProtoConverters;
 import org.apache.tez.common.TezConverterUtils;
@@ -258,17 +257,9 @@ public class TezEvent implements Writable {
       ((TaskStatusUpdateEvent)event).readFields(in);
     } else {
       int eventBytesLen = in.readInt();
-      byte[] eventBytes;
-      CodedInputStream input;
-      int startOffset = 0;
-      if (in instanceof DataInputBuffer) {
-        eventBytes = ((DataInputBuffer)in).getData();
-        startOffset = ((DataInputBuffer) in).getPosition();
-      } else {
-        eventBytes = new byte[eventBytesLen];
-        in.readFully(eventBytes);
-      }
-      input = CodedInputStream.newInstance(eventBytes, startOffset, eventBytesLen);
+      byte[] eventBytes = new byte[eventBytesLen];
+      in.readFully(eventBytes);
+      CodedInputStream input = CodedInputStream.newInstance(eventBytes);
       switch (eventType) {
       case CUSTOM_PROCESSOR_EVENT:
         CustomProcessorEventProto cpProto =
@@ -330,13 +321,6 @@ public class TezEvent implements Writable {
         // RootInputUpdatePayload event not wrapped in a TezEvent.
         throw new TezUncheckedException("Unexpected TezEvent"
            + ", type=" + eventType);
-      }
-      if (in instanceof DataInputBuffer) {
-        // Skip so that position is updated
-        int skipped = in.skipBytes(eventBytesLen);
-        if (skipped != eventBytesLen) {
-          throw new TezUncheckedException("Expected to skip " + eventBytesLen + " bytes. Actually skipped = " + skipped);
-        }
       }
     }
   }
