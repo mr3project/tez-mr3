@@ -1260,10 +1260,14 @@ public final class PipelinedSorter {
 
     public SpanIterator sort() {
       if (length() > 1) {
-        quicksort(length());
+        radixSort(length());
       }
-      if (isDebugEnabled) { LOG.debug("{}: done sorting span={}, length={}",
-          outputContext.getDestinationVertexName(), index, length()); }
+      if (isDebugEnabled) {
+        // verify that records are sorted (for debugging)
+        checksort();
+        LOG.debug("{}: done sorting span={}, length={}",
+            outputContext.getDestinationVertexName(), index, length());
+      }
       return new SpanIterator(this);
     }
 
@@ -1320,6 +1324,107 @@ public final class PipelinedSorter {
      */
     private void quicksort(int r) {
       sortInternal(0, r, getMaxDepth(r));
+    }
+
+    private static final int RADIX_BITS = 16;   // 32 / RADIX_BITS = 2, so 2-pass radixSort
+    private static final int RADIX_SIZE = 1 << RADIX_BITS;
+    private static final int RADIX_MASK = RADIX_SIZE - 1;
+
+    private void radixSort(int r) {
+      // Cf. Experiments show that storing counts[] in a thread-local variable hurts performance.
+      final int[] counts = new int[RADIX_SIZE];
+      final byte[] scratch = new byte[r * METASIZE];
+
+      byte[] src = kvmetaArray;
+      long srcBaseOffset = kvmetaBaseOffset;
+      byte[] dst = scratch;
+      long dstBaseOffset = FastByteComparisons.BYTE_ARRAY_BASE_OFFSET;
+
+      for (int shift = 0; shift < Integer.SIZE; shift += RADIX_BITS) {
+        Arrays.fill(counts, 0);
+
+        for (int i = 0; i < r; i++) {
+          counts[getRadixDigit(src, srcBaseOffset, i, shift)]++;
+        }
+
+        int sum = 0;
+        for (int i = 0; i < RADIX_SIZE; i++) {
+          final int count = counts[i];
+          counts[i] = sum;
+          sum += count;
+        }
+
+        for (int i = 0; i < r; i++) {
+          final int bucket = getRadixDigit(src, srcBaseOffset, i, shift);
+          copyMetaRecord(src, srcBaseOffset, i, dst, dstBaseOffset, counts[bucket]++);
+        }
+
+        final byte[] tmpArray = src;
+        src = dst;
+        dst = tmpArray;
+        final long tmpBaseOffset = srcBaseOffset;
+        srcBaseOffset = dstBaseOffset;
+        dstBaseOffset = tmpBaseOffset;
+      }
+
+      // Two 16-bit passes move the sorted metadata back into kvmetaArray. Keep this
+      // copy for safety if the number of passes changes later.
+      if (src != kvmetaArray) {
+        for (int i = 0; i < r; i++) {
+          copyMetaRecord(src, srcBaseOffset, i, kvmetaArray, kvmetaBaseOffset, i);
+        }
+      }
+
+      sortEqualPrefixRuns(r);
+    }
+
+    private int getRadixDigit(byte[] metaArray, long baseOffset, int index, int shift) {
+      return ((getPrefix(metaArray, baseOffset, index) ^ Integer.MIN_VALUE) >>> shift) & RADIX_MASK;
+    }
+
+    private int getPrefix(byte[] metaArray, long baseOffset, int index) {
+      return FastByteComparisons.theUnsafe.getInt(
+          metaArray, baseOffset + ((long) offsetFor(index) + PARTITION) * Integer.BYTES);
+    }
+
+    private void copyMetaRecord(byte[] src, long srcBaseOffset, int srcIndex,
+        byte[] dst, long dstBaseOffset, int dstIndex) {
+      final long srcOffset = srcBaseOffset + (long) srcIndex * METASIZE;
+      final long dstOffset = dstBaseOffset + (long) dstIndex * METASIZE;
+      FastByteComparisons.theUnsafe.putLong(dst, dstOffset,
+          FastByteComparisons.theUnsafe.getLong(src, srcOffset));
+      FastByteComparisons.theUnsafe.putLong(dst, dstOffset + Long.BYTES,
+          FastByteComparisons.theUnsafe.getLong(src, srcOffset + Long.BYTES));
+    }
+
+    private void sortEqualPrefixRuns(int r) {
+      int p = 0;
+      while (p < r) {
+        final int prefix = getPrefix(kvmetaArray, kvmetaBaseOffset, p);
+        int q = p + 1;
+        while (q < r && getPrefix(kvmetaArray, kvmetaBaseOffset, q) == prefix) {
+          q++;
+        }
+        if (q - p > 1) {
+          sortInternal(p, q, getMaxDepth(q - p));
+        }
+        p = q;
+      }
+    }
+
+    private void checksort() {
+      final long savedEq = eq;
+      try {
+        for (int i = 1; i < length(); i++) {
+          if (compare(i - 1, i) > 0) {
+            throw new IllegalStateException(String.format(
+                "SortSpan is not sorted at index %d for destination vertex %s",
+                i, outputContext.getDestinationVertexName()));
+          }
+        }
+      } finally {
+        eq = savedEq;
+      }
     }
 
     private void sortInternal(int p, int r, int depth) {
