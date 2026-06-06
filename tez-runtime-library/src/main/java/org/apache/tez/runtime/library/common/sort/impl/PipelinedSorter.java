@@ -47,7 +47,6 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.counters.TaskCounter;
 import org.apache.tez.common.counters.TezCounter;
@@ -1215,7 +1214,7 @@ public final class PipelinedSorter {
   }
 
 
-  private static final class InputByteBuffer extends DataInputBuffer {
+  private static final class InputByteBuffer extends RawDataBuffer {
     private byte[] buffer = new byte[256]; 
     private ByteBuffer wrapped = ByteBuffer.wrap(buffer);
     private void resize(int length) {
@@ -1228,19 +1227,19 @@ public final class PipelinedSorter {
     }
 
     // shallow copy
-    public void reset(DataInputBuffer clone) {
+    public void reset(RawDataBuffer clone) {
       byte[] data = clone.getData();
       int start = clone.getPosition();
-      int length = clone.getLength() - start;
+      int length = clone.getRemaining();
       super.reset(data, start, length);
     }
 
     // deep copy
     @SuppressWarnings("unused")
-    public void copy(DataInputBuffer clone) {
+    public void copy(RawDataBuffer clone) {
       byte[] data = clone.getData();
       int start = clone.getPosition();
-      int length = clone.getLength() - start;
+      int length = clone.getRemaining();
       resize(length);
       System.arraycopy(data, start, buffer, 0, length);
       super.reset(buffer, 0, length);
@@ -1569,7 +1568,7 @@ public final class PipelinedSorter {
       return remaining;
     }
 
-    private int compareInternal(final DataInputBuffer needle, final int needlePart, final int index) {
+    private int compareInternal(final RawDataBuffer needle, final int needlePart, final int index) {
       int cmp;
       final int partition = FastByteComparisons.theUnsafe.getInt(
           kvmetaArray, offsetForIntIndex(this.offsetFor(index) + PARTITION));
@@ -1581,7 +1580,7 @@ public final class PipelinedSorter {
         final int keyStart = (int) keyValStartPair;
         final int valStart = (int) (keyValStartPair >>> Integer.SIZE);
         final int keyLength = valStart - keyStart;
-        final int needleLength = needle.getLength() - needle.getPosition();
+        final int needleLength = needle.getRemaining();
         final int skip = Math.min(fullKeyPrefixBytes, Math.min(keyLength, needleLength));
         cmp = FastByteComparisons.compareTo(kvbufferArray,
             kvbufferArrayOffset + keyStart + skip, keyLength - skip,
@@ -1625,7 +1624,7 @@ public final class PipelinedSorter {
       this.maxindex = span.length() - 1;
     }
 
-    public DataInputBuffer getKey()  {
+    public RawDataBuffer getKey()  {
       key.reset(kvbufferArray, kvbufferArrayOffset + keyStart, keyLength);
       return key;
     }
@@ -1679,7 +1678,7 @@ public final class PipelinedSorter {
      * @param needlePart
      * @return
      */
-    int bisect(DataInputBuffer needle, int needlePart) {
+    int bisect(RawDataBuffer needle, int needlePart) {
       int start = kvindex;
       int end = maxindex-1;
       int mid;

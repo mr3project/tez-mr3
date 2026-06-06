@@ -20,7 +20,7 @@ package org.apache.tez.runtime.library.input;
 
 import java.io.IOException;
 
-import org.apache.hadoop.io.DataInputBuffer;
+import org.apache.tez.runtime.library.common.sort.impl.RawDataBuffer;
 import org.apache.tez.dag.api.TezException;
 import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.library.common.sort.impl.TezRawKeyValueIterator;
@@ -37,12 +37,12 @@ public class OrderedGroupedInputLegacy extends OrderedGroupedKVInput {
       if (getNumPhysicalInputs() == 0) {
         return new TezRawKeyValueIterator() {
           @Override
-          public DataInputBuffer getKey() throws IOException {
+          public RawDataBuffer getKey() throws IOException {
             throw new RuntimeException("No data available in Input");
           }
 
           @Override
-          public DataInputBuffer getValue() throws IOException {
+          public RawDataBuffer getValue() throws IOException {
             throw new RuntimeException("No data available in Input");
           }
 

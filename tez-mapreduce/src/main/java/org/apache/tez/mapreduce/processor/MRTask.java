@@ -75,6 +75,7 @@ import org.apache.tez.runtime.api.AbstractLogicalIOProcessor;
 import org.apache.tez.runtime.api.LogicalOutput;
 import org.apache.tez.runtime.api.ProcessorContext;
 import org.apache.tez.runtime.library.common.Constants;
+import org.apache.tez.runtime.library.common.sort.impl.RawDataBuffer;
 import org.apache.tez.runtime.library.common.sort.impl.TezRawKeyValueIterator;
 
 public abstract class MRTask extends AbstractLogicalIOProcessor {
@@ -432,6 +433,8 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
     RawKeyValueIterator r =
         new RawKeyValueIterator() {
           private final Progress progress = new Progress();
+          private final DataInputBuffer keyBuffer = new DataInputBuffer();
+          private final DataInputBuffer valueBuffer = new DataInputBuffer();
           private boolean done = false;
 
           @Override
@@ -444,7 +447,9 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
 
           @Override
           public DataInputBuffer getValue() throws IOException {
-            return rIter.getValue();
+            RawDataBuffer value = rIter.getValue();
+            valueBuffer.reset(value.getData(), value.getPosition(), value.getRemaining());
+            return valueBuffer;
           }
 
           @Override
@@ -455,7 +460,9 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
 
           @Override
           public DataInputBuffer getKey() throws IOException {
-            return rIter.getKey();
+            RawDataBuffer key = rIter.getKey();
+            keyBuffer.reset(key.getData(), key.getPosition(), key.getRemaining());
+            return keyBuffer;
           }
 
           @Override
