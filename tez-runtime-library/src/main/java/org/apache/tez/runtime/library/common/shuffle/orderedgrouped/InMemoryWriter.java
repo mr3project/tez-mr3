@@ -20,11 +20,9 @@ package org.apache.tez.runtime.library.common.shuffle.orderedgrouped;
 import java.io.IOException;
 import java.util.zip.CRC32;
 
-import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.apache.tez.runtime.library.common.sort.impl.IFileOutputStream;
-import org.apache.tez.runtime.library.utils.BufferUtils;
 import org.apache.tez.util.FastByteComparisons;
 
 public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
@@ -33,8 +31,11 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
   private final CRC32 checksum = new CRC32();
   private int pos;
 
-  private DataInputBuffer prevKey = null;
-  private final DataOutputBuffer previous = new DataOutputBuffer();
+  private byte[] previousKeyData = new byte[0];
+  private int previousKeyOffset = 0;
+  private int previousKeyLength = 0;
+  private byte[] previousKeyCopy = new byte[0];
+  private boolean previousWasRepeat = false;
 
   // InMemoryWriter is used only in MergeManager.IntermediateMemoryToMemoryMerger with isRleEnabled = true.
   private final boolean isRleEnabled = true;
@@ -63,30 +64,37 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
   }
 
   public void appendRle(DataInputBuffer key, DataInputBuffer value) throws IOException {
+    appendRle(key, value, false);
+  }
+
+  @Override
+  public void appendRle(DataInputBuffer key, DataInputBuffer value, boolean keyStable) throws IOException {
     assert isRleEnabled;
-    int keyLength = key.getLength() - key.getPosition();
+    int keyPosition = key.getPosition();
+    int keyLength = key.getLength() - keyPosition;
     int valueLength = value.getLength() - value.getPosition();
 
     boolean sameKey = key == IFile.REPEAT_KEY;
     if (!sameKey) {
-      sameKey = (keyLength != 0) && BufferUtils.compareEqual(previous, key);
+      sameKey = (keyLength != 0) && FastByteComparisons.compareEqual(
+          previousKeyData, previousKeyOffset, previousKeyLength, key.getData(), keyPosition, keyLength);
     }
 
     if (!sameKey) {
       // Normal key-value pair
       // Write V_END_MARKER if needed (if previous was a REPEAT_KEY)
-      if (prevKey == IFile.REPEAT_KEY) {
+      if (previousWasRepeat) {
         writeInt(IFile.V_END_MARKER);
       }
 
       long combined = ((long) valueLength << 32) | (keyLength & 0xFFFFFFFFL);
       writeLong(combined);
-      writeBytes(key.getData(), key.getPosition(), keyLength);
+      writeBytes(key.getData(), keyPosition, keyLength);
       writeBytes(value.getData(), value.getPosition(), valueLength);
-      BufferUtils.copy(key, previous);
+      populatePreviousKey(key.getData(), keyPosition, keyLength, keyStable);
     } else {
       // Repeated key
-      if (prevKey != IFile.REPEAT_KEY) {
+      if (!previousWasRepeat) {
         // First repeated key, write RLE marker
         writeInt(IFile.RLE_MARKER);
       }
@@ -96,7 +104,23 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
       writeBytes(value.getData(), value.getPosition(), valueLength);
     }
 
-    prevKey = sameKey ? IFile.REPEAT_KEY : key;
+    previousWasRepeat = sameKey;
+  }
+
+  private void populatePreviousKey(byte[] keyData, int keyOffset, int keyLength, boolean keyStable) {
+    if (keyStable) {
+      previousKeyData = keyData;
+      previousKeyOffset = keyOffset;
+      previousKeyLength = keyLength;
+    } else {
+      if (previousKeyCopy.length < keyLength) {
+        previousKeyCopy = new byte[keyLength];
+      }
+      System.arraycopy(keyData, keyOffset, previousKeyCopy, 0, keyLength);
+      previousKeyData = previousKeyCopy;
+      previousKeyOffset = 0;
+      previousKeyLength = keyLength;
+    }
   }
 
   public void close() throws IOException {
@@ -112,7 +136,7 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
 
   private void closeRle() throws IOException {
     // Write V_END_MARKER if needed
-    if (prevKey == IFile.REPEAT_KEY) {
+    if (previousWasRepeat) {
       writeInt(IFile.V_END_MARKER);
     }
   }
