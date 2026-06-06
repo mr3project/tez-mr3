@@ -629,7 +629,7 @@ public final class PipelinedSorter {
           if (!sendEmptyPartitionDetails || (i == partition)) {
             writer = new WriterBytesWritable(out,
                 codec, spilledRecordsCounter, null,
-                false, false,
+                false,
                 -1, -1,
                 writeBuffer, null, outputContext);
           }

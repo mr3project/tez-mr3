@@ -386,7 +386,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       byte[] writeBuffer = IFile.allocateWriteBuffer();
       finalOutPath = outputFileHandler.getOutputFileForWrite();
       writer = new IFile.WriterBytesWritable(rfs, finalOutPath,
-          codec, outputRecordsCounter, outputRecordBytesCounter, compositeFetch, false, -1, -1,
+          codec, outputRecordsCounter, outputRecordBytesCounter, compositeFetch, -1, -1,
           writeBuffer, outputContext);
       ensureSpillFilePermissions(finalOutPath, rfs, rfsSpillFilePerms);
     } else {
@@ -1590,7 +1590,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
           WriterBytesWritable writer = null;
           try {
             writer = new IFile.WriterBytesWritable(out, codec, null, null,
-                compositeFetch, false,
+                compositeFetch,
                 maxKeyLen, maxValLen,
                 IFile.allocateWriteBufferSingle(), null, outputContext);
             if (compositeFetch) {
