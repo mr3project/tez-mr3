@@ -31,6 +31,8 @@ import org.apache.tez.http.HttpConnection;
 import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.http.SSLFactory;
 import org.apache.tez.runtime.library.common.security.SecureShuffleUtils;
+import org.apache.tez.runtime.library.partitioner.HashPartitioner;
+import org.apache.tez.runtime.library.partitioner.ValueHashPartitioner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -49,34 +51,28 @@ public class TezRuntimeUtils {
 
   @SuppressWarnings("unchecked")
   public static Partitioner instantiatePartitioner(Configuration conf) throws IOException {
+    String className = conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_PARTITIONER_CLASS);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Using partitioner class: " + className);
+    }
+    if (HashPartitioner.class.getName().equals(className)) {
+      return new HashPartitioner();
+    } else if (ValueHashPartitioner.class.getName().equals(className)) {
+      return new ValueHashPartitioner();
+    }
+
     Class<? extends Partitioner> clazz;
     try {
-      clazz = (Class<? extends Partitioner>) conf.getClassByName(
-          conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_PARTITIONER_CLASS));
+      clazz = (Class<? extends Partitioner>) conf.getClassByName(className);
     } catch (ClassNotFoundException e) {
-      throw new IOException("Unable to find Partitioner class specified in config : "
-          + conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_PARTITIONER_CLASS), e);
+      throw new IOException("Unable to find Partitioner class specified in config: " + className, e);
     }
 
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Using partitioner class: " + clazz.getName());
-    }
-
-    Partitioner partitioner = null;
+    Partitioner partitioner;
     try {
       Constructor<? extends Partitioner> ctorWithConf = clazz.getConstructor();
       partitioner = ctorWithConf.newInstance();
-    } catch (SecurityException e) {
-      throw new IOException(e);
-    } catch (NoSuchMethodException e) {
-      throw new IOException(e);
-    } catch (IllegalArgumentException e) {
-      throw new IOException(e);
-    } catch (InstantiationException e) {
-      throw new IOException(e);
-    } catch (IllegalAccessException e) {
-      throw new IOException(e);
-    } catch (InvocationTargetException e) {
+    } catch (Exception e) {
       throw new IOException(e);
     }
     return partitioner;
