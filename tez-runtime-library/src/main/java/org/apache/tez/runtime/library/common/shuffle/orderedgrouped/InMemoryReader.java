@@ -322,6 +322,9 @@ public class InMemoryReader implements IFile.KeyValueReader {
   }
 
   public KeyState readRawKey(BytesWritable key) throws IOException {
+    if (isVectorBatch()) {
+      throw new IllegalStateException("Key access is unavailable for vector-batch format");
+    }
     if (isRleEnabled) {
       return readRawKeyRle(key);
     } else {
@@ -401,6 +404,42 @@ public class InMemoryReader implements IFile.KeyValueReader {
 
     bytesRead += currentValueLength;
     ++recNo;
+  }
+
+  @Override
+  public boolean isVectorBatch() {
+    return tezOffsetRecord != null && tezOffsetRecord.isVectorBatch();
+  }
+
+  @Override
+  public boolean nextRawVectorValue(BytesWritable value) throws IOException {
+    if (!isVectorBatch()) {
+      throw new IllegalStateException("Reader is not in vector-batch format");
+    }
+    try {
+      if (eof) {
+        throw new IOException(String.format("Reached EOF. Completed reading %d", bytesRead));
+      }
+      int valueLength = memDataIn.readInt();
+      bytesRead += Integer.BYTES;
+      if (valueLength == IFile.EOF_MARKER) {
+        int secondMarker = memDataIn.readInt();
+        bytesRead += Integer.BYTES;
+        if (secondMarker != IFile.EOF_MARKER) {
+          throw new IOException("Malformed vector-batch EOF marker: " + secondMarker);
+        }
+        eof = true;
+        return false;
+      }
+      if (valueLength < 0) {
+        throw new IOException("Negative vector-batch value length: " + valueLength);
+      }
+      currentValueLength = valueLength;
+      nextRawValue(value);
+      return true;
+    } catch (RuntimeException e) {
+      throw new IOException("Malformed vector-batch IFile data", e);
+    }
   }
 
   @Override

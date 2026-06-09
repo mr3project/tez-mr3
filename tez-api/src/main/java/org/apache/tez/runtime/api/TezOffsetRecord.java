@@ -21,11 +21,17 @@ package org.apache.tez.runtime.api;
  * Metadata needed to decode non-RLE Tez IFile records with variable length-prefix transitions.
  */
 public class TezOffsetRecord {
+  public static final int NO_RECORD = -1;
+  public static final int VECTOR_BATCH = -2;
   private final int maxKeyLen;
   private final int maxValLen;
   private final int firstKeyOffset;
   private final int firstValOffset;
   private final int eofPos;
+
+  public static TezOffsetRecord vectorBatch(int eofPos) {
+    return new TezOffsetRecord(VECTOR_BATCH, 0, 0, 0, eofPos);
+  }
 
   public TezOffsetRecord(
       int maxKeyLen,
@@ -40,19 +46,32 @@ public class TezOffsetRecord {
     this.eofPos = eofPos;
   }
 
+  public boolean isVectorBatch() {
+    return maxKeyLen == VECTOR_BATCH;
+  }
+
+  private void requireKeyValue() {
+    if (isVectorBatch()) {
+      throw new IllegalStateException("Key/value metadata is unavailable for vector-batch format");
+    }
+  }
+
   public int getMaxKeyLen() {
     return maxKeyLen;
   }
 
   public int getMaxValLen() {
+    requireKeyValue();
     return maxValLen;
   }
 
   public int getFirstKeyOffset() {
+    requireKeyValue();
     return firstKeyOffset;
   }
 
   public int getFirstValOffset() {
+    requireKeyValue();
     return firstValOffset;
   }
 

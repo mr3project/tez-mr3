@@ -1073,7 +1073,7 @@ public class ShuffleHandler {
           if (partLength != 0) {
             TezOffsetRecord offsetRecord = outputInfo.getTezOffsetRecord(reduce);
             contentLength += 8 + 4;  // uncompressedLength, forReduce
-            contentLength += offsetRecord != null ? 5 * 4 : 4;
+            contentLength += offsetRecord == null ? 4 : (offsetRecord.isVectorBatch() ? 2 * 4 : 5 * 4);
           }
           contentLength += partLength;
         }

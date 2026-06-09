@@ -72,6 +72,7 @@ import org.apache.tez.runtime.api.OutputContext;
 import org.apache.tez.runtime.api.TezTaskOutput;
 import org.apache.tez.runtime.api.TezOffsetRecord;
 import org.apache.tez.runtime.library.api.KeyValuesWriterEdge;
+import org.apache.tez.runtime.library.api.KeyValuesWriterEdgeVector;
 import org.apache.tez.runtime.library.api.Partitioner;
 import org.apache.tez.runtime.api.events.CompositeDataMovementEvent;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
@@ -106,7 +107,7 @@ import javax.annotation.Nullable;
 
 import static org.apache.tez.runtime.library.common.sort.impl.TezSpillRecord.ensureSpillFilePermissions;
 
-public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
+public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge implements KeyValuesWriterEdgeVector {
 
   private static final Logger LOG = LoggerFactory.getLogger(UnorderedPartitionedKVWriter.class);
   private static final boolean isDebugEnabled = LOG.isDebugEnabled();
@@ -230,6 +231,14 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       return deflater;
     }
   };
+
+  private enum LogicalMode {
+    UNDECIDED,
+    KEY_VALUE,
+    VECTOR_BATCH
+  }
+
+  private volatile LogicalMode logicalMode = LogicalMode.UNDECIDED;
 
   private enum WriterState {
     RUNNING,
@@ -525,9 +534,42 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     }
   }
 
+  @Override
+  public boolean supportsVectorBatch() {
+    return singlePartition && compositeFetch && !useCachedStream;
+  }
+
+  private void selectMode(LogicalMode requested) {
+    if (logicalMode == LogicalMode.UNDECIDED) {
+      logicalMode = requested;
+    } else if (logicalMode != requested) {
+      throw new RuntimeException("Cannot mix key/value and vector-batch records on one writer");
+    }
+  }
+
+  @Override
+  public void writeVectorBatch(BytesWritable serializedBatch) throws IOException {
+    if (!supportsVectorBatch()) {
+      throw new RuntimeException("Vector batches are unsupported by this writer configuration");
+    }
+    selectMode(LogicalMode.VECTOR_BATCH);
+    if (writerState != WriterState.RUNNING) {
+      throw new IOException("Write already closed or spill failed");
+    }
+    if (skipBuffers) {
+      if (writer.getRawLength() == 0) {
+        writer.enableVectorBatchFormat();
+      }
+      writer.appendVectorBatch(serializedBatch);
+    } else {
+      write(new BytesWritable(), serializedBatch, 0);
+    }
+  }
+
   // TODO: optimize, if this method is actually called
   @Override
   public void write(BytesWritable key, Iterable<BytesWritable> values) throws IOException {
+    selectMode(LogicalMode.KEY_VALUE);
     Iterator<BytesWritable> it = values.iterator();
     while (it.hasNext()) {
       write(key, it.next());
@@ -536,6 +578,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
 
   @Override
   public void write(BytesWritable key, BytesWritable value) throws IOException {
+    selectMode(LogicalMode.KEY_VALUE);
     // Skipping checks for key-value types.
     // IFile takes care of these, but should be removed from there as well.
 
@@ -861,6 +904,9 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
                     fsOutput, codec, null, null, compositeFetch, false,
                     maxKeyLen, maxValLen,
                     writeBuffer, compressorExternal, outputContext);
+                if (logicalMode == LogicalMode.VECTOR_BATCH) {
+                  writer.enableVectorBatchFormat();
+                }
               }
               numRecords += writeBufferedPartition(i, buffer, writer, key, val);
             }
@@ -940,7 +986,9 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       keyBuffer.reset(wrappedBuffer.buffer, pos + SINGLE_PARTITION_META_SIZE, keyLength);
       valBuffer.reset(wrappedBuffer.buffer, pos + SINGLE_PARTITION_META_SIZE + keyLength, valLength);
 
-      if (compositeFetch) {
+      if (logicalMode == LogicalMode.VECTOR_BATCH) {
+        writer.appendVectorBatch(valBuffer);
+      } else if (compositeFetch) {
         writer.appendNoRleTez(keyBuffer, valBuffer);
       } else {
         writer.appendNoRle(keyBuffer, valBuffer);
@@ -1423,6 +1471,9 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
             out, codec, null, null, compositeFetch, false,
             maxKeyLen, maxValLen,
             writeBuffer, null, outputContext);
+        if (logicalMode == LogicalMode.VECTOR_BATCH) {
+          writer.enableVectorBatchFormat();
+        }
         try {
           for (WrappedBuffer buffer : filledBuffers) {
             if (hasRecordsForPartition(i, buffer)) {
@@ -1503,13 +1554,24 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
                 // Note that reader.close() itself may throw IOException and reader.decompressor may not be returned to the pool.
                 // For the same reason, this not memory leak because reader.decompressor is eventually garbage collected.
                 try {
-                  while (reader.readRawKey(keyBufferIFile) != IFile.Reader.KeyState.NO_KEY) {
-                    // TODO Inefficient for large records, since the entire record will be read into memory.
-                    reader.nextRawValue(valBufferIFile);
-                    if (compositeFetch) {
-                      writer.appendNoRleTez(keyBufferIFile, valBufferIFile);
-                    } else {
-                      writer.appendNoRle(keyBufferIFile, valBufferIFile);
+                  boolean vectorSpill = spillOffsetRecord != null && spillOffsetRecord.isVectorBatch();
+                  if (vectorSpill != (logicalMode == LogicalMode.VECTOR_BATCH)) {
+                    throw new IOException("Spill record format does not match writer logical mode");
+                  }
+                  if (vectorSpill) {
+                    BytesWritable vectorValue = new BytesWritable();
+                    while (((IFile.KeyValueReaderBytesWritable) reader).nextRawVectorValue(vectorValue)) {
+                      writer.appendVectorBatch(new RawDataBuffer(vectorValue.getBytesRaw(),
+                          vectorValue.getOffset(), vectorValue.getLength()));
+                    }
+                  } else {
+                    while (reader.readRawKey(keyBufferIFile) != IFile.Reader.KeyState.NO_KEY) {
+                      reader.nextRawValue(valBufferIFile);
+                      if (compositeFetch) {
+                        writer.appendNoRleTez(keyBufferIFile, valBufferIFile);
+                      } else {
+                        writer.appendNoRle(keyBufferIFile, valBufferIFile);
+                      }
                     }
                   }
                 } finally {
@@ -1638,7 +1700,10 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
                 compositeFetch,
                 maxKeyLen, maxValLen,
                 IFile.allocateWriteBufferSingle(), null, outputContext);
-            if (compositeFetch) {
+            if (logicalMode == LogicalMode.VECTOR_BATCH) {
+              writer.enableVectorBatchFormat();
+              writer.appendVectorBatch(value);
+            } else if (compositeFetch) {
               writer.appendNoRleTez(key, value);
             } else {
               writer.appendNoRle(key, value);

@@ -30,13 +30,14 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.runtime.library.api.KeyValueReaderEdge;
+import org.apache.tez.runtime.library.api.KeyValueReaderEdgeVector;
 import org.apache.tez.runtime.library.common.shuffle.impl.ShuffleManager;
 import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.InMemoryReader;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.apache.tez.runtime.library.common.shuffle.FetchedInput;
 import org.apache.tez.runtime.library.common.shuffle.MemoryFetchedInput;
 
-public class UnorderedKVReader extends KeyValueReaderEdge {
+public class UnorderedKVReader extends KeyValueReaderEdge implements KeyValueReaderEdgeVector {
 
   private static final Logger LOG = LoggerFactory.getLogger(UnorderedKVReader.class);
   
@@ -56,6 +57,23 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
   private IFile.KeyValueReaderBytesWritable currentReader;
   
   private long numRecordsRead = 0;
+  private enum ReaderState {
+    INITIAL,
+    CURRENT_KEY_VALUE,
+    CURRENT_VECTOR_BATCH,
+    CONSUMING_ALL,
+    END_OF_INPUT,
+    FAILED
+  }
+
+  private enum LogicalMode {
+    UNDECIDED,
+    KEY_VALUE,
+    VECTOR_BATCH
+  }
+
+  private ReaderState state = ReaderState.INITIAL;
+  private LogicalMode logicalMode = LogicalMode.UNDECIDED;
 
   public UnorderedKVReader(ShuffleManager shuffleManager, Configuration conf,
       CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLength,
@@ -77,51 +95,134 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
    * @return true if another key/value(s) pair exists, false if there are no more.
    * @throws IOException if an error occurs
    */
-  @Override  
+  @Override
   public boolean next() throws IOException {
-    if (readNextFromCurrentReader()) {
-      inputRecordCounter.increment(1);
-      numRecordsRead++;
-      return true;
-    } else {
-      boolean nextInputExists = moveToNextInput();
-      while (nextInputExists) {
-        if (readNextFromCurrentReader()) {
-          inputRecordCounter.increment(1);
-          numRecordsRead++;
-          return true;
-        }
-        nextInputExists = moveToNextInput();
-      }
-      LOG.info("Num Records read: " + numRecordsRead);
-      completedProcessing = true;
-      return false;
+    if (state != ReaderState.INITIAL) {
+      throw new RuntimeException("next() is only valid as the initial advance operation");
     }
+    try {
+      if (advanceKeyValue()) {
+        state = ReaderState.CURRENT_KEY_VALUE;
+        return true;
+      }
+      finishInput();
+      return false;
+    } catch (IOException e) {
+      state = ReaderState.FAILED;
+      throw e;
+    }
+  }
+
+  @Override
+  public NextResult nextVectorBatchAware() throws IOException {
+    if (state == ReaderState.END_OF_INPUT) {
+      throw new IOException("Input is already exhausted");
+    }
+    if (state != ReaderState.INITIAL && state != ReaderState.CURRENT_VECTOR_BATCH) {
+      throw new RuntimeException("Invalid vector-aware advance in state " + state);
+    }
+    try {
+      while (true) {
+        if (currentReader == null && !moveToNextInput()) {
+          finishInput();
+          return NextResult.END_OF_INPUT;
+        }
+        boolean vector = currentReader.isVectorBatch();
+        boolean hasRecord;
+        if (vector) {
+          hasRecord = currentReader.nextRawVectorValue(value);
+        } else {
+          hasRecord = readNextFromCurrentReader();
+        }
+        if (!hasRecord) {
+          if (!moveToNextInput()) {
+            finishInput();
+            return NextResult.END_OF_INPUT;
+          }
+          continue;
+        }
+        LogicalMode physicalMode = vector ? LogicalMode.VECTOR_BATCH : LogicalMode.KEY_VALUE;
+        establishMode(physicalMode);
+        inputRecordCounter.increment(1);
+        numRecordsRead++;
+        state = vector ? ReaderState.CURRENT_VECTOR_BATCH : ReaderState.CURRENT_KEY_VALUE;
+        return vector ? NextResult.VECTOR_BATCH : NextResult.KEY_VALUE;
+      }
+    } catch (IOException e) {
+      state = ReaderState.FAILED;
+      throw e;
+    }
+  }
+
+  private boolean advanceKeyValue() throws IOException {
+    while (true) {
+      if (currentReader == null && !moveToNextInput()) {
+        return false;
+      }
+      if (currentReader.isVectorBatch()) {
+        throw new IOException("Vector-batch input requires nextVectorBatchAware()");
+      }
+      if (readNextFromCurrentReader()) {
+        establishMode(LogicalMode.KEY_VALUE);
+        inputRecordCounter.increment(1);
+        numRecordsRead++;
+        return true;
+      }
+      if (!moveToNextInput()) {
+        return false;
+      }
+    }
+  }
+
+  private void establishMode(LogicalMode physicalMode) throws IOException {
+    if (logicalMode == LogicalMode.UNDECIDED) {
+      logicalMode = physicalMode;
+    } else if (logicalMode != physicalMode) {
+      throw new IOException("Mixed non-empty upstream IFile record formats");
+    }
+  }
+
+  private void finishInput() {
+    LOG.info("Num Records read: {}", numRecordsRead);
+    completedProcessing = true;
+    state = ReaderState.END_OF_INPUT;
   }
 
   // The backing byte[] array of key is immutable, so the consumer may keep pointers to it.
   @Override
   public BytesWritable getCurrentKey() throws IOException {
+    if (state != ReaderState.CURRENT_KEY_VALUE) {
+      throw new RuntimeException("Current key is unavailable in state " + state);
+    }
     return key;
   }
 
   // The backing byte[] array of value is immutable, so the consumer may keep pointers to it.
   @Override
   public BytesWritable getCurrentValue() throws IOException {
+    if (state != ReaderState.CURRENT_KEY_VALUE && state != ReaderState.CURRENT_VECTOR_BATCH) {
+      throw new RuntimeException("Current value is unavailable in state " + state);
+    }
     return value;
   }
 
   @Override
   public long consumeAll(KeyValueReaderEdge.ThrowingBiConsumer<BytesWritable, BytesWritable> consumer) throws Exception {
-    assert numRecordsRead == 0L;  // must not be mixed with next()
-    while (moveToNextInput()) {
-      long currentConsumed = currentReader.consumeAll(consumer);
-      inputRecordCounter.increment(currentConsumed);
-      numRecordsRead += currentConsumed;
+    if (state != ReaderState.CURRENT_KEY_VALUE) {
+      throw new RuntimeException("consumeAll() requires one prepared key/value record");
     }
-    LOG.info("Num Records read: {}", numRecordsRead);
-    completedProcessing = true;
-    return numRecordsRead;
+    state = ReaderState.CONSUMING_ALL;
+    try {
+      consumer.accept(key, value);
+      while (advanceKeyValue()) {
+        consumer.accept(key, value);
+      }
+      finishInput();
+      return numRecordsRead;
+    } catch (Exception e) {
+      state = ReaderState.FAILED;
+      throw e;
+    }
   }
 
   public float getProgress() throws IOException, InterruptedException {
