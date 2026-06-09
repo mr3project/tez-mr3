@@ -105,9 +105,11 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput implements
     if (!isStarted.get()) {
       memoryUpdateCallbackHandler.validateUpdateReceived();
 
+      // Keep this mode in sync with PipelinedSorter. In pipelined mode the sorter returns the
+      // lastEvent=true DME; in final-merge mode this output generates the single final DME.
       isPipelinedShuffle = conf.getBoolean(
-          TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED,
-          TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT);
+          TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ORDERED_ENABLED,
+          TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ORDERED_ENABLED_DEFAULT);
       // We do not use TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT.
       isFinalMergeEnabled = !this.isPipelinedShuffle;
 
@@ -213,7 +215,6 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput implements
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_PARTITIONER_CLASS);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ORDERED_ENABLED);
-    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_FREE_MEMORY_WRITER_OUTPUT_THRESHOLD_MB);

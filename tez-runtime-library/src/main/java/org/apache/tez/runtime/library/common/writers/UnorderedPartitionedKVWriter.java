@@ -312,7 +312,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     this.destNameTrimmed = TezUtilsInternal.cleanVertexName(outputContext.getDestinationVertexName());
 
     this.isPipelinedShuffle = this.conf.getBoolean(
-        TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED,
+        TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_UNORDERED_ENABLED,
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT);
 
     this.dataViaEventsEnabled = conf.getBoolean(

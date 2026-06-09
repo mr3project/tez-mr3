@@ -77,7 +77,7 @@ public class UnorderedKVOutput extends AbstractLogicalOutput implements LogicalO
     this.memoryUpdateCallbackHandler = new MemoryUpdateCallbackHandler();
 
     boolean isPipelinedShuffle = this.conf.getBoolean(
-        TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED,
+        TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_UNORDERED_ENABLED,
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT);
     long memRequestSize = isPipelinedShuffle ?
         UnorderedPartitionedKVWriter.getInitialMemoryRequirement(
@@ -142,8 +142,7 @@ public class UnorderedKVOutput extends AbstractLogicalOutput implements LogicalO
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_ENABLED);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_MAX_SIZE);
-    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED);
-    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT);
+    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_UNORDERED_ENABLED);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_REPORT_PARTITION_STATS);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_PARTITIONED_NON_PIPELINED_NUM_BUFFERS);

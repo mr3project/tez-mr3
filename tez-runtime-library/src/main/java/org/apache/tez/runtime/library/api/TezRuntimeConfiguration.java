@@ -236,30 +236,14 @@ public class TezRuntimeConfiguration {
       TEZ_RUNTIME_PREFIX + "transfer.data-via-events.max-size";
   public static final int TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_MAX_SIZE_DEFAULT = 2048;
 
-  /**
-   * Expert level setting. Enable pipelined shuffle in ordered outputs and in unordered
-   * partitioned outputs. In ordered cases, it works with PipelinedSorter.
-   * set tez.runtime.sort.threads to greater than 1 to enable PipelinedSorter.
-   * Ensure to set tez.runtime.enable.final-merge.in.output=false.
-   * Speculative execution needs to be turned off when using this parameter. --> Not the case in MR3
-   */
   @ConfigurationProperty(type = "boolean")
-  public static final String TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED =
+  public static final String TEZ_RUNTIME_PIPELINED_SHUFFLE_UNORDERED_ENABLED =
       TEZ_RUNTIME_PREFIX + "pipelined-shuffle.enabled";
   public static final boolean TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT = false;
 
   public static final String TEZ_RUNTIME_PIPELINED_SHUFFLE_ORDERED_ENABLED =
     TEZ_RUNTIME_PREFIX + "pipelined-shuffle.ordered.enabled";
   public static final boolean TEZ_RUNTIME_PIPELINED_SHUFFLE_ORDERED_ENABLED_DEFAULT = false;
-
-  /**
-   * Expert level setting. Enable final merge in ordered (defaultsorter/pipelinedsorter) outputs.
-   * Speculative execution needs to be turned off when disabling this parameter. //TODO: TEZ-2132
-   */
-  @ConfigurationProperty(type = "boolean")
-  public static final String TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT =
-      TEZ_RUNTIME_PREFIX + "enable.final-merge.in.output";
-  public static final boolean TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT_DEFAULT = true;
 
   /**
    * Used only for internal testing. Strictly not recommended to be used elsewhere. This
@@ -452,9 +436,8 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED);
     tezRuntimeKeys.add(TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_ENABLED);
     tezRuntimeKeys.add(TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_MAX_SIZE);
-    tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED);
+    tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SHUFFLE_UNORDERED_ENABLED);
     tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SHUFFLE_ORDERED_ENABLED);
-    tezRuntimeKeys.add(TEZ_RUNTIME_ENABLE_FINAL_MERGE_IN_OUTPUT);
     tezRuntimeKeys.add(TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT);
     tezRuntimeKeys.add(TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT);
     tezRuntimeKeys.add(TEZ_RUNTIME_FREE_MEMORY_FACTOR_FOR_FETCHED_INPUT);
