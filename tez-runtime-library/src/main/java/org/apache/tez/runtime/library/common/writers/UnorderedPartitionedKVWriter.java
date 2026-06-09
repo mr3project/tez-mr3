@@ -454,7 +454,6 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     if (isDebugEnabled) {
       LOG.debug("skipBuffers=" + skipBuffers
           + ", pipelinedShuffle=" + isPipelinedShuffle
-          + ", numPartitions=" + numPartitions
           + ", reportPartitionStats=" + reportPartitionStats
           + ", dataViaEventsEnabled=" + dataViaEventsEnabled
           + ", dataViaEventsMaxSize=" + dataViaEventsMaxSize
@@ -1136,9 +1135,8 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
 
       // For pipelined case, send out an event in case finalSpill() generated a spill file.
       if (finalSpill() != null) {
-        // VertexManagerEvent is only sent at the end and thus sizePerPartition is used
-        // for the sum of all spills.
-        mayBeSendEventsForSpill(currentBuffer.recordsPerPartition,
+        // VertexManagerEvent is only sent at the end and thus sizePerPartition is used for the sum of all spills.
+        sendEventsForSpillForPipelined(currentBuffer.recordsPerPartition,
             sizePerPartition, numSpills.get() - 1, true);
       }
 
@@ -1149,7 +1147,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
   }
 
   private BitSet getEmptyPartitions(int[] recordsPerPartition) {
-    Preconditions.checkArgument(recordsPerPartition != null, "records per partition can not be null");
+    assert recordsPerPartition != null;
     BitSet emptyPartitions = new BitSet();
     for (int i = 0; i < numPartitions; i++) {
       if (recordsPerPartition[i] == 0 ) {
@@ -1260,13 +1258,13 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
         eventList.add(ShuffleUtils.generateVMEvent(outputContext,
             reportPartitionStats() ? new long[numPartitions] : null,
             reportDetailedPartitionStats(), deflater.get()));
-        if (localOutputRecordsCounter == 0 && outputLargeRecordsCounter.getValue() == 0) {
-          // Should send this event (all empty partitions) only when no records are written out.
-          BitSet emptyPartitions = new BitSet(numPartitions);
-          emptyPartitions.flip(0, numPartitions);
-          eventList.add(generateDMEvent(true, numSpills.get(), true,
-              null, emptyPartitions));
-        }
+        // A pipelined shuffle must always terminate its incremental spill-event sequence with a
+        // lastEvent DME. There may be no data in currentBuffer because all records, including large
+        // records, were already sent in earlier spills.
+        BitSet emptyPartitions = new BitSet(numPartitions);
+        emptyPartitions.flip(0, numPartitions);
+        eventList.add(generateDMEvent(true, numSpills.get(), true,
+            null, emptyPartitions));
         outputContext.sendEvents(eventList);
       }
       return null;
@@ -1305,7 +1303,6 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
         throw (ex instanceof IOException) ? (IOException)ex : new IOException(ex);
       }
     }
-
   }
 
   /**
@@ -1689,9 +1686,8 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       if (isPipelinedShuffle) {
         // This output file is directly served to downstream tasks, so increment fileOutputBytesCounter.
         fileOutputBytesCounter.increment(rfs.getFileStatus(spillPathDetails.outputFilePath).getLen());
+        sendEventsForSpillForPipelined(emptyPartitions, sizePerPartition, spillIndex, false);
       }
-
-      mayBeSendEventsForSpill(emptyPartitions, sizePerPartition, spillIndex, false);
 
       LOG.info("{}: Finished writing large record of size {} to spill file {}", destNameTrimmed, outSize, spillIndex);
       if (isDebugEnabled) {
@@ -1821,11 +1817,10 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     return (uniqueId + "_" + spillNumber);
   }
 
-  private List<Event> generateEventForSpill(BitSet emptyPartitions, long[] sizePerPartition,
-      int spillNumber,
-      boolean isFinalUpdate) throws IOException {
+  private List<Event> generateEventForSpill(
+      BitSet emptyPartitions, long[] sizePerPartition,
+      int spillNumber, boolean isFinalUpdate) throws IOException {
     List<Event> eventList = Lists.newLinkedList();
-    //Send out an event for consuming.
     String pathComponent = generatePathComponent(outputContext.getUniqueIdentifier(), spillNumber);
     if (isFinalUpdate) {
       eventList.add(ShuffleUtils.generateVMEvent(outputContext,
@@ -1837,34 +1832,29 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     return eventList;
   }
 
-  private void mayBeSendEventsForSpill(
+  private void sendEventsForSpillForPipelined(
+      int[] recordsPerPartition, long[] sizePerPartition,
+      int spillNumber, boolean isFinalUpdate) {
+    BitSet emptyPartitions = getEmptyPartitions(recordsPerPartition);
+    sendEventsForSpillForPipelined(emptyPartitions, sizePerPartition, spillNumber, isFinalUpdate);
+  }
+
+  private void sendEventsForSpillForPipelined(
       BitSet emptyPartitions, long[] sizePerPartition,
       int spillNumber, boolean isFinalUpdate) {
-    if (!isPipelinedShuffle) {
-      return;
-    }
-    List<Event> events = null;
+    assert isPipelinedShuffle;
+    List<Event> events;
     try {
-      events = generateEventForSpill(emptyPartitions, sizePerPartition, spillNumber,
-          isFinalUpdate);
+      events = generateEventForSpill(emptyPartitions, sizePerPartition, spillNumber, isFinalUpdate);
       if (isDebugEnabled) {
         LOG.debug("{}: Adding spill event for spill (final update={}), spillId={}",
             destNameTrimmed, isFinalUpdate, spillNumber);
       }
-      // Send out an event for consuming.
       outputContext.sendEvents(events);
     } catch (IOException e) {
       LOG.error(destNameTrimmed + ": Error in sending pipelined events", e);
-      outputContext.reportFailure(TaskFailureType.NON_FATAL, e,
-          "Error in sending events.");
+      outputContext.reportFailure(TaskFailureType.NON_FATAL, e, "Error in sending events.");
     }
-  }
-
-  private void mayBeSendEventsForSpill(int[] recordsPerPartition,
-      long[] sizePerPartition, int spillNumber, boolean isFinalUpdate) {
-    BitSet emptyPartitions = getEmptyPartitions(recordsPerPartition);
-    mayBeSendEventsForSpill(emptyPartitions, sizePerPartition, spillNumber,
-        isFinalUpdate);
   }
 
   private class SpillCallback implements FutureCallback<SpillResult> {
@@ -1902,7 +1892,9 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
 
       computePartitionStats(result);
 
-      mayBeSendEventsForSpill(recordsPerPartition, sizePerPartition, spillNumber, false);
+      if (isPipelinedShuffle) {
+        sendEventsForSpillForPipelined(recordsPerPartition, sizePerPartition, spillNumber, false);
+      }
 
       try {
         for (WrappedBuffer buffer : result.filledBuffers) {
