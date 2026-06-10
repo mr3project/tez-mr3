@@ -162,9 +162,12 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
 
   private final TezCounter shuffleDataViaEventSize;
 
-  private final boolean dataViaEventsEnabled;
   private final int dataViaEventsMaxSize;
-  private final boolean useCachedStream;
+  private final boolean considerDataViaEvents;
+
+  @Nullable
+  private final MultiByteArrayOutputStream singlePartitionByteArrayOutput;
+  private final boolean useAdaptiveSinglePartitionOutput;
 
   private final boolean writeSpillRecord;
   private final boolean spillCompressed;
@@ -315,15 +318,34 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_UNORDERED_ENABLED,
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT);
 
-    this.dataViaEventsEnabled = conf.getBoolean(
+    this.freeMemoryThreshold = 1024L * 1024L * conf.getInt(
+        TezRuntimeConfiguration.TEZ_RUNTIME_FREE_MEMORY_WRITER_OUTPUT_THRESHOLD_MB,
+        TezRuntimeConfiguration.TEZ_RUNTIME_FREE_MEMORY_WRITER_OUTPUT_THRESHOLD_MB_DEFAULT);
+    // useFreeMemoryWriterOutput = false if compositeFetch == false, i.e, when using mapreduce_shuffle
+    this.useFreeMemoryWriterOutput = compositeFetch && conf.getBoolean(
+        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT,
+        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT_DEFAULT);
+
+    final boolean singlePartitionDirect = numPartitions == 1 && !isPipelinedShuffle;
+    this.skipBuffers = singlePartitionDirect;
+
+    if (singlePartitionDirect && useFreeMemoryWriterOutput) {
+      this.useAdaptiveSinglePartitionOutput = MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold);
+    } else {
+      this.useAdaptiveSinglePartitionOutput = false;
+    }
+
+    boolean dataViaEventsEnabled = conf.getBoolean(
        TezRuntimeConfiguration.TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_ENABLED,
        TezRuntimeConfiguration.TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_ENABLED_DEFAULT);
     // No max cap on size (intentional)
     this.dataViaEventsMaxSize = conf.getInt(
        TezRuntimeConfiguration.TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_MAX_SIZE,
        TezRuntimeConfiguration.TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_MAX_SIZE_DEFAULT);
-    this.useCachedStream = this.dataViaEventsEnabled && (numPartitions == 1) && !isPipelinedShuffle;
-    this.trackMaxKeyValLen = compositeFetch && !useCachedStream;
+    this.considerDataViaEvents = singlePartitionDirect && dataViaEventsEnabled;
+
+    // trackMaxKeyValLen == compositeFetch && (!(numPartitions == 1) || isPipelinedShuffle || !dataViaEventsEnabled)
+    this.trackMaxKeyValLen = compositeFetch && !considerDataViaEvents;
 
     this.writeSpillRecord = !this.compositeFetch;
     if (this.writeSpillRecord) {
@@ -340,34 +362,43 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     }
 
     if (availableMemoryBytes == 0) {
-      Preconditions.checkArgument(((numPartitions == 1) && !isPipelinedShuffle),
+      Preconditions.checkArgument(singlePartitionDirect,
         "availableMemory can be set to 0 only when numPartitions=1 and pipeline shuffle disabled");
     }
 
     // Ideally, should be significantly larger.
     this.availableMemory = availableMemoryBytes;
 
-    this.freeMemoryThreshold = 1024L * 1024L * conf.getInt(
-        TezRuntimeConfiguration.TEZ_RUNTIME_FREE_MEMORY_WRITER_OUTPUT_THRESHOLD_MB,
-        TezRuntimeConfiguration.TEZ_RUNTIME_FREE_MEMORY_WRITER_OUTPUT_THRESHOLD_MB_DEFAULT);
-    // useFreeMemoryWriterOutput = false if compositeFetch == false, i.e, when using mapreduce_shuffle
-    this.useFreeMemoryWriterOutput = compositeFetch && conf.getBoolean(
-        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT,
-        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT_DEFAULT);
-
     this.rfs = FileSystem.getLocal(this.conf).getRaw();
     this.rfsSpillFilePerms = TezSpillRecord.SPILL_FILE_PERMS.equals(
         TezSpillRecord.SPILL_FILE_PERMS.applyUMask(FsPermission.getUMask(this.rfs.getConf())));
 
-    if (this.useCachedStream) {
+    if (isPipelinedShuffle) {
+      this.spillCompressed = codec != null;
+    } else {
+      this.spillCompressed = conf.getBoolean(
+          TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_NON_PIPELINED_SPILL_COMPRESS,
+          TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_NON_PIPELINED_SPILL_COMPRESS_DEFAULT) && codec != null;
+    }
+
+    if (singlePartitionDirect) {
       this.partitioner = null;
-      this.spillCompressed = false;
-      skipBuffers = true;
       byte[] writeBuffer = IFile.allocateWriteBuffer();
-      writer = new IFile.FileBackedInMemIFileWriter(rfs,
-          outputFileHandler, codec, outputRecordsCounter,
-          outputRecordBytesCounter, dataViaEventsMaxSize,
-          writeBuffer, outputContext);
+      finalOutPath = outputFileHandler.getOutputFileForWrite();
+
+      if (useAdaptiveSinglePartitionOutput) {
+        singlePartitionByteArrayOutput = new MultiByteArrayOutputStream(rfs, finalOutPath);
+        FSDataOutputStream output = new FSDataOutputStream(singlePartitionByteArrayOutput, null);
+        writer = new IFile.WriterBytesWritable(output, codec, outputRecordsCounter,
+            outputRecordBytesCounter, trackMaxKeyValLen, -1, -1, writeBuffer, null, outputContext);
+      } else {
+        singlePartitionByteArrayOutput = null;
+        writer = new IFile.WriterBytesWritable(rfs, finalOutPath,
+            codec, outputRecordsCounter, outputRecordBytesCounter, trackMaxKeyValLen, -1, -1,
+            writeBuffer, outputContext);
+        ensureSpillFilePermissions(finalOutPath, rfs, rfsSpillFilePerms);
+      }
+
       baos = null;
       numRecordsPerPartition = null;
       reportPartitionStats = ReportPartitionStats.fromString(conf.get(
@@ -377,6 +408,9 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       indexFileSizeEstimate = numPartitions * Constants.MAP_OUTPUT_INDEX_RECORD_LENGTH;
       return;
     }
+
+    singlePartitionByteArrayOutput = null;
+    writer = null;
 
     if (singlePartition) {
       this.partitioner = null;
@@ -388,58 +422,37 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       }
     }
 
-    if (isPipelinedShuffle) {
-      this.spillCompressed = codec != null;
-    } else {
-      this.spillCompressed = conf.getBoolean(
-          TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_NON_PIPELINED_SPILL_COMPRESS,
-          TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_NON_PIPELINED_SPILL_COMPRESS_DEFAULT) && codec != null;
-    }
-
-    if (numPartitions == 1 && !isPipelinedShuffle) {
-      // special case, where in only one partition is available.
-      skipBuffers = true;
-      byte[] writeBuffer = IFile.allocateWriteBuffer();
-      finalOutPath = outputFileHandler.getOutputFileForWrite();
-      writer = new IFile.WriterBytesWritable(rfs, finalOutPath,
-          codec, outputRecordsCounter, outputRecordBytesCounter, compositeFetch, -1, -1,
-          writeBuffer, outputContext);
-      ensureSpillFilePermissions(finalOutPath, rfs, rfsSpillFilePerms);
-    } else {
-      skipBuffers = false;
-      writer = null;
-    }
+    assert !skipBuffers;
 
     baos = new ByteArrayOutputStream();
-    if (!skipBuffers) {
-      computeNumBuffersAndSize();
+    computeNumBuffersAndSize();
 
-      availableBuffers = new LinkedBlockingQueue<WrappedBuffer>();
-      buffers = new WrappedBuffer[numBuffers];
-      // Set up only the first buffer to start with.
-      buffers[0] = new WrappedBuffer(numOutputs, sizePerBuffer);
-      numInitializedBuffers = 1;
-      if (isDebugEnabled) {
-        LOG.debug(destNameTrimmed + ": " + "Initializing Buffer #" +
-            numInitializedBuffers + " with size=" + sizePerBuffer);
-      }
-      currentBuffer = buffers[0];
-
-      int maxThreads = Math.max(2, numBuffers/2);
-      ExecutorService executor = new ThreadPoolExecutor(1, maxThreads,
-          60L, TimeUnit.SECONDS,
-          new SynchronousQueue<Runnable>(),
-          new ThreadFactoryBuilder()
-              .setDaemon(true)
-              .setNameFormat("UnorderedOutSpiller {" + outputContext.getDestinationVertexName() + "} #%d")
-              .build()
-      );
-      // to restrict submission of more tasks than threads (e.g numBuffers > numThreads)
-      // This is maxThreads - 1, to avoid race between callback thread releasing semaphore and the
-      // thread calling tryAcquire.
-      availableSlots = new Semaphore(maxThreads - 1, true);
-      spillExecutor = MoreExecutors.listeningDecorator(executor);
+    availableBuffers = new LinkedBlockingQueue<WrappedBuffer>();
+    buffers = new WrappedBuffer[numBuffers];
+    // Set up only the first buffer to start with.
+    buffers[0] = new WrappedBuffer(numOutputs, sizePerBuffer);
+    numInitializedBuffers = 1;
+    if (isDebugEnabled) {
+      LOG.debug(destNameTrimmed + ": " + "Initializing Buffer #" +
+          numInitializedBuffers + " with size=" + sizePerBuffer);
     }
+    currentBuffer = buffers[0];
+
+    // TODO: use a shared ThreadPoolExecutor
+    int maxThreads = Math.max(2, numBuffers/2);
+    ExecutorService executor = new ThreadPoolExecutor(1, maxThreads,
+        60L, TimeUnit.SECONDS,
+        new SynchronousQueue<Runnable>(),
+        new ThreadFactoryBuilder()
+            .setDaemon(true)
+            .setNameFormat("UnorderedOutSpiller {" + outputContext.getDestinationVertexName() + "} #%d")
+            .build()
+    );
+    // to restrict submission of more tasks than threads (e.g numBuffers > numThreads)
+    // This is maxThreads - 1, to avoid race between callback thread releasing semaphore and the
+    // thread calling tryAcquire.
+    availableSlots = new Semaphore(maxThreads - 1, true);
+    spillExecutor = MoreExecutors.listeningDecorator(executor);
 
     numRecordsPerPartition = new int[numPartitions];
     reportPartitionStats = ReportPartitionStats.fromString(conf.get(
@@ -455,9 +468,9 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       LOG.debug("skipBuffers=" + skipBuffers
           + ", pipelinedShuffle=" + isPipelinedShuffle
           + ", reportPartitionStats=" + reportPartitionStats
-          + ", dataViaEventsEnabled=" + dataViaEventsEnabled
           + ", dataViaEventsMaxSize=" + dataViaEventsMaxSize
-          + ", useCachedStream=" + useCachedStream);
+          + ", considerDataViaEvents=" + considerDataViaEvents
+          + ", useAdaptiveSinglePartitionOutput=" + useAdaptiveSinglePartitionOutput);
     }
   }
 
@@ -550,13 +563,16 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
 
     if (skipBuffers) {
       // Special case, where we have only one partition and pipelining is disabled.
+
       // The reason outputRecordsCounter isn't updated here:
       // For skipBuffers case, IFile writer has the reference to outputRecordsCounter and
       // during its close method call, it will update the outputRecordsCounter.
       //
-      // For useCachedStream (DME-eligible) path, call appendNoRle() because
+
+      // For considerDataViaEvents path, call appendNoRle() because
       // DME payload does not include TezOffsetRecord metadata.
-      if (compositeFetch && !useCachedStream) {
+
+      if (compositeFetch && !considerDataViaEvents) {
         writer.appendNoRleTez(key, value);
       } else {
         writer.appendNoRle(key, value);
@@ -983,42 +999,24 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     return reqBytes;
   }
 
-  private boolean canSendDataOverDME() throws IOException {
-    if (this.useCachedStream   // == dataViaEventsEnabled && (numPartitions == 1) && !pipelinedShuffle
-        && this.finalOutPath == null) {
-
-      // It is possible that in-mem writer spilled over to disk. Need to use
-      // that path as finalOutPath and set its permission.
-
-      if (((IFile.FileBackedInMemIFileWriter) writer).isDataFlushedToDisk()) {
-        this.finalOutPath = ((IFile.FileBackedInMemIFileWriter) writer).getOutputPath();
-        ensureSpillFilePermissions(finalOutPath, rfs, rfsSpillFilePerms);
-        // Do NOT increment additionalSpillBytesWrittenCounter because the spill is the final output,
-        // not an intermediate one.
-        // Instead the caller should update fileOutputBytesCounter.
-      }
-    }
-
-    // NOTE: useCachedStream does not guarantee DME-only transfer. If payload exceeds
-    // dataViaEventsMaxSize (or spilled file is chosen), this returns false and we fall back to
-    // file-backed shuffle payload handling.
-    // writer != null iff. numPartitions == 1 && !pipelinedShuffle
-    return (writer != null) && dataViaEventsEnabled
-            && (writer.getCompressedLength() <= dataViaEventsMaxSize);
+  private boolean canSendDataOverDME() {
+    return considerDataViaEvents && writer.getCompressedLength() <= dataViaEventsMaxSize;
   }
 
   private ByteBuffer readDataForDME() throws IOException {
-    if (this.useCachedStream
-        && !((IFile.FileBackedInMemIFileWriter) writer).isDataFlushedToDisk()) {
-      return ((IFile.FileBackedInMemIFileWriter) writer).getData();
-    } else {
-      try (FSDataInputStream inStream = rfs.open(finalOutPath)) {
-        byte[] buf = new byte[(int) writer.getCompressedLength()];
-        IOUtils.readFully(inStream, buf, 0, (int) writer.getCompressedLength());
-        additionalSpillBytesReadCounter.increment(writer.getCompressedLength());
-        return ByteBuffer.wrap(buf);
+    int length = (int) writer.getCompressedLength();
+    byte[] buf = new byte[length];
+    if (useAdaptiveSinglePartitionOutput) {
+      try (InputStream in = singlePartitionByteArrayOutput.createInputStreamFrom(0, length)) {
+        IOUtils.readFully(in, buf, 0, length);
       }
+    } else {
+      try (FSDataInputStream in = rfs.open(finalOutPath)) {
+        IOUtils.readFully(in, buf, 0, length);
+      }
+      additionalSpillBytesReadCounter.increment(length);
     }
+    return ByteBuffer.wrap(buf);
   }
 
   public List<Event> close() throws IOException, InterruptedException {
@@ -1060,6 +1058,9 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     if (!isPipelinedShuffle) {
       if (skipBuffers) {  // numPartitions == 1 && !pipelinedShuffle, and written directly to writer
         writer.close();   // okay, the final data was written to either disk or memory
+        if (useAdaptiveSinglePartitionOutput) {
+          singlePartitionByteArrayOutput.close();
+        }
         long rawLen = writer.getRawLength();
         long compLen = writer.getCompressedLength();
 
@@ -1080,7 +1081,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
         eventList.add(generateVMEvent());
 
         if (!canSendDataOverDME()) {
-          // the final data was written to disk, so increment fileOutputBytesCounter
+          // Publish the final data from disk or adaptive memory and update the corresponding counter.
           TezIndexRecord rec = new TezIndexRecord(0, rawLen, compLen);
           TezSpillRecord sr = new TezSpillRecord(1);
           sr.putIndex(rec, 0);
@@ -1094,14 +1095,21 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
             // output-context index/path cache instead of writing a local spill index file.
             final boolean isRleEnabled = false;   // because we use WriterBytesWritable which does not support RLE
             final Map<Integer, TezOffsetRecord> spillOffsetRecordMap =
-              (compositeFetch && !useCachedStream && !isRleEnabled) ? new HashMap<>() : null;
+              (trackMaxKeyValLen && !isRleEnabled) ? new HashMap<>() : null;
             if (spillOffsetRecordMap != null && rec.hasData()) {
               spillOffsetRecordMap.put(0, writer.getTezOffsetRecord());
             }
 
+            Path outputPath = useAdaptiveSinglePartitionOutput ? null : finalOutPath;
+            MultiByteArrayOutputStream byteArrayOutput =
+                useAdaptiveSinglePartitionOutput ? singlePartitionByteArrayOutput : null;
             ShuffleUtils.writeToIndexPathCacheAndByteCache(
-                outputContext, finalOutPath, sr, null, spillOffsetRecordMap);
-            fileOutputBytesCounter.increment(compLen);
+                outputContext, outputPath, sr, byteArrayOutput, spillOffsetRecordMap);
+            if (useAdaptiveSinglePartitionOutput) {
+              fileOutputBytesMemoryCounter.increment(compLen);
+            } else {
+              fileOutputBytesCounter.increment(compLen);
+            }
           }
         }
         eventList.add(generateDMEvent(false, -1, false,
