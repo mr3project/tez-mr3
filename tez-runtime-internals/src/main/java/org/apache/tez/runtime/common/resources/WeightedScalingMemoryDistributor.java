@@ -186,7 +186,7 @@ public class WeightedScalingMemoryDistributor implements InitialMemoryAllocator 
       typeScaleMap.put(RequestType.UNSORTED_OUTPUT, 1);
       typeScaleMap.put(RequestType.UNSORTED_INPUT, 1);
       typeScaleMap.put(RequestType.SORTED_OUTPUT, 12);
-      typeScaleMap.put(RequestType.SORTED_MERGED_INPUT, 1);
+      typeScaleMap.put(RequestType.SORTED_MERGED_INPUT, 12);
       typeScaleMap.put(RequestType.PROCESSOR, 1);
       typeScaleMap.put(RequestType.OTHER, 1);
       return;
