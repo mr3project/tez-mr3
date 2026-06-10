@@ -154,7 +154,7 @@ public class InMemoryReader implements IFile.KeyValueReader {
   }
 
   private void readKeyValueLengthNoRle() {
-    if (tezOffsetRecord != null) {
+    if (tezOffsetRecord != null && !tezOffsetRecord.isVectorBatch()) {
       int recordOffset = (int) bytesRead;
 
       if (recordOffset == tezOffsetRecord.getEofPos()) {
@@ -273,6 +273,8 @@ public class InMemoryReader implements IFile.KeyValueReader {
 
   @Override
   public KeyState readRawKey(RawDataBuffer key) throws IOException {
+    assert !isVectorBatch();
+
     if (isRleEnabled) {
       return readRawKeyRle(key);
     } else {
@@ -401,6 +403,27 @@ public class InMemoryReader implements IFile.KeyValueReader {
 
     bytesRead += currentValueLength;
     ++recNo;
+  }
+
+  @Override
+  public boolean isVectorBatch() {
+    return tezOffsetRecord != null && tezOffsetRecord.isVectorBatch();
+  }
+
+  @Override
+  public boolean nextRawVectorValue(BytesWritable value) throws IOException {
+    assert isVectorBatch();
+    assert !isRleEnabled;
+    try {
+      if (!positionToNextRecordNoRle()) {
+        return false;
+      }
+      assert currentKeyLength == 0;
+      nextRawValue(value);
+      return true;
+    } catch (RuntimeException e) {
+      throw new IOException("Malformed vector-batch IFile data", e);
+    }
   }
 
   @Override

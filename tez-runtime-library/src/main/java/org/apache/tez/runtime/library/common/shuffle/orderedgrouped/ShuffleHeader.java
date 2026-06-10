@@ -113,14 +113,25 @@ public class ShuffleHeader implements Writable {
     uncompressedLength = in.readLong();
     forReduce = in.readInt();
     int maxKeyLen = in.readInt();
-    if (maxKeyLen < 0) {
-      tezOffsetRecord = null;
-    } else {
+    if (maxKeyLen == TezOffsetRecord.VECTOR_BATCH) {
+      int eofPos = in.readInt();
+      if (eofPos <= 0) {
+        throw new IOException("Invalid TezOffsetRecord eofPos: " + eofPos);
+      }
+      tezOffsetRecord = TezOffsetRecord.vectorBatch(eofPos);
+    } else if (maxKeyLen >= 0) {
       int maxValLen = in.readInt();
       int firstKeyOffset = in.readInt();
       int firstValOffset = in.readInt();
       int eofPos = in.readInt();
+      if (eofPos <= 0) {
+        throw new IOException("Invalid TezOffsetRecord eofPos: " + eofPos);
+      }
       tezOffsetRecord = new TezOffsetRecord(maxKeyLen, maxValLen, firstKeyOffset, firstValOffset, eofPos);
+    } else if (maxKeyLen == TezOffsetRecord.NO_RECORD) {
+      tezOffsetRecord = null;
+    } else {
+      throw new IOException("Invalid TezOffsetRecord maxKeyLen: " + maxKeyLen);
     }
   }
 
@@ -153,7 +164,7 @@ public class ShuffleHeader implements Writable {
     int length = 8;  // compressedLength
     if (compressedLength != 0) {
       length += 8 + 4;  // uncompressedLength, forReduce
-      length += tezOffsetRecord != null ? 5 * 4 : 4;
+      length += tezOffsetRecord == null ? 4 : (tezOffsetRecord.isVectorBatch() ? 2 * 4 : 5 * 4);
     }
     return length;
   }
@@ -179,12 +190,16 @@ public class ShuffleHeader implements Writable {
     out.writeInt(forReduce);
     if (tezOffsetRecord != null) {
       out.writeInt(tezOffsetRecord.getMaxKeyLen());
-      out.writeInt(tezOffsetRecord.getMaxValLen());
-      out.writeInt(tezOffsetRecord.getFirstKeyOffset());
-      out.writeInt(tezOffsetRecord.getFirstValOffset());
-      out.writeInt(tezOffsetRecord.getEofPos());
+      if (tezOffsetRecord.isVectorBatch()) {
+        out.writeInt(tezOffsetRecord.getEofPos());
+      } else {
+        out.writeInt(tezOffsetRecord.getMaxValLen());
+        out.writeInt(tezOffsetRecord.getFirstKeyOffset());
+        out.writeInt(tezOffsetRecord.getFirstValOffset());
+        out.writeInt(tezOffsetRecord.getEofPos());
+      }
     } else {
-      out.writeInt(-1);
+      out.writeInt(TezOffsetRecord.NO_RECORD);
     }
   }
 }

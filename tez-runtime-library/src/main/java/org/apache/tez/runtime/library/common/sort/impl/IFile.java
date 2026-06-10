@@ -102,6 +102,7 @@ public class IFile {
     // call when isRleEnabled is not statically known
     void appendNoRle(RawDataBuffer key, RawDataBuffer value) throws IOException;
     void appendNoRleTez(RawDataBuffer key, RawDataBuffer value) throws IOException;
+    void appendVectorBatch(RawDataBuffer value) throws IOException;
 
     void appendRle(RawDataBuffer key, RawDataBuffer value, boolean keyStable) throws IOException;
 
@@ -112,6 +113,7 @@ public class IFile {
   public interface WriterAppendBytesWritable {
     void appendNoRle(BytesWritable key, BytesWritable value) throws IOException;
     void appendNoRleTez(BytesWritable key, BytesWritable value) throws IOException;
+    void appendVectorBatch(BytesWritable value) throws IOException;
 
     void close() throws IOException;
   }
@@ -257,18 +259,16 @@ public class IFile {
     }
 
     @Override
-    protected void writeValue(byte[] data, int offset, int length) throws IOException {
-      if (!bufferFull) {
-        totalSize += INT_SIZE + length;
-
-        if (shouldWriteToDisk()) {
-          resetToFileBasedWriter();
-        }
-      }
-      super.writeValue(data, offset, length);
+    public void appendVectorBatch(BytesWritable value) throws IOException {
+      assert vectorBatchFormat;
+      assert !isRleEnabled;
+      byte[] data = value.getBytesRaw();
+      int offset = value.getOffset();
+      writeKVPair(data, offset, 0,  // using data[] is okay because keyLength == 0
+          data, offset, value.getLength());
+      ++numRecordsWritten;
     }
 
-    @Override
     public void appendNoRleTez(BytesWritable key, BytesWritable value) throws IOException {
       assert false;
     }
@@ -352,6 +352,7 @@ public class IFile {
     protected int firstKeyOffset = -1;
     protected int firstValOffset = -1;
     protected int eofPos = -1;
+    protected boolean vectorBatchFormat = false;
 
     protected Writer(FSDataOutputStream outputStream,
                      CompressionCodec codec,
@@ -474,6 +475,11 @@ public class IFile {
       }
     }
 
+    public void enableVectorBatchFormat() {
+      assert numRecordsWritten == 0 && !isRleEnabled && useMaxKeyValLen;
+      vectorBatchFormat = true;
+    }
+
     protected void writeValue(byte[] data, int offset, int length) throws IOException {
       bufferWriteInt(length); // value length
       bufferWriteBytes(data, offset, length);
@@ -497,6 +503,10 @@ public class IFile {
 
     protected void onClose() throws IOException {
       if (useMaxKeyValLen) {
+        if (vectorBatchFormat) {
+          eofPos = (int) decompressedBytesWritten;
+          return;
+        }
         if (numRecordsWritten == 0) {
           maxKeyLen = 0;
           maxValLen = 0;
@@ -574,8 +584,9 @@ public class IFile {
       if (!useMaxKeyValLen) {
         return null;
       } else {
-        assert eofPos >= 0;   // must be called after close()
-        return new TezOffsetRecord(maxKeyLen, maxValLen, firstKeyOffset, firstValOffset, eofPos);
+        assert eofPos > 0;   // because we check indexRecord.hasData() before calling getTezOffsetRecord()
+        return vectorBatchFormat ? TezOffsetRecord.vectorBatch(eofPos)
+            : new TezOffsetRecord(maxKeyLen, maxValLen, firstKeyOffset, firstValOffset, eofPos);
       }
     }
   }
@@ -628,6 +639,7 @@ public class IFile {
     }
 
     public void appendNoRle(RawDataBuffer key, RawDataBuffer value) throws IOException {
+      assert !vectorBatchFormat;
       assert !isRleEnabled && !useMaxKeyValLen;
       int keyLength = key.getLength();
       int valueLength = value.getLength();
@@ -639,12 +651,14 @@ public class IFile {
 
     public void appendNoRle(byte[] keyData, int keyOffset, int keyLength,
                             byte[] valueData, int valueOffset, int valueLength) throws IOException {
+      assert !vectorBatchFormat;
       assert !isRleEnabled && !useMaxKeyValLen;
       super.writeKVPair(keyData, keyOffset, keyLength, valueData, valueOffset, valueLength);
       ++numRecordsWritten;
     }
 
     public void appendNoRleTez(RawDataBuffer key, RawDataBuffer value) throws IOException {
+      assert !vectorBatchFormat;
       assert !isRleEnabled && useMaxKeyValLen;
       int keyLength = key.getLength();
       int valueLength = value.getLength();
@@ -681,7 +695,18 @@ public class IFile {
       ++numRecordsWritten;
     }
 
+    public void appendVectorBatch(RawDataBuffer value) throws IOException {
+      assert vectorBatchFormat;
+      assert !isRleEnabled;
+      byte[] data = value.getData();
+      int position = value.getPosition();
+      writeKVPair(data, position, 0,  // using data[] is safe because keyLength == 0
+          data, position, value.getLength());
+      ++numRecordsWritten;
+    }
+
     public void appendRle(RawDataBuffer key, RawDataBuffer value, boolean keyStable) throws IOException {
+      assert !vectorBatchFormat;
       assert isRleEnabled && !useMaxKeyValLen;
       int keyLength = key.getLength();
       int valueLength = value.getLength();
@@ -699,6 +724,7 @@ public class IFile {
     public void appendRle(byte[] keyData, int keyOffset, int keyLength,
                           byte[] valueData, int valueOffset, int valueLength, boolean keyStable)
         throws IOException {
+      assert !vectorBatchFormat;
       assert isRleEnabled && !useMaxKeyValLen;
       boolean sameKey = keyLength != 0 && FastByteComparisons.compareEqual(
           previousKeyData, previousKeyOffset, previousKeyLength, keyData, keyOffset, keyLength);
@@ -814,6 +840,7 @@ public class IFile {
     }
 
     public void appendNoRle(BytesWritable key, BytesWritable value) throws IOException {
+      assert !vectorBatchFormat;
       assert !isRleEnabled;
       assert !useMaxKeyValLen;
       int keyLength = key.getLength();
@@ -824,7 +851,18 @@ public class IFile {
       ++numRecordsWritten;
     }
 
+    public void appendVectorBatch(BytesWritable value) throws IOException {
+      assert vectorBatchFormat;
+      assert !isRleEnabled;
+      byte[] data = value.getBytesRaw();
+      int offset = value.getOffset();
+      writeKVPair(data, offset, 0,  // using data[] is okay because keyLength == 0
+          data, offset, value.getLength());
+      ++numRecordsWritten;
+    }
+
     public void appendNoRleTez(BytesWritable key, BytesWritable value) throws IOException {
+      assert !vectorBatchFormat;
       assert !isRleEnabled;
       assert useMaxKeyValLen;
       int recordStartOffset = (int) getDecompressedBytesWritten();
@@ -899,6 +937,8 @@ public class IFile {
     Reader.KeyState readRawKey(BytesWritable key) throws IOException;
     // After readRawValue() returns, the backing byte[] array is immutable, so the consumer may keep pointers to it.
     void nextRawValue(BytesWritable value) throws IOException;
+    boolean nextRawVectorValue(BytesWritable value) throws IOException;
+    boolean isVectorBatch();
 
     // Retrieves all key/value pairs, where both BytesWritable arguments are backed by immutable byte[] arrays.
     // consumeAll() must not be mixed with readRawKey()/nextRawValue().
@@ -1237,7 +1277,7 @@ public class IFile {
     }
 
     private void readKeyValueLengthNoRle() throws IOException {
-      if (tezOffsetRecord != null) {
+      if (tezOffsetRecord != null && !tezOffsetRecord.isVectorBatch()) {
         readKeyValueLengthNoRleWithTezOffsetRecord();
       } else {
         long combined = readLong();
@@ -1297,6 +1337,21 @@ public class IFile {
         originalKeyLength = currentKeyLength;
       }
       bytesRead += INT_SIZE + INT_SIZE;
+    }
+
+    public boolean isVectorBatch() {
+      return tezOffsetRecord != null && tezOffsetRecord.isVectorBatch();
+    }
+
+    public boolean nextRawVectorValue(BytesWritable value) throws IOException {
+      assert isVectorBatch();
+      assert !isRleEnabled;
+      if (!positionToNextRecordNoRle()) {
+        return false;
+      }
+      assert currentKeyLength == 0;
+      nextRawValue(value);
+      return true;
     }
 
     private boolean positionToNextRecordNoRle() throws IOException {
@@ -1373,13 +1428,13 @@ public class IFile {
       return new byte[newLength];
     }
 
-
     @Override
     public boolean isCurrentRecordStable() {
       return false;
     }
 
     public KeyState readRawKey(RawDataBuffer key) throws IOException {
+      assert !isVectorBatch();
       if (isRleEnabled) {
         return readRawKeyRle(key);
       } else {
@@ -1425,6 +1480,7 @@ public class IFile {
     }
 
     public KeyState readRawKey(BytesWritable key) throws IOException {
+      assert !isVectorBatch();
       if (isRleEnabled) {
         return readRawKeyRle(key);
       } else {

@@ -64,6 +64,11 @@ public class InMemoryWriter implements IFile.WriterAppendDataInputBuffer {
   }
 
   @Override
+  public void appendVectorBatch(RawDataBuffer value) throws IOException {
+    throw new UnsupportedOperationException("In-memory ordered shuffle does not support vector batches");
+  }
+
+  @Override
   public void appendRle(RawDataBuffer key, RawDataBuffer value, boolean keyStable) throws IOException {
     assert isRleEnabled;
     int keyPosition = key.getPosition();

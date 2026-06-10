@@ -85,7 +85,6 @@ public final class PipelinedSorter {
 
   final ReportPartitionStats reportPartitionStats;
   private final long[] partitionStats;
-  private final boolean sendEmptyPartitionDetails;
 
   private int numSpills;
   private final boolean cleanup;
@@ -202,9 +201,6 @@ public final class PipelinedSorter {
         conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_REPORT_PARTITION_STATS,
             TezRuntimeConfiguration.TEZ_RUNTIME_REPORT_PARTITION_STATS_DEFAULT));
     this.partitionStats = reportPartitionStats.isEnabled() ? (new long[partitions]) : null;
-    this.sendEmptyPartitionDetails = conf.getBoolean(
-        TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED,
-        TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED_DEFAULT);
 
     this.numSpills = 0;
     this.cleanup = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT,
@@ -352,8 +348,7 @@ public final class PipelinedSorter {
         .append(", minBlockSize=").append(MIN_BLOCK_SIZE)
         .append(", initial BLOCK_SIZE=").append(buffers.get(0).capacity())
         .append(", isFinalMergeEnabled=").append(isFinalMergeEnabled)
-        .append(", pipelinedShuffle=").append(isPipelinedShuffle)
-        .append(", sendEmptyPartitions=").append(sendEmptyPartitionDetails);
+        .append(", pipelinedShuffle=").append(isPipelinedShuffle);
       LOG.debug(sb.toString());
     }
 
@@ -501,7 +496,7 @@ public final class PipelinedSorter {
     String pathComponent = ShuffleUtils.getUniqueIdentifierSpillId(outputContext, numSpills - 1);
     ShuffleUtils.generateEventOnSpill(events, isFinalMergeEnabled, false,
         outputContext, (numSpills - 1), spillInfoList.get(numSpills - 1).spillRecord,
-        partitions, sendEmptyPartitionDetails, pathComponent, partitionStats,
+        partitions, pathComponent, partitionStats,
         reportDetailedPartitionStats(), auxiliaryService, deflater);
     outputContext.sendEvents(events);
     if (isDebugEnabled) {
@@ -631,7 +626,7 @@ public final class PipelinedSorter {
         WriterBytesWritable writer = null;
         try {
           long segmentStart = out.getPos();
-          if (!sendEmptyPartitionDetails || (i == partition)) {
+          if (i == partition) {
             writer = new WriterBytesWritable(out,
                 codec, spilledRecordsCounter, null,
                 false,
@@ -749,7 +744,7 @@ public final class PipelinedSorter {
         long segmentStart = fsOutput.getPos();
         WriterDataInputBuffer writer = null;
         boolean hasNext = kvIter.hasNext();
-        if (hasNext || !sendEmptyPartitionDetails) {
+        if (hasNext) {
           if (codec != null && compressorExternal == null) {
             compressorExternal = outputContext.getCompressor(codec);
           }
@@ -918,7 +913,7 @@ public final class PipelinedSorter {
           String pathComponent = (outputContext.getUniqueIdentifier() + "_" + i);
           ShuffleUtils.generateEventOnSpill(finalEvents, isFinalMergeEnabled, isLastEvent,
               outputContext, i, spillInfoList.get(i).spillRecord, partitions,
-              sendEmptyPartitionDetails, pathComponent, partitionStats,
+              pathComponent, partitionStats,
               reportDetailedPartitionStats(), auxiliaryService, deflater);
           if (isDebugEnabled) {
             LOG.debug("{}: Adding spill event for spill (final update={}), spillId={}",
@@ -1027,7 +1022,7 @@ public final class PipelinedSorter {
           for (int i = 0; i < numSpills; i++) {
             SpillInfo spillInfo = spillInfoList.get(i);
             TezIndexRecord indexRecord = spillInfo.spillRecord.getIndex(parts);
-            if (indexRecord.hasData() || !sendEmptyPartitionDetails) {
+            if (indexRecord.hasData()) {
               shouldWrite = true;
               segmentList.add(createSegmentFromSpill(spillInfo, parts));
             }

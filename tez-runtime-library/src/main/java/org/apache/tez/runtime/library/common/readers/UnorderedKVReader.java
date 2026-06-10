@@ -30,13 +30,14 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.runtime.library.api.KeyValueReaderEdge;
+import org.apache.tez.runtime.library.api.KeyValueReaderEdgeVector;
 import org.apache.tez.runtime.library.common.shuffle.impl.ShuffleManager;
 import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.InMemoryReader;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.apache.tez.runtime.library.common.shuffle.FetchedInput;
 import org.apache.tez.runtime.library.common.shuffle.MemoryFetchedInput;
 
-public class UnorderedKVReader extends KeyValueReaderEdge {
+public class UnorderedKVReader extends KeyValueReaderEdge implements KeyValueReaderEdgeVector {
 
   private static final Logger LOG = LoggerFactory.getLogger(UnorderedKVReader.class);
   
@@ -56,6 +57,14 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
   private IFile.KeyValueReaderBytesWritable currentReader;
   
   private long numRecordsRead = 0;
+
+  private enum LogicalMode {
+    UNDECIDED,
+    KEY_VALUE,
+    VECTOR_BATCH
+  }
+
+  private LogicalMode logicalMode = LogicalMode.UNDECIDED;
 
   public UnorderedKVReader(ShuffleManager shuffleManager, Configuration conf,
       CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLength,
@@ -77,26 +86,69 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
    * @return true if another key/value(s) pair exists, false if there are no more.
    * @throws IOException if an error occurs
    */
-  @Override  
+  @Override
   public boolean next() throws IOException {
+    assert logicalMode != LogicalMode.VECTOR_BATCH;
+    assert !(currentReader != null) || !currentReader.isVectorBatch();
+
     if (readNextFromCurrentReader()) {
       inputRecordCounter.increment(1);
       numRecordsRead++;
       return true;
-    } else {
-      boolean nextInputExists = moveToNextInput();
-      while (nextInputExists) {
-        if (readNextFromCurrentReader()) {
-          inputRecordCounter.increment(1);
-          numRecordsRead++;
-          return true;
-        }
-        nextInputExists = moveToNextInput();
-      }
-      LOG.info("Num Records read: " + numRecordsRead);
-      completedProcessing = true;
-      return false;
     }
+    while (moveToNextInput()) {
+      assert !currentReader.isVectorBatch();
+      if (readNextFromCurrentReader()) {
+        inputRecordCounter.increment(1);
+        numRecordsRead++;
+        return true;
+      }
+    }
+    finishInput();
+    return false;
+  }
+
+  @Override
+  public NextResult nextVectorBatchAware() throws IOException {
+    assert logicalMode != LogicalMode.KEY_VALUE;
+
+    if (logicalMode == LogicalMode.UNDECIDED) {
+      if (currentReader == null && !moveToNextInput()) {
+        finishInput();
+        return NextResult.END_OF_INPUT;
+      }
+      if (!currentReader.isVectorBatch()) {
+        logicalMode = LogicalMode.KEY_VALUE;
+        return NextResult.KEY_VALUE;
+      }
+      logicalMode = LogicalMode.VECTOR_BATCH;
+    }
+
+    // Reaching here means either:
+    //  - we just opened a vector-batch reader, or
+    //  - a previous call returned VECTOR_BATCH and did not reach END_OF_INPUT.
+    // The caller must NOT call this method again after END_OF_INPUT.
+    assert currentReader != null;
+
+    while (true) {
+      assert currentReader != null;
+      if (!currentReader.isVectorBatch()) {
+        throw new IOException("Mixed non-empty upstream IFile record formats");
+      }
+      if (currentReader.nextRawVectorValue(value)) {
+        inputRecordCounter.increment(1);
+        numRecordsRead++;
+        return NextResult.VECTOR_BATCH;
+      }
+      if (!moveToNextInput()) {
+        finishInput();
+        return NextResult.END_OF_INPUT;
+      }
+    }
+  }
+
+  private void finishInput() {
+    completedProcessing = true;
   }
 
   // The backing byte[] array of key is immutable, so the consumer may keep pointers to it.
@@ -113,15 +165,30 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
 
   @Override
   public long consumeAll(KeyValueReaderEdge.ThrowingBiConsumer<BytesWritable, BytesWritable> consumer) throws Exception {
+    assert logicalMode != LogicalMode.VECTOR_BATCH;
     assert numRecordsRead == 0L;  // must not be mixed with next()
-    while (moveToNextInput()) {
-      long currentConsumed = currentReader.consumeAll(consumer);
-      inputRecordCounter.increment(currentConsumed);
-      numRecordsRead += currentConsumed;
+    // currentReader != null if this call is made after nextVectorBatchAware() returns NextResult.KEY_VALUE
+    assert !(currentReader != null) || (logicalMode == LogicalMode.KEY_VALUE);
+
+    if (currentReader != null) {
+      assert !currentReader.isVectorBatch();
+      consumeCurrentReader(consumer);
     }
-    LOG.info("Num Records read: {}", numRecordsRead);
-    completedProcessing = true;
+    while (moveToNextInput()) {
+      if (currentReader.isVectorBatch()) {
+        throw new IOException("Mixed non-empty upstream IFile record formats");
+      }
+      consumeCurrentReader(consumer);
+    }
+    finishInput();
     return numRecordsRead;
+  }
+
+  private void consumeCurrentReader(
+      KeyValueReaderEdge.ThrowingBiConsumer<BytesWritable, BytesWritable> consumer) throws Exception {
+    long currentConsumed = currentReader.consumeAll(consumer);
+    inputRecordCounter.increment(currentConsumed);
+    numRecordsRead += currentConsumed;
   }
 
   public float getProgress() throws IOException, InterruptedException {
