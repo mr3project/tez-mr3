@@ -221,11 +221,6 @@ public class TezRuntimeConfiguration {
       TEZ_RUNTIME_PREFIX + "task.input.post-merge.buffer.percent";
   public static final float TEZ_RUNTIME_INPUT_BUFFER_PERCENT_DEFAULT = 0.9f;
 
-  @ConfigurationProperty(type = "boolean")
-  public static final String TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED =
-      TEZ_RUNTIME_PREFIX + "empty.partitions.info-via-events.enabled";
-  public static final boolean TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED_DEFAULT = true;
-
   public static final String TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_ENABLED =
       TEZ_RUNTIME_PREFIX + "transfer.data-via-events.enabled";
   public static final boolean TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_ENABLED_DEFAULT = true;
@@ -433,7 +428,6 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_INPUT_POST_MERGE_BUFFER_PERCENT);
     tezRuntimeKeys.add(TEZ_RUNTIME_KEY_COMPARATOR_CLASS);
     tezRuntimeKeys.add(TEZ_RUNTIME_KEY_SECONDARY_COMPARATOR_CLASS);
-    tezRuntimeKeys.add(TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED);
     tezRuntimeKeys.add(TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_ENABLED);
     tezRuntimeKeys.add(TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_MAX_SIZE);
     tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SHUFFLE_UNORDERED_ENABLED);

@@ -67,7 +67,6 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput implements
 
   boolean isPipelinedShuffle;
   boolean isFinalMergeEnabled;
-  private boolean sendEmptyPartitionDetails;
 
   private String auxiliaryService;
   private boolean compositeFetch;
@@ -89,10 +88,6 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput implements
     getContext().requestInitialMemory(
         PipelinedSorter.getInitialMemoryRequirement(conf,
             getContext().getTotalMemoryAvailableToTask()), memoryUpdateCallbackHandler);
-
-    sendEmptyPartitionDetails = conf.getBoolean(
-        TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED,
-        TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED_DEFAULT);
 
     auxiliaryService = ShuffleUtils.getTezShuffleHandlerServiceId(conf);
     compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
@@ -187,7 +182,7 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput implements
       boolean isLastEvent = true;
       ShuffleUtils.generateEventOnSpill(eventList, isFinalMergeEnabled, isLastEvent,
           getContext(), 0, tezSpillRecord,
-          getNumPhysicalOutputs(), sendEmptyPartitionDetails, pathComponent,
+          getNumPhysicalOutputs(), pathComponent,
           sorter.getPartitionStats(), sorter.reportDetailedPartitionStats(), auxiliaryService, deflater);
     }
     return eventList;
@@ -213,7 +208,6 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput implements
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_LAZY_ALLOCATE_MEMORY);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_RLE_THRESHOLD_FRACTION);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_PARTITIONER_CLASS);
-    confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_EMPTY_PARTITION_INFO_VIA_EVENTS_ENABLED);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ORDERED_ENABLED);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT);
     confKeys.add(TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT);

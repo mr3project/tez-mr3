@@ -273,7 +273,6 @@ public class ShuffleUtils {
   /**
    * Generate DataMovementEvent
    *
-   * @param sendEmptyPartitionDetails
    * @param numPhysicalOutputs
    * @param spillRecord
    * @param context
@@ -286,35 +285,31 @@ public class ShuffleUtils {
    * @return ByteBuffer
    * @throws IOException
    */
-  static ByteBuffer generateDMEPayload(boolean sendEmptyPartitionDetails,
+  static ByteBuffer generateDMEPayload(
       int numPhysicalOutputs, TezSpillRecord spillRecord, OutputContext context,
       int spillId, boolean finalMergeEnabled, boolean isLastEvent, String pathComponent, String auxiliaryService,
       Deflater deflater)
       throws IOException {
     DataMovementEventPayloadProto.Builder payloadBuilder = DataMovementEventPayloadProto.newBuilder();
 
-    boolean outputGenerated = true;
-    if (sendEmptyPartitionDetails) {
-      BitSet emptyPartitionDetails = new BitSet();
-      for(int i=0;i<spillRecord.size();i++) {
-        TezIndexRecord indexRecord = spillRecord.getIndex(i);
-        if (!indexRecord.hasData()) {
-          emptyPartitionDetails.set(i);
-        }
-      }
-      int emptyPartitions = emptyPartitionDetails.cardinality();
-      outputGenerated = (spillRecord.size() != emptyPartitions);
-      if (emptyPartitions > 0) {
-        ByteString emptyPartitionsBytesString =
-            TezCommonUtils.compressByteArrayToByteString(
-                TezUtilsInternal.toByteArray(emptyPartitionDetails), deflater);
-        payloadBuilder.setEmptyPartitions(emptyPartitionsBytesString);
-        LOG.info("EmptyPartition bitsetSize={}, numOutputs={}, emptyPartitions={}, compressedSize={}",
-            emptyPartitionDetails.cardinality(), numPhysicalOutputs, emptyPartitions, emptyPartitionsBytesString.size());
+    BitSet emptyPartitionDetails = new BitSet();
+    for(int i = 0; i < spillRecord.size(); i++) {
+      TezIndexRecord indexRecord = spillRecord.getIndex(i);
+      if (!indexRecord.hasData()) {
+        emptyPartitionDetails.set(i);
       }
     }
+    int emptyPartitions = emptyPartitionDetails.cardinality();
+    boolean outputGenerated = (spillRecord.size() != emptyPartitions);
+    if (emptyPartitions > 0) {
+      ByteString emptyPartitionsBytesString = TezCommonUtils.compressByteArrayToByteString(
+          TezUtilsInternal.toByteArray(emptyPartitionDetails), deflater);
+      payloadBuilder.setEmptyPartitions(emptyPartitionsBytesString);
+      LOG.info("EmptyPartition bitsetSize={}, numOutputs={}, emptyPartitions={}, compressedSize={}",
+          emptyPartitionDetails.cardinality(), numPhysicalOutputs, emptyPartitions, emptyPartitionsBytesString.size());
+    }
 
-    if (!sendEmptyPartitionDetails || outputGenerated) {
+    if (outputGenerated) {
       String containerId = context.getExecutionContext().getEnvContainerId();
       int vertexId = context.getTaskVertexIndex();
       payloadBuilder.setContainerId(containerId);
@@ -430,7 +425,7 @@ public class ShuffleUtils {
    */
   public static void generateEventOnSpill(List<Event> eventList, boolean finalMergeEnabled,
       boolean isLastEvent, OutputContext context, int spillId, TezSpillRecord spillRecord,
-      int numPhysicalOutputs, boolean sendEmptyPartitionDetails, String pathComponent,
+      int numPhysicalOutputs, String pathComponent,
       @Nullable long[] partitionStats, boolean reportDetailedPartitionStats, String auxiliaryService,
       Deflater deflater)
       throws IOException {
@@ -446,7 +441,7 @@ public class ShuffleUtils {
           ", numPhysicalOutputs=" + numPhysicalOutputs);
     }
 
-    ByteBuffer payload = generateDMEPayload(sendEmptyPartitionDetails, numPhysicalOutputs,
+    ByteBuffer payload = generateDMEPayload(numPhysicalOutputs,
         spillRecord, context, spillId,
         finalMergeEnabled, isLastEvent, pathComponent, auxiliaryService, deflater);
 
