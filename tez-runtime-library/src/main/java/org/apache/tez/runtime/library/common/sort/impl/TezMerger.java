@@ -287,8 +287,8 @@ public class TezMerger {
     }
   }
 
-  static class MergeQueue
-  implements TezRawKeyValueIterator {
+  static class MergeQueue implements TezRawKeyValueIterator {
+
     final Configuration conf;
     final FileSystem fs;
     final CompressionCodec codec;
@@ -322,6 +322,9 @@ public class TezMerger {
     KeyValueBuffer prevKey = new KeyValueBuffer(Segment.EMPTY_BYTES, 0, 0);
     byte[] prevKeyCopy = Segment.EMPTY_BYTES;
 
+    final boolean useFreeMemoryWriterOutput;
+    final long freeMemoryThreshold;
+
     public MergeQueue(Configuration conf, FileSystem fs,
         List<Segment> segments,
         boolean sortSegments, CompressionCodec codec,
@@ -334,6 +337,13 @@ public class TezMerger {
       }
       this.checkForSameKeys = checkForSameKeys;
       this.codec = codec;
+
+      useFreeMemoryWriterOutput = conf.getBoolean(
+        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT,
+        TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT_DEFAULT);
+      freeMemoryThreshold = 1024L * 1024L * conf.getInt(
+        TezRuntimeConfiguration.TEZ_RUNTIME_FREE_MEMORY_WRITER_OUTPUT_THRESHOLD_MB,
+        TezRuntimeConfiguration.TEZ_RUNTIME_FREE_MEMORY_WRITER_OUTPUT_THRESHOLD_MB_DEFAULT);
     }
 
     public void close() throws IOException {
@@ -688,12 +698,6 @@ public class TezMerger {
 
           Path outputFile = lDirAlloc.getLocalPathForWrite(tmpFilename.toString(), approxOutputSize, conf);
 
-          boolean useFreeMemoryWriterOutput = conf.getBoolean(
-              TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT,
-              TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_WRITER_OUTPUT_DEFAULT);
-          long freeMemoryThreshold = 1024L * 1024L * conf.getInt(
-              TezRuntimeConfiguration.TEZ_RUNTIME_FREE_MEMORY_WRITER_OUTPUT_THRESHOLD_MB,
-              TezRuntimeConfiguration.TEZ_RUNTIME_FREE_MEMORY_WRITER_OUTPUT_THRESHOLD_MB_DEFAULT);
           boolean writeIntermediateToMemory = useFreeMemoryWriterOutput
               && MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold);
 
