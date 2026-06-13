@@ -34,7 +34,10 @@ public class MultiByteArrayOutputStream extends OutputStream {
   private static final int MIN_CACHE_SIZE_WRITER = 16 * 1024;   // set to 128 * 1024 to start at 128KB
   private static final int MAX_CACHE_SIZE_WRITER = 4 * 1024 * 1024;
   private static final int CACHE_SIZE_MULTIPLE = 8;
-  private static final int MAX_NUM_BUFFERS = 64;
+
+  // assume max number of buffers = 64
+  // 16 + 128 + 1024 + 4096 * (64 - 3) = 251024
+  private static final long DEFAULT_BUFFER_SIZE_THRESHOLD = 251024 * 1024;
 
   public static boolean canUseFreeMemoryBuffers(long freeMemoryThreshold) {
     long currentFreeMemory = Runtime.getRuntime().freeMemory();
@@ -49,6 +52,7 @@ public class MultiByteArrayOutputStream extends OutputStream {
 
   private long totalBytes = 0;
   private long bufferBytes = 0;
+  private final long bufferSizeThreshold;   // bufferSizeThreshold == 0 is allowed
 
   // spill fields
   private final FileSystem fs;
@@ -58,11 +62,20 @@ public class MultiByteArrayOutputStream extends OutputStream {
   public MultiByteArrayOutputStream(
       FileSystem fs,
       Path outputPath) {
+    this(fs, outputPath, DEFAULT_BUFFER_SIZE_THRESHOLD);
+  }
+
+  public MultiByteArrayOutputStream(
+      FileSystem fs,
+      Path outputPath,
+      long bufferSizeThreshold) {
     // start with an empty byte[] buffer because no data might be written
     this.cacheSize = 0;   // set to the size of currentBuffer
     this.currentBuffer = null;
     this.posInBuf = 0;
     // posInBuf == cacheSize if currentBuffer is full, so currentBuffer is initially considered full
+
+    this.bufferSizeThreshold = bufferSizeThreshold;
 
     this.fs = fs;
     this.outputPath = outputPath;
@@ -78,7 +91,7 @@ public class MultiByteArrayOutputStream extends OutputStream {
       // in-memory buffer has space
       currentBuffer[posInBuf++] = (byte) b;
       bufferBytes++;
-    } else if (buffers.size() < MAX_NUM_BUFFERS) {
+    } else if (bufferBytes < bufferSizeThreshold) {
       allocateNewBuffer();
       currentBuffer[posInBuf++] = (byte) b;
       bufferBytes++;
@@ -118,7 +131,7 @@ public class MultiByteArrayOutputStream extends OutputStream {
         }
       }
       // remaining > 0;
-      if (buffers.size() < MAX_NUM_BUFFERS) {
+      if (bufferBytes < bufferSizeThreshold) {
         allocateNewBuffer();
       } else {
         // spill future writes
