@@ -44,4 +44,9 @@ public abstract class KeyValueWriterEdge implements WriterEdge {
    * @throws {@link IOInterruptedException} if IO was performing a blocking operation and was interrupted
    */
   public abstract void write(BytesWritable key, BytesWritable value) throws IOException;
+
+  // Return:
+  //   >= 0: unordered edge
+  //   -1: ordered edge
+  public abstract int getNumUnorderedPartitions();
 }

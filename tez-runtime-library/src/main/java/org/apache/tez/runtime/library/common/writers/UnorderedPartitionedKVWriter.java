@@ -533,6 +533,11 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     }
   }
 
+  @Override
+  public int getNumUnorderedPartitions() {
+    return numPartitions;
+  }
+
   // TODO: optimize, if this method is actually called
   @Override
   public void write(BytesWritable key, Iterable<BytesWritable> values) throws IOException {

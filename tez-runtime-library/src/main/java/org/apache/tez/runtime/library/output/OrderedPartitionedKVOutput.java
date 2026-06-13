@@ -133,6 +133,11 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput implements
       public void write(BytesWritable key, Iterable<BytesWritable> values) throws IOException {
         sorter.write(key, values);
       }
+
+      @Override
+      public int getNumUnorderedPartitions() {
+        return -1;  // because this is ordered
+      }
     };
   }
 
