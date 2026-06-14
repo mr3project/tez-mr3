@@ -112,8 +112,11 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
   }
 
   @Override
-  public long consumeAll(KeyValueReaderEdge.ThrowingBiConsumer<BytesWritable, BytesWritable> consumer) throws Exception {
+  public long consumeAll(
+      Runnable setupForEachReader,
+      KeyValueReaderEdge.ThrowingBiConsumer<BytesWritable, BytesWritable> consumer) throws Exception {
     assert numRecordsRead == 0L;  // must not be mixed with next()
+    setupForEachReader.run();
     while (moveToNextInput()) {
       long currentConsumed = currentReader.consumeAll(consumer);
       inputRecordCounter.increment(currentConsumed);

@@ -87,14 +87,16 @@ public class ConcatenatedMergedKeyValueInput extends MergedLogicalInput implemen
     }
 
     @Override
-    public long consumeAll(KeyValueReaderEdge.ThrowingBiConsumer<BytesWritable, BytesWritable> consumer) throws Exception {
+    public long consumeAll(
+        Runnable setupForEachReader,
+        KeyValueReaderEdge.ThrowingBiConsumer<BytesWritable, BytesWritable> consumer) throws Exception {
       long consumedRecords = 0;
       for (; currentReaderIndex < getInputs().size(); currentReaderIndex++) {
         Reader reader = getInputs().get(currentReaderIndex).getReader();
         if (!(reader instanceof KeyValueReaderEdge)) {
           throw new TezUncheckedException("Expected KeyValueReaderEdge. Got: " + reader.getClass().getName());
         }
-        consumedRecords += ((KeyValueReaderEdge) reader).consumeAll(consumer);
+        consumedRecords += ((KeyValueReaderEdge) reader).consumeAll(setupForEachReader, consumer);
       }
       hasCompletedProcessing();
       completedProcessing = true;

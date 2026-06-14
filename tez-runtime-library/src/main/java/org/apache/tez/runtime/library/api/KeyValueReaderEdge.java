@@ -24,8 +24,6 @@ import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.api.ReaderEdge;
 
 public abstract class KeyValueReaderEdge extends KeyValueReader implements ReaderEdge {
-  // Contract: next() and consumeAll() are mutually exclusive and must not be mixed.
-
   /**
    * Returns the current key
    * @return the current key
@@ -51,7 +49,11 @@ public abstract class KeyValueReaderEdge extends KeyValueReader implements Reade
     void accept(T t, U u) throws Exception;
   }
 
+  // Contract: next() and consumeAll() are mutually exclusive and must not be mixed.
+
   // Invariant:
   //   The backing byte[] arrays of both BytesWritable arguments are immutable.
-  public abstract long consumeAll(ThrowingBiConsumer<BytesWritable, BytesWritable> consumer) throws Exception;
+  public abstract long consumeAll(
+      Runnable setupForEachReader,
+      ThrowingBiConsumer<BytesWritable, BytesWritable> consumer) throws Exception;
 }

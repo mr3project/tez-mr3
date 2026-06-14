@@ -189,7 +189,9 @@ public class UnorderedKVInput extends AbstractLogicalInput implements LogicalInp
         }
 
         @Override
-        public long consumeAll(KeyValueReaderEdge.ThrowingBiConsumer<BytesWritable, BytesWritable> consumer) throws Exception {
+        public long consumeAll(
+            Runnable setupForEachReader,
+            KeyValueReaderEdge.ThrowingBiConsumer<BytesWritable, BytesWritable> consumer) throws Exception {
           hasCompletedProcessing();
           completedProcessing = true;
           return 0L;
