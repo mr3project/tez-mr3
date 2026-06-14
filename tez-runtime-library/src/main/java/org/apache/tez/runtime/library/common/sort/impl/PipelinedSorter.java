@@ -210,8 +210,7 @@ public final class PipelinedSorter {
       LOG.debug(outputContext.getDestinationVertexName() + ": Initial Mem bytes : " +
           initialMemoryAvailable + ", in MB=" + ((initialMemoryAvailable >> 20)));
     }
-    int assignedMb = (int) (initialMemoryAvailable >> 20);
-    this.availableMemoryMb = assignedMb;
+    this.availableMemoryMb = initialMemoryAvailable >> 20;
 
     this.conf.setInt(TezRuntimeFrameworkConfigs.TEZ_RUNTIME_NUM_EXPECTED_PARTITIONS, this.partitions);
     this.partitioner = TezRuntimeUtils.instantiatePartitioner(this.conf);
@@ -302,12 +301,11 @@ public final class PipelinedSorter {
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_RLE_THRESHOLD_FRACTION,
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_RLE_THRESHOLD_FRACTION_DEFAULT);
 
-    LOG.info("Setting up PipelinedSorter for {}, memoryMb={}",
-        outputContext.getDestinationVertexName(), assignedMb);
+    LOG.info("Setting up PipelinedSorter for {}, availableMemoryMb={}, pipelinedShuffle={}",
+        outputContext.getDestinationVertexName(), this.availableMemoryMb, this.isPipelinedShuffle);
 
     // buffers and accounting
-    long maxMemLimit = this.availableMemoryMb << 20;
-
+    final long maxMemLimit = this.availableMemoryMb << 20;
     long totalCapacityWithoutMeta = 0;
     long availableMem = maxMemLimit;
     int numBlocks = 0;
@@ -339,9 +337,7 @@ public final class PipelinedSorter {
         .append(", lazyAllocateMem=").append(lazyAllocateMem)
         .append(", useSoftReference=").append(useSoftReference)
         .append(", minBlockSize=").append(MIN_BLOCK_SIZE)
-        .append(", initial BLOCK_SIZE=").append(buffers.get(0).capacity())
-        .append(", isFinalMergeEnabled=").append(isFinalMergeEnabled)
-        .append(", pipelinedShuffle=").append(isPipelinedShuffle);
+        .append(", initial BLOCK_SIZE=").append(buffers.get(0).capacity());
       LOG.debug(sb.toString());
     }
 

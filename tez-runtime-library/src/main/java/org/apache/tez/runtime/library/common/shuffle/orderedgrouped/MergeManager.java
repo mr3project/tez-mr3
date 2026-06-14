@@ -331,35 +331,31 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
    * Exposing this to get an initial memory ask without instantiating the object.
    */
   static long getInitialMemoryRequirement(Configuration conf, long maxAvailableTaskMemory) {
-    final float maxInMemCopyUse =
-        conf.getFloat(
-            TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT,
-            TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT_DEFAULT);
-      if (maxInMemCopyUse > 1.0 || maxInMemCopyUse < 0.0) {
-        throw new IllegalArgumentException("Invalid value for " +
-            TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT + ": " +
-            maxInMemCopyUse);
-      }
+    float maxInMemCopyUse = conf.getFloat(
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT,
+        TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT_DEFAULT);
+    if (maxInMemCopyUse > 1.0 || maxInMemCopyUse < 0.0) {
+      throw new IllegalArgumentException(
+          TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT + ": " + maxInMemCopyUse);
+    }
+    final long memLimit = (long)(maxAvailableTaskMemory * maxInMemCopyUse);
 
-      // Allow unit tests to fix Runtime memory
-      long memLimit = (long)(maxAvailableTaskMemory * maxInMemCopyUse);
-      
-      float maxRedPer = conf.getFloat(
-          TezRuntimeConfiguration.TEZ_RUNTIME_INPUT_POST_MERGE_BUFFER_PERCENT,
-          TezRuntimeConfiguration.TEZ_RUNTIME_INPUT_BUFFER_PERCENT_DEFAULT);
-      if (maxRedPer > 1.0 || maxRedPer < 0.0) {
-        throw new TezUncheckedException(TezRuntimeConfiguration.TEZ_RUNTIME_INPUT_POST_MERGE_BUFFER_PERCENT + maxRedPer);
-      }
-      long maxRedBuffer = (long) (maxAvailableTaskMemory * maxRedPer);
+    float maxRedPer = conf.getFloat(
+        TezRuntimeConfiguration.TEZ_RUNTIME_INPUT_POST_MERGE_BUFFER_PERCENT,
+        TezRuntimeConfiguration.TEZ_RUNTIME_INPUT_BUFFER_PERCENT_DEFAULT);
+    if (maxRedPer > 1.0 || maxRedPer < 0.0) {
+      throw new TezUncheckedException(
+        TezRuntimeConfiguration.TEZ_RUNTIME_INPUT_POST_MERGE_BUFFER_PERCENT + ": " + maxRedPer);
+    }
+    final long maxRedBuffer = (long) (maxAvailableTaskMemory * maxRedPer);
 
-      if (isDebugEnabled) {
-        LOG.debug("Initial Memory required for SHUFFLE_BUFFER=" + memLimit +
-            " based on INPUT_BUFFER_FACTOR=" + maxInMemCopyUse + ",  for final merged output=" +
-            maxRedBuffer + ", using factor: " + maxRedPer);
-      }
+    if (isDebugEnabled) {
+      LOG.debug("Initial Memory required for SHUFFLE_BUFFER=" + memLimit +
+          " based on INPUT_BUFFER_FACTOR=" + maxInMemCopyUse + ",  for final merged output=" +
+          maxRedBuffer + ", using factor: " + maxRedPer);
+    }
 
-      long reqMem = Math.max(maxRedBuffer, memLimit);
-      return reqMem;
+    return Math.max(maxRedBuffer, memLimit);
   }
 
   public void waitForInMemoryMerge() throws InterruptedException {

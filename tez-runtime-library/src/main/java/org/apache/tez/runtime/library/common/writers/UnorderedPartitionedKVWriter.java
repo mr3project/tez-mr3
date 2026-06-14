@@ -304,8 +304,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     this.outputFileHandler = TezRuntimeUtils.instantiateTaskOutputManager(
         this.conf, outputContext, this.compositeFetch);
 
-    Preconditions.checkArgument(availableMemoryBytes >= 0, "availableMemory should be >= 0 bytes");
-    Preconditions.checkArgument(!(availableMemoryBytes == 0) || numPartitions == 1, "availableMemory can be set to 0 only when numPartitions=1");
+    Preconditions.checkArgument(availableMemoryBytes > 0, "availableMemory should be > 0 bytes");
     // Ideally, should be significantly larger.
     this.availableMemoryBytes = availableMemoryBytes;
 
@@ -1086,11 +1085,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
         TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_OUTPUT_BUFFER_SIZE_MB_DEFAULT);
     Preconditions.checkArgument(initialMemRequestMb != 0,
         TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_OUTPUT_BUFFER_SIZE_MB + " should be larger than 0");
-    long reqBytes = initialMemRequestMb << 20;
-    if (isDebugEnabled) {
-      LOG.debug("Requested BufferSize ({}): {}", TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_OUTPUT_BUFFER_SIZE_MB, initialMemRequestMb);
-    }
-    return reqBytes;
+    return initialMemRequestMb << 20;
   }
 
   private boolean canSendDataOverDME() {

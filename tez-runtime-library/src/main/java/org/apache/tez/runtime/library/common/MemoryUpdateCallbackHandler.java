@@ -38,6 +38,6 @@ public class MemoryUpdateCallbackHandler extends MemoryUpdateCallback {
   }
 
   public synchronized void validateUpdateReceived() {
-    Preconditions.checkState(updated == true, "Iniital memory update not received");
+    Preconditions.checkState(updated == true, "Initial memory update not received");
   }
 }
