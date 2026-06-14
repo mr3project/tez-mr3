@@ -92,7 +92,7 @@ public class Shuffle implements ExceptionReporter {
   private final TezCounter shufflePhaseTime;
 
   public Shuffle(InputContext inputContext, Configuration conf, int numInputs,
-      long initialMemoryAvailable) throws IOException {
+      long assignedMemoryBytes) throws IOException {
     this.inputContext = inputContext;
     this.srcNameTrimmed = TezUtilsInternal.cleanVertexName(inputContext.getSourceVertexName());
 
@@ -134,7 +134,7 @@ public class Shuffle implements ExceptionReporter {
         spilledRecordsCounter,
         mergedMapOutputsCounter,
         this,
-        initialMemoryAvailable,
+        assignedMemoryBytes,
         codec,
         ifileReadAhead,
         ifileReadAheadLength);

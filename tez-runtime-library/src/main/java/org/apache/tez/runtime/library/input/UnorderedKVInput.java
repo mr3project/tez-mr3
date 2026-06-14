@@ -66,7 +66,6 @@ public class UnorderedKVInput extends AbstractLogicalInput implements LogicalInp
   private final BlockingQueue<Event> pendingEvents = new LinkedBlockingQueue<Event>();
   private long firstEventReceivedTime = -1;
   private MemoryUpdateCallbackHandler memoryUpdateCallbackHandler;
-  @SuppressWarnings("rawtypes")
   private UnorderedKVReader kvReader;
 
   private final AtomicBoolean isStarted = new AtomicBoolean(false);
@@ -155,9 +154,9 @@ public class UnorderedKVInput extends AbstractLogicalInput implements LogicalInp
           ifileReadAhead, ifileReadAheadLength);
       List<Event> pending = new LinkedList<Event>();
       pendingEvents.drainTo(pending);
-      if (pending.size() > 0) {
+      if (!pending.isEmpty()) {
         if (LOG.isDebugEnabled()) {
-          LOG.debug(inputContext.getSourceVertexName() + ": " + "NoAutoStart delay in processing first event: "
+          LOG.debug(inputContext.getSourceVertexName() + ": NoAutoStart delay in processing first event: "
               + (System.currentTimeMillis() - firstEventReceivedTime));
         }
         inputEventHandler.handleEvents(pending);

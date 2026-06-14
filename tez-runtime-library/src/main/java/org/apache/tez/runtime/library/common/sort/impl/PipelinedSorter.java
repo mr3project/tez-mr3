@@ -58,7 +58,6 @@ import org.apache.tez.common.TezCommonUtils;
 import org.apache.tez.runtime.api.OutputContext;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration.ReportPartitionStats;
-import org.apache.tez.runtime.library.common.serializer.SerializationContext;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterBytesWritable;
@@ -88,7 +87,7 @@ public final class PipelinedSorter {
 
   private int numSpills;
   private final boolean cleanup;
-  private final long availableMemoryMb;
+  private final long assignedMemoryMb;
   private final Partitioner partitioner;
   private final CompressionCodec codec;
   private final boolean ifileReadAhead;
@@ -141,10 +140,10 @@ public final class PipelinedSorter {
 
   private final double rleThresholdFraction;
 
-  private long currentAllocatableMemory;
+  private long currentAllocatableMemoryBytes;
   final int maxNumberOfBlocks;
-  //total memory capacity allocated to sorter
-  private final long capacity;
+  // total memory capacity allocated to sorter
+  private final long capacityBytes;
 
   // Maintain a list of ByteBuffers
   final List<ByteBuffer> buffers;
@@ -188,7 +187,7 @@ public final class PipelinedSorter {
   private int bufferOverflowRecursion = 0;
 
   public PipelinedSorter(OutputContext outputContext, Configuration conf, int numOutputs,
-      long initialMemoryAvailable) throws IOException {
+      long assignedMemoryBytes) throws IOException {
     this.outputContext = outputContext;
     this.conf = conf;
     this.partitions = numOutputs;
@@ -206,11 +205,11 @@ public final class PipelinedSorter {
     this.cleanup = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT,
         TezRuntimeConfiguration.TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT_DEFAULT);
 
-    if (LOG.isDebugEnabled()) {
+    if (isDebugEnabled) {
       LOG.debug(outputContext.getDestinationVertexName() + ": Initial Mem bytes : " +
-          initialMemoryAvailable + ", in MB=" + ((initialMemoryAvailable >> 20)));
+          assignedMemoryBytes + ", in MB=" + ((assignedMemoryBytes >> 20)));
     }
-    this.availableMemoryMb = initialMemoryAvailable >> 20;
+    this.assignedMemoryMb = assignedMemoryBytes >> 20;
 
     this.conf.setInt(TezRuntimeFrameworkConfigs.TEZ_RUNTIME_NUM_EXPECTED_PARTITIONS, this.partitions);
     this.partitioner = TezRuntimeUtils.instantiatePartitioner(this.conf);
@@ -302,29 +301,29 @@ public final class PipelinedSorter {
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_RLE_THRESHOLD_FRACTION_DEFAULT);
 
     LOG.info("Setting up PipelinedSorter for {}, availableMemoryMb={}, pipelinedShuffle={}",
-        outputContext.getDestinationVertexName(), this.availableMemoryMb, this.isPipelinedShuffle);
+        outputContext.getDestinationVertexName(), this.assignedMemoryMb, this.isPipelinedShuffle);
 
     // buffers and accounting
-    final long maxMemLimit = this.availableMemoryMb << 20;
+    final long maxMemLimitBytes = this.assignedMemoryMb << 20;
     long totalCapacityWithoutMeta = 0;
-    long availableMem = maxMemLimit;
+    long availableMem = maxMemLimitBytes;
     int numBlocks = 0;
     while (availableMem > 0) {
-      long size = Math.min(availableMem, computeBlockSize(availableMem, maxMemLimit));
+      long size = Math.min(availableMem, computeBlockSize(availableMem, maxMemLimitBytes));
       int sizeWithoutMeta = (int) ((size) - (size % METASIZE));
       totalCapacityWithoutMeta += sizeWithoutMeta;
       availableMem -= size;
       numBlocks++;
     }
-    this.currentAllocatableMemory = maxMemLimit;
+    this.currentAllocatableMemoryBytes = maxMemLimitBytes;
     this.maxNumberOfBlocks = numBlocks;
-    this.capacity = totalCapacityWithoutMeta;
+    this.capacityBytes = totalCapacityWithoutMeta;
 
     this.buffers = Lists.newArrayListWithCapacity(maxNumberOfBlocks);
     this.bufferUsage = Lists.newArrayListWithCapacity(maxNumberOfBlocks);
     allocateSpace();  // Allocate the first block
     if (!this.lazyAllocateMem) {
-      // LOG.info("Pre allocating rest of memory buffers upfront");
+      // pre-allocating rest of memory buffers upfront
       while (allocateSpace() != null);
     }
 
@@ -333,7 +332,7 @@ public final class PipelinedSorter {
       StringBuilder sb = new StringBuilder("PipelinedSorter for ")
         .append(outputContext.getDestinationVertexName())
         .append(": #blocks=").append(maxNumberOfBlocks)
-        .append(", maxMemUsage=").append(maxMemLimit)
+        .append(", maxMemUsage=").append(maxMemLimitBytes)
         .append(", lazyAllocateMem=").append(lazyAllocateMem)
         .append(", useSoftReference=").append(useSoftReference)
         .append(", minBlockSize=").append(MIN_BLOCK_SIZE)
@@ -361,13 +360,13 @@ public final class PipelinedSorter {
   }
 
   ByteBuffer allocateSpace() {
-    if (currentAllocatableMemory <= 0) {
+    if (currentAllocatableMemoryBytes <= 0) {
       // No space available.
       return null;
     }
 
-    int size = computeBlockSize(currentAllocatableMemory, availableMemoryMb << 20);
-    currentAllocatableMemory -= size;
+    int size = computeBlockSize(currentAllocatableMemoryBytes, assignedMemoryMb << 20);
+    currentAllocatableMemoryBytes -= size;
     int sizeWithoutMeta = (size) - (size % METASIZE);
 
     ByteBuffer space;
@@ -378,7 +377,7 @@ public final class PipelinedSorter {
         space = bufferFromCache;
         LOG.info("Reusing ByteBuffer from soft cache: {} {}",sizeWithoutMeta, space.capacity());
       } else {
-        LOG.info("Creating a new ByteBuffer: " + sizeWithoutMeta);
+        LOG.info("Creating a new ByteBuffer: {}", sizeWithoutMeta);
         space = ByteBuffer.allocate(sizeWithoutMeta);
       }
     } else {
@@ -396,9 +395,9 @@ public final class PipelinedSorter {
       StringBuilder allocLog = new StringBuilder("Newly allocated block size=" + size);
       allocLog.append(", index=").append(bufferIndex);
       allocLog.append(", Number of buffers=").append(buffers.size());
-      allocLog.append(", currentAllocatableMemory=").append(currentAllocatableMemory);
+      allocLog.append(", currentAllocatableMemory=").append(currentAllocatableMemoryBytes);
       allocLog.append(", currentBufferSize=").append(space.capacity());
-      allocLog.append(", total=").append(availableMemoryMb << 20);
+      allocLog.append(", total=").append(assignedMemoryMb << 20);
       LOG.debug(allocLog.toString());
     }
     return space;
@@ -456,15 +455,15 @@ public final class PipelinedSorter {
       // Use the next buffer
       bufferIndex = (bufferIndex + 1) % buffers.size();
       bufferUsage.set(bufferIndex, bufferUsage.get(bufferIndex) + 1);
-      int items = 1024*1024;
+      int items = 1024 * 1024;
       int perItem = 16;
       if (span.length() != 0) {
         items = span.length();
         perItem = span.kvbuffer.limit()/items;
         items = (int) ((span.capacity)/(METASIZE+perItem));
-        if (items > 1024*1024) {
+        if (items > 1024 * 1024) {
             // our goal is to have 1M splits and sort early
-            items = 1024*1024;
+            items = 1024 * 1024;
         }
       }
       Preconditions.checkArgument(buffers.get(bufferIndex) != null, "block should not be empty");
@@ -690,7 +689,7 @@ public final class PipelinedSorter {
 
     // create spill file
 
-    final long size = capacity + (partitions * APPROX_HEADER_LENGTH);
+    final long size = capacityBytes + (partitions * APPROX_HEADER_LENGTH);
     final TezSpillRecord spillRec = new TezSpillRecord(partitions);
     final Path spillFileName = mapOutputFile.getSpillFileForWrite(numSpills, size);
     spillFilePaths.put(numSpills, spillFileName);
@@ -1140,7 +1139,7 @@ public final class PipelinedSorter {
     Preconditions.checkArgument(initialMemRequestMb > 0 && reqBytes < maxAvailableTaskMemory,
         "{} {} should be larger than 0 and should be less than the available task memory (MB): {}",
         TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB, initialMemRequestMb, maxAvailableTaskMemory >> 20);
-    if (LOG.isDebugEnabled()) {
+    if (isDebugEnabled) {
       LOG.debug("Requested SortBufferSize ("
           + TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB + "): " + initialMemRequestMb);
     }

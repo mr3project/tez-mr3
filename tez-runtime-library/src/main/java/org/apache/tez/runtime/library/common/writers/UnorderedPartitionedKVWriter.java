@@ -151,7 +151,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
 
   private final TezTaskOutput outputFileHandler;
 
-  private final long availableMemoryBytes;
+  private final long assignedMemoryBytes;
 
   private final FileSystem rfs;
   private final boolean rfsSpillFilePerms;
@@ -269,7 +269,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
   private int singlePartitionSpillRecords;
 
   public UnorderedPartitionedKVWriter(OutputContext outputContext, Configuration conf,
-      int numOutputs, long availableMemoryBytes) throws IOException {
+      int numOutputs, long assignedMemoryBytes) throws IOException {
     this.outputContext = outputContext;
     this.conf = conf;
     this.destNameTrimmed = TezUtilsInternal.cleanVertexName(outputContext.getDestinationVertexName());
@@ -304,9 +304,9 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     this.outputFileHandler = TezRuntimeUtils.instantiateTaskOutputManager(
         this.conf, outputContext, this.compositeFetch);
 
-    Preconditions.checkArgument(availableMemoryBytes > 0, "availableMemory should be > 0 bytes");
+    Preconditions.checkArgument(assignedMemoryBytes > 0, "availableMemory should be > 0 bytes");
     // Ideally, should be significantly larger.
-    this.availableMemoryBytes = availableMemoryBytes;
+    this.assignedMemoryBytes = assignedMemoryBytes;
 
     this.rfs = FileSystem.getLocal(this.conf).getRaw();
     this.rfsSpillFilePerms = TezSpillRecord.SPILL_FILE_PERMS.equals(
@@ -380,13 +380,13 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       // In order to prevent the last record exceeding the boundary from creating a spill file
       // in writeSinglePartitionPipelined(), reserve the last 1024 bytes as unused bytes.
       this.singlePartitionSpillSizeLimit =
-        isPipelinedShuffle ? Math.max(1L, availableMemoryBytes - 1024) : 0;
+        isPipelinedShuffle ? Math.max(1L, assignedMemoryBytes - 1024) : 0;
 
       if (!isPipelinedShuffle) {
         byte[] writeBuffer = IFile.allocateWriteBuffer();
         Path finalOutPath = outputFileHandler.getOutputFileForWrite();
         this.singlePartitionByteArrayOutput =
-            new MultiByteArrayOutputStream(rfs, finalOutPath, availableMemoryBytes);
+            new MultiByteArrayOutputStream(rfs, finalOutPath, assignedMemoryBytes);
         FSDataOutputStream output = new FSDataOutputStream(singlePartitionByteArrayOutput, null);
         this.writer = new IFile.WriterBytesWritable(output, codec, outputRecordsCounter,
             outputRecordBytesCounter, trackMaxKeyValLen, -1, -1, writeBuffer, null, outputContext);
@@ -459,7 +459,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     this.spillExecutor = MoreExecutors.listeningDecorator(executor);
 
     LOG.info("{}: pipelinedShuffle={}, sizePerBuffer={}, numPartitions={}, availableMemory={}",
-        destNameTrimmed, isPipelinedShuffle, sizePerBuffer, numPartitions, this.availableMemoryBytes);
+        destNameTrimmed, isPipelinedShuffle, sizePerBuffer, numPartitions, this.assignedMemoryBytes);
     if (isDebugEnabled) {
       LOG.debug("numBuffers=" + numBuffers
           + ", considerDataViaEvents=" + considerDataViaEvents
@@ -481,10 +481,10 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
           TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_PARTITIONED_NON_PIPELINED_NUM_BUFFERS_DEFAULT);
       numBuffers = Math.max(numBuffers, 2);
       spillLimit = numBuffers - 1;
-      if (availableMemoryBytes / numBuffers > Integer.MAX_VALUE) {
+      if (assignedMemoryBytes / numBuffers > Integer.MAX_VALUE) {
         sizePerBuffer = Integer.MAX_VALUE;
       } else {
-        sizePerBuffer = (int)(availableMemoryBytes / numBuffers);
+        sizePerBuffer = (int)(assignedMemoryBytes / numBuffers);
       }
       Preconditions.checkArgument(sizePerBuffer >= 8 * 1024 * 1024,
           "Insufficient memory for %s: sizePerBuffer=%s (< 8MB)",
@@ -492,10 +492,10 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       // equal sized buffers
       lastBufferSize = sizePerBuffer;
     } else {
-      numBuffers = (int)(availableMemoryBytes / bufferLimit);
+      numBuffers = (int)(assignedMemoryBytes / bufferLimit);
       if (numBuffers >= 2) {
         sizePerBuffer = bufferLimit - ALLOC_OVERHEAD;
-        lastBufferSize = (int)(availableMemoryBytes % bufferLimit);
+        lastBufferSize = (int)(assignedMemoryBytes % bufferLimit);
         // Use leftover memory last buffer only if the leftover memory > 50% of bufferLimit
         if (lastBufferSize > bufferLimit / 2) {
           numBuffers += 1;
@@ -507,10 +507,10 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
         }
       } else {
         numBuffers = 2;   // we should have minimum of 2 buffers
-        if (availableMemoryBytes / numBuffers > Integer.MAX_VALUE) {
+        if (assignedMemoryBytes / numBuffers > Integer.MAX_VALUE) {
           sizePerBuffer = Integer.MAX_VALUE;
         } else {
-          sizePerBuffer = (int)(availableMemoryBytes / numBuffers);
+          sizePerBuffer = (int)(assignedMemoryBytes / numBuffers);
         }
         lastBufferSize = sizePerBuffer;   // 2 equal sized buffers
       }
@@ -631,7 +631,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     if (spillNumber == 0) {
       // availableMemoryBytes is reserved for this UnorderedPartitionedKVWriter, so create MultiByteArrayOutputStream
       singlePartitionByteArrayOutput = new MultiByteArrayOutputStream(
-          rfs, singlePartitionSpillPathDetails.outputFilePath, availableMemoryBytes);
+          rfs, singlePartitionSpillPathDetails.outputFilePath, assignedMemoryBytes);
       singlePartitionSpillOutput = new FSDataOutputStream(singlePartitionByteArrayOutput, null);
     } else {
       // we have consumed availableMemoryBytes reserved for this UnorderedPartitionedKVWriter, so check free memory

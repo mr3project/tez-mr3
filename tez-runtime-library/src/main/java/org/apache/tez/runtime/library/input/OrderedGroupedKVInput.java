@@ -75,7 +75,6 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
   protected MemoryUpdateCallbackHandler memoryUpdateCallbackHandler;
   private final BlockingQueue<Event> pendingEvents = new LinkedBlockingQueue<Event>();
   private long firstEventReceivedTime = -1;
-  @SuppressWarnings("rawtypes")
   protected ValuesIterator vIter;
 
   private TezCounter inputKeyCounter;
@@ -94,7 +93,7 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
     this.conf = getContext().getConfigurationFromUserPayload(true);
 
     if (this.getNumPhysicalInputs() == 0) {
-      getContext().requestInitialMemory(0l, null);
+      getContext().requestInitialMemory(0L, null);
       isStarted.set(true);
       getContext().inputIsReady();
       LOG.info("input fetch not required since there are 0 physical inputs for input vertex: {}",
@@ -127,7 +126,7 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
       }
       List<Event> pending = new LinkedList<Event>();
       pendingEvents.drainTo(pending);
-      if (pending.size() > 0) {
+      if (!pending.isEmpty()) {
         if (LOG.isDebugEnabled()) {
           LOG.debug("NoAutoStart delay in processing first event: "
               + (System.currentTimeMillis() - firstEventReceivedTime));
@@ -139,7 +138,8 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
   }
 
   Shuffle createShuffle() throws IOException {
-    return new Shuffle(getContext(), conf, getNumPhysicalInputs(), memoryUpdateCallbackHandler.getMemoryAssigned());
+    return new Shuffle(getContext(), conf, getNumPhysicalInputs(),
+        memoryUpdateCallbackHandler.getMemoryAssigned());
   }
 
   /**
@@ -282,19 +282,9 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
   }
 
   private synchronized void createValuesIterator() {
-    // Not used by ReduceProcessor
-    Class<?> keyClass = SerializationContext.getKeyClass();
-    Class<?> valClass = SerializationContext.getValueClass();
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("{}: creating ValuesIterator with keyClass={}, valClass={}",
-          getContext().getSourceVertexName(),
-          keyClass.getName(), valClass.getName());
-    }
-
     vIter = new ValuesIterator(rawIter, inputKeyCounter, inputValueCounter);
   }
 
-  @SuppressWarnings("rawtypes")
   private static class OrderedGroupedKeyValuesReader extends KeyValuesReaderEdge {
 
     private final ValuesIterator valuesIter;
@@ -314,7 +304,6 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public Iterable<BytesWritable> getCurrentValues() throws IOException {
       return valuesIter.getValues();
     }

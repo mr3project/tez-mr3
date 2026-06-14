@@ -20,7 +20,7 @@ package org.apache.tez.runtime.library.common.shuffle.orderedgrouped;
 /**
  * An interface for reporting exceptions to other threads
  */
-interface ExceptionReporter {
+public interface ExceptionReporter {
   void reportException(Throwable t);
   void killSelf(Exception exception, String message);
 }

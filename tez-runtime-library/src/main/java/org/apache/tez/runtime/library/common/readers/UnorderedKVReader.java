@@ -93,7 +93,7 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
         }
         nextInputExists = moveToNextInput();
       }
-      LOG.info("Num Records read: " + numRecordsRead);
+      LOG.info("Num Records read: {}", numRecordsRead);
       completedProcessing = true;
       return false;
     }
@@ -122,7 +122,7 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
       inputRecordCounter.increment(currentConsumed);
       numRecordsRead += currentConsumed;
     }
-    LOG.info("Num Records read: {}", numRecordsRead);
+    LOG.info("Num Records read in consumeAll(): {}", numRecordsRead);
     completedProcessing = true;
     return numRecordsRead;
   }

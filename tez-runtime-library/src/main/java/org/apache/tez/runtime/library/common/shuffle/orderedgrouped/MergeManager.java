@@ -91,8 +91,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   final Set<FileChunk> onDiskMapOutputs = new TreeSet<FileChunk>();
   final OnDiskMerger onDiskMerger;
   
-  private final long memoryLimit;
-  final long postMergeMemLimit;
+  private final long memoryLimitBytes;
+  final long postMergeMemoryLimitBytes;
 
   // Lifecycle of InMemoryMapOutput:
   // - create InMemoryMapOutput, increase usedMemory
@@ -123,11 +123,11 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   private long commitMemory;
 
   private final int ioSortFactor;
-  private final long maxSingleShuffleLimit;
 
   private final AtomicBoolean isShutdown = new AtomicBoolean(false);
 
-  private final int memToMemMergeOutputsThreshold; 
+  private final long maxSingleShuffleLimit;
+  private final int memToMemMergeOutputsThreshold;
   private final long mergeThreshold;
   
   private final ExceptionReporter exceptionReporter;
@@ -171,7 +171,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
                       TezCounter spilledRecordsCounter,
                       TezCounter mergedMapOutputsCounter,
                       ExceptionReporter exceptionReporter,
-                      long memoryAssigned,
+                      long assignedMemoryBytes,
                       CompressionCodec codec,
                       boolean ifileReadAheadEnabled,
                       int ifileReadAheadLength) {
@@ -230,16 +230,16 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     }
     long maxRedBuffer = (long)(maxTaskAvailableMemory * maxRedPer);
 
-    if (memoryAssigned < memLimit) {
-      this.memoryLimit = memoryAssigned;
+    if (assignedMemoryBytes < memLimit) {
+      this.memoryLimitBytes = assignedMemoryBytes;
     } else {
-      this.memoryLimit = memLimit;
+      this.memoryLimitBytes = memLimit;
     }
     
-    if (memoryAssigned < maxRedBuffer) {
-      this.postMergeMemLimit = memoryAssigned;
+    if (assignedMemoryBytes < maxRedBuffer) {
+      this.postMergeMemoryLimitBytes = assignedMemoryBytes;
     } else {
-      this.postMergeMemLimit = maxRedBuffer;
+      this.postMergeMemoryLimitBytes = maxRedBuffer;
     }
 
     this.ioSortFactor = conf.getInt(
@@ -256,19 +256,19 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
           + maxSingleShuffleMemoryLimitPercent);
     }
 
-    //TODO: Cap it to MAX_VALUE until MapOutput starts supporting > 2 GB
-    this.maxSingleShuffleLimit = (long) Math.min((memoryLimit * maxSingleShuffleMemoryLimitPercent), Integer.MAX_VALUE);
+    // TODO: Cap it to MAX_VALUE until MapOutput starts supporting > 2 GB
+    this.maxSingleShuffleLimit = (long) Math.min((memoryLimitBytes * maxSingleShuffleMemoryLimitPercent), Integer.MAX_VALUE);
     this.memToMemMergeOutputsThreshold = conf.getInt(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MEMTOMEM_SEGMENTS, ioSortFactor);
-    this.mergeThreshold = (long)(this.memoryLimit * conf.getFloat(
+    this.mergeThreshold = (long)(this.memoryLimitBytes * conf.getFloat(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MERGE_PERCENT,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MERGE_PERCENT_DEFAULT));
     if (isDebugEnabled) {
-      LOG.debug(inputContext.getSourceVertexName() + ": MergerManager: memoryLimit=" + memoryLimit + ", " +
+      LOG.debug(inputContext.getSourceVertexName() + ": MergerManager: memoryLimitBytes=" + memoryLimitBytes + ", " +
                "maxSingleShuffleLimit=" + maxSingleShuffleLimit + ", " +
                "mergeThreshold=" + mergeThreshold + ", " +
                "ioSortFactor=" + ioSortFactor + ", " +
-               "postMergeMem=" + postMergeMemLimit + ", " +
+               "postMergeMemLimitBytes=" + postMergeMemoryLimitBytes + ", " +
                "memToMemMergeOutputsThreshold=" + memToMemMergeOutputsThreshold);
     }
     
@@ -377,15 +377,12 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     }
     if (triggerAdditionalMerge) {
       inMemoryMerger.waitForMerge();
-      if (isDebugEnabled) {
-        LOG.debug("Additional in-memory merge triggered");
-      }
     }
   }
 
   public synchronized void waitForShuffleToMergeMemory() throws InterruptedException {
     long startTime = System.currentTimeMillis();
-    while (this.usedMemory > memoryLimit) {
+    while (this.usedMemory > memoryLimitBytes) {
       wait();
     }
     if (isDebugEnabled) {
@@ -430,7 +427,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     // all the stalled threads
 
     synchronized (this) {
-      if (this.usedMemory > memoryLimit) {
+      if (this.usedMemory > memoryLimitBytes) {
         if (!useFreeMemoryFetchedInput || !hasFreeMemoryForSize(actualSize)) {
           // this ContainerWorker is busy serving Tasks, so do not borrow
           return stallShuffle;
@@ -471,7 +468,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         // usedMemoryForMergeManager = 0 because this MemoryMapOutput should not contribute to usedMemory
         MapOutput result = unconditionalReserve(
             srcAttemptIdentifier, usedMemoryForMergeManager, actualSize, true);
-        if (LOG.isDebugEnabled()) {
+        if (isDebugEnabled) {
           LOG.debug("Created MemoryMapOutput: {}, {}", this.usedMemory, actualSize);
         }
         return result;
@@ -484,7 +481,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
   private MapOutput getDiskMapOutput(
       long compressedLength, InputAttemptIdentifier srcAttemptIdentifier, int fetcher) throws IOException {
-    if (LOG.isDebugEnabled()) {
+    if (isDebugEnabled) {
       LOG.debug("Creating DiskMapOutput: {}", compressedLength);
     }
     return MapOutput.createDiskMapOutput(srcAttemptIdentifier, this, compressedLength, conf,
@@ -686,9 +683,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     }
 
     try {
-      if (isDebugEnabled) {
-        LOG.debug("Deleting " + path);
-      }
       fs.delete(path, true);
     } catch (IOException e) {
       LOG.warn("Error in deleting {}", path);
@@ -736,14 +730,14 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
           // we will create a buffer big enough to hold the sum of the actual sizes of all selected inputs.
           // Adding manager.getUsedMemory() is okay because
           // the guard is about whether we can safely charge the new merged buffer under the budget.
-          if ((mergeOutputSize + mo.getSizeForMergeMemoryAccounting() + manager.getUsedMemory()) > memoryLimit) {
+          if ((mergeOutputSize + mo.getSizeForMergeMemoryAccounting() + manager.getUsedMemory()) > memoryLimitBytes) {
             // Search for smaller segments that can fit into existing mem
             if (isDebugEnabled) {
               LOG.debug("Size is greater than usedMemory. "
                   + "mergeOutputSize=" + mergeOutputSize
                   + ", moSize=" + mo.getSizeForMergeMemoryAccounting()
                   + ", usedMemory=" + manager.getUsedMemory()
-                  + ", memoryLimit=" + memoryLimit);
+                  + ", memoryLimit=" + memoryLimitBytes);
             }
           } else {
             mergeOutputSize += mo.getSizeForMergeMemoryAccounting();
@@ -1161,7 +1155,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     long inMemToDiskBytes = 0;
     if (!inMemoryMapOutputs.isEmpty()) {
       int srcTaskId = inMemoryMapOutputs.get(0).getAttemptIdentifier().getInputIdentifier();
-      inMemToDiskBytes = createInMemorySegments(inMemoryMapOutputs, memDiskSegments, this.postMergeMemLimit);
+      inMemToDiskBytes = createInMemorySegments(inMemoryMapOutputs, memDiskSegments, this.postMergeMemoryLimitBytes);
       final int numMemDiskSegments = memDiskSegments.size();
       if (numMemDiskSegments > 0 && ioSortFactor > onDiskMapOutputs.size()) {
         
@@ -1230,8 +1224,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       onDiskBytes += fileLength;
       if (isDebugEnabled) {
         LOG.debug("Disk file=" + fileChunk.getPath() + ", len=" + fileLength +
-            ", isLocal=" +
-            fileChunk.isLocalFile());
+            ", isLocal=" + fileChunk.isLocalFile());
       }
 
       final Path file = fileChunk.getPath();

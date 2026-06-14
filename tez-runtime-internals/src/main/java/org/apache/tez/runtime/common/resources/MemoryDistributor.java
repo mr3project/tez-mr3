@@ -73,7 +73,7 @@ public class MemoryDistributor {
       int numTotalInputs, int numTotalOutputs, Configuration conf, long totalMemory,
       String taskAttemptIdStr) {
     this.conf = conf;
-    isEnabled = conf.getBoolean(TezConfiguration.TEZ_TASK_SCALE_MEMORY_ENABLED,
+    this.isEnabled = conf.getBoolean(TezConfiguration.TEZ_TASK_SCALE_MEMORY_ENABLED,
         TezConfiguration.TEZ_TASK_SCALE_MEMORY_ENABLED_DEFAULT);
 
     this.numTotalInputs = numTotalInputs;
