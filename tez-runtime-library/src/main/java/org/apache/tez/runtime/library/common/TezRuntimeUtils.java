@@ -31,6 +31,7 @@ import org.apache.tez.http.HttpConnection;
 import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.http.SSLFactory;
 import org.apache.tez.runtime.library.common.security.SecureShuffleUtils;
+import org.apache.tez.runtime.library.output.UnorderedKVOutput;
 import org.apache.tez.runtime.library.partitioner.HashPartitioner;
 import org.apache.tez.runtime.library.partitioner.ValueHashPartitioner;
 import org.slf4j.Logger;
@@ -49,33 +50,24 @@ public class TezRuntimeUtils {
   // Shared by multiple threads
   private static volatile SSLFactory sslFactory;
 
-  @SuppressWarnings("unchecked")
   public static Partitioner instantiatePartitioner(Configuration conf) throws IOException {
     String className = conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_PARTITIONER_CLASS);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Using partitioner class: " + className);
-    }
+
+    // BROADCAST_EDGE, ONE_TO_ONE_EDGE: CustomPartitioner (set in UnorderedKVOutput.initialize())
+    // CUSTOM_EDGE: HashPartitioner
+    // CUSTOM_SIMPLE_EDGE: HashPartitioner
+    // XPROD_EDGE: ValueHashPartitioner
+    // SIMPLE_EDGE and default: HashPartitioner
+
     if (HashPartitioner.class.getName().equals(className)) {
       return new HashPartitioner();
     } else if (ValueHashPartitioner.class.getName().equals(className)) {
       return new ValueHashPartitioner();
+    } else {
+      // UnorderedPartitionedKVWriter does not create Partitioner for BROADCAST_EDGE and ONE_TO_ONE_EDGE
+      assert false;
+      return new UnorderedKVOutput.CustomPartitioner();
     }
-
-    Class<? extends Partitioner> clazz;
-    try {
-      clazz = (Class<? extends Partitioner>) conf.getClassByName(className);
-    } catch (ClassNotFoundException e) {
-      throw new IOException("Unable to find Partitioner class specified in config: " + className, e);
-    }
-
-    Partitioner partitioner;
-    try {
-      Constructor<? extends Partitioner> ctorWithConf = clazz.getConstructor();
-      partitioner = ctorWithConf.newInstance();
-    } catch (Exception e) {
-      throw new IOException(e);
-    }
-    return partitioner;
   }
 
   public static TezTaskOutput instantiateTaskOutputManager(

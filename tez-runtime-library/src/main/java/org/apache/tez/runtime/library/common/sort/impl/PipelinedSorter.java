@@ -216,14 +216,6 @@ public final class PipelinedSorter {
     this.conf.setInt(TezRuntimeFrameworkConfigs.TEZ_RUNTIME_NUM_EXPECTED_PARTITIONS, this.partitions);
     this.partitioner = TezRuntimeUtils.instantiatePartitioner(this.conf);
 
-    LOG.info("{}, memoryMb={}", outputContext.getDestinationVertexName(), assignedMb);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("keyClass=" + SerializationContext.getKeyClass()
-          + ", valueClass=" + SerializationContext.getValueClass()
-          + ", partitioner=" + conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_PARTITIONER_CLASS)
-          + ", reportPartitionStats=" + reportPartitionStats);
-    }
-
     Object shuffleServer = outputContext.peekShuffleServer();
     Configuration codecConf = ShuffleServer.getCodecConf(shuffleServer, conf);
     Class<? extends CompressionCodec> codecClass =
@@ -310,7 +302,8 @@ public final class PipelinedSorter {
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_RLE_THRESHOLD_FRACTION,
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_RLE_THRESHOLD_FRACTION_DEFAULT);
 
-    LOG.info("Setting up PipelinedSorter for {}", outputContext.getDestinationVertexName());
+    LOG.info("Setting up PipelinedSorter for {}, memoryMb={}",
+        outputContext.getDestinationVertexName(), assignedMb);
 
     // buffers and accounting
     long maxMemLimit = this.availableMemoryMb << 20;

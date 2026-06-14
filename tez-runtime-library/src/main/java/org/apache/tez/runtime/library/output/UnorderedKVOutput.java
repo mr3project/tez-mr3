@@ -71,19 +71,20 @@ public class UnorderedKVOutput extends AbstractLogicalOutput implements LogicalO
     this.conf = getContext().getConfigurationFromUserPayload(true);
     this.conf.setStrings(TezRuntimeFrameworkConfigs.LOCAL_DIRS, getContext().getWorkDirs());
 
-    this.conf.set(TezRuntimeConfiguration.TEZ_RUNTIME_PARTITIONER_CLASS,
-        CustomPartitioner.class.getName());
+    // UnorderedKVOutput is for BROADCAST_EDGE and ONE_TO_ONE_EDGE,
+    // so setting TEZ_RUNTIME_PARTITIONER_CLASS here is not really necessary because
+    // UnorderedPartitionedKVWriter sets partitioner to null if numPartitions == 1.
+    this.conf.set(TezRuntimeConfiguration.TEZ_RUNTIME_PARTITIONER_CLASS, CustomPartitioner.class.getName());
 
     this.memoryUpdateCallbackHandler = new MemoryUpdateCallbackHandler();
 
-    boolean isPipelinedShuffle = this.conf.getBoolean(
-        TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_UNORDERED_ENABLED,
-        TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SHUFFLE_ENABLED_DEFAULT);
-    long memRequestSize = isPipelinedShuffle ?
-        UnorderedPartitionedKVWriter.getInitialMemoryRequirement(
-          conf, getContext().getTotalMemoryAvailableToTask()) : 0;
-    getContext().requestInitialMemory(memRequestSize, memoryUpdateCallbackHandler);
-    
+    // In UnorderedPartitionedKVWriter, we create MultiByteArrayOutputStream with availableMemoryBytes.
+    // Hence, we should not set memRequestSize to 0 (as in the original Tez).
+    // Instead, we should request memory in the same way as for UnorderedPartitionedKVOutput.
+    getContext().requestInitialMemory(
+        UnorderedPartitionedKVWriter.getInitialMemoryRequirement(conf,
+            getContext().getTotalMemoryAvailableToTask()), memoryUpdateCallbackHandler);
+
     return Collections.emptyList();
   }
 
