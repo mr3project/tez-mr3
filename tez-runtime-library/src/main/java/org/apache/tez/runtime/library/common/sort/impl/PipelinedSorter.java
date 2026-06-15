@@ -859,7 +859,9 @@ public final class PipelinedSorter {
     }
 
     try {
-      if (isDebugEnabled) { LOG.debug(outputContext.getDestinationVertexName() + ": Starting flush of map output"); }
+      if (isDebugEnabled) {
+        LOG.debug(outputContext.getDestinationVertexName() + ": Starting flush of map output");
+      }
       span.end();
       merger.add(span.sort());
       // force a spill in flush()
@@ -1110,7 +1112,13 @@ public final class PipelinedSorter {
    * @return events to be returned by the edge.
    * @throws IOException parent can throw this.
    */
-  synchronized public final List<Event> close() throws IOException {
+  synchronized public List<Event> close() throws IOException {
+    if (isPipelinedShuffle) {
+      LOG.info("{} PipelinedSorter for {}: final pipelined numSpills={}",
+          outputContext.getTaskAttemptIdStr(), outputContext.getDestinationVertexName(),
+          numSpills);
+    }
+
     if (writeSpillRecord) {
       spillFileIndexPaths.clear();
     }

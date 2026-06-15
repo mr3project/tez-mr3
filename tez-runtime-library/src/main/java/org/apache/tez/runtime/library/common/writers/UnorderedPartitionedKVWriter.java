@@ -522,13 +522,16 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     lastBufferSize = lastBufferSize - (lastBufferSize % INT_SIZE);
   }
 
+  // called from the client (Hive)
   @Override
   public void closeWriter() {
-    if (trackMaxKeyValLen) {
-      LOG.info("Closing up Unordered maxKey/ValLen for {}: maxKeyLen={}, maxValLen={}",
-          destNameTrimmed, maxKeyLen, maxValLen);
-    } else {
-      LOG.info("Closing up Unordered KeyValueWriterEdge for {}", destNameTrimmed);
+    if (isDebugEnabled) {
+      if (trackMaxKeyValLen) {
+        LOG.debug("Closing up Unordered maxKey/ValLen for {}: maxKeyLen={}, maxValLen={}",
+            destNameTrimmed, maxKeyLen, maxValLen);
+      } else {
+        LOG.debug("Closing up Unordered KeyValueWriterEdge for {}", destNameTrimmed);
+      }
     }
   }
 
@@ -1118,8 +1121,10 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     }
     spillLock.lock();
     try {
-      if (pendingSpillCount.get() != 0) {
-        LOG.info("{}: Waiting for all spills to complete : Pending : {}", destNameTrimmed, pendingSpillCount.get());
+      if (isDebugEnabled) {
+        if (pendingSpillCount.get() != 0) {
+          LOG.debug("{}: Waiting for all spills to complete : Pending : {}", destNameTrimmed, pendingSpillCount.get());
+        }
       }
       while (pendingSpillCount.get() != 0 && writerState != WriterState.SPILL_FAILED) {
         spillInProgress.await();
@@ -1210,7 +1215,12 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
         cleanupCurrentBuffer();
         return eventList;
       }
-    } else if (numPartitions == 1) {
+    }
+
+    LOG.info("{} UnorderedPartitionedKVWriter for {}: final pipelined numSpills={}",
+        outputContext.getTaskAttemptIdStr(), outputContext.getDestinationVertexName(),
+        numSpills.get());
+    if (numPartitions == 1) {
       updateTezCountersAndNotify();
       if (writer == null) {
         BitSet emptyPartitions = new BitSet(1);
