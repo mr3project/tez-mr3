@@ -51,6 +51,7 @@ public class WeightedScalingMemoryDistributor implements InitialMemoryAllocator 
 
   static final double MAX_ADDITIONAL_RESERVATION_FRACTION_PER_IO = 0.1d;
   static final double RESERVATION_FRACTION_PER_IO = 0.015d;
+  static final long PARTITIONED_UNSORTED_OUTPUT_UNSCALED_THRESHOLD_BYTES = 20L << 20;
 
   // TODO: update populateTypeScaleMap() as well
   static final String[] DEFAULT_TASK_MEMORY_WEIGHTED_RATIOS =
@@ -79,7 +80,6 @@ public class WeightedScalingMemoryDistributor implements InitialMemoryAllocator 
   private final EnumMap<RequestType, Integer> typeScaleMap = Maps.newEnumMap(RequestType.class);
 
   private int numRequests = 0;
-  private int numRequestsScaled = 0;
 
   private final List<Request> requests = Lists.newArrayList();
 
@@ -94,44 +94,79 @@ public class WeightedScalingMemoryDistributor implements InitialMemoryAllocator 
       initialProcessMemoryRequestContext(context);
     }
 
-    if (numRequestsScaled == 0) {
-      // Fall back to regular scaling. e.g. BROADCAST : SHUFFLE = 0:1. 
-      // i.e. if Shuffle present, Broadcast gets nothing, but otherwise it
-      // should get an allocation
-      numRequestsScaled = numRequests;
-      for (Request request : requests) {
-        request.requestWeight = 1;
-      }
-    }
-
-    // Scale down while adding requests - don't want to hit Long limits.
-    double totalScaledRequest = 0d;
-    for (Request request : requests) {
-      double requested = request.requestSize * (request.requestWeight / (double) numRequestsScaled);
-      totalScaledRequest += requested;
-    }
-
     // Take a certain amount of memory away for general usage.
     double reserveFraction = computeReservedFraction(numRequests);
 
     Preconditions.checkState(reserveFraction >= 0.0d && reserveFraction <= 1.0d);
     availableBytesForAllocation = (long) (availableBytesForAllocation - (reserveFraction * availableBytesForAllocation));
 
-    // Actual scaling
+    Set<Request> unscaledRequests = new HashSet<Request>();
+    long unscaledRequestTotal = 0;
+    boolean unscaledRequestsFit = true;
+    for (Request request : requests) {
+      if (request.requestType == RequestType.PARTITIONED_UNSORTED_OUTPUT
+          && request.requestSize <= PARTITIONED_UNSORTED_OUTPUT_UNSCALED_THRESHOLD_BYTES) {
+        unscaledRequests.add(request);
+        if (request.requestSize > availableBytesForAllocation - unscaledRequestTotal) {
+          unscaledRequestsFit = false;
+          break;
+        }
+        unscaledRequestTotal += request.requestSize;
+      }
+    }
+    if (!unscaledRequestsFit) {
+      unscaledRequests.clear();
+      unscaledRequestTotal = 0;
+    }
+
+    long availableBytesForScaling = availableBytesForAllocation - unscaledRequestTotal;
+    int remainingRequestWeights = 0;
+    for (Request request : requests) {
+      if (!unscaledRequests.contains(request)) {
+        remainingRequestWeights += request.requestWeight;
+      }
+    }
+    if (remainingRequestWeights == 0) {
+      // Fall back to regular scaling for requests that were not allocated in full.
+      for (Request request : requests) {
+        if (!unscaledRequests.contains(request)) {
+          request.requestWeight = 1;
+          remainingRequestWeights++;
+        }
+      }
+    }
+
+    // Scale down while adding requests - don't want to hit Long limits.
+    double totalScaledRequest = 0d;
+    for (Request request : requests) {
+      if (!unscaledRequests.contains(request)) {
+        totalScaledRequest += request.requestSize
+            * (request.requestWeight / (double) remainingRequestWeights);
+      }
+    }
+
+    // Actual allocation
     List<Long> allocations = Lists.newArrayListWithCapacity(numRequests);
     for (Request request : requests) {
       long allocated = 0;
-      if (request.requestSize == 0) {
+      if (unscaledRequests.contains(request)) {
+        allocated = request.requestSize;
+        allocations.add(allocated);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Allocating requested " + request.requestType + " of type "
+              + request.requestType + " " + request.requestSize + " without scaling");
+        }
+      } else if (request.requestSize == 0) {
         allocations.add(0L);
         if (LOG.isDebugEnabled()) {
           LOG.debug("Scaling requested " + request.requestType + " of type "
               + request.requestType + " 0 to allocated: 0");
         }
       } else {
-        double requestFactor = request.requestWeight / (double) numRequestsScaled;
+        double requestFactor = request.requestWeight / (double) remainingRequestWeights;
         double scaledRequest = requestFactor * request.requestSize;
         allocated = Math.min(
-            (long) ((scaledRequest / totalScaledRequest) * availableBytesForAllocation),
+            (long) ((scaledRequest / totalScaledRequest) * availableBytesForScaling),
             request.requestSize);
         // TODO: If requestedSize is used, the difference (allocated - requestedSize) could be allocated to others.
         allocations.add(allocated);
@@ -154,7 +189,6 @@ public class WeightedScalingMemoryDistributor implements InitialMemoryAllocator 
         context.getComponentType(), context.getRequestedSize(), requestType, typeScaleFactor);
 
     requests.add(request);
-    numRequestsScaled += typeScaleFactor;
   }
 
   private Integer getScaleFactorForType(RequestType requestType) {
