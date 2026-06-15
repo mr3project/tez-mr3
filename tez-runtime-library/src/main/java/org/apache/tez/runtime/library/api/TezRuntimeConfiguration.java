@@ -168,6 +168,9 @@ public class TezRuntimeConfiguration {
   /**
    * Size of the buffer to use if not writing directly to disk.
    */
+  // TEZ_RUNTIME_UNORDERED_OUTPUT_BUFFER_SIZE_MB can be set in DAGUtils.createTezEdgeProperty() in Hive-MR3.
+  // Hence, UnorderedPartitionedKVWriter may be assigned memory much smaller than set in tez-site.xml.
+  // Cf. UnorderedPartitionedKVWriter.assignedMemoryBytes
   @ConfigurationProperty(type = "integer")
   public static final String TEZ_RUNTIME_UNORDERED_OUTPUT_BUFFER_SIZE_MB =
       TEZ_RUNTIME_PREFIX + "unordered.output.buffer.size-mb";
