@@ -43,7 +43,6 @@ import org.apache.tez.runtime.api.AbstractLogicalInput;
 import org.apache.tez.runtime.api.Event;
 import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
-import org.apache.tez.runtime.library.common.serializer.SerializationContext;
 import org.apache.tez.runtime.library.common.MemoryUpdateCallbackHandler;
 import org.apache.tez.runtime.library.common.ValuesIterator;
 import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.Shuffle;
@@ -70,12 +69,12 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
   static final Logger LOG = LoggerFactory.getLogger(OrderedGroupedKVInput.class);
 
   protected TezRawKeyValueIterator rawIter = null;
-  protected Configuration conf;
-  protected Shuffle shuffle;
-  protected MemoryUpdateCallbackHandler memoryUpdateCallbackHandler;
+
+  private Configuration conf;
+  private Shuffle shuffle;
+  private MemoryUpdateCallbackHandler memoryUpdateCallbackHandler;
   private final BlockingQueue<Event> pendingEvents = new LinkedBlockingQueue<Event>();
-  private long firstEventReceivedTime = -1;
-  protected ValuesIterator vIter;
+  private ValuesIterator valIter;
 
   private TezCounter inputKeyCounter;
   private TezCounter inputValueCounter;
@@ -101,10 +100,10 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
       return Collections.emptyList();
     }
 
-    long initialMemoryRequest = Shuffle.getInitialMemoryRequirement(conf,
-        getContext().getTotalMemoryAvailableToTask());
     this.memoryUpdateCallbackHandler = new MemoryUpdateCallbackHandler();
-    getContext().requestInitialMemory(initialMemoryRequest, memoryUpdateCallbackHandler);
+    getContext().requestInitialMemory(
+        Shuffle.getInitialMemoryRequirement(conf, getContext().getTotalMemoryAvailableToTask()),
+        memoryUpdateCallbackHandler);
 
     this.inputKeyCounter = getContext().getCounters().findCounter(TaskCounter.INPUT_GROUPS_ORDERED);
     this.inputValueCounter = getContext().getCounters().findCounter(TaskCounter.INPUT_RECORDS_ORDERED);
@@ -121,23 +120,16 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
       // Start the shuffle - copy and merge
       shuffle = createShuffle();
       shuffle.run();
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Initialized the handlers in shuffle..Safe to start processing..");
-      }
       List<Event> pending = new LinkedList<Event>();
       pendingEvents.drainTo(pending);
       if (!pending.isEmpty()) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("NoAutoStart delay in processing first event: "
-              + (System.currentTimeMillis() - firstEventReceivedTime));
-        }
         shuffle.handleEvents(pending);
       }
       isStarted.set(true);
     }
   }
 
-  Shuffle createShuffle() throws IOException {
+  private Shuffle createShuffle() throws IOException {
     return new Shuffle(getContext(), conf, getNumPhysicalInputs(),
         memoryUpdateCallbackHandler.getMemoryAssigned());
   }
@@ -247,7 +239,7 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
     @SuppressWarnings("rawtypes")
     ValuesIterator valuesIter = null;
     synchronized(this) {
-      valuesIter = vIter;
+      valuesIter = valIter;
     }
     return new OrderedGroupedKeyValuesReader(valuesIter);
   }
@@ -270,9 +262,6 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
         throw new RuntimeException("No input events expected as numInputs is 0");
       }
       if (!isStarted.get()) {
-        if (firstEventReceivedTime == -1) {
-          firstEventReceivedTime = System.currentTimeMillis();
-        }
         pendingEvents.addAll(inputEvents);
         return;
       }
@@ -282,7 +271,7 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
   }
 
   private synchronized void createValuesIterator() {
-    vIter = new ValuesIterator(rawIter, inputKeyCounter, inputValueCounter);
+    valIter = new ValuesIterator(rawIter, inputKeyCounter, inputValueCounter);
   }
 
   private static class OrderedGroupedKeyValuesReader extends KeyValuesReaderEdge {

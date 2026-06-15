@@ -378,7 +378,7 @@ public class MROutput extends AbstractLogicalOutput {
   }
 
   protected List<Event> initializeBase() throws IOException, InterruptedException {
-    getContext().requestInitialMemory(0l, null); //mandatory call
+    getContext().requestInitialMemory(0L, null); //mandatory call
     taskNumberFormat.setMinimumIntegerDigits(5);
     taskNumberFormat.setGroupingUsed(false);
     nonTaskNumberFormat.setMinimumIntegerDigits(3);
@@ -391,8 +391,7 @@ public class MROutput extends AbstractLogicalOutput {
 
     // Add tokens to the jobConf - in case they are accessed within the RW / OF
     jobConf.getCredentials().mergeAll(UserGroupInformation.getCurrentUser().getCredentials());
-    this.isMapperOutput = jobConf.getBoolean(MRConfig.IS_MAP_PROCESSOR,
-        false);
+    this.isMapperOutput = jobConf.getBoolean(MRConfig.IS_MAP_PROCESSOR, false);
     if (this.isMapperOutput) {
       this.useNewApi = this.jobConf.getUseNewMapper();
     } else {

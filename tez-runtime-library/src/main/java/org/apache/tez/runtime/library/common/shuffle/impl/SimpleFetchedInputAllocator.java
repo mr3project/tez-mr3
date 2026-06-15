@@ -46,7 +46,7 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator, Fetch
 
   private final TezTaskOutputFiles fileNameAllocator;
 
-  private final long memoryLimitBytes;   // memory assigned to this LogicalInput
+  private final long memoryLimitBytes;
   private final long maxSingleMemoryShuffleBytes;
 
   private final String srcNameTrimmed;
@@ -62,7 +62,7 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator, Fetch
   public SimpleFetchedInputAllocator(String srcNameTrimmed,
                                      String uniqueIdentifier, int dagID,
                                      Configuration conf,
-                                     long maxTaskAvailableMemory,
+                                     long totalTaskMemoryBytes,
                                      long assignedMemoryBytes,
                                      String containerId, int vertexId,
                                      boolean compositeFetch) {
@@ -88,7 +88,7 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator, Fetch
     this.useFreeMemoryFetchedInput = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT,
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT_DEFAULT);
-    this.freeMemoryThreshold = maxTaskAvailableMemory;  // TODO: factor
+    this.freeMemoryThreshold = totalTaskMemoryBytes;  // TODO: factor
 
     final float freeMemoryFactor = conf.getFloat(
         TezRuntimeConfiguration.TEZ_RUNTIME_FREE_MEMORY_FACTOR_FOR_FETCHED_INPUT,
@@ -98,17 +98,19 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator, Fetch
           + TezRuntimeConfiguration.TEZ_RUNTIME_FREE_MEMORY_FACTOR_FOR_FETCHED_INPUT + ": "
           + freeMemoryFactor);
     }
-    this.freeMemoryLimit = (long)(maxTaskAvailableMemory * freeMemoryFactor);
+    this.freeMemoryLimit = (long)(totalTaskMemoryBytes * freeMemoryFactor);
 
     this.shuffleMemoryStreaming = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_UNORDERED_MEMORY_STREAMING,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_UNORDERED_MEMORY_STREAMING_DEFAULT);
 
-    LOG.info("{}: memoryLimit={}, maxSingleMemoryShuffle={}, freeMemoryLimit={}, shuffleMemoryStreaming={}",
-        srcNameTrimmed, memoryLimitBytes, maxSingleMemoryShuffleBytes, freeMemoryLimit, shuffleMemoryStreaming);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("{}: memoryLimit={}, maxSingleMemoryShuffle={}, freeMemoryLimit={}, shuffleMemoryStreaming={}",
+          srcNameTrimmed, memoryLimitBytes, maxSingleMemoryShuffleBytes, freeMemoryLimit, shuffleMemoryStreaming);
+    }
   }
 
-  public static long getInitialMemoryReq(Configuration conf, long maxAvailableTaskMemory) {
+  public static long getInitialMemoryReq(Configuration conf, long totalTaskMemoryBytes) {
     final float maxInMemCopyUse = conf.getFloat(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT_DEFAULT);
@@ -117,7 +119,7 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator, Fetch
           + TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT + ": "
           + maxInMemCopyUse);
     }
-    return (long)(Math.min(maxAvailableTaskMemory, Integer.MAX_VALUE) * maxInMemCopyUse);
+    return (long)(Math.min(totalTaskMemoryBytes, Integer.MAX_VALUE) * maxInMemCopyUse);
   }
 
   final private FetchedInput stallShuffle = FetchedInput.createWaitFetchedInput(null);

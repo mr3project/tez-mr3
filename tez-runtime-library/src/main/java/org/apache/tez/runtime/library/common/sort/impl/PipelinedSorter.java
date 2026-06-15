@@ -300,8 +300,10 @@ public final class PipelinedSorter {
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_RLE_THRESHOLD_FRACTION,
         TezRuntimeConfiguration.TEZ_RUNTIME_PIPELINED_SORTER_RLE_THRESHOLD_FRACTION_DEFAULT);
 
-    LOG.info("Setting up PipelinedSorter for {}, availableMemoryMb={}, pipelinedShuffle={}",
-        outputContext.getDestinationVertexName(), this.assignedMemoryMb, this.isPipelinedShuffle);
+    // OrderedPartitionedKVOutput
+    LOG.info("{} PipelinedSorter for {}: assignedMemoryBytes={}, assignedMemoryMb={}, isPipelinedShuffle={}",
+        outputContext.getTaskAttemptIdStr(), outputContext.getDestinationVertexName(),
+        assignedMemoryBytes, this.assignedMemoryMb, this.isPipelinedShuffle);
 
     // buffers and accounting
     final long maxMemLimitBytes = this.assignedMemoryMb << 20;
@@ -331,7 +333,8 @@ public final class PipelinedSorter {
     if (isDebugEnabled) {
       StringBuilder sb = new StringBuilder("PipelinedSorter for ")
         .append(outputContext.getDestinationVertexName())
-        .append(": #blocks=").append(maxNumberOfBlocks)
+        .append(": isPipelinedShuffle=").append(isPipelinedShuffle)
+        .append(", #blocks=").append(maxNumberOfBlocks)
         .append(", maxMemUsage=").append(maxMemLimitBytes)
         .append(", lazyAllocateMem=").append(lazyAllocateMem)
         .append(", useSoftReference=").append(useSoftReference)
@@ -1131,14 +1134,14 @@ public final class PipelinedSorter {
     return finalOutputFile;
   }
 
-  public static long getInitialMemoryRequirement(Configuration conf, long maxAvailableTaskMemory) {
+  public static long getInitialMemoryRequirement(Configuration conf, long totalTaskMemoryBytes) {
     int initialMemRequestMb = conf.getInt(
         TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB,
         TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB_DEFAULT);
     long reqBytes = ((long) initialMemRequestMb) << 20;
-    Preconditions.checkArgument(initialMemRequestMb > 0 && reqBytes < maxAvailableTaskMemory,
+    Preconditions.checkArgument(initialMemRequestMb > 0 && reqBytes < totalTaskMemoryBytes,
         "{} {} should be larger than 0 and should be less than the available task memory (MB): {}",
-        TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB, initialMemRequestMb, maxAvailableTaskMemory >> 20);
+        TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB, initialMemRequestMb, totalTaskMemoryBytes >> 20);
     if (isDebugEnabled) {
       LOG.debug("Requested SortBufferSize ("
           + TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB + "): " + initialMemRequestMb);

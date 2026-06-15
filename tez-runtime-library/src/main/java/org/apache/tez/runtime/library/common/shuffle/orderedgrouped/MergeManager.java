@@ -218,9 +218,9 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
           TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT + ": " +
           maxInMemCopyUse);
     }
-
-    long maxTaskAvailableMemory = inputContext.getTotalMemoryAvailableToTask();
-    long memLimit = (long)(maxTaskAvailableMemory * maxInMemCopyUse);
+    long totalTaskMemoryBytes = inputContext.getTotalMemoryAvailableToTask();
+    long memLimit = (long)(totalTaskMemoryBytes * maxInMemCopyUse);
+    this.memoryLimitBytes = Math.min(assignedMemoryBytes, memLimit);
 
     float maxRedPer = conf.getFloat(
         TezRuntimeConfiguration.TEZ_RUNTIME_INPUT_POST_MERGE_BUFFER_PERCENT,
@@ -228,19 +228,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     if (maxRedPer > 1.0 || maxRedPer < 0.0) {
       throw new TezUncheckedException(TezRuntimeConfiguration.TEZ_RUNTIME_INPUT_POST_MERGE_BUFFER_PERCENT + maxRedPer);
     }
-    long maxRedBuffer = (long)(maxTaskAvailableMemory * maxRedPer);
-
-    if (assignedMemoryBytes < memLimit) {
-      this.memoryLimitBytes = assignedMemoryBytes;
-    } else {
-      this.memoryLimitBytes = memLimit;
-    }
-    
-    if (assignedMemoryBytes < maxRedBuffer) {
-      this.postMergeMemoryLimitBytes = assignedMemoryBytes;
-    } else {
-      this.postMergeMemoryLimitBytes = maxRedBuffer;
-    }
+    long maxRedBuffer = (long)(totalTaskMemoryBytes * maxRedPer);
+    this.postMergeMemoryLimitBytes = Math.min(assignedMemoryBytes, maxRedBuffer);
 
     this.ioSortFactor = conf.getInt(
         TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_FACTOR,
@@ -263,13 +252,20 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     this.mergeThreshold = (long)(this.memoryLimitBytes * conf.getFloat(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MERGE_PERCENT,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_MERGE_PERCENT_DEFAULT));
+
+    // OrderedGroupedKVInput
+    LOG.info("{} MergeManager for {}: assignedMemoryBytes={}",
+        inputContext.getTaskAttemptIdStr(), inputContext.getSourceVertexName(),
+        assignedMemoryBytes);
+
     if (isDebugEnabled) {
-      LOG.debug(inputContext.getSourceVertexName() + ": MergerManager: memoryLimitBytes=" + memoryLimitBytes + ", " +
-               "maxSingleShuffleLimit=" + maxSingleShuffleLimit + ", " +
-               "mergeThreshold=" + mergeThreshold + ", " +
-               "ioSortFactor=" + ioSortFactor + ", " +
-               "postMergeMemLimitBytes=" + postMergeMemoryLimitBytes + ", " +
-               "memToMemMergeOutputsThreshold=" + memToMemMergeOutputsThreshold);
+      LOG.debug(inputContext.getSourceVertexName() + ": MergerManager: " +
+          "memoryLimitBytes=" + memoryLimitBytes + ", " +
+          "maxSingleShuffleLimit=" + maxSingleShuffleLimit + ", " +
+          "mergeThreshold=" + mergeThreshold + ", " +
+          "ioSortFactor=" + ioSortFactor + ", " +
+          "postMergeMemLimitBytes=" + postMergeMemoryLimitBytes + ", " +
+          "memToMemMergeOutputsThreshold=" + memToMemMergeOutputsThreshold);
     }
     
     if (this.maxSingleShuffleLimit >= this.mergeThreshold) {
@@ -293,7 +289,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     this.useFreeMemoryFetchedInput = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT,
         TezRuntimeConfiguration.TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT_DEFAULT);
-    this.freeMemoryThreshold = maxTaskAvailableMemory;  // TODO: factor
+    this.freeMemoryThreshold = totalTaskMemoryBytes;  // TODO: factor
 
     final float freeMemoryFactor = conf.getFloat(
         TezRuntimeConfiguration.TEZ_RUNTIME_FREE_MEMORY_FACTOR_FOR_FETCHED_INPUT,
@@ -303,7 +299,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         + TezRuntimeConfiguration.TEZ_RUNTIME_FREE_MEMORY_FACTOR_FOR_FETCHED_INPUT + ": "
         + freeMemoryFactor);
     }
-    this.freeMemoryLimit = (long)(maxTaskAvailableMemory * freeMemoryFactor);
+    this.freeMemoryLimit = (long)(totalTaskMemoryBytes * freeMemoryFactor);
 
     this.mdcContext = inputContext.getMdcContext();
   }
@@ -330,7 +326,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   /**
    * Exposing this to get an initial memory ask without instantiating the object.
    */
-  static long getInitialMemoryRequirement(Configuration conf, long maxAvailableTaskMemory) {
+  static long getInitialMemoryRequirement(Configuration conf, long totalTaskMemoryBytes) {
     float maxInMemCopyUse = conf.getFloat(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT_DEFAULT);
@@ -338,7 +334,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       throw new IllegalArgumentException(
           TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT + ": " + maxInMemCopyUse);
     }
-    final long memLimit = (long)(maxAvailableTaskMemory * maxInMemCopyUse);
+    final long memLimit = (long)(totalTaskMemoryBytes * maxInMemCopyUse);
 
     float maxRedPer = conf.getFloat(
         TezRuntimeConfiguration.TEZ_RUNTIME_INPUT_POST_MERGE_BUFFER_PERCENT,
@@ -347,7 +343,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       throw new TezUncheckedException(
         TezRuntimeConfiguration.TEZ_RUNTIME_INPUT_POST_MERGE_BUFFER_PERCENT + ": " + maxRedPer);
     }
-    final long maxRedBuffer = (long) (maxAvailableTaskMemory * maxRedPer);
+    final long maxRedBuffer = (long) (totalTaskMemoryBytes * maxRedPer);
 
     if (isDebugEnabled) {
       LOG.debug("Initial Memory required for SHUFFLE_BUFFER=" + memLimit +

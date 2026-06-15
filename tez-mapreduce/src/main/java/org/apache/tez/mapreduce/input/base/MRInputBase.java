@@ -59,11 +59,11 @@ public abstract class MRInputBase extends AbstractLogicalInput {
   protected boolean useNewApi;
 
   public List<Event> initialize() throws IOException {
-    getContext().requestInitialMemory(0l, null); // mandatory call
+    getContext().requestInitialMemory(0L, null); // mandatory call
     MRRuntimeProtos.MRInputUserPayloadProto mrUserPayload =
         MRInputHelpers.parseMRInputPayload(getContext().getUserPayload());
     boolean isGrouped = mrUserPayload.getGroupingEnabled();
-    Preconditions.checkArgument(mrUserPayload.hasSplits() == false,
+    Preconditions.checkArgument(!mrUserPayload.hasSplits(),
         "Split information not expected in {}", this.getClass().getName());
 
     Configuration commonJobConf = getContext().getCommonJobConf(false);

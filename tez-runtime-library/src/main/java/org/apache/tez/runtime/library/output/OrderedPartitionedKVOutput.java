@@ -80,14 +80,14 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput implements
   public synchronized List<Event> initialize() throws IOException {
     this.conf = getContext().getConfigurationFromUserPayload(true);
     this.localFs = (RawLocalFileSystem) FileSystem.getLocal(conf).getRaw();
-
     // Initializing this parameter in this conf since it is used in multiple
     // places (wherever LocalDirAllocator is used) - TezTaskOutputFiles, TezMerger, etc.
     this.conf.setStrings(TezRuntimeFrameworkConfigs.LOCAL_DIRS, getContext().getWorkDirs());
+
     this.memoryUpdateCallbackHandler = new MemoryUpdateCallbackHandler();
     getContext().requestInitialMemory(
-        PipelinedSorter.getInitialMemoryRequirement(conf,
-            getContext().getTotalMemoryAvailableToTask()), memoryUpdateCallbackHandler);
+        PipelinedSorter.getInitialMemoryRequirement(conf, getContext().getTotalMemoryAvailableToTask()),
+        memoryUpdateCallbackHandler);
 
     auxiliaryService = ShuffleUtils.getTezShuffleHandlerServiceId(conf);
     compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);

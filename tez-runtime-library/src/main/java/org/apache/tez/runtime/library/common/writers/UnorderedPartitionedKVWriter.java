@@ -366,6 +366,11 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     // trackMaxKeyValLen == compositeFetch && (!(numPartitions == 1) || isPipelinedShuffle || !dataViaEventsEnabled)
     this.trackMaxKeyValLen = compositeFetch && !considerDataViaEvents;
 
+    // UnorderedKVOutput, UnorderedPartitionedKVOutput
+    LOG.info("{} UnorderedPartitionedKVWriter for {}: assignedMemoryBytes={}, numPartitions={}, isPipelinedShuffle={}",
+        outputContext.getTaskAttemptIdStr(), outputContext.getDestinationVertexName(),
+        this.assignedMemoryBytes, this.numPartitions, this.isPipelinedShuffle);
+
     // If numPartitions == 1 + isPipelinedShuffle == true,
     // we do NOT create WrappedBuffer[] (buffers) and perform spilling in SpillCallable threads.
     //  - Pros: we can avoid redundant byte copies and directly write to spills.
@@ -435,10 +440,6 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     // Set up only the first buffer to start with.
     buffers[0] = new WrappedBuffer(numOutputs, sizePerBuffer);
     this.numInitializedBuffers = 1;
-    if (isDebugEnabled) {
-      LOG.debug(destNameTrimmed + ": " + "Initializing Buffer #" +
-          numInitializedBuffers + " with size=" + sizePerBuffer);
-    }
     this.currentBuffer = buffers[0];
 
     // TODO: use a shared ThreadPoolExecutor
@@ -458,13 +459,12 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     this.availableSlots = new Semaphore(maxThreads - 1, true);
     this.spillExecutor = MoreExecutors.listeningDecorator(executor);
 
-    LOG.info("{}: pipelinedShuffle={}, sizePerBuffer={}, numPartitions={}, availableMemory={}",
-        destNameTrimmed, isPipelinedShuffle, sizePerBuffer, numPartitions, this.assignedMemoryBytes);
     if (isDebugEnabled) {
-      LOG.debug("numBuffers=" + numBuffers
-          + ", considerDataViaEvents=" + considerDataViaEvents
-          + ", dataViaEventsMaxSize=" + dataViaEventsMaxSize
-          + ", reportPartitionStats=" + reportPartitionStats);
+      LOG.debug("numBuffers=" + numBuffers +
+          ", sizePerBuffer" + sizePerBuffer +
+          ", considerDataViaEvents=" + considerDataViaEvents +
+          ", dataViaEventsMaxSize=" + dataViaEventsMaxSize +
+          ", reportPartitionStats=" + reportPartitionStats);
     }
   }
 
@@ -1079,11 +1079,11 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     return mod == 0 ? position : position + INT_SIZE - mod;
   }
 
-  public static long getInitialMemoryRequirement(Configuration conf, long maxAvailableTaskMemory) {
+  public static long getInitialMemoryRequirement(Configuration conf, long totalTaskMemoryBytes) {
     long initialMemRequestMb = conf.getInt(
         TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_OUTPUT_BUFFER_SIZE_MB,
         TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_OUTPUT_BUFFER_SIZE_MB_DEFAULT);
-    Preconditions.checkArgument(initialMemRequestMb != 0,
+    Preconditions.checkArgument(initialMemRequestMb > 0,
         TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_OUTPUT_BUFFER_SIZE_MB + " should be larger than 0");
     return initialMemRequestMb << 20;
   }

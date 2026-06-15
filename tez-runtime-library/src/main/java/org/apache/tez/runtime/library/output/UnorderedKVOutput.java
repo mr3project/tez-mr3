@@ -76,14 +76,13 @@ public class UnorderedKVOutput extends AbstractLogicalOutput implements LogicalO
     // UnorderedPartitionedKVWriter sets partitioner to null if numPartitions == 1.
     this.conf.set(TezRuntimeConfiguration.TEZ_RUNTIME_PARTITIONER_CLASS, CustomPartitioner.class.getName());
 
-    this.memoryUpdateCallbackHandler = new MemoryUpdateCallbackHandler();
-
     // In UnorderedPartitionedKVWriter, we create MultiByteArrayOutputStream with availableMemoryBytes.
     // Hence, we should not set memRequestSize to 0 (as in the original Tez).
     // Instead, we should request memory in the same way as for UnorderedPartitionedKVOutput.
+    this.memoryUpdateCallbackHandler = new MemoryUpdateCallbackHandler();
     getContext().requestInitialMemory(
-        UnorderedPartitionedKVWriter.getInitialMemoryRequirement(conf,
-            getContext().getTotalMemoryAvailableToTask()), memoryUpdateCallbackHandler);
+        UnorderedPartitionedKVWriter.getInitialMemoryRequirement(conf, getContext().getTotalMemoryAvailableToTask()),
+        memoryUpdateCallbackHandler);
 
     return Collections.emptyList();
   }

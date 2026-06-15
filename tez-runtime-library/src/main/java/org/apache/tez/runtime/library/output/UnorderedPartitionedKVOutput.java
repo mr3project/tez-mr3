@@ -66,10 +66,12 @@ public class UnorderedPartitionedKVOutput extends AbstractLogicalOutput implemen
     this.conf.setStrings(TezRuntimeFrameworkConfigs.LOCAL_DIRS, getContext().getWorkDirs());
     this.conf.setInt(TezRuntimeFrameworkConfigs.TEZ_RUNTIME_NUM_EXPECTED_PARTITIONS,
         getNumPhysicalOutputs());
+
     this.memoryUpdateCallbackHandler = new MemoryUpdateCallbackHandler();
     getContext().requestInitialMemory(
-        UnorderedPartitionedKVWriter.getInitialMemoryRequirement(conf,
-            getContext().getTotalMemoryAvailableToTask()), memoryUpdateCallbackHandler);
+        UnorderedPartitionedKVWriter.getInitialMemoryRequirement(conf, getContext().getTotalMemoryAvailableToTask()),
+        memoryUpdateCallbackHandler);
+
     return Collections.emptyList();
   }
 

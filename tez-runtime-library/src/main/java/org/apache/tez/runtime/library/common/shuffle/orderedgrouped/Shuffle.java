@@ -402,8 +402,8 @@ public class Shuffle implements ExceptionReporter {
     }
   }
 
-  public static long getInitialMemoryRequirement(Configuration conf, long maxAvailableTaskMemory) {
-    return MergeManager.getInitialMemoryRequirement(conf, maxAvailableTaskMemory);
+  public static long getInitialMemoryRequirement(Configuration conf, long totalTaskMemoryBytes) {
+    return MergeManager.getInitialMemoryRequirement(conf, totalTaskMemoryBytes);
   }
 
   private class ShuffleRunnerFutureCallback implements FutureCallback<TezRawKeyValueIterator> {

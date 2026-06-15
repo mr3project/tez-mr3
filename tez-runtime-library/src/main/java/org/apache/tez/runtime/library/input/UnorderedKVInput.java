@@ -90,17 +90,18 @@ public class UnorderedKVInput extends AbstractLogicalInput implements LogicalInp
     this.compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
 
     if (getNumPhysicalInputs() == 0) {
-      getContext().requestInitialMemory(0l, null);
+      getContext().requestInitialMemory(0L, null);
       isStarted.set(true);
       getContext().inputIsReady();
       LOG.info("input fetch not required since there are 0 physical inputs for input vertex: {}",
           getContext().getSourceVertexName());
       return Collections.emptyList();
-    } else {
-      long initialMemReq = getInitialMemoryReq();
-      memoryUpdateCallbackHandler = new MemoryUpdateCallbackHandler();
-      this.getContext().requestInitialMemory(initialMemReq, memoryUpdateCallbackHandler);
     }
+
+    this.memoryUpdateCallbackHandler = new MemoryUpdateCallbackHandler();
+    getContext().requestInitialMemory(
+        SimpleFetchedInputAllocator.getInitialMemoryReq(conf, getContext().getTotalMemoryAvailableToTask()),
+        memoryUpdateCallbackHandler);
 
     this.conf.setStrings(TezRuntimeFrameworkConfigs.LOCAL_DIRS, getContext().getWorkDirs());
     this.inputRecordCounter = getContext().getCounters().findCounter(TaskCounter.INPUT_RECORDS);
@@ -132,18 +133,23 @@ public class UnorderedKVInput extends AbstractLogicalInput implements LogicalInp
       }
 
       InputContext inputContext = getContext();
+      String srcNameTrimmed = TezUtilsInternal.cleanVertexName(inputContext.getSourceVertexName());
+      long assignedMemoryBytes = memoryUpdateCallbackHandler.getMemoryAssigned();
       this.inputManager = new SimpleFetchedInputAllocator(
-          TezUtilsInternal.cleanVertexName(getContext().getSourceVertexName()),
+          srcNameTrimmed,
           inputContext.getUniqueIdentifier(),
           inputContext.getDagIdentifier(), conf,
           inputContext.getTotalMemoryAvailableToTask(),
-          memoryUpdateCallbackHandler.getMemoryAssigned(),
+          assignedMemoryBytes,
           inputContext.getExecutionContext().getEnvContainerId(),
           inputContext.getTaskVertexIndex(), compositeFetch);
 
-      String srcNameTrimmed = TezUtilsInternal.cleanVertexName(inputContext.getSourceVertexName());
-      this.shuffleManager = new ShuffleManager(inputContext, conf, getNumPhysicalInputs(), inputManager, srcNameTrimmed);
+      // UnorderedKVInput
+      LOG.info("{} SimpleFetchedInputAllocator for {}: assignedMemoryBytes={}",
+          inputContext.getTaskAttemptIdStr(), srcNameTrimmed,
+          assignedMemoryBytes);
 
+      this.shuffleManager = new ShuffleManager(inputContext, conf, getNumPhysicalInputs(), inputManager, srcNameTrimmed);
       this.inputEventHandler = new ShuffleInputEventHandlerImpl(inputContext, shuffleManager,
           inputManager, codec, ifileReadAhead, ifileReadAheadLength, compositeFetch);
 
@@ -237,13 +243,6 @@ public class UnorderedKVInput extends AbstractLogicalInput implements LogicalInp
     return null;
   }
 
-  private long getInitialMemoryReq() {
-    return SimpleFetchedInputAllocator.getInitialMemoryReq(conf,
-        getContext().getTotalMemoryAvailableToTask());
-  }
-
-
-  @SuppressWarnings("rawtypes")
   private UnorderedKVReader createReader(TezCounter inputRecordCounter, CompressionCodec codec,
       boolean ifileReadAheadEnabled, int ifileReadAheadLength)
       throws IOException {
