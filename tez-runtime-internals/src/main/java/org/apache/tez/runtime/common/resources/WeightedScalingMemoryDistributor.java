@@ -18,7 +18,6 @@
 
 package org.apache.tez.runtime.common.resources;
 
-import java.text.DecimalFormat;
 import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
@@ -81,12 +80,11 @@ public class WeightedScalingMemoryDistributor implements InitialMemoryAllocator 
 
   private int numRequests = 0;
   private int numRequestsScaled = 0;
-  private long totalRequested = 0;
 
   private final List<Request> requests = Lists.newArrayList();
 
   @Override
-  public Iterable<Long> assignMemory(long availableForAllocation, int numTotalInputs,
+  public Iterable<Long> assignMemory(long availableBytesForAllocation, int numTotalInputs,
       int numTotalOutputs, Iterable<InitialMemoryRequestContext> initialRequests) {
 
     // Read in configuration
@@ -117,17 +115,7 @@ public class WeightedScalingMemoryDistributor implements InitialMemoryAllocator 
     double reserveFraction = computeReservedFraction(numRequests);
 
     Preconditions.checkState(reserveFraction >= 0.0d && reserveFraction <= 1.0d);
-    availableForAllocation = (long) (availableForAllocation - (reserveFraction * availableForAllocation));
-
-    if (LOG.isDebugEnabled()) {
-      long totalJvmMem = Runtime.getRuntime().maxMemory();
-      double ratio = totalRequested / (double) totalJvmMem;
-      LOG.debug("Scaling Requests. NumRequests: " + numRequests + ", numScaledRequests: "
-          + numRequestsScaled + ", TotalRequested: " + totalRequested + ", TotalRequestedScaled: "
-          + totalScaledRequest + ", TotalJVMHeap: " + totalJvmMem + ", TotalAvailable: "
-          + availableForAllocation + ", TotalRequested/TotalJVMHeap:"
-          + new DecimalFormat("0.00").format(ratio));
-    }
+    availableBytesForAllocation = (long) (availableBytesForAllocation - (reserveFraction * availableBytesForAllocation));
 
     // Actual scaling
     List<Long> allocations = Lists.newArrayListWithCapacity(numRequests);
@@ -143,7 +131,7 @@ public class WeightedScalingMemoryDistributor implements InitialMemoryAllocator 
         double requestFactor = request.requestWeight / (double) numRequestsScaled;
         double scaledRequest = requestFactor * request.requestSize;
         allocated = Math.min(
-            (long) ((scaledRequest / totalScaledRequest) * availableForAllocation),
+            (long) ((scaledRequest / totalScaledRequest) * availableBytesForAllocation),
             request.requestSize);
         // TODO: If requestedSize is used, the difference (allocated - requestedSize) could be allocated to others.
         allocations.add(allocated);
@@ -159,7 +147,6 @@ public class WeightedScalingMemoryDistributor implements InitialMemoryAllocator 
 
   private void initialProcessMemoryRequestContext(InitialMemoryRequestContext context) {
     numRequests++;
-    totalRequested += context.getRequestedSize();
 
     RequestType requestType = context.getRequestType();
     Integer typeScaleFactor = getScaleFactorForType(requestType);
@@ -173,7 +160,7 @@ public class WeightedScalingMemoryDistributor implements InitialMemoryAllocator 
   private Integer getScaleFactorForType(RequestType requestType) {
     Integer typeScaleFactor = typeScaleMap.get(requestType);
     if (typeScaleFactor == null) {
-      LOG.warn("Bad scale factor for requestType: " + requestType + ", Using factor 0");
+      LOG.warn("Bad scale factor for requestType: {}, using factor 0", requestType);
       typeScaleFactor = 0;
     }
     return typeScaleFactor;
@@ -226,7 +213,7 @@ public class WeightedScalingMemoryDistributor implements InitialMemoryAllocator 
       typeScaleMap.put(requestType, ratioVal);
       sb.append("[").append(requestType).append(":").append(ratioVal).append("]");
     }
-    LOG.info("ScaleRatiosUsed={}", sb.toString());
+    LOG.info("Scale ratios constructed={}", sb.toString());
   }
 
   private double computeReservedFraction(int numTotalRequests) {

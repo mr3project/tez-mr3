@@ -55,8 +55,8 @@ public class MemoryDistributor {
   private AtomicInteger numInputsSeen = new AtomicInteger(0);
   private AtomicInteger numOutputsSeen = new AtomicInteger(0);
 
-  private final long totalJvmMemory;
-  private final boolean isEnabled;
+  private final long totalTaskMemoryBytes;
+  private final boolean isScaleMemoryEnabled;
   private final Set<TaskContext> dupSet = Collections
       .newSetFromMap(new ConcurrentHashMap<TaskContext, Boolean>());
   private final List<RequestorInfo> requestList;
@@ -70,18 +70,18 @@ public class MemoryDistributor {
    *          Tez specific task configuration
    */
   public MemoryDistributor(
-      int numTotalInputs, int numTotalOutputs, Configuration conf, long totalMemory,
+      int numTotalInputs, int numTotalOutputs, Configuration conf, long totalTaskMemoryBytes,
       String taskAttemptIdStr) {
     this.conf = conf;
-    this.isEnabled = conf.getBoolean(TezConfiguration.TEZ_TASK_SCALE_MEMORY_ENABLED,
+    this.isScaleMemoryEnabled = conf.getBoolean(TezConfiguration.TEZ_TASK_SCALE_MEMORY_ENABLED,
         TezConfiguration.TEZ_TASK_SCALE_MEMORY_ENABLED_DEFAULT);
 
     this.numTotalInputs = numTotalInputs;
     this.numTotalOutputs = numTotalOutputs;
-    this.totalJvmMemory = totalMemory;
+    this.totalTaskMemoryBytes = totalTaskMemoryBytes;
     this.requestList = Collections.synchronizedList(new LinkedList<RequestorInfo>());
-    LOG.info("InitialMemoryDistributor for {}: isEnabled={}, numInputs={}, numOutputs={}, JVM.maxFree={}",
-        taskAttemptIdStr, isEnabled, numTotalInputs, numTotalOutputs, totalJvmMemory);
+    LOG.info("InitialMemoryDistributor for {}: isScaleMemoryEnabled={}, numInputs={}, numOutputs={}, totalTaskMemoryBytes={}",
+        taskAttemptIdStr, isScaleMemoryEnabled, numTotalInputs, numTotalOutputs, totalTaskMemoryBytes);
   }
 
   /**
@@ -113,7 +113,7 @@ public class MemoryDistributor {
         });
 
     Iterable<Long> allocations = null;
-    if (!isEnabled) {
+    if (!isScaleMemoryEnabled) {
       allocations = Iterables.transform(requestList, new Function<RequestorInfo, Long>() {
         public Long apply(RequestorInfo requestInfo) {
           return requestInfo.getRequestContext().getRequestedSize();
@@ -122,7 +122,7 @@ public class MemoryDistributor {
     } else {
       WeightedScalingMemoryDistributor allocator = new WeightedScalingMemoryDistributor();
       allocator.setConf(conf);
-      allocations = allocator.assignMemory(totalJvmMemory, numTotalInputs, numTotalOutputs,
+      allocations = allocator.assignMemory(totalTaskMemoryBytes, numTotalInputs, numTotalOutputs,
           Iterables.unmodifiableIterable(requestContexts));
       validateAllocations(allocations, requestList.size());
       if (LOG.isDebugEnabled()) {
@@ -146,7 +146,7 @@ public class MemoryDistributor {
     }
   }
 
-  private long registerRequest(long requestSize, MemoryUpdateCallback callback,
+  private void registerRequest(long requestSize, MemoryUpdateCallback callback,
       TaskContext entityContext, InitialMemoryRequestContext.RequestType requestType) {
     Preconditions.checkArgument(requestSize >= 0);
     Objects.requireNonNull(callback);
@@ -177,7 +177,6 @@ public class MemoryDistributor {
       break;
     }
     requestList.add(requestInfo);
-    return -1;
   }
 
   private void validateAllocations(Iterable<Long> allocations, int numRequestors) {
@@ -189,11 +188,11 @@ public class MemoryDistributor {
       numAllocations++;
     }
     Preconditions.checkState(numAllocations == numRequestors,
-        "Number of allocations must match number of requestors. Allocated={}, Requests: {}",
+        "Number of allocations {} must match number of requesters {}",
         numAllocations, numRequestors);
-    Preconditions.checkState(totalAllocated <= totalJvmMemory,
-        "Total allocation should be <= availableMem. TotalAllocated: {}, totalJvmMemory: {}",
-        totalAllocated, totalJvmMemory);
+    Preconditions.checkState(totalAllocated <= totalTaskMemoryBytes,
+        "Total allocation {} should be <= totalTaskMemoryBytes {}",
+        totalAllocated, totalTaskMemoryBytes);
   }
 
   private static class RequestorInfo {

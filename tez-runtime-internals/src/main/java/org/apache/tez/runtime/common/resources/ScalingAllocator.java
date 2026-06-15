@@ -53,13 +53,6 @@ public class ScalingAllocator implements InitialMemoryAllocator {
     Preconditions.checkState(reserveFraction >= 0.0d && reserveFraction <= 1.0d);
     availableForAllocation = (long) (availableForAllocation - (reserveFraction * availableForAllocation));
 
-    if (LOG.isDebugEnabled()) {
-      long totalJvmMem = Runtime.getRuntime().maxMemory();
-      double ratio = totalRequested / (double) totalJvmMem;
-      LOG.debug("Scaling Requests. TotalRequested: {}, TotalJVMHeap: {}, TotalAvailable: {}, TotalRequested/TotalJVMHeap: {}",
-          totalRequested, totalJvmMem, availableForAllocation, ratio);
-    }
-
     if (totalRequested < availableForAllocation || totalRequested == 0) {
       // Not scaling up requests. Assuming things were setup correctly by
       // users in this case, keeping Processor, caching etc in mind.
@@ -75,7 +68,7 @@ public class ScalingAllocator implements InitialMemoryAllocator {
     for (InitialMemoryRequestContext request : requests) {
       long requestedSize = request.getRequestedSize();
       if (requestedSize == 0) {
-        allocations.add(0l);
+        allocations.add(0L);
         if (LOG.isDebugEnabled()) {
           LOG.debug("Scaling requested: 0 to allocated: 0");
         }
@@ -85,7 +78,6 @@ public class ScalingAllocator implements InitialMemoryAllocator {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Scaling requested: " + requestedSize + " to allocated: " + allocated);  
         }
-
       }
     }
     return allocations;
