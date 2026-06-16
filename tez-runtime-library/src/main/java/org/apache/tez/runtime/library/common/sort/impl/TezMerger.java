@@ -704,7 +704,8 @@ public class TezMerger {
           MultiByteArrayOutputStream byteArrayOutput = null;
           IFile.WriterAppendDataInputBuffer writer;
           if (writeIntermediateToMemory) {
-            byteArrayOutput = new MultiByteArrayOutputStream(fs, outputFile);
+            byteArrayOutput = new MultiByteArrayOutputStream(
+                fs, outputFile, true, freeMemoryThreshold);
             FSDataOutputStream outputStream = new FSDataOutputStream(byteArrayOutput, null);
             writer = new WriterDataInputBuffer(outputStream, codec, writesCounter, null,
                 false, checkForSameKeys, -1, -1, writeBuffer, null, taskContext);

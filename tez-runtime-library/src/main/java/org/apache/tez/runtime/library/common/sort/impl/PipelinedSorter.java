@@ -704,7 +704,8 @@ public final class PipelinedSorter {
     if (spillToFreeMemory) {
       canUseBuffers = MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold);
       if (canUseBuffers) {
-        byteArrayOutput = new MultiByteArrayOutputStream(localFs, spillFileName);
+        byteArrayOutput = new MultiByteArrayOutputStream(
+            localFs, spillFileName, true, freeMemoryThreshold);
       }
     }
 
@@ -992,7 +993,8 @@ public final class PipelinedSorter {
       MultiByteArrayOutputStream byteArrayOutput = null;
       if (useFreeMemoryWriterOutput
           && MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold)) {
-        byteArrayOutput = new MultiByteArrayOutputStream(localFs, finalOutputFile);
+        byteArrayOutput = new MultiByteArrayOutputStream(
+            localFs, finalOutputFile, true, freeMemoryThreshold);
       }
 
       // the output stream for the final single output file

@@ -33,6 +33,7 @@ public class MultiByteArrayOutputStream extends OutputStream {
   // Cf. gla2025.5.26.pptx
   private static final int MIN_CACHE_SIZE_WRITER = 16 * 1024;   // set to 128 * 1024 to start at 128KB
   private static final int MAX_CACHE_SIZE_WRITER = 4 * 1024 * 1024;
+  private static final int EXTRA_CACHE_SIZE_WRITER = 8 * 1024 * 1024;
   private static final int CACHE_SIZE_MULTIPLE = 8;
 
   // assume max number of buffers = 64
@@ -53,6 +54,9 @@ public class MultiByteArrayOutputStream extends OutputStream {
   private long totalBytes = 0;
   private long bufferBytes = 0;
   private final long bufferSizeThreshold;   // bufferSizeThreshold == 0 is allowed
+  private long currentBufferSizeThreshold;
+  private final boolean tryFreeMemoryAfterBufferSizeThreshold;
+  private final long freeMemoryThreshold;
 
   // spill fields
   private final FileSystem fs;
@@ -61,14 +65,19 @@ public class MultiByteArrayOutputStream extends OutputStream {
 
   public MultiByteArrayOutputStream(
       FileSystem fs,
-      Path outputPath) {
-    this(fs, outputPath, DEFAULT_BUFFER_SIZE_THRESHOLD);
+      Path outputPath,
+      boolean tryFreeMemoryAfterBufferSizeThreshold,
+      long freeMemoryThreshold) {
+    this(fs, outputPath, DEFAULT_BUFFER_SIZE_THRESHOLD,
+        tryFreeMemoryAfterBufferSizeThreshold, freeMemoryThreshold);
   }
 
   public MultiByteArrayOutputStream(
       FileSystem fs,
       Path outputPath,
-      long bufferSizeThreshold) {
+      long bufferSizeThreshold,
+      boolean tryFreeMemoryAfterBufferSizeThreshold,
+      long freeMemoryThreshold) {
     // start with an empty byte[] buffer because no data might be written
     this.cacheSize = 0;   // set to the size of currentBuffer
     this.currentBuffer = null;
@@ -76,6 +85,9 @@ public class MultiByteArrayOutputStream extends OutputStream {
     // posInBuf == cacheSize if currentBuffer is full, so currentBuffer is initially considered full
 
     this.bufferSizeThreshold = bufferSizeThreshold;
+    this.currentBufferSizeThreshold = bufferSizeThreshold;
+    this.tryFreeMemoryAfterBufferSizeThreshold = tryFreeMemoryAfterBufferSizeThreshold;
+    this.freeMemoryThreshold = freeMemoryThreshold;
 
     this.fs = fs;
     this.outputPath = outputPath;
@@ -91,14 +103,14 @@ public class MultiByteArrayOutputStream extends OutputStream {
       // in-memory buffer has space
       currentBuffer[posInBuf++] = (byte) b;
       bufferBytes++;
-    } else if (bufferBytes < bufferSizeThreshold) {
-      allocateNewBuffer();
-      currentBuffer[posInBuf++] = (byte) b;
-      bufferBytes++;
     } else {
-      // hit buffer limit: spill future writes
-      spillToFile();
-      fileOut.write(b);
+      allocateBufferOrSpillToFile();
+      if (fileOut != null) {
+        fileOut.write(b);
+      } else {
+        currentBuffer[posInBuf++] = (byte) b;
+        bufferBytes++;
+      }
     }
     totalBytes++;
   }
@@ -131,23 +143,40 @@ public class MultiByteArrayOutputStream extends OutputStream {
         }
       }
       // remaining > 0;
-      if (bufferBytes < bufferSizeThreshold) {
-        allocateNewBuffer();
-      } else {
-        // spill future writes
-        spillToFile();
+      allocateBufferOrSpillToFile();
+    }
+  }
+
+  private void allocateBufferOrSpillToFile() throws IOException {
+    if (bufferBytes < currentBufferSizeThreshold) {
+      allocateNewBuffer();
+    } else if (tryFreeMemoryAfterBufferSizeThreshold
+        && canUseFreeMemoryBuffers(freeMemoryThreshold)) {
+      allocateNewBuffer(EXTRA_CACHE_SIZE_WRITER);
+      currentBufferSizeThreshold += EXTRA_CACHE_SIZE_WRITER;
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Allocated extra buffer: bufferBytes={}, bufferSizeThreshold={}, "
+                + "currentBufferSizeThreshold={}, outputPath={}",
+            bufferBytes, bufferSizeThreshold, currentBufferSizeThreshold, outputPath);
       }
+    } else {
+      // hit buffer limit: spill future writes
+      spillToFile();
     }
   }
 
   // allocate a new buffer
   private void allocateNewBuffer() {
-    assert posInBuf == cacheSize;
     if (cacheSize == 0) {
-      cacheSize = MIN_CACHE_SIZE_WRITER;
+      allocateNewBuffer(MIN_CACHE_SIZE_WRITER);
     } else {
-      cacheSize = Math.min(cacheSize * CACHE_SIZE_MULTIPLE, MAX_CACHE_SIZE_WRITER);
+      allocateNewBuffer(Math.min(cacheSize * CACHE_SIZE_MULTIPLE, MAX_CACHE_SIZE_WRITER));
     }
+  }
+
+  private void allocateNewBuffer(int newCacheSize) {
+    assert posInBuf == cacheSize;
+    cacheSize = newCacheSize;
     currentBuffer = new byte[cacheSize];
     buffers.add(currentBuffer);
     posInBuf = 0;
@@ -178,7 +207,9 @@ public class MultiByteArrayOutputStream extends OutputStream {
   @Override
   synchronized public void close() throws IOException {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Closing: totalBytes={}, bufferBytes={}, outputPath={}", totalBytes, bufferBytes, outputPath);
+      LOG.debug("Closing: totalBytes={}, bufferBytes={}, bufferSizeThreshold={}, "
+              + "currentBufferSizeThreshold={}, outputPath={}",
+          totalBytes, bufferBytes, bufferSizeThreshold, currentBufferSizeThreshold, outputPath);
     }
     if (fileOut != null) {
       fileOut.close();

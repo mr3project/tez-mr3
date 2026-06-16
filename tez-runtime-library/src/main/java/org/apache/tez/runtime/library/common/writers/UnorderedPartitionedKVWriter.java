@@ -391,7 +391,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
         byte[] writeBuffer = IFile.allocateWriteBuffer();
         Path finalOutPath = outputFileHandler.getOutputFileForWrite();
         this.singlePartitionByteArrayOutput =
-            new MultiByteArrayOutputStream(rfs, finalOutPath, assignedMemoryBytes);
+            new MultiByteArrayOutputStream(rfs, finalOutPath, assignedMemoryBytes, false, 0L);
         FSDataOutputStream output = new FSDataOutputStream(singlePartitionByteArrayOutput, null);
         this.writer = new IFile.WriterBytesWritable(output, codec, outputRecordsCounter,
             outputRecordBytesCounter, trackMaxKeyValLen, -1, -1, writeBuffer, null, outputContext);
@@ -634,7 +634,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     if (spillNumber == 0) {
       // availableMemoryBytes is reserved for this UnorderedPartitionedKVWriter, so create MultiByteArrayOutputStream
       singlePartitionByteArrayOutput = new MultiByteArrayOutputStream(
-          rfs, singlePartitionSpillPathDetails.outputFilePath, assignedMemoryBytes);
+          rfs, singlePartitionSpillPathDetails.outputFilePath, assignedMemoryBytes, false, 0L);
       singlePartitionSpillOutput = new FSDataOutputStream(singlePartitionByteArrayOutput, null);
     } else {
       // we have consumed availableMemoryBytes reserved for this UnorderedPartitionedKVWriter, so check free memory
@@ -642,7 +642,8 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       if (useFreeMemoryWriterOutput
           && MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold)) {
         singlePartitionByteArrayOutput =
-            new MultiByteArrayOutputStream(rfs, singlePartitionSpillPathDetails.outputFilePath);
+            new MultiByteArrayOutputStream(
+                rfs, singlePartitionSpillPathDetails.outputFilePath, true, freeMemoryThreshold);
         singlePartitionSpillOutput = new FSDataOutputStream(singlePartitionByteArrayOutput, null);
       } else {
         singlePartitionSpillOutput = rfs.create(singlePartitionSpillPathDetails.outputFilePath);
@@ -948,7 +949,8 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       if (spillToFreeMemory) {
         canUseBuffers = MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold);
         if (canUseBuffers) {
-          byteArrayOutput = new MultiByteArrayOutputStream(rfs, spillPathDetails.outputFilePath);
+          byteArrayOutput = new MultiByteArrayOutputStream(
+              rfs, spillPathDetails.outputFilePath, true, freeMemoryThreshold);
         }
       }
 
@@ -1492,7 +1494,8 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     MultiByteArrayOutputStream byteArrayOutput = null;
     if (useFreeMemoryWriterOutput) {
       if (MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold)) {
-        byteArrayOutput = new MultiByteArrayOutputStream(rfs, finalOutPath);
+        byteArrayOutput = new MultiByteArrayOutputStream(
+            rfs, finalOutPath, true, freeMemoryThreshold);
       }
     }
 
