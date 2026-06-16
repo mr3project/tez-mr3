@@ -24,14 +24,8 @@ public class Constants {
   public static final String DAG_PREFIX = "dag_";
   public static final String VERTEX_PREFIX = "vertex_";
 
-  public static final String MAP_OUTPUT_FILENAME_STRING = "file.out";
-  public static final String MAP_OUTPUT_INDEX_SUFFIX_STRING = ".index";
-  public static final String REDUCE_INPUT_FILE_FORMAT_STRING = "%s/map_%d.out";
-
   public static final int MAP_OUTPUT_INDEX_RECORD_LENGTH = 24;
   public static final String MERGED_OUTPUT_PREFIX = ".merged";
-
-  public static final long DEFAULT_COMBINE_RECORDS_BEFORE_PROGRESS = 10000;
 
   // TODO NEWTEZ Remove this constant once the old code is removed.
   public static final String TEZ_RUNTIME_TASK_ATTEMPT_ID = 
@@ -42,9 +36,6 @@ public class Constants {
 
   public static final String TEZ_RUNTIME_TASK_OUTPUT_INDEX_SUFFIX_STRING =
       ".index";
-
-  public static final String TEZ_RUNTIME_TASK_INPUT_FILE_FORMAT_STRING =
-      "%s/task_%d.out"; 
 
   public static final String TEZ_RUNTIME_TASK_OUTPUT_DIR = "output";
 }

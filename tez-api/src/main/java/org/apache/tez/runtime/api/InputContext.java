@@ -24,6 +24,10 @@ package org.apache.tez.runtime.api;
  */
 public interface InputContext extends TaskContext {
 
+  // returns an identifier which is unique to the specific Input
+  // passed to TezTaskOutputFiles
+  public String getUniqueIdentifierForOutputFiles();
+
   /**
    * Get the Vertex Name of the Source that generated data for this Input
    * @return Name of the Source Vertex

@@ -31,15 +31,6 @@ import org.apache.hadoop.fs.Path;
 public interface TezTaskOutput {
 
   /**
-   * Create a local output file name.
-   *
-   * @param size the size of the file
-   * @return path the path to write to
-   * @throws IOException
-   */
-  public Path getOutputFileForWrite(long size) throws IOException;
-
-  /**
    * Create a local output file name. This method is meant to be used *only* if
    * the size of the file is not know up front.
    * 
@@ -47,15 +38,6 @@ public interface TezTaskOutput {
    * @throws IOException
    */
   public Path getOutputFileForWrite() throws IOException;
-
-  /**
-   * Create a local output file name on the same volume.
-   * This is only meant to be used to rename temporary files to their final destination within the
-   * same volume.
-   *
-   * @return path the path of the output file within the same volume
-   */
-  public Path getOutputFileForWriteInVolume(Path existing);
 
   /**
    * Create a local output index file name.
@@ -67,24 +49,22 @@ public interface TezTaskOutput {
   public Path getOutputIndexFileForWrite(long size) throws IOException;
 
   /**
-   * Create a local output index file name on the same volume.
-   * The intended usage of this method is to write the index file on the same volume as the
-   * associated data file.
-   * @return path the path of the index file within the same volume
-   */
-  public Path getOutputIndexFileForWriteInVolume(Path existing);
-
-  /**
-   * Create a local output spill file name.
+   * Create a task output file for the supplied path kind and unique file name.
    *
-   * @param spillNumber the spill number
-   * @param size the size of the file
-   * @return path the path to write the spill file for the specific spillNumber
+   * @param uniqueName a caller-constructed single file-name component
+   * @param size the size of the file, or 0 if unknown
+   * @return path the path to write to
    * @throws IOException
    */
-  public Path getSpillFileForWrite(int spillNumber, long size)
-      throws IOException;
+  public Path getFileForWrite(String uniqueName, long size) throws IOException;
 
+  /**
+   * Construct a spill file name, given a spill number.
+   *
+   * @param spillNumber the spill number
+   * @return a spill file name independent of local directories
+   */
+  public String getSpillFileName(int spillNumber);
 
   /**
    * Create a local output spill index file name.
@@ -94,8 +74,7 @@ public interface TezTaskOutput {
    * @return path the path to write the spill index file for the specific spillNumber
    * @throws IOException
    */
-  public Path getSpillIndexFileForWrite(int spillNumber, long size)
-      throws IOException;
+  public Path getSpillIndexFileForWrite(int spillNumber, long size) throws IOException;
 
   /**
    * Create a local input file name.
@@ -105,8 +84,7 @@ public interface TezTaskOutput {
    * @param size the size of the file  @return path the path to the input file.
    * @throws IOException
    */
-  public Path getInputFileForWrite(int srcIdentifier,
-      int spillNum, long size) throws IOException;
+  public Path getInputFileForWrite(int srcIdentifier, int spillNum, long size) throws IOException;
 
   /**
    * Construct a spill file name, given a spill number
@@ -116,5 +94,4 @@ public interface TezTaskOutput {
    * @return a spill file name independent of the unique identifier and local directories
    */
   public String getSpillFileName(int srcId, int spillNum);
-
 }
