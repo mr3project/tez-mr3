@@ -76,7 +76,7 @@ public class TezRuntimeUtils {
       Configuration conf, OutputContext outputContext,
       boolean isCompositeFetch) {
     return new TezTaskOutputFiles(conf,
-        outputContext.getUniqueIdentifier(),
+        outputContext.getUniqueIdentifierForOutputFiles(),
         outputContext.getDagIdentifier(),
         outputContext.getExecutionContext().getEnvContainerId(),
         outputContext.getTaskVertexIndex(),

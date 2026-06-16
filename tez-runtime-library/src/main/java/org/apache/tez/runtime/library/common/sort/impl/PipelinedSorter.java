@@ -64,6 +64,7 @@ import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterBytesWritable
 import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterDataInputBuffer;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger.DiskSegment;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger.Segment;
+import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.TezRuntimeUtils;
 import org.apache.tez.util.FastByteComparisons;
 
@@ -599,8 +600,10 @@ public final class PipelinedSorter {
   private void spillSingleRecord(final BytesWritable key, final BytesWritable value,
           int partition) throws IOException {
     final TezSpillRecord spillRec = new TezSpillRecord(partitions);
-    // getSpillFileForWrite with size -1 as the serialized size of KV pair is still unknown
-    final Path outputFilePath = mapOutputFile.getSpillFileForWrite(numSpills, -1);
+    final String uniqueSpillName = mapOutputFile.getSpillFileName(numSpills);
+    // should call getFileForWrite() here because we will create a local file
+    final Path outputFilePath = mapOutputFile.getFileForWrite(uniqueSpillName, 0);
+
     spillFilePaths.put(numSpills, outputFilePath);
     Path indexFilename = null;
     FSDataOutputStream out = localFs.create(outputFilePath, true, 4096);
@@ -692,11 +695,8 @@ public final class PipelinedSorter {
 
     // create spill file
 
-    final long size = capacityBytes + (partitions * APPROX_HEADER_LENGTH);
     final TezSpillRecord spillRec = new TezSpillRecord(partitions);
-    final Path spillFileName = mapOutputFile.getSpillFileForWrite(numSpills, size);
-    spillFilePaths.put(numSpills, spillFileName);
-    Path indexFilename = null;
+    final String uniqueSpillName = mapOutputFile.getSpillFileName(numSpills);
 
     MultiByteArrayOutputStream byteArrayOutput = null;
     boolean canUseBuffers = false;
@@ -704,9 +704,15 @@ public final class PipelinedSorter {
     if (spillToFreeMemory) {
       canUseBuffers = MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold);
       if (canUseBuffers) {
-        byteArrayOutput = new MultiByteArrayOutputStream(localFs, spillFileName);
+        byteArrayOutput = new MultiByteArrayOutputStream(localFs, mapOutputFile, uniqueSpillName);
       }
     }
+    final Path spillFileName = byteArrayOutput == null ?
+        mapOutputFile.getFileForWrite(uniqueSpillName, 0) : null;
+    if (spillFileName != null) {
+      spillFilePaths.put(numSpills, spillFileName);
+    }
+    Path indexFilename = null;
 
     final boolean isRleEnabled = merger.needsRLE();
 
@@ -717,13 +723,9 @@ public final class PipelinedSorter {
     try {
       if (byteArrayOutput == null) {
         fsOutput = localFs.create(spillFileName, true, 4096);
+        ensureSpillFilePermissions(spillFileName, localFs, localFsSpillFilePerms);
       } else {
         fsOutput = new FSDataOutputStream(byteArrayOutput, null);
-      }
-      ensureSpillFilePermissions(spillFileName, localFs, localFsSpillFilePerms);
-
-      if (isDebugEnabled) {
-        LOG.debug("Spilling to {} (use in-memory buffers = {})", spillFileName.toString(), canUseBuffers);
       }
 
       for (int i = 0; i < partitions; ++i) {
@@ -942,8 +944,7 @@ public final class PipelinedSorter {
         finalIndexComputed = true;  // because final TezSpillRecord can be obtained
 
         if (isDebugEnabled) {
-          LOG.debug(outputContext.getDestinationVertexName() + ": numSpills=" + numSpills +
-              ", finalOutputFile=" + finalOutputFile + ", finalIndexFile=" + finalIndexFile);
+          LOG.debug(outputContext.getDestinationVertexName() + ": numSpills=" + numSpills);
         }
 
         String uniqueId = ShuffleUtils.getUniqueIdentifierSpillId(outputContext, 0);
@@ -978,7 +979,17 @@ public final class PipelinedSorter {
         return;
       }
 
-      finalOutputFile = mapOutputFile.getOutputFileForWrite(0);
+      MultiByteArrayOutputStream byteArrayOutput = null;
+      if (useFreeMemoryWriterOutput
+          && MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold)) {
+        byteArrayOutput = new MultiByteArrayOutputStream(
+            localFs, mapOutputFile, Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING);
+        finalOutputFile = null;
+      } else {
+        finalOutputFile = mapOutputFile.getFileForWrite(
+            Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING, 0);
+      }
+
       if (writeSpillRecord) {
         finalIndexFile = mapOutputFile.getOutputIndexFileForWrite(0);
       }
@@ -986,17 +997,11 @@ public final class PipelinedSorter {
 
       if (isDebugEnabled) {
         LOG.debug(outputContext.getDestinationVertexName() + ": numSpills: " + numSpills +
-            ", finalOutputFile:" + finalOutputFile + ", finalIndexFile:" + finalIndexFile);
-      }
-
-      MultiByteArrayOutputStream byteArrayOutput = null;
-      if (useFreeMemoryWriterOutput
-          && MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold)) {
-        byteArrayOutput = new MultiByteArrayOutputStream(localFs, finalOutputFile);
+          ", finalOutputFile:" + finalOutputFile + ", finalIndexFile:" + finalIndexFile);
       }
 
       // the output stream for the final single output file
-      FSDataOutputStream finalOut = null;
+      FSDataOutputStream finalOut;
       if (byteArrayOutput == null) {
         finalOut = localFs.create(finalOutputFile, true, 4096);
         ensureSpillFilePermissions(finalOutputFile, localFs, localFsSpillFilePerms);
@@ -1028,7 +1033,7 @@ public final class PipelinedSorter {
           // merge
           TezRawKeyValueIterator kvIter = TezMerger.merge(conf, localFs,
               codec, segmentList, mergeFactor, 0,
-              new Path(uniqueIdentifier),
+              mapOutputFile, "pipelined_" + parts,
               sortSegments, null, spilledRecordsCounter,
               additionalSpillBytesReadCounter, isFinalMergeRleEnabled, outputContext);
           // write merged output to disk
@@ -1084,7 +1089,9 @@ public final class PipelinedSorter {
 
       for (int i = 0; i < numSpills; i++) {
         Path spillFilename = spillFilePaths.get(i);
-        localFs.delete(spillFilename, true);
+        if (spillFilename != null) {
+          localFs.delete(spillFilename, true);
+        }
       }
       spillFilePaths.clear();
 

@@ -137,7 +137,7 @@ public class UnorderedKVInput extends AbstractLogicalInput implements LogicalInp
       long assignedMemoryBytes = memoryUpdateCallbackHandler.getMemoryAssigned();
       this.inputManager = new SimpleFetchedInputAllocator(
           srcNameTrimmed,
-          inputContext.getUniqueIdentifier(),
+          inputContext.getUniqueIdentifierForOutputFiles(),
           inputContext.getDagIdentifier(), conf,
           inputContext.getTotalMemoryAvailableToTask(),
           assignedMemoryBytes,

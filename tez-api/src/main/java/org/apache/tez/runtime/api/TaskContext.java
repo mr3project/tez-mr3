@@ -111,12 +111,7 @@ public interface TaskContext extends DecompressorPool, CompressorPool {
    */
   public String[] getWorkDirs();
 
-  /**
-   * Returns an identifier which is unique to the specific Input, Processor or
-   * Output
-   * 
-   * @return a unique identifier
-   */
+  // Returns an identifier which is unique to the specific Task
   public String getUniqueIdentifier();
 
   public String getTaskAttemptIdStr();

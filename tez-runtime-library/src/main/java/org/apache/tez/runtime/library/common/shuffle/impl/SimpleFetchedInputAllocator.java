@@ -60,7 +60,7 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator, Fetch
   private final boolean shuffleMemoryStreaming;
 
   public SimpleFetchedInputAllocator(String srcNameTrimmed,
-                                     String uniqueIdentifier, int dagID,
+                                     String uniqueIdentifierForOutputFiles, int dagID,
                                      Configuration conf,
                                      long totalTaskMemoryBytes,
                                      long assignedMemoryBytes,
@@ -69,7 +69,7 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator, Fetch
     this.srcNameTrimmed = srcNameTrimmed;
     this.conf = conf;    
     this.fileNameAllocator = new TezTaskOutputFiles(
-        conf, uniqueIdentifier, dagID, containerId, vertexId, compositeFetch);
+        conf, uniqueIdentifierForOutputFiles, dagID, containerId, vertexId, compositeFetch);
 
     this.memoryLimitBytes = assignedMemoryBytes;
 

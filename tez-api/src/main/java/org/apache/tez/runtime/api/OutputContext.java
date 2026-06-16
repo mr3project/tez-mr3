@@ -26,6 +26,10 @@ import java.util.concurrent.ExecutorService;
  */
 public interface OutputContext extends TaskContext {
 
+  // returns an identifier which is unique to the specific Output
+  // passed to TezTaskOutputFiles
+  public String getUniqueIdentifierForOutputFiles();
+
   /**
    * Get the Vertex Name of the Destination that is the recipient of this
    * Output's data

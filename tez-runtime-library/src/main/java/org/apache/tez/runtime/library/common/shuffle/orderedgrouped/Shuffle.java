@@ -36,9 +36,7 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.TezUtilsInternal;
 import org.apache.tez.common.counters.TaskCounter;
 import org.apache.tez.common.counters.TezCounter;
@@ -116,8 +114,6 @@ public class Shuffle implements ExceptionReporter {
     }
 
     FileSystem localFS = FileSystem.getLocal(conf);
-    LocalDirAllocator localDirAllocator =
-        new LocalDirAllocator(TezRuntimeFrameworkConfigs.LOCAL_DIRS);
 
     TezCounter spilledRecordsCounter = inputContext.getCounters().findCounter(TaskCounter.SPILLED_RECORDS);
     TezCounter mergedMapOutputsCounter = inputContext.getCounters().findCounter(TaskCounter.MERGE_NUM_MAP_OUTPUTS);
@@ -129,7 +125,6 @@ public class Shuffle implements ExceptionReporter {
     merger = new MergeManager(
         conf,
         localFS,
-        localDirAllocator,
         inputContext,
         spilledRecordsCounter,
         mergedMapOutputsCounter,

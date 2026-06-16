@@ -386,9 +386,9 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
 
       if (!isPipelinedShuffle) {
         byte[] writeBuffer = IFile.allocateWriteBuffer();
-        Path finalOutPath = outputFileHandler.getOutputFileForWrite();
         this.singlePartitionByteArrayOutput =
-            new MultiByteArrayOutputStream(rfs, finalOutPath, assignedMemoryBytes);
+            new MultiByteArrayOutputStream(rfs, outputFileHandler,
+                Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING, assignedMemoryBytes);
         FSDataOutputStream output = new FSDataOutputStream(singlePartitionByteArrayOutput, null);
         this.writer = new IFile.WriterBytesWritable(output, codec, outputRecordsCounter,
             outputRecordBytesCounter, trackMaxKeyValLen, -1, -1, writeBuffer, null, outputContext);
@@ -628,21 +628,23 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
 
   private void openSinglePartitionPipelinedSpill() throws IOException {
     int spillNumber = numSpills.getAndIncrement();
+    boolean useMemoryOutput = spillNumber == 0
+        || (useFreeMemoryWriterOutput &&
+            MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold));
     singlePartitionSpillPathDetails = getSpillPathDetails(
-        false, singlePartitionSpillSizeLimit + APPROX_HEADER_LENGTH, spillNumber);
+        false, singlePartitionSpillSizeLimit + APPROX_HEADER_LENGTH, spillNumber, useMemoryOutput);
 
     if (spillNumber == 0) {
       // availableMemoryBytes is reserved for this UnorderedPartitionedKVWriter, so create MultiByteArrayOutputStream
-      singlePartitionByteArrayOutput = new MultiByteArrayOutputStream(
-          rfs, singlePartitionSpillPathDetails.outputFilePath, assignedMemoryBytes);
+      singlePartitionByteArrayOutput = new MultiByteArrayOutputStream(rfs, outputFileHandler,
+          singlePartitionSpillPathDetails.uniqueName, assignedMemoryBytes);
       singlePartitionSpillOutput = new FSDataOutputStream(singlePartitionByteArrayOutput, null);
     } else {
       // we have consumed availableMemoryBytes reserved for this UnorderedPartitionedKVWriter, so check free memory
       singlePartitionByteArrayOutput = null;
-      if (useFreeMemoryWriterOutput
-          && MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold)) {
-        singlePartitionByteArrayOutput =
-            new MultiByteArrayOutputStream(rfs, singlePartitionSpillPathDetails.outputFilePath);
+      if (useMemoryOutput) {
+        singlePartitionByteArrayOutput = new MultiByteArrayOutputStream(rfs, outputFileHandler,
+            singlePartitionSpillPathDetails.uniqueName);
         singlePartitionSpillOutput = new FSDataOutputStream(singlePartitionByteArrayOutput, null);
       } else {
         singlePartitionSpillOutput = rfs.create(singlePartitionSpillPathDetails.outputFilePath);
@@ -919,7 +921,8 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     public SpillCallable(List<WrappedBuffer> filledBuffers, CompressionCodec codec,
         TezCounter numRecordsCounter, SpillPathDetails spillPathDetails, boolean spillToFreeMemory) {
       this(filledBuffers, codec, numRecordsCounter, spillPathDetails.spillIndex, spillToFreeMemory);
-      Preconditions.checkArgument(spillPathDetails.outputFilePath != null, "Spill output file path can not be null");
+      Preconditions.checkArgument(spillToFreeMemory || spillPathDetails.outputFilePath != null,
+          "Spill output file path cannot be null");
       this.spillPathDetails = spillPathDetails;
     }
 
@@ -939,17 +942,15 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       // Number of parallel spills determined by number of threads.
       // Last spill synchronization handled separately.
       SpillResult spillResult = null;
-      if (spillPathDetails == null) {
-        this.spillPathDetails = getSpillPathDetails(false, -1, spillNumber);
-      }
-
       MultiByteArrayOutputStream byteArrayOutput = null;
-      boolean canUseBuffers = false;
-      if (spillToFreeMemory) {
-        canUseBuffers = MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold);
-        if (canUseBuffers) {
-          byteArrayOutput = new MultiByteArrayOutputStream(rfs, spillPathDetails.outputFilePath);
-        }
+      boolean canUseBuffers = spillToFreeMemory
+          && MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold);
+      if (spillPathDetails == null) {
+        this.spillPathDetails = getSpillPathDetails(false, -1, spillNumber, canUseBuffers);
+      }
+      if (canUseBuffers) {
+        byteArrayOutput = new MultiByteArrayOutputStream(
+            rfs, outputFileHandler, spillPathDetails.uniqueName);
       }
 
       final boolean isRleEnabled = false;
@@ -962,8 +963,11 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       Compressor compressorExternal = null;
       try {
         if (byteArrayOutput == null) {
-          fsOutput = rfs.create(spillPathDetails.outputFilePath);
-          ensureSpillFilePermissions(spillPathDetails.outputFilePath, rfs, rfsSpillFilePerms);
+          Path outputFilePath = spillPathDetails.outputFilePath == null
+              ? outputFileHandler.getFileForWrite(spillPathDetails.uniqueName, 0)
+              : spillPathDetails.outputFilePath;
+          fsOutput = rfs.create(outputFilePath);
+          ensureSpillFilePermissions(outputFilePath, rfs, rfsSpillFilePerms);
         } else {
           fsOutput = new FSDataOutputStream(byteArrayOutput, null);
           // spillPathDetails.outputFilePath is not used
@@ -971,7 +975,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
 
         if (isDebugEnabled) {
           LOG.debug("Writing spill {} to {} (use in-memory buffers = {})",
-              spillNumber, spillPathDetails.outputFilePath.toString(), canUseBuffers);
+              spillNumber, spillPathDetails.outputFilePath, canUseBuffers);
         }
 
         RawDataBuffer key = new RawDataBuffer();
@@ -1369,10 +1373,14 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       updateGlobalStats(currentBuffer);
       filledBuffers.add(currentBuffer);
 
-      // Capture spill count before getSpillPathDetails() increments numSpills.
+      // Capture spill count before assigning a spill number.
       boolean hasNoPreviousSpills = (numSpills.get() == 0);
-      //setup output file and index file
-      SpillPathDetails spillPathDetails = getSpillPathDetails(true, -1);
+      boolean useMemoryOutput = useFreeMemoryWriterOutput
+          && MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold);
+      // setup output file and index file
+      SpillPathDetails spillPathDetails = getSpillPathDetails(
+          true, -1, numSpills.getAndIncrement(), useMemoryOutput);
+
       // finalSpill() serves two scenarios:
       //  1) isPipelinedShuffle == false && numSpills == 0:
       //     this spill is the final output and must follow final-output compression (codec).
@@ -1381,7 +1389,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       CompressionCodec finalSpillCodec =
           (!isPipelinedShuffle && hasNoPreviousSpills) ? codec : (spillCompressed ? codec : null);
       SpillCallable spillCallable = new SpillCallable(
-          filledBuffers, finalSpillCodec, null, spillPathDetails, useFreeMemoryWriterOutput);
+          filledBuffers, finalSpillCodec, null, spillPathDetails, useMemoryOutput);
       try {
         SpillResult spillResult = spillCallable.call();
 
@@ -1413,20 +1421,11 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
   private SpillPathDetails getSpillPathDetails(boolean isFinalSpill, long expectedSpillSize)
       throws IOException {
     int spillNumber = numSpills.getAndIncrement();
-    return getSpillPathDetails(isFinalSpill, expectedSpillSize, spillNumber);
+    return getSpillPathDetails(isFinalSpill, expectedSpillSize, spillNumber, false);
   }
 
-  /**
-   * Set up spill output file, index file details.
-   *
-   * @param isFinalSpill
-   * @param expectedSpillSize
-   * @param spillNumber
-   * @return SpillPathDetails
-   * @throws IOException
-   */
   private SpillPathDetails getSpillPathDetails(boolean isFinalSpill, long expectedSpillSize,
-      int spillNumber) throws IOException {
+      int spillNumber, boolean deferOutputPath) throws IOException {
     long spillSize = (expectedSpillSize < 0) ?
         (currentBuffer.nextPosition + numPartitions * APPROX_HEADER_LENGTH) : expectedSpillSize;
 
@@ -1437,19 +1436,28 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     boolean indexComputed = false;   // true if TezSpillRecord is effectively computed (i.e., indexFilePath set)
     if (!isPipelinedShuffle) {
       if (isFinalSpill) {
-        outputFilePath = outputFileHandler.getOutputFileForWrite(spillSize);
+        if (!deferOutputPath) {
+          outputFilePath = outputFileHandler.getFileForWrite(
+              Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING, spillSize);
+        }
         if (writeSpillRecord) {
           indexFilePath = outputFileHandler.getOutputIndexFileForWrite(indexFileSizeEstimate);
         }
         indexComputed = true;   // because indexFilePath would be set when using mapreduce_shuffle (ignoring writeSpillRecord)
         finalSpillIndex = -1;   // spill index was not used
       } else {
-        outputFilePath = outputFileHandler.getSpillFileForWrite(spillNumber, spillSize);
+        if (!deferOutputPath) {
+          String uniqueSpillName = outputFileHandler.getSpillFileName(spillNumber);
+          outputFilePath = outputFileHandler.getFileForWrite(uniqueSpillName, spillSize);
+        }
         finalSpillIndex = spillNumber;
         // indexComputed = false && indexFilePath not set
       }
     } else {
-      outputFilePath = outputFileHandler.getSpillFileForWrite(spillNumber, spillSize);
+      if (!deferOutputPath) {
+        String uniqueSpillName = outputFileHandler.getSpillFileName(spillNumber);
+        outputFilePath = outputFileHandler.getFileForWrite(uniqueSpillName, spillSize);
+      }
       if (writeSpillRecord) {
         indexFilePath = outputFileHandler.getSpillIndexFileForWrite(spillNumber, indexFileSizeEstimate);
       }
@@ -1457,7 +1465,14 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       finalSpillIndex = spillNumber;
     }
 
-    return new SpillPathDetails(outputFilePath, indexFilePath, finalSpillIndex, indexComputed);
+    String uniqueName = isFinalSpill && !isPipelinedShuffle ?
+        Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING :
+        outputFileHandler.getSpillFileName(spillNumber);
+
+    assert deferOutputPath || outputFilePath != null;
+    assert !deferOutputPath || outputFilePath == null;
+    return new SpillPathDetails(
+        outputFilePath, indexFilePath, finalSpillIndex, indexComputed, uniqueName);
   }
 
   private void mergeAll() throws IOException {
@@ -1473,7 +1488,17 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       updateGlobalStats(currentBuffer);
     }
 
-    SpillPathDetails spillPathDetails = getSpillPathDetails(true, expectedSize);
+    MultiByteArrayOutputStream byteArrayOutput = null;
+    if (useFreeMemoryWriterOutput) {
+      if (MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold)) {
+        byteArrayOutput = new MultiByteArrayOutputStream(rfs, outputFileHandler,
+            Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING);
+      }
+    }
+
+    SpillPathDetails spillPathDetails = getSpillPathDetails(true, expectedSize,
+        numSpills.getAndIncrement(), byteArrayOutput != null);
+
     // if !writeSpillRecord, then spillPathDetails.indexFilePath == null
     Path finalIndexPath = writeSpillRecord ? spillPathDetails.indexFilePath : null;
     Path finalOutPath = spillPathDetails.outputFilePath;
@@ -1489,17 +1514,11 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     RawDataBuffer keyBufferIFile = new RawDataBuffer();
     RawDataBuffer valBufferIFile = new RawDataBuffer();
 
-    MultiByteArrayOutputStream byteArrayOutput = null;
-    if (useFreeMemoryWriterOutput) {
-      if (MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold)) {
-        byteArrayOutput = new MultiByteArrayOutputStream(rfs, finalOutPath);
-      }
-    }
-
     FSDataOutputStream out = null;
     long finalOutSize = 0;
     try {
       if (byteArrayOutput == null) {
+        Preconditions.checkState(finalOutPath != null, "Final output path must be resolved for disk output");
         out = rfs.create(finalOutPath);
         ensureSpillFilePermissions(finalOutPath, rfs, rfsSpillFilePerms);
       } else {
@@ -1716,7 +1735,9 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     long outSize = 0;
     try {
       final TezSpillRecord spillRecord = new TezSpillRecord(numPartitions);
-      final Path outPath = spillPathDetails.outputFilePath;
+      final Path outPath = spillPathDetails.outputFilePath == null
+          ? outputFileHandler.getFileForWrite(spillPathDetails.uniqueName, 0)
+          : spillPathDetails.outputFilePath;
       out = rfs.create(outPath);
       ensureSpillFilePermissions(outPath, rfs, rfsSpillFilePerms);
       BitSet emptyPartitions = null;
@@ -1778,7 +1799,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
 
       if (isPipelinedShuffle) {
         // This output file is directly served to downstream tasks, so increment fileOutputBytesCounter.
-        fileOutputBytesCounter.increment(rfs.getFileStatus(spillPathDetails.outputFilePath).getLen());
+        fileOutputBytesCounter.increment(rfs.getFileStatus(outPath).getLen());
         sendEventsForSpillForPipelined(emptyPartitions, sizePerPartition, spillIndex, false);
       }
 
@@ -2094,6 +2115,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     // null if writeSpillRecord == false
     final Path indexFilePath;
     final Path outputFilePath;
+    final String uniqueName;
 
     // if true, index was computed:
     //   1) when using hadoop_shuffle, indexFilePath is set
@@ -2107,11 +2129,13 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     final int spillIndex;
 
     SpillPathDetails(Path outputFilePath, @Nullable Path indexFilePath, int spillIndex,
-                     boolean indexComputed) {
+                     boolean indexComputed,
+                     String uniqueName) {
       this.outputFilePath = outputFilePath;
       this.indexFilePath = indexFilePath;
       this.spillIndex = spillIndex;
       this.indexComputed = indexComputed;
+      this.uniqueName = uniqueName;
     }
   }
 }
