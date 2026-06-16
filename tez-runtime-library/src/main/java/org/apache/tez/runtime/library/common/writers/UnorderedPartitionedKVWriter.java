@@ -382,10 +382,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       this.partitioner = null;
       // The synchronous single-partition path has no concurrent record buffers,
       // so the current spill can use the full output-memory allocation.
-      // In order to prevent the last record exceeding the boundary from creating a spill file
-      // in writeSinglePartitionPipelined(), reserve the last 1024 bytes as unused bytes.
-      this.singlePartitionSpillSizeLimit =
-        isPipelinedShuffle ? Math.max(1L, assignedMemoryBytes - 1024) : 0;
+      this.singlePartitionSpillSizeLimit = isPipelinedShuffle ? assignedMemoryBytes : 0;
 
       if (!isPipelinedShuffle) {
         byte[] writeBuffer = IFile.allocateWriteBuffer();
@@ -617,8 +614,13 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       outputLargeRecordsCounter.increment(1);
     }
 
-    long estimatedSpillBytes = singlePartitionSpillRecordBytes
-        + (long) singlePartitionSpillRecords * 2 * INT_SIZE;
+    // In general, we cannot compute the exact number of final physical bytes because of compression.
+    // Thus, estimatedSpillBytes is just a best effort to to start a new spill
+    // before the current spill's projected raw serialized size exceeds singlePartitionSpillSizeLimit.
+    // With compression, the number of physical bytes is usually smaller than estimatedSpillBytes.
+    // TODO: introduce a configuration key for adjusting estimatedSpillBytes (e.g, by multiplying 0.75)
+    long estimatedSpillBytes =
+        singlePartitionSpillRecordBytes + (long) singlePartitionSpillRecords * 2 * INT_SIZE;
     if (estimatedSpillBytes >= singlePartitionSpillSizeLimit) {
       closeSinglePartitionPipelinedSpill(false);
     }
