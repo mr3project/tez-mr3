@@ -360,7 +360,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     this.sizePerPartition = (reportPartitionStats.isEnabled()) ? new long[numPartitions] : null;
     this.indexFileSizeEstimate = (long)numPartitions * Constants.MAP_OUTPUT_INDEX_RECORD_LENGTH;
 
-    final boolean singlePartitionDirect = numPartitions == 1 && !isPipelinedShuffle;
+    final boolean singlePartitionDirect = compositeFetch && numPartitions == 1 && !isPipelinedShuffle;
 
     this.considerDataViaEvents = singlePartitionDirect && dataViaEventsEnabled;
     // trackMaxKeyValLen == compositeFetch && (!(numPartitions == 1) || isPipelinedShuffle || !dataViaEventsEnabled)
@@ -378,7 +378,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     // We cannot achieve both 'avoiding redundant byte copies' and 'closing in separate threads',
     // so this decision is a trade-off between memory efficiency and latency.
 
-    if (numPartitions == 1) {
+    if (compositeFetch && numPartitions == 1) {
       this.partitioner = null;
       // The synchronous single-partition path has no concurrent record buffers,
       // so the current spill can use the full output-memory allocation.
@@ -416,8 +416,6 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-
-    assert !(numPartitions == 1);
 
     numRecordsPerPartition = new int[numPartitions];
 
@@ -563,7 +561,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       maxValLen = Math.max(maxValLen, value.getLength());
     }
 
-    if (numPartitions == 1) {
+    if (compositeFetch && numPartitions == 1) {
       // Special case where there is only one partition; no partition buffers are needed.
 
       // The reason outputRecordsCounter isn't updated here:
@@ -1116,7 +1114,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
 
     // In case there are buffers to be spilled, schedule spilling.
     // For final-merge mode, filledBuffers are merged directly in mergeAll(), so skip scheduling.
-    if (isPipelinedShuffle && !(numPartitions == 1)) {
+    if (isPipelinedShuffle && !(compositeFetch && numPartitions == 1)) {
       scheduleSpillBlocking(1);
     }
     spillLock.lock();
@@ -1143,7 +1141,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
 
     List<Event> eventList = Lists.newLinkedList();
     if (!isPipelinedShuffle) {
-      if (numPartitions == 1) {  // written directly to the final IFile writer
+      if (compositeFetch && numPartitions == 1) {  // written directly to the final IFile writer
         writer.close();   // okay, the final data was written to either disk or memory
         singlePartitionByteArrayOutput.close();
         long rawLen = writer.getRawLength();
@@ -1220,7 +1218,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     LOG.info("{} UnorderedPartitionedKVWriter for {}: final pipelined numSpills={}",
         outputContext.getTaskAttemptIdStr(), outputContext.getDestinationVertexName(),
         numSpills.get());
-    if (numPartitions == 1) {
+    if (compositeFetch && numPartitions == 1) {
       updateTezCountersAndNotify();
       if (writer == null) {
         BitSet emptyPartitions = new BitSet(1);

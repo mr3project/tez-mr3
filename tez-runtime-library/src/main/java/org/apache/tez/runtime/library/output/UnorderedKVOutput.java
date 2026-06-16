@@ -71,9 +71,8 @@ public class UnorderedKVOutput extends AbstractLogicalOutput implements LogicalO
     this.conf = getContext().getConfigurationFromUserPayload(true);
     this.conf.setStrings(TezRuntimeFrameworkConfigs.LOCAL_DIRS, getContext().getWorkDirs());
 
-    // UnorderedKVOutput is for BROADCAST_EDGE and ONE_TO_ONE_EDGE,
-    // so setting TEZ_RUNTIME_PARTITIONER_CLASS here is not really necessary because
-    // UnorderedPartitionedKVWriter sets partitioner to null if numPartitions == 1.
+    // UnorderedKVOutput is for BROADCAST_EDGE and ONE_TO_ONE_EDGE.
+    // Setting TEZ_RUNTIME_PARTITIONER_CLASS here is necessary for mapreduce_shuffle.
     this.conf.set(TezRuntimeConfiguration.TEZ_RUNTIME_PARTITIONER_CLASS, CustomPartitioner.class.getName());
 
     // In UnorderedPartitionedKVWriter, we create MultiByteArrayOutputStream with availableMemoryBytes.

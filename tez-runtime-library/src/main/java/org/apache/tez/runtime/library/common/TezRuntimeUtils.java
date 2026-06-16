@@ -19,6 +19,7 @@
 package org.apache.tez.runtime.library.common;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
@@ -26,6 +27,7 @@ import java.nio.ByteBuffer;
 
 import org.apache.hadoop.io.DataInputByteBuffer;
 import org.apache.tez.common.security.JobTokenSecretManager;
+import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.http.BaseHttpConnection;
 import org.apache.tez.http.HttpConnection;
 import org.apache.tez.http.HttpConnectionParams;
@@ -63,10 +65,10 @@ public class TezRuntimeUtils {
       return new HashPartitioner();
     } else if (ValueHashPartitioner.class.getName().equals(className)) {
       return new ValueHashPartitioner();
-    } else {
-      // UnorderedPartitionedKVWriter does not create Partitioner for BROADCAST_EDGE and ONE_TO_ONE_EDGE
-      assert false;
+    } else if (UnorderedKVOutput.CustomPartitioner.class.getName().equals(className)) {
       return new UnorderedKVOutput.CustomPartitioner();
+    } else {
+      throw new TezUncheckedException("Unsupported Partitioner class: " + className);
     }
   }
 
