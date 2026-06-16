@@ -1433,6 +1433,12 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
    */
   private SpillPathDetails getSpillPathDetails(boolean isFinalSpill, long expectedSpillSize,
       int spillNumber) throws IOException {
+    return getSpillPathDetails(isFinalSpill, expectedSpillSize, spillNumber,
+        compositeFetch && useFreeMemoryWriterOutput);
+  }
+
+  private SpillPathDetails getSpillPathDetails(boolean isFinalSpill, long expectedSpillSize,
+      int spillNumber, boolean deferOutputPath) throws IOException {
     long spillSize = (expectedSpillSize < 0) ?
         (currentBuffer.nextPosition + numPartitions * APPROX_HEADER_LENGTH) : expectedSpillSize;
 
@@ -1443,7 +1449,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     boolean indexComputed = false;   // true if TezSpillRecord is effectively computed (i.e., indexFilePath set)
     if (!isPipelinedShuffle) {
       if (isFinalSpill) {
-        if (!(compositeFetch && useFreeMemoryWriterOutput)) {
+        if (!deferOutputPath) {
           outputFilePath = outputFileHandler.getFileForWrite(PathKind.FINAL_OUTPUT,
               Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING, spillSize);
         }
@@ -1454,7 +1460,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
         finalSpillIndex = -1;   // spill index was not used
       } else {
         String uniqueSpillName = outputFileHandler.getSpillFileName(spillNumber);
-        if (!(compositeFetch && useFreeMemoryWriterOutput)) {
+        if (!deferOutputPath) {
           outputFilePath = outputFileHandler.getFileForWrite(
               PathKind.SPILL, uniqueSpillName, spillSize);
         }
@@ -1463,7 +1469,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       }
     } else {
       String uniqueSpillName = outputFileHandler.getSpillFileName(spillNumber);
-        if (!(compositeFetch && useFreeMemoryWriterOutput)) {
+        if (!deferOutputPath) {
           outputFilePath = outputFileHandler.getFileForWrite(
               PathKind.SPILL, uniqueSpillName, spillSize);
         }
@@ -1492,7 +1498,16 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       updateGlobalStats(currentBuffer);
     }
 
-    SpillPathDetails spillPathDetails = getSpillPathDetails(true, expectedSize);
+    MultiByteArrayOutputStream byteArrayOutput = null;
+    if (useFreeMemoryWriterOutput) {
+      if (MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold)) {
+        byteArrayOutput = new MultiByteArrayOutputStream(rfs, outputFileHandler, PathKind.FINAL_OUTPUT,
+            Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING);
+      }
+    }
+
+    SpillPathDetails spillPathDetails = getSpillPathDetails(true, expectedSize,
+        numSpills.getAndIncrement(), byteArrayOutput != null);
     // if !writeSpillRecord, then spillPathDetails.indexFilePath == null
     Path finalIndexPath = writeSpillRecord ? spillPathDetails.indexFilePath : null;
     Path finalOutPath = spillPathDetails.outputFilePath;
@@ -1508,22 +1523,11 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     RawDataBuffer keyBufferIFile = new RawDataBuffer();
     RawDataBuffer valBufferIFile = new RawDataBuffer();
 
-    MultiByteArrayOutputStream byteArrayOutput = null;
-    if (useFreeMemoryWriterOutput) {
-      if (MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold)) {
-        byteArrayOutput = new MultiByteArrayOutputStream(rfs, outputFileHandler, PathKind.FINAL_OUTPUT,
-            Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING);
-      }
-    }
-
     FSDataOutputStream out = null;
     long finalOutSize = 0;
     try {
       if (byteArrayOutput == null) {
-        if (finalOutPath == null) {
-          finalOutPath = outputFileHandler.getFileForWrite(PathKind.FINAL_OUTPUT,
-              Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING, 0);
-        }
+        Preconditions.checkState(finalOutPath != null, "Final output path must be resolved for disk output");
         out = rfs.create(finalOutPath);
         ensureSpillFilePermissions(finalOutPath, rfs, rfsSpillFilePerms);
       } else {
