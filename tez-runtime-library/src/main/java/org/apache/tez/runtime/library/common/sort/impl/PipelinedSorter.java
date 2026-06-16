@@ -38,6 +38,7 @@ import com.google.common.collect.Lists;
 
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.tez.runtime.api.MultiByteArrayOutputStream;
+import org.apache.tez.runtime.api.PathKind;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
 import org.apache.tez.runtime.library.utils.CodecUtils;
 import org.slf4j.Logger;
@@ -64,6 +65,7 @@ import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterBytesWritable
 import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterDataInputBuffer;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger.DiskSegment;
 import org.apache.tez.runtime.library.common.sort.impl.TezMerger.Segment;
+import org.apache.tez.runtime.library.common.Constants;
 import org.apache.tez.runtime.library.common.TezRuntimeUtils;
 import org.apache.tez.util.FastByteComparisons;
 
@@ -600,7 +602,8 @@ public final class PipelinedSorter {
           int partition) throws IOException {
     final TezSpillRecord spillRec = new TezSpillRecord(partitions);
     // getSpillFileForWrite with size -1 as the serialized size of KV pair is still unknown
-    final Path outputFilePath = mapOutputFile.getSpillFileForWrite(numSpills, -1);
+    final String uniqueSpillName = mapOutputFile.getSpillFileName(numSpills);
+    final Path outputFilePath = mapOutputFile.getFileForWrite(PathKind.SPILL, uniqueSpillName, 0);
     spillFilePaths.put(numSpills, outputFilePath);
     Path indexFilename = null;
     FSDataOutputStream out = localFs.create(outputFilePath, true, 4096);
@@ -694,9 +697,7 @@ public final class PipelinedSorter {
 
     final long size = capacityBytes + (partitions * APPROX_HEADER_LENGTH);
     final TezSpillRecord spillRec = new TezSpillRecord(partitions);
-    final Path spillFileName = mapOutputFile.getSpillFileForWrite(numSpills, size);
-    spillFilePaths.put(numSpills, spillFileName);
-    Path indexFilename = null;
+    final String uniqueSpillName = mapOutputFile.getSpillFileName(numSpills);
 
     MultiByteArrayOutputStream byteArrayOutput = null;
     boolean canUseBuffers = false;
@@ -704,9 +705,13 @@ public final class PipelinedSorter {
     if (spillToFreeMemory) {
       canUseBuffers = MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold);
       if (canUseBuffers) {
-        byteArrayOutput = new MultiByteArrayOutputStream(localFs, spillFileName);
+        byteArrayOutput = new MultiByteArrayOutputStream(localFs, mapOutputFile, PathKind.SPILL, uniqueSpillName);
       }
     }
+    final Path spillFileName = byteArrayOutput == null ?
+        mapOutputFile.getFileForWrite(PathKind.SPILL, uniqueSpillName, 0) : null;
+    spillFilePaths.put(numSpills, spillFileName);
+    Path indexFilename = null;
 
     final boolean isRleEnabled = merger.needsRLE();
 
@@ -720,7 +725,9 @@ public final class PipelinedSorter {
       } else {
         fsOutput = new FSDataOutputStream(byteArrayOutput, null);
       }
-      ensureSpillFilePermissions(spillFileName, localFs, localFsSpillFilePerms);
+      if (byteArrayOutput == null) {
+        ensureSpillFilePermissions(spillFileName, localFs, localFsSpillFilePerms);
+      }
 
       if (isDebugEnabled) {
         LOG.debug("Spilling to {} (use in-memory buffers = {})", spillFileName.toString(), canUseBuffers);
@@ -978,7 +985,10 @@ public final class PipelinedSorter {
         return;
       }
 
-      finalOutputFile = mapOutputFile.getOutputFileForWrite(0);
+      finalOutputFile = (useFreeMemoryWriterOutput
+          && MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold)) ? null :
+          mapOutputFile.getFileForWrite(PathKind.FINAL_OUTPUT,
+              Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING, 0);
       if (writeSpillRecord) {
         finalIndexFile = mapOutputFile.getOutputIndexFileForWrite(0);
       }
@@ -992,7 +1002,8 @@ public final class PipelinedSorter {
       MultiByteArrayOutputStream byteArrayOutput = null;
       if (useFreeMemoryWriterOutput
           && MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold)) {
-        byteArrayOutput = new MultiByteArrayOutputStream(localFs, finalOutputFile);
+        byteArrayOutput = new MultiByteArrayOutputStream(localFs, mapOutputFile, PathKind.FINAL_OUTPUT,
+            Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING);
       }
 
       // the output stream for the final single output file
@@ -1028,7 +1039,7 @@ public final class PipelinedSorter {
           // merge
           TezRawKeyValueIterator kvIter = TezMerger.merge(conf, localFs,
               codec, segmentList, mergeFactor, 0,
-              new Path(uniqueIdentifier),
+              mapOutputFile, "pipelined_" + parts,
               sortSegments, null, spilledRecordsCounter,
               additionalSpillBytesReadCounter, isFinalMergeRleEnabled, outputContext);
           // write merged output to disk

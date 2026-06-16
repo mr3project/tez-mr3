@@ -783,7 +783,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       // TODO Is this doing any combination ?
       TezRawKeyValueIterator rIter = TezMerger.merge(conf, rfs, null, inMemorySegments,
             inMemorySegments.size(), 0,
-            new Path(inputContext.getUniqueIdentifier()),
+            mapOutputFile, "manager_" + mergeFileSequenceId.getAndIncrement(),
             false, null, null, null, true, inputContext);
       TezMerger.writeFile(rIter, writer,
           TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
@@ -868,10 +868,11 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         TezRawKeyValueIterator rIter = null;
         LOG.info("Initiating in-memory merge with {} segments", noInMemorySegments);
 
-        tmpDir = new Path(inputContext.getUniqueIdentifier());
+        tmpDir = null;
         // Nothing actually materialized to disk - controlled by setting sort-factor to #segments.
         rIter = TezMerger.merge(conf, rfs, null,
-            inMemorySegments, inMemorySegments.size(), 0, tmpDir,
+            inMemorySegments, inMemorySegments.size(), 0,
+            mapOutputFile, "manager_" + mergeFileSequenceId.getAndIncrement(),
             false, spilledRecordsCounter, null,
             additionalSpillBytesRead, true, inputContext);
         // spilledRecordsCounter is tracking the number of keys that will be
@@ -992,10 +993,11 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
       WriterDataInputBuffer writer = new WriterDataInputBuffer(rfs, outputPath, codec, null, null,
           true, writeBuffer, inputContext);
-      tmpDir = new Path(inputContext.getUniqueIdentifier());
+      tmpDir = null;
       try {
         TezRawKeyValueIterator iter = TezMerger.merge(conf, rfs,
-            null, inputSegments, ioSortFactor, 0, tmpDir,
+            null, inputSegments, ioSortFactor, 0,
+            mapOutputFile, "manager_" + mergeFileSequenceId.getAndIncrement(),
             true, spilledRecordsCounter, null,
             mergedMapOutputsCounter, true, inputContext);
 
@@ -1166,7 +1168,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         final Path outputPath = mapOutputFile.getInputFileForWrite(
             srcTaskId, Integer.MAX_VALUE, inMemToDiskBytes).suffix(Constants.MERGED_OUTPUT_PREFIX);
         final TezRawKeyValueIterator rIter = TezMerger.merge(job, fs,
-            null, memDiskSegments, numMemDiskSegments, 0, tmpDir,
+            null, memDiskSegments, numMemDiskSegments, 0,
+            mapOutputFile, "manager_" + mergeFileSequenceId.getAndIncrement(),
             false, spilledRecordsCounter, null,
             additionalSpillBytesRead, true, inputContext);
         final byte[] writeBuffer = IFile.allocateWriteBuffer();
@@ -1258,7 +1261,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       diskSegments.addAll(0, memDiskSegments);
       memDiskSegments.clear();
       TezRawKeyValueIterator diskMerge = TezMerger.merge(job, fs,
-          codec, diskSegments, ioSortFactor, numInMemSegments, tmpDir,
+          codec, diskSegments, ioSortFactor, numInMemSegments,
+          mapOutputFile, "manager_" + mergeFileSequenceId.getAndIncrement(),
           false, spilledRecordsCounter, null,
           additionalSpillBytesRead, true, inputContext);
       diskSegments.clear();
@@ -1270,7 +1274,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     }
     // This is doing nothing but creating an iterator over the segments.
     return TezMerger.merge(job, fs, codec, finalSegments,
-        finalSegments.size(), 0, tmpDir, false,
+        finalSegments.size(), 0,
+        mapOutputFile, "manager_" + mergeFileSequenceId.getAndIncrement(), false,
         spilledRecordsCounter, null, additionalSpillBytesRead, false,
         inputContext);
   }

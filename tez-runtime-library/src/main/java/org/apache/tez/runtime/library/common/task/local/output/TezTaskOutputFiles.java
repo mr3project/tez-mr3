@@ -22,6 +22,7 @@ import java.io.IOException;
 
 import org.apache.tez.common.Preconditions;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
+import org.apache.tez.runtime.api.PathKind;
 import org.apache.tez.runtime.api.TezTaskOutput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,6 +44,7 @@ public class TezTaskOutputFiles implements TezTaskOutput {
   private static final String SPILL_FILE_SRC_SEPARATOR = "_src_";
   private static final String SPILL_FILE_SPILL_SEPARATOR = "_spill_";
   private static final String SPILL_FILE_EXTENSION = ".out";
+  private static final String COMPOSITE_SPILL_FILE_PREFIX = "spill_";
 
   private final Configuration conf;
   private final String uniqueId;
@@ -224,6 +226,34 @@ public class TezTaskOutputFiles implements TezTaskOutput {
     return lDirAlloc.getLocalPathForWrite(outputDirStr, size, conf);
   }
 
+
+  @Override
+  public Path getFileForWrite(PathKind pathKind, String uniqueName, long size) throws IOException {
+    Preconditions.checkArgument(uniqueName != null && !uniqueName.isEmpty(),
+        "uniqueName must be non-empty");
+    Preconditions.checkArgument(new Path(uniqueName).getName().equals(uniqueName),
+        "uniqueName must be a single file-name component: %s", uniqueName);
+
+    Path outputPath;
+    switch (pathKind) {
+    case FINAL_OUTPUT:
+      Preconditions.checkArgument(
+          Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING.equals(uniqueName),
+          "Final output name must be %s", Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING);
+      outputPath = new Path(getAttemptOutputDir(), uniqueName);
+      break;
+    case SPILL:
+      outputPath = new Path(getAttemptOutputDir(), uniqueName);
+      break;
+    case MERGE:
+      outputPath = new Path(getAttemptOutputDir(), uniqueName);
+      break;
+    default:
+      throw new IllegalArgumentException("Unsupported path kind: " + pathKind);
+    }
+    return lDirAlloc.getLocalPathForWrite(outputPath.toString(), size, conf);
+  }
+
   /**
    * Create a local output spill index file name.
    *
@@ -278,6 +308,11 @@ public class TezTaskOutputFiles implements TezTaskOutput {
    * @param spillNum
    * @return a spill file name independent of the unique identifier and local directories
    */
+  @Override
+  public String getSpillFileName(int spillNumber) {
+    return COMPOSITE_SPILL_FILE_PREFIX + spillNumber + SPILL_FILE_EXTENSION;
+  }
+
   @Override
   public String getSpillFileName(int srcId, int spillNum) {
     return uniqueId + SPILL_FILE_SRC_SEPARATOR

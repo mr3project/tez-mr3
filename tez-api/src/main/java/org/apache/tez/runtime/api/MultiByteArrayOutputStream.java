@@ -56,18 +56,25 @@ public class MultiByteArrayOutputStream extends OutputStream {
 
   // spill fields
   private final FileSystem fs;
-  private final Path outputPath;
+  private final TezTaskOutput taskOutput;
+  private final PathKind pathKind;
+  private final String uniqueSpillName;
+  private Path outputPath;
   private FSDataOutputStream fileOut;   // set when creating a spill file
 
   public MultiByteArrayOutputStream(
       FileSystem fs,
-      Path outputPath) {
-    this(fs, outputPath, DEFAULT_BUFFER_SIZE_THRESHOLD);
+      TezTaskOutput taskOutput,
+      PathKind pathKind,
+      String uniqueSpillName) {
+    this(fs, taskOutput, pathKind, uniqueSpillName, DEFAULT_BUFFER_SIZE_THRESHOLD);
   }
 
   public MultiByteArrayOutputStream(
       FileSystem fs,
-      Path outputPath,
+      TezTaskOutput taskOutput,
+      PathKind pathKind,
+      String uniqueSpillName,
       long bufferSizeThreshold) {
     // start with an empty byte[] buffer because no data might be written
     this.cacheSize = 0;   // set to the size of currentBuffer
@@ -78,7 +85,10 @@ public class MultiByteArrayOutputStream extends OutputStream {
     this.bufferSizeThreshold = bufferSizeThreshold;
 
     this.fs = fs;
-    this.outputPath = outputPath;
+    this.taskOutput = taskOutput;
+    this.pathKind = pathKind;
+    this.uniqueSpillName = uniqueSpillName;
+    this.outputPath = null;
     this.fileOut = null;
   }
 
@@ -159,6 +169,9 @@ public class MultiByteArrayOutputStream extends OutputStream {
   private void spillToFile() throws IOException {
     assert posInBuf == cacheSize;
     assert fileOut == null;
+    if (outputPath == null) {
+      outputPath = taskOutput.getFileForWrite(pathKind, uniqueSpillName, 0);
+    }
     if (LOG.isDebugEnabled()) {
       LOG.debug("Creating fileOut: {}", outputPath);
     }

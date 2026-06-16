@@ -33,12 +33,12 @@ import org.apache.hadoop.fs.ChecksumFileSystem;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.runtime.api.MultiByteArrayOutputStream;
+import org.apache.tez.runtime.api.PathKind;
+import org.apache.tez.runtime.api.TezTaskOutput;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader;
 import org.apache.tez.runtime.library.common.sort.impl.IFile.Reader.KeyState;
@@ -52,15 +52,11 @@ import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterDataInputBuff
 public class TezMerger {
   private static final Logger LOG = LoggerFactory.getLogger(TezMerger.class);
 
-  // Local directories
-  private static LocalDirAllocator lDirAlloc = 
-    new LocalDirAllocator(TezRuntimeFrameworkConfigs.LOCAL_DIRS);
-
   public static
   TezRawKeyValueIterator merge(Configuration conf, FileSystem fs,
       CompressionCodec codec,
       List<Segment> segments,
-      int mergeFactor, int inMemSegments, Path tmpDir,
+      int mergeFactor, int inMemSegments, TezTaskOutput taskOutput, String mergeId,
       boolean sortSegments,
       TezCounter readsCounter,
       TezCounter writesCounter,
@@ -69,7 +65,7 @@ public class TezMerger {
       TaskContext taskContext)
       throws IOException, InterruptedException {
     return new MergeQueue(conf, fs, segments, sortSegments, codec, checkForSameKeys).merge(
-      mergeFactor, inMemSegments, tmpDir, readsCounter, writesCounter, bytesReadCounter, taskContext);
+      mergeFactor, inMemSegments, taskOutput, mergeId, readsCounter, writesCounter, bytesReadCounter, taskContext);
   }
 
   public static void writeFile(TezRawKeyValueIterator records, IFile.WriterAppendDataInputBuffer writer,
@@ -595,7 +591,7 @@ public class TezMerger {
       }
     }
 
-    TezRawKeyValueIterator merge(int factor, int inMem, Path tmpDir,
+    TezRawKeyValueIterator merge(int factor, int inMem, TezTaskOutput taskOutput, String mergeId,
                                  TezCounter readsCounter,
                                  TezCounter writesCounter,
                                  TezCounter bytesReadCounter,
@@ -694,21 +690,21 @@ public class TezMerger {
           for (Segment s : segmentsToMerge) {
             approxOutputSize += s.getLength() + (long)ChecksumFileSystem.getApproxChkSumLength(s.getLength());
           }
-          Path tmpFilename = new Path(tmpDir, "intermediate").suffix("." + passNo);
-
-          Path outputFile = lDirAlloc.getLocalPathForWrite(tmpFilename.toString(), approxOutputSize, conf);
+          String fileName = "merge_" + mergeId + "_" + passNo + ".out";
 
           boolean writeIntermediateToMemory = useFreeMemoryWriterOutput
               && MultiByteArrayOutputStream.canUseFreeMemoryBuffers(freeMemoryThreshold);
 
           MultiByteArrayOutputStream byteArrayOutput = null;
           IFile.WriterAppendDataInputBuffer writer;
+          Path outputFile = null;
           if (writeIntermediateToMemory) {
-            byteArrayOutput = new MultiByteArrayOutputStream(fs, outputFile);
+            byteArrayOutput = new MultiByteArrayOutputStream(fs, taskOutput, PathKind.MERGE, fileName);
             FSDataOutputStream outputStream = new FSDataOutputStream(byteArrayOutput, null);
             writer = new WriterDataInputBuffer(outputStream, codec, writesCounter, null,
                 false, checkForSameKeys, -1, -1, writeBuffer, null, taskContext);
           } else {
+            outputFile = taskOutput.getFileForWrite(PathKind.MERGE, fileName, 0);
             writer = new WriterDataInputBuffer(fs, outputFile, codec, writesCounter, null,
                 checkForSameKeys, writeBuffer, taskContext);
           }

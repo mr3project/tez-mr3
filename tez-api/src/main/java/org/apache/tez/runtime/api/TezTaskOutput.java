@@ -85,6 +85,26 @@ public interface TezTaskOutput {
   public Path getSpillFileForWrite(int spillNumber, long size)
       throws IOException;
 
+  /**
+   * Create a task output file for the supplied path kind and unique file name.
+   *
+   * @param pathKind the kind of output file to create
+   * @param uniqueName a caller-constructed single file-name component
+   * @param size the size of the file, or 0 if unknown
+   * @return path the path to write to
+   * @throws IOException
+   */
+  public Path getFileForWrite(PathKind pathKind, String uniqueName, long size)
+      throws IOException;
+
+  /**
+   * Construct a spill file name, given a spill number.
+   *
+   * @param spillNumber the spill number
+   * @return a spill file name independent of local directories
+   */
+  public String getSpillFileName(int spillNumber);
+
 
   /**
    * Create a local output spill index file name.
