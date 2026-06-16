@@ -55,7 +55,7 @@ public class WeightedScalingMemoryDistributor implements InitialMemoryAllocator 
 
   // TODO: update populateTypeScaleMap() as well
   static final String[] DEFAULT_TASK_MEMORY_WEIGHTED_RATIOS =
-      generateWeightStrings(1, 1, 1, 12, 12, 1, 1);
+      generateWeightStrings(1, 1, 1, 1, 1, 1, 1);
 
   private static class Request {
     ComponentType componentType;
@@ -202,8 +202,8 @@ public class WeightedScalingMemoryDistributor implements InitialMemoryAllocator 
       typeScaleMap.put(RequestType.PARTITIONED_UNSORTED_OUTPUT, 1);
       typeScaleMap.put(RequestType.UNSORTED_OUTPUT, 1);
       typeScaleMap.put(RequestType.UNSORTED_INPUT, 1);
-      typeScaleMap.put(RequestType.SORTED_OUTPUT, 12);
-      typeScaleMap.put(RequestType.SORTED_MERGED_INPUT, 12);
+      typeScaleMap.put(RequestType.SORTED_OUTPUT, 1);
+      typeScaleMap.put(RequestType.SORTED_MERGED_INPUT, 1);
       typeScaleMap.put(RequestType.PROCESSOR, 1);
       typeScaleMap.put(RequestType.OTHER, 1);
       return;
