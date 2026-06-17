@@ -78,6 +78,7 @@ import org.apache.tez.runtime.library.common.Constants;
 +-----------------------------------------------+---------------------------------------------------------------+
  */
 public class TezTaskOutputFiles implements TezTaskOutput {
+
   private static final Logger LOG = LoggerFactory.getLogger(TezTaskOutputFiles.class);
 
   private static final String SPILL_FILE_SRC_SEPARATOR = "_src_";
@@ -121,18 +122,6 @@ public class TezTaskOutputFiles implements TezTaskOutput {
     this.compositeFetch = compositeFetch;
   }
 
-  /*
-   * if service_id = mapreduce_shuffle  then "${appDir}/output/${uniqueId}"
-   * if service_id = tez_shuffle  then "${appDir}/dagId/output/${uniqueId}"
-                                   --> "${appDir}/dagId/containerId/vertexId/${uniqueId}"
-                                   while shuffle map ids omit the containerId prefix:
-                                   "vertexId/${uniqueId}"
-   */
-  private Path getAttemptOutputDir() {
-    String dagPath = getDagOutputDir(this.outputDir);
-    return new Path(dagPath, uniqueId);
-  }
-
   /**
    * Create a local output file name. This should *only* be used if the size
    * of the file is not known. Otherwise use the equivalent which accepts a size
@@ -146,11 +135,12 @@ public class TezTaskOutputFiles implements TezTaskOutput {
    * @return path the path to write to
    * @throws IOException
    */
+  // size unknown
   @Override
   public Path getOutputFileForWrite() throws IOException {
     Path attemptOutput =
       new Path(getAttemptOutputDir(), Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING);
-    return lDirAlloc.getLocalPathForWrite(attemptOutput.toString(), conf);
+    return lDirAlloc.getLocalPathForWrite(attemptOutput.toString(), 0L, conf, false);
   }
 
   /**
@@ -161,45 +151,32 @@ public class TezTaskOutputFiles implements TezTaskOutput {
    *
    * The structure of this file name is critical, to be served by the MapReduce ShuffleHandler.
    *
-   * @param size the size of the file
    * @return path the path to write the index file to
    * @throws IOException
    */
+  // for index files, do not bother with size
   @Override
-  public Path getOutputIndexFileForWrite(long size) throws IOException {
+  public Path getOutputIndexFileForWrite() throws IOException {
     Path attemptIndexOutput =
       new Path(getAttemptOutputDir(), Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING +
                                       Constants.TEZ_RUNTIME_TASK_OUTPUT_INDEX_SUFFIX_STRING);
-    return lDirAlloc.getLocalPathForWrite(attemptIndexOutput.toString(), size, conf);
+    return lDirAlloc.getLocalPathForWrite(attemptIndexOutput.toString(), 0L, conf, false);
   }
 
   @Override
-  public Path getFileForWrite(String uniqueName, long size) throws IOException {
+  public Path getFileForWrite(String uniqueName) throws IOException {
     Path outputPath;
-    if (!compositeFetch && uniqueName.startsWith(COMPOSITE_SPILL_FILE_PREFIX)
+    if (!compositeFetch
+        && uniqueName.startsWith(COMPOSITE_SPILL_FILE_PREFIX)
         && uniqueName.endsWith(SPILL_FILE_EXTENSION)) {
       String spillNumber = uniqueName.substring(
           COMPOSITE_SPILL_FILE_PREFIX.length(), uniqueName.length() - SPILL_FILE_EXTENSION.length());
       outputPath = new Path(getDagOutputDir(this.outputDir),
-          uniqueId + '_' + spillNumber + Path.SEPARATOR
-              + Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING);
+          uniqueId + '_' + spillNumber + Path.SEPARATOR + Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING);
     } else {
       outputPath = new Path(getAttemptOutputDir(), uniqueName);
     }
-    return lDirAlloc.getLocalPathForWrite(outputPath.toString(), size, conf);
-  }
-
-  @Override
-  public Path getMergedFileForWrite(String fileName, long size, int mergeNumber) throws IOException {
-    String namePart = removeFinalExtension(fileName);
-    String outputPathString = getDagOutputDir(namePart);
-    Path outputPathInit = lDirAlloc.getLocalPathForWrite(outputPathString, size, conf);
-    return outputPathInit.suffix(Constants.MERGED_OUTPUT_PREFIX + mergeNumber);
-  }
-
-  private static String removeFinalExtension(String fileName) {
-    int extensionIndex = fileName.lastIndexOf('.');
-    return extensionIndex == -1 ? fileName : fileName.substring(0, extensionIndex);
+    return lDirAlloc.getLocalPathForWrite(outputPath.toString(), 0L, conf, false);
   }
 
   /**
@@ -209,12 +186,12 @@ public class TezTaskOutputFiles implements TezTaskOutput {
    * e.g. application_1422270854961_0027/output/attempt_1422270854961_0027_1_00_000001_0_10003_1/file.out.index
    *
    * @param spillNumber the spill number
-   * @param size the size of the file
    * @return path the path to write the spill index file for the specific spillNumber
    * @throws IOException
    */
+  // for index files, do not bother with size
   @Override
-  public Path getSpillIndexFileForWrite(int spillNumber, long size) throws IOException {
+  public Path getSpillIndexFileForWrite(int spillNumber) throws IOException {
     assert spillNumber >= 0;
     String outputDirStr;
     if (compositeFetch) {
@@ -226,9 +203,8 @@ public class TezTaskOutputFiles implements TezTaskOutput {
         + Path.SEPARATOR + Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING
         + Constants.TEZ_RUNTIME_TASK_OUTPUT_INDEX_SUFFIX_STRING;
     }
-    return lDirAlloc.getLocalPathForWrite(outputDirStr, size, conf);
+    return lDirAlloc.getLocalPathForWrite(outputDirStr, 0L, conf, false);
   }
-
 
   /**
    * Create a local input file name.
@@ -250,9 +226,19 @@ public class TezTaskOutputFiles implements TezTaskOutput {
   @Override
   public Path getInputFileForWrite(int srcIdentifier, int spillNum, long size) throws IOException {
     String fileName = getSpillFileName(srcIdentifier, spillNum);
-    String dagPath = compositeFetch ? new Path(getAttemptOutputDir(), fileName).toString()
-        : getDagOutputDir(fileName);
-    return lDirAlloc.getLocalPathForWrite(dagPath, size, conf);
+    String dagPath = compositeFetch ?
+        new Path(getAttemptOutputDir(), fileName).toString() :
+        getDagOutputDir(fileName);
+    return lDirAlloc.getLocalPathForWrite(dagPath, size, conf, false);
+  }
+
+  // do not use size because we can get only approximate size
+  @Override
+  public Path getMergedFileForWrite(String fileName, int mergeNumber) throws IOException {
+    String namePart = removeFinalExtension(fileName);
+    String outputPathString = getDagOutputDir(namePart);
+    Path outputPathInit = lDirAlloc.getLocalPathForWrite(outputPathString, 0L, conf, false);
+    return outputPathInit.suffix(Constants.MERGED_OUTPUT_PREFIX + mergeNumber);
   }
 
   /**
@@ -265,8 +251,6 @@ public class TezTaskOutputFiles implements TezTaskOutput {
    * src_${srcId}_spill_${spillNumber}.out
    *
    *
-   * @param srcId
-   * @param spillNum
    * @return a spill file name independent of the unique identifier and local directories
    */
   @Override
@@ -288,5 +272,22 @@ public class TezTaskOutputFiles implements TezTaskOutput {
       return new Path(getAttemptOutputDir(), child).toString();
     }
     return dagId.concat(child);
+  }
+
+  /*
+   * if service_id = mapreduce_shuffle  then "${appDir}/output/${uniqueId}"
+   * if service_id = tez_shuffle  then "${appDir}/dagId/output/${uniqueId}"
+                                   --> "${appDir}/dagId/containerId/vertexId/${uniqueId}"
+                                   while shuffle map ids omit the containerId prefix:
+                                   "vertexId/${uniqueId}"
+   */
+  private Path getAttemptOutputDir() {
+    String dagPath = getDagOutputDir(this.outputDir);
+    return new Path(dagPath, uniqueId);
+  }
+
+  private static String removeFinalExtension(String fileName) {
+    int extensionIndex = fileName.lastIndexOf('.');
+    return extensionIndex == -1 ? fileName : fileName.substring(0, extensionIndex);
   }
 }

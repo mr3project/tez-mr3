@@ -166,7 +166,7 @@ public class MultiByteArrayOutputStream extends OutputStream {
     assert posInBuf == cacheSize;
     assert fileOut == null;
     if (outputPath == null) {
-      outputPath = taskOutput.getFileForWrite(uniqueSpillName, 0);
+      outputPath = taskOutput.getFileForWrite(uniqueSpillName);
     }
     if (LOG.isDebugEnabled()) {
       LOG.debug("Creating fileOut: {}", outputPath);

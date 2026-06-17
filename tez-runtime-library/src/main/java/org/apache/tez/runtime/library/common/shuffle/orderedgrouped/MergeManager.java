@@ -717,8 +717,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
       MapOutput mergedMapOutputs = null;
 
-      long mergeOutputSize = 0l;
-      //Lock manager so that fetcher threads can not change the mem size
+      long mergeOutputSize = 0L;
+      // Lock manager so that fetcher threads can not change the mem size
       synchronized (manager) {
 
         Iterator<MapOutput> it = inputs.iterator();
@@ -853,12 +853,11 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       long mergeOutputSize = createInMemorySegments(inputs, inMemorySegments,0);
       int noInMemorySegments = inMemorySegments.size();
 
-      // TODO Maybe track serialized vs deserialized bytes.
-      
       // All disk writes done by this merge are overhead - due to the lack of
       // adequate memory to keep all segments in memory.
       outputPath = mapOutputFile.getInputFileForWrite(
-          srcTaskIdentifier.getInputIdentifier(), srcTaskIdentifier.getSpillEventId(),
+          srcTaskIdentifier.getInputIdentifier(),
+          srcTaskIdentifier.getSpillEventId(),
           mergeOutputSize).suffix(Constants.MERGED_OUTPUT_PREFIX);
 
       WriterDataInputBuffer writer = null;
@@ -948,7 +947,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
       LOG.info("OnDiskMerger: We have {} map outputs on disk. Triggering merge...", inputs.size());
 
-      long approxOutputSize = 0;
       List<Segment> inputSegments = new ArrayList<Segment>(inputs.size());
 
       // 1. Prepare the list of files to be merged.
@@ -962,14 +960,10 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
               + ", path=" + fileChunk.getPath());
         }
         final Path file = fileChunk.getPath();
-        approxOutputSize += size;
         DiskSegment segment = new DiskSegment(rfs, file, offset, size, codec, ifileReadAhead,
             ifileReadAheadLength, preserve, null, inputContext);
         inputSegments.add(segment);
       }
-
-      // add the checksum length
-      approxOutputSize += (long)ChecksumFileSystem.getApproxChkSumLength(approxOutputSize);
 
       // 2. Start the on-disk merge process
       FileChunk file0 = inputs.get(0);
@@ -983,8 +977,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         namePart = file0.getPath().getName().toString();
       }
 
-      outputPath = mapOutputFile.getMergedFileForWrite(
-          namePart, approxOutputSize, getNextMergeFileSequenceId());
+      outputPath = mapOutputFile.getMergedFileForWrite(namePart, getNextMergeFileSequenceId());
 
       WriterDataInputBuffer writer = new WriterDataInputBuffer(rfs, outputPath, codec, null, null,
           true, writeBuffer, inputContext);
@@ -1009,8 +1002,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       final long outputLen = localFS.getFileStatus(outputPath).getLen();
       closeOnDiskFile(new FileChunk(outputPath, 0, outputLen));
 
-      LOG.info("{} Finished merging {} map output files on disk of total-size {}. Local output file is {} of size {}",
-          inputContext.getSourceVertexName(), inputs.size(), approxOutputSize, outputPath, outputLen);
+      LOG.info("{} Finished merging {} map output files on disk. Local output file is {} of size {}",
+          inputContext.getSourceVertexName(), inputs.size(), outputPath, outputLen);
     }
 
     @Override
@@ -1146,7 +1139,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       inMemToDiskBytes = createInMemorySegments(inMemoryMapOutputs, memDiskSegments, this.postMergeMemoryLimitBytes);
       final int numMemDiskSegments = memDiskSegments.size();
       if (numMemDiskSegments > 0 && ioSortFactor > onDiskMapOutputs.size()) {
-        
         // If we reach here, it implies that we have less than io.sort.factor
         // disk segments and this will be incremented by 1 (result of the 
         // memory segments merge). Since this total would still be 

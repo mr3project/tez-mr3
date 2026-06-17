@@ -113,12 +113,6 @@ public final class PipelinedSorter {
   private Path finalIndexFile;
   private boolean finalIndexComputed;
 
-  /**
-   * The size of each record in the index file for the map-outputs.
-   */
-  public static final int MAP_OUTPUT_INDEX_RECORD_LENGTH = 24;
-  private final static int APPROX_HEADER_LENGTH = 150;
-
   private final int partitionBits;
   private final int fullKeyPrefixBytes;
 
@@ -602,7 +596,7 @@ public final class PipelinedSorter {
     final TezSpillRecord spillRec = new TezSpillRecord(partitions);
     final String uniqueSpillName = mapOutputFile.getSpillFileName(numSpills);
     // should call getFileForWrite() here because we will create a local file
-    final Path outputFilePath = mapOutputFile.getFileForWrite(uniqueSpillName, 0);
+    final Path outputFilePath = mapOutputFile.getFileForWrite(uniqueSpillName);
 
     spillFilePaths.put(numSpills, outputFilePath);
     Path indexFilename = null;
@@ -654,8 +648,7 @@ public final class PipelinedSorter {
       }
 
       if (writeSpillRecord) {
-        indexFilename = mapOutputFile.getSpillIndexFileForWrite(
-            numSpills, partitions * MAP_OUTPUT_INDEX_RECORD_LENGTH);
+        indexFilename = mapOutputFile.getSpillIndexFileForWrite(numSpills);
         spillFileIndexPaths.put(numSpills, indexFilename);
         spillRec.writeToFile(indexFilename, localFs, localFsSpillFilePerms);
       } else {
@@ -708,7 +701,7 @@ public final class PipelinedSorter {
       }
     }
     final Path spillFileName = byteArrayOutput == null ?
-        mapOutputFile.getFileForWrite(uniqueSpillName, 0) : null;
+        mapOutputFile.getFileForWrite(uniqueSpillName) : null;
     if (spillFileName != null) {
       spillFilePaths.put(numSpills, spillFileName);
     }
@@ -778,8 +771,7 @@ public final class PipelinedSorter {
     }
 
     if (writeSpillRecord) {
-      indexFilename = mapOutputFile.getSpillIndexFileForWrite(
-          numSpills, partitions * MAP_OUTPUT_INDEX_RECORD_LENGTH);
+      indexFilename = mapOutputFile.getSpillIndexFileForWrite(numSpills);
       spillFileIndexPaths.put(numSpills, indexFilename);
       spillRec.writeToFile(indexFilename, localFs, localFsSpillFilePerms);
     } else {
@@ -849,8 +841,6 @@ public final class PipelinedSorter {
   }
 
   synchronized public void flush() throws IOException {
-    final String uniqueIdentifier = outputContext.getUniqueIdentifier();
-
     /**
      * Possible that the thread got interrupted when flush was happening or when the flush was
      * never invoked. As a part of cleanup activity in TezTaskRunner, it would invoke close()
@@ -987,11 +977,11 @@ public final class PipelinedSorter {
         finalOutputFile = null;
       } else {
         finalOutputFile = mapOutputFile.getFileForWrite(
-            Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING, 0);
+            Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING);
       }
 
       if (writeSpillRecord) {
-        finalIndexFile = mapOutputFile.getOutputIndexFileForWrite(0);
+        finalIndexFile = mapOutputFile.getOutputIndexFileForWrite();
       }
       finalIndexComputed = true;  // because final TezSpillRecord can be obtained
 

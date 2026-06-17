@@ -55,7 +55,8 @@ public abstract class MapOutput implements ShuffleInput {
   }
 
   public static MapOutput createDiskMapOutput(InputAttemptIdentifier attemptIdentifier,
-                                              FetchedInputAllocatorOrderedGrouped callback, long size, Configuration conf,
+                                              FetchedInputAllocatorOrderedGrouped callback, long size,
+                                              Configuration conf,
                                               int fetcher, boolean primaryMapOutput,
                                               TezTaskOutputFiles mapOutputFile) throws
       IOException {

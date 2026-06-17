@@ -699,7 +699,7 @@ public class TezMerger {
             writer = new WriterDataInputBuffer(outputStream, codec, writesCounter, null,
                 false, checkForSameKeys, -1, -1, writeBuffer, null, taskContext);
           } else {
-            outputFile = taskOutput.getFileForWrite(fileName, 0);
+            outputFile = taskOutput.getFileForWrite(fileName);
             writer = new WriterDataInputBuffer(fs, outputFile, codec, writesCounter, null,
                 checkForSameKeys, writeBuffer, taskContext);
           }

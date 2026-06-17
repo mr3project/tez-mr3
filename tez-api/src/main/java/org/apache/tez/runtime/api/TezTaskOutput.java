@@ -42,32 +42,29 @@ public interface TezTaskOutput {
   /**
    * Create a local output index file name.
    *
-   * @param size the size of the file
    * @return path the path to write the index file to
    * @throws IOException
    */
-  public Path getOutputIndexFileForWrite(long size) throws IOException;
+  public Path getOutputIndexFileForWrite() throws IOException;
 
   /**
    * Create a task output file for the supplied path kind and unique file name.
    *
    * @param uniqueName a caller-constructed single file-name component
-   * @param size the size of the file, or 0 if unknown
    * @return path the path to write to
    * @throws IOException
    */
-  public Path getFileForWrite(String uniqueName, long size) throws IOException;
+  public Path getFileForWrite(String uniqueName) throws IOException;
 
   /**
    * Create a local merged file for the supplied file name.
    *
    * @param fileName a caller-supplied file name
-   * @param size the size of the file, or 0 if unknown
    * @param mergeNumber the merge sequence number
    * @return path the path to write to
    * @throws IOException
    */
-  public Path getMergedFileForWrite(String fileName, long size, int mergeNumber) throws IOException;
+  public Path getMergedFileForWrite(String fileName, int mergeNumber) throws IOException;
 
   /**
    * Construct a spill file name, given a spill number.
@@ -81,11 +78,10 @@ public interface TezTaskOutput {
    * Create a local output spill index file name.
    *
    * @param spillNumber the spill number
-   * @param size the size of the spill file
    * @return path the path to write the spill index file for the specific spillNumber
    * @throws IOException
    */
-  public Path getSpillIndexFileForWrite(int spillNumber, long size) throws IOException;
+  public Path getSpillIndexFileForWrite(int spillNumber) throws IOException;
 
   /**
    * Create a local input file name.
