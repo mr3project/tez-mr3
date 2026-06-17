@@ -49,4 +49,10 @@ public abstract class KeyValueWriterEdge implements WriterEdge {
   //   >= 0: unordered edge
   //   -1: ordered edge
   public abstract int getNumUnorderedPartitions();
+
+  public abstract void writeWithPartition(BytesWritable key, BytesWritable value, int partition) throws IOException;
+
+  // return value = 0: use key hash to get partition
+  // return value = 1: use value hash to get partition
+  public abstract int getPartitionerType();
 }

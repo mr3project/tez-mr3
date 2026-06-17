@@ -87,6 +87,8 @@ import org.apache.tez.runtime.library.common.sort.impl.IFile.WriterDataInputBuff
 import org.apache.tez.runtime.library.common.sort.impl.TezSpillRecord;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
+import org.apache.tez.runtime.library.output.UnorderedKVOutput;
+import org.apache.tez.runtime.library.partitioner.HashPartitioner;
 import org.apache.tez.runtime.library.shuffle.impl.ShuffleUserPayloads;
 import org.apache.tez.runtime.library.shuffle.impl.ShuffleUserPayloads.DataMovementEventPayloadProto;
 import org.apache.tez.runtime.library.utils.CodecUtils;
@@ -533,6 +535,17 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     return numPartitions;
   }
 
+  // should match TezRuntimeUtils.instantiatePartitioner()
+  public int getPartitionerType() {
+    String className = conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_PARTITIONER_CLASS);
+    if (HashPartitioner.class.getName().equals(className) ||
+        UnorderedKVOutput.CustomPartitioner.class.getName().equals(className)) {
+      return 0;   // use key hash to get partition
+    } else {
+      return 1;   // use value hash to get partition - ValueHashPartitioner
+    }
+  }
+
   // TODO: optimize, if this method is actually called
   @Override
   public void write(BytesWritable key, Iterable<BytesWritable> values) throws IOException {
@@ -544,6 +557,31 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
 
   @Override
   public void write(BytesWritable key, BytesWritable value) throws IOException {
+    if (writerState != WriterState.RUNNING) {
+      throw new IOException("Write already closed or spill failed");
+    }
+
+    if (trackMaxKeyValLen) {
+      maxKeyLen = Math.max(maxKeyLen, key.getLength());
+      maxValLen = Math.max(maxValLen, value.getLength());
+    }
+
+    if (compositeFetch && numPartitions == 1) {
+      if (isPipelinedShuffle) {
+        writeSinglePartitionPipelined(key, value);
+      } else if (!considerDataViaEvents) {
+        writer.appendNoRleTez(key, value);
+      } else {
+        writer.appendNoRle(key, value);
+      }
+    } else {
+      int partition = partitioner.getPartition(key, value, numPartitions);
+      writeRecord(key, value, partition);
+    }
+  }
+
+  @Override
+  public void writeWithPartition(BytesWritable key, BytesWritable value, int partition) throws IOException {
     // Skipping checks for key-value types.
     // IFile takes care of these, but should be removed from there as well.
 
@@ -568,14 +606,13 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
 
       if (isPipelinedShuffle) {
         writeSinglePartitionPipelined(key, value);
-      } else if (compositeFetch && !considerDataViaEvents) {
+      } else if (!considerDataViaEvents) {
         writer.appendNoRleTez(key, value);
       } else {
         writer.appendNoRle(key, value);
       }
     } else {
-      int partition = partitioner.getPartition(key, value, numPartitions);
-      write(key, value, partition);
+      writeRecord(key, value, partition);
     }
   }
 
@@ -712,7 +749,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
         spillPathDetails.spillIndex, finalUpdate);
   }
 
-  private void write(BytesWritable key, BytesWritable value, int partition) throws IOException {
+  private void writeRecord(BytesWritable key, BytesWritable value, int partition) throws IOException {
     // Wrap to 4 byte (Int) boundary for metaData
     int metaSkip = alignToIntBoundary(currentBuffer.nextPosition) - currentBuffer.nextPosition;
     if ((currentBuffer.availableSize < (PARTITIONED_META_SIZE + metaSkip)) || (currentBuffer.full)) {
@@ -737,7 +774,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
         // Try resetting the buffer to the next one, if this was not the start of a buffer,
         // and begin spilling the current buffer to disk if it has any records.
         setupNextBuffer();
-        write(key, value, partition);
+        writeRecord(key, value, partition);
         return;
       }
     }
@@ -755,7 +792,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       } else { // Exceeded length on current buffer.
         // Try writing key+value to a new buffer - will fall back to disk if that fails.
         setupNextBuffer();
-        write(key, value, partition);
+        writeRecord(key, value, partition);
         return;
       }
     }

@@ -138,6 +138,17 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput implements
       public int getNumUnorderedPartitions() {
         return -1;  // because this is ordered
       }
+
+      @Override
+      public void writeWithPartition(BytesWritable key, BytesWritable value, int partition) throws IOException {
+        assert false;
+      }
+
+      @Override
+      public int getPartitionerType() {
+        assert false;
+        return 0;
+      }
     };
   }
 

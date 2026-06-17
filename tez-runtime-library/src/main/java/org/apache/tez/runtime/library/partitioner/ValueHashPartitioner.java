@@ -28,6 +28,6 @@ public class ValueHashPartitioner implements Partitioner {
 
   @Override
   public int getPartition(BytesWritable key, BytesWritable value, int numPartitions) {
-    return (value.hashCode() & 2147483647) % numPartitions;
+    return (value.hashCode() & Integer.MAX_VALUE) % numPartitions;
   }
 }
