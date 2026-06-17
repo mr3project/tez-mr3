@@ -59,6 +59,17 @@ public interface TezTaskOutput {
   public Path getFileForWrite(String uniqueName, long size) throws IOException;
 
   /**
+   * Create a local merged file for the supplied file name.
+   *
+   * @param fileName a caller-supplied file name
+   * @param size the size of the file, or 0 if unknown
+   * @param mergeNumber the merge sequence number
+   * @return path the path to write to
+   * @throws IOException
+   */
+  public Path getMergedFileForWrite(String fileName, long size, int mergeNumber) throws IOException;
+
+  /**
    * Construct a spill file name, given a spill number.
    *
    * @param spillNumber the spill number

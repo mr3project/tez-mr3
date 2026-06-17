@@ -189,6 +189,19 @@ public class TezTaskOutputFiles implements TezTaskOutput {
     return lDirAlloc.getLocalPathForWrite(outputPath.toString(), size, conf);
   }
 
+  @Override
+  public Path getMergedFileForWrite(String fileName, long size, int mergeNumber) throws IOException {
+    String namePart = removeFinalExtension(fileName);
+    String outputPathString = getDagOutputDir(namePart);
+    Path outputPathInit = lDirAlloc.getLocalPathForWrite(outputPathString, size, conf);
+    return outputPathInit.suffix(Constants.MERGED_OUTPUT_PREFIX + mergeNumber);
+  }
+
+  private static String removeFinalExtension(String fileName) {
+    int extensionIndex = fileName.lastIndexOf('.');
+    return extensionIndex == -1 ? fileName : fileName.substring(0, extensionIndex);
+  }
+
   /**
    * Create a local output spill index file name.
    *

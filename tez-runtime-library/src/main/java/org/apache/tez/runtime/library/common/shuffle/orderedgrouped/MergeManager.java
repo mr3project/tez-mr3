@@ -18,12 +18,10 @@
 package org.apache.tez.runtime.library.common.shuffle.orderedgrouped;
 
 import org.apache.tez.common.Preconditions;
-import org.apache.commons.io.FilenameUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ChecksumFileSystem;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.tez.runtime.library.common.sort.impl.RawDataBuffer;
@@ -75,7 +73,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   private final Configuration conf;
   private final FileSystem localFS;
   private final FileSystem rfs;
-  private final LocalDirAllocator localDirAllocator;
   
   private final TezTaskOutputFiles mapOutputFile;
 
@@ -166,7 +163,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
    */
   public MergeManager(Configuration conf,
                       FileSystem localFS,
-                      LocalDirAllocator localDirAllocator,  
                       InputContext inputContext,
                       TezCounter spilledRecordsCounter,
                       TezCounter mergedMapOutputsCounter,
@@ -177,7 +173,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
                       int ifileReadAheadLength) {
     this.inputContext = inputContext;
     this.conf = conf;
-    this.localDirAllocator = localDirAllocator;
     this.exceptionReporter = exceptionReporter;
 
     this.spilledRecordsCounter = spilledRecordsCounter;
@@ -971,7 +966,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       // 2. Start the on-disk merge process
       FileChunk file0 = inputs.get(0);
       String namePart;
-      String outputPathString;
       if (file0.isLocalFile()) {
         // This is setup the same way a type DISK MapOutput is setup when fetching.
         namePart = mapOutputFile.getSpillFileName(
@@ -981,11 +975,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         namePart = file0.getPath().getName().toString();
       }
 
-      // namePart includes the suffix of the file. We need to remove it.
-      namePart = FilenameUtils.removeExtension(namePart);
-      outputPathString = mapOutputFile.getDagOutputDir(namePart);
-      Path outputPathInit = localDirAllocator.getLocalPathForWrite(outputPathString, approxOutputSize, conf);
-      outputPath = outputPathInit.suffix(Constants.MERGED_OUTPUT_PREFIX + mergeFileSequenceId.getAndIncrement());
+      outputPath = mapOutputFile.getMergedFileForWrite(
+          namePart, approxOutputSize, mergeFileSequenceId.getAndIncrement());
 
       WriterDataInputBuffer writer = new WriterDataInputBuffer(rfs, outputPath, codec, null, null,
           true, writeBuffer, inputContext);
