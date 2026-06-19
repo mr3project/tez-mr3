@@ -55,6 +55,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.BytesWritable;
+import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.tez.runtime.library.common.sort.impl.RawDataBuffer;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.compress.CompressionCodec;
@@ -256,6 +257,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
   private long localOutputRecordBytesCounter = 0;
   private long localOutputBytesWithOverheadCounter = 0;
   private long localOutputRecordsCounter = 0;
+  private boolean valueWriterOpen = false;
   // notify after x records
   private static final int NOTIFY_THRESHOLD = 100_000;
 
@@ -520,6 +522,9 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
   // called from the client (Hive)
   @Override
   public void closeWriter() {
+    if (valueWriterOpen) {
+      throw new RuntimeException("A value writer is still open");
+    }
     if (isDebugEnabled) {
       if (trackMaxKeyValLen) {
         LOG.debug("Closing up Unordered maxKey/ValLen for {}: maxKeyLen={}, maxValLen={}",
@@ -557,6 +562,9 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
 
   @Override
   public void write(BytesWritable key, BytesWritable value) throws IOException {
+    if (valueWriterOpen) {
+      throw new RuntimeException("A value writer is already open");
+    }
     if (writerState != WriterState.RUNNING) {
       throw new IOException("Write already closed or spill failed");
     }
@@ -580,8 +588,340 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     }
   }
 
+
+  @Override
+  public ValueWriter requestValueWriter(BytesWritable key, int partition) throws IOException {
+    if (compositeFetch && numPartitions == 1) {
+      throw new RuntimeException("Use requestValueWriterBuffered for compositeFetch single-partition path");
+    }
+    if (valueWriterOpen) {
+      throw new RuntimeException("A value writer is already open");
+    }
+    valueWriterOpen = true;
+    return new PartitionedValueWriter(key, partition);
+  }
+
+  @Override
+  public ValueWriterBuffered requestValueWriterBuffered(BytesWritable key, int partition) throws IOException {
+    if (!(compositeFetch && numPartitions == 1)) {
+      throw new RuntimeException("Use requestValueWriter for partition-buffer path");
+    }
+    if (valueWriterOpen) {
+      throw new RuntimeException("A value writer is already open");
+    }
+    valueWriterOpen = true;
+    return new IFileValueWriterBuffered(key, partition);
+  }
+
+  private void closeValueWriterGuard() {
+    valueWriterOpen = false;
+  }
+
+  private void validateValueWriterByteRange(byte[] bytes, int offset, int length) throws IOException {
+    if (bytes == null) {
+      throw new IOException("bytes is null");
+    }
+    if (offset < 0 || length < 0 || offset + length > bytes.length) {
+      throw new IOException("Invalid byte range");
+    }
+  }
+
+  private final class PartitionedValueWriter implements ValueWriter {
+    private final BytesWritable key;
+    private final int partition;
+    private final byte[] scratch = new byte[8];
+    private WrappedBuffer buffer;
+    private int metaSkip;
+    private int metaStart;
+    private int valStart = -1;
+    private int snapshotNextPosition;
+    private int snapshotAvailableSize;
+    private boolean snapshotFull;
+    private boolean tempMode;
+    private DataOutputBuffer tempBuffer;
+    private boolean closed;
+
+    private PartitionedValueWriter(BytesWritable key, int partition) throws IOException {
+      this.key = key;
+      this.partition = partition;
+      if (writerState != WriterState.RUNNING) {
+        closeValueWriterGuard();
+        throw new IOException("Write already closed or spill failed");
+      }
+      if (trackMaxKeyValLen) {
+        maxKeyLen = Math.max(maxKeyLen, key.getLength());
+      }
+      beginDirectRecord();
+    }
+
+    private void beginDirectRecord() throws IOException {
+      metaSkip = alignToIntBoundary(currentBuffer.nextPosition) - currentBuffer.nextPosition;
+      if ((currentBuffer.availableSize < (PARTITIONED_META_SIZE + metaSkip)) || currentBuffer.full) {
+        metaSkip = 0;
+        setupNextBuffer();
+      }
+      buffer = currentBuffer;
+      snapshotNextPosition = buffer.nextPosition;
+      snapshotAvailableSize = buffer.availableSize;
+      snapshotFull = buffer.full;
+      buffer.nextPosition += metaSkip;
+      metaStart = buffer.nextPosition;
+      buffer.availableSize -= (PARTITIONED_META_SIZE + metaSkip);
+      buffer.nextPosition += PARTITIONED_META_SIZE;
+      if (!writeDirectBytes(key.getBytesRaw(), key.getOffset(), key.getLength())) {
+        restoreDirectRecord();
+        switchToTempMode(false);
+        return;
+      }
+      valStart = buffer.nextPosition;
+    }
+
+    private boolean writeDirectBytes(byte[] bytes, int offset, int length) {
+      if (buffer.full || length > buffer.availableSize) {
+        buffer.full = true;
+        return false;
+      }
+      System.arraycopy(bytes, offset, buffer.buffer, buffer.nextPosition, length);
+      buffer.nextPosition += length;
+      buffer.availableSize -= length;
+      return true;
+    }
+
+    private void restoreDirectRecord() {
+      buffer.nextPosition = snapshotNextPosition;
+      buffer.availableSize = snapshotAvailableSize;
+      buffer.full = snapshotFull;
+      currentBuffer = buffer;
+    }
+
+    private void switchToTempMode(boolean copyCurrentValue) throws IOException {
+      tempMode = true;
+      tempBuffer = new DataOutputBuffer();
+      if (copyCurrentValue && buffer != null && valStart >= 0 && buffer.nextPosition > valStart) {
+        tempBuffer.write(buffer.buffer, valStart, buffer.nextPosition - valStart);
+      }
+    }
+
+    private void handleDirectOverflow(byte[] bytes, int offset, int length) throws IOException {
+      int existingValueLength = buffer.nextPosition - valStart;
+      byte[] existingValue = Arrays.copyOfRange(buffer.buffer, valStart, buffer.nextPosition);
+      restoreDirectRecord();
+      setupNextBuffer();
+      beginDirectRecord();
+      if (tempMode) {
+        tempBuffer.write(existingValue, 0, existingValueLength);
+        tempBuffer.write(bytes, offset, length);
+        return;
+      }
+      if (!writeDirectBytes(existingValue, 0, existingValueLength) || !writeDirectBytes(bytes, offset, length)) {
+        restoreDirectRecord();
+        switchToTempMode(false);
+        tempBuffer.write(existingValue, 0, existingValueLength);
+        tempBuffer.write(bytes, offset, length);
+      }
+    }
+
+    private void writeValueBytes(byte[] bytes, int offset, int length) throws IOException {
+      validateValueWriterByteRange(bytes, offset, length);
+      if (closed) {
+        throw new IOException("ValueWriter is already closed");
+      }
+      if (tempMode) {
+        tempBuffer.write(bytes, offset, length);
+      } else if (!writeDirectBytes(bytes, offset, length)) {
+        handleDirectOverflow(bytes, offset, length);
+      }
+    }
+
+    @Override
+    public void writeByte(int value) throws IOException {
+      scratch[0] = (byte) value;
+      writeValueBytes(scratch, 0, 1);
+    }
+
+    @Override
+    public void writeInt(int value) throws IOException {
+      scratch[0] = (byte) (value >>> 24);
+      scratch[1] = (byte) (value >>> 16);
+      scratch[2] = (byte) (value >>> 8);
+      scratch[3] = (byte) value;
+      writeValueBytes(scratch, 0, 4);
+    }
+
+    @Override
+    public void writeLong(long value) throws IOException {
+      for (int i = 7; i >= 0; i--) {
+        scratch[7 - i] = (byte) (value >>> (i * 8));
+      }
+      writeValueBytes(scratch, 0, 8);
+    }
+
+    @Override
+    public void writeDouble(double value) throws IOException {
+      writeLong(Double.doubleToLongBits(value));
+    }
+
+    @Override
+    public void writeBytes(byte[] bytes) throws IOException {
+      writeBytes(bytes, 0, bytes.length);
+    }
+
+    @Override
+    public void writeBytes(byte[] bytes, int offset, int length) throws IOException {
+      writeValueBytes(bytes, offset, length);
+    }
+
+    @Override
+    public void close() throws IOException {
+      if (closed) {
+        throw new IOException("ValueWriter is already closed");
+      }
+      closed = true;
+      try {
+        if (tempMode) {
+          BytesWritable value = new BytesWritable(Arrays.copyOf(tempBuffer.getData(), tempBuffer.getLength()));
+          writeRecord(key, value, partition);
+          if (trackMaxKeyValLen) {
+            maxValLen = Math.max(maxValLen, tempBuffer.getLength());
+          }
+          return;
+        }
+        int valueLength = buffer.nextPosition - valStart;
+        if (trackMaxKeyValLen) {
+          maxValLen = Math.max(maxValLen, valueLength);
+        }
+        int metaIndex = metaStart / INT_SIZE;
+        buffer.metaBuffer.put(metaIndex + INDEX_KEYLEN, (valStart - (metaStart + PARTITIONED_META_SIZE)));
+        buffer.metaBuffer.put(metaIndex + INDEX_VALLEN, valueLength);
+        buffer.metaBuffer.put(metaIndex + INDEX_NEXT, WrappedBuffer.PARTITION_ABSENT_POSITION);
+        buffer.skipSize += metaSkip;
+        localOutputRecordBytesCounter += (buffer.nextPosition - (metaStart + PARTITIONED_META_SIZE));
+        localOutputBytesWithOverheadCounter += ((buffer.nextPosition - metaStart) + metaSkip);
+        localOutputRecordsCounter++;
+        if (localOutputRecordBytesCounter % NOTIFY_THRESHOLD == 0) {
+          updateTezCountersAndNotify();
+        }
+        int currentPartitionTailOffset = buffer.partitionTails[partition];
+        if (currentPartitionTailOffset != WrappedBuffer.PARTITION_ABSENT_POSITION) {
+          int previousTailMetaIndexInInts = currentPartitionTailOffset / INT_SIZE;
+          buffer.metaBuffer.put(previousTailMetaIndexInInts + INDEX_NEXT, metaStart);
+        } else {
+          buffer.partitionHeads[partition] = metaStart;
+        }
+        buffer.partitionTails[partition] = metaStart;
+        buffer.recordsPerPartition[partition]++;
+        buffer.sizePerPartition[partition] += buffer.nextPosition - (metaStart + PARTITIONED_META_SIZE);
+        buffer.numRecords++;
+      } finally {
+        closeValueWriterGuard();
+      }
+    }
+  }
+
+  private final class IFileValueWriterBuffered implements ValueWriterBuffered {
+    private final BytesWritable key;
+    private int expectedLength = -1;
+    private int writtenLength = 0;
+    private boolean closed;
+
+    private IFileValueWriterBuffered(BytesWritable key, int partition) throws IOException {
+      this.key = key;
+      if (writerState != WriterState.RUNNING) {
+        closeValueWriterGuard();
+        throw new IOException("Write already closed or spill failed");
+      }
+    }
+
+    @Override
+    public void setLength(int length) throws IOException {
+      if (closed) {
+        throw new IOException("ValueWriterBuffered is already closed");
+      }
+      if (expectedLength >= 0) {
+        throw new IOException("Value length is already set");
+      }
+      if (length < 0) {
+        throw new IOException("Negative value length: " + length);
+      }
+      expectedLength = length;
+      if (trackMaxKeyValLen) {
+        maxKeyLen = Math.max(maxKeyLen, key.getLength());
+        maxValLen = Math.max(maxValLen, length);
+      }
+      if (isPipelinedShuffle && writer == null) {
+        openSinglePartitionPipelinedSpill();
+      }
+      writer.writeKeyAndValLen(key, length);
+    }
+
+    @Override
+    public void writeBytes(byte[] bytes, int offset, int length) throws IOException {
+      validateValueWriterByteRange(bytes, offset, length);
+      if (closed) {
+        throw new IOException("ValueWriterBuffered is already closed");
+      }
+      if (expectedLength < 0) {
+        throw new IOException("Value length is not set");
+      }
+      if (writtenLength + length > expectedLength) {
+        throw new IOException("Too many value bytes written");
+      }
+      writer.writeValBytes(bytes, offset, length);
+      writtenLength += length;
+    }
+
+    @Override
+    public void close() throws IOException {
+      if (closed) {
+        throw new IOException("ValueWriterBuffered is already closed");
+      }
+      closed = true;
+      try {
+        if (expectedLength < 0) {
+          throw new IOException("Value length is not set");
+        }
+        if (writtenLength != expectedLength) {
+          throw new IOException("Expected " + expectedLength + " value bytes, wrote " + writtenLength);
+        }
+        writer.closeVal();
+        if (isPipelinedShuffle) {
+          finishSinglePartitionPipelinedValue(key.getLength(), expectedLength);
+        }
+      } finally {
+        closeValueWriterGuard();
+      }
+    }
+  }
+
+  private void finishSinglePartitionPipelinedValue(int keyLength, int valueLength) throws IOException {
+    long recordBytes = (long) keyLength + valueLength;
+    singlePartitionSpillRecordBytes += recordBytes;
+    singlePartitionSpillRecords++;
+    if (reportPartitionStats()) {
+      sizePerPartition[0] += recordBytes;
+    }
+    localOutputRecordBytesCounter += recordBytes;
+    localOutputBytesWithOverheadCounter += recordBytes + 2 * INT_SIZE;
+    localOutputRecordsCounter++;
+    if (localOutputRecordsCounter % NOTIFY_THRESHOLD == 0) {
+      updateTezCountersAndNotify();
+    }
+    long recordBytesWithOverhead = recordBytes + 2 * INT_SIZE;
+    if (recordBytesWithOverhead > singlePartitionSpillSizeLimit) {
+      outputLargeRecordsCounter.increment(1);
+    }
+    long estimatedSpillBytes =
+        singlePartitionSpillRecordBytes + (long) singlePartitionSpillRecords * 2 * INT_SIZE;
+    if (estimatedSpillBytes >= singlePartitionSpillSizeLimit) {
+      closeSinglePartitionPipelinedSpill(false);
+    }
+  }
+
   @Override
   public void writeWithPartition(BytesWritable key, BytesWritable value, int partition) throws IOException {
+    if (valueWriterOpen) {
+      throw new RuntimeException("A value writer is already open");
+    }
     // Skipping checks for key-value types.
     // IFile takes care of these, but should be removed from there as well.
 

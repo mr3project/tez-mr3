@@ -787,6 +787,11 @@ public class IFile {
   // WriterBytesWritable does not use RLE.
   public static class WriterBytesWritable extends Writer implements WriterAppendBytesWritable {
 
+    private int streamingValueLength = -1;
+    private int streamingValueBytesWritten = 0;
+    private int streamingKeyLength = 0;
+    private int streamingLengthBytes = 0;
+
     public WriterBytesWritable(FileSystem fs, Path file,
         CompressionCodec codec,
         TezCounter writesCounter,
@@ -811,6 +816,83 @@ public class IFile {
       super(outputStream, codec, writesCounter, serializedBytesCounter, useMaxKeyValLen, false,
           maxKeyLen, maxValLen,
           writeBuffer, compressorExternal, taskContext);
+    }
+
+
+    public void writeKeyAndValLen(BytesWritable key, int valLen) throws IOException {
+      if (valLen < 0) {
+        throw new IOException("Negative value length: " + valLen);
+      }
+      streamingValueLength = valLen;
+      streamingValueBytesWritten = 0;
+      streamingKeyLength = key.getLength();
+      streamingLengthBytes = 0;
+
+      if (useMaxKeyValLen) {
+        int recordStartOffset = (int) getDecompressedBytesWritten();
+        if (maxKeyLen < 0 || maxValLen < 0) {
+          maxKeyLen = streamingKeyLength;
+          maxValLen = valLen;
+        }
+        if (!keyLenTransitioned
+            && (streamingKeyLength != maxKeyLen || (numRecordsWritten == 0 && streamingKeyLength == 0))) {
+          keyLenTransitioned = true;
+          firstKeyOffset = recordStartOffset;
+        }
+        if (!valLenTransitioned
+            && (valLen != maxValLen || (numRecordsWritten == 0 && valLen == 0))) {
+          valLenTransitioned = true;
+          firstValOffset = recordStartOffset;
+        }
+        if (keyLenTransitioned) {
+          bufferWriteInt(streamingKeyLength);
+          streamingLengthBytes += INT_SIZE;
+        }
+        if (valLenTransitioned) {
+          bufferWriteInt(valLen);
+          streamingLengthBytes += INT_SIZE;
+        }
+      } else {
+        long combined = ((long) valLen << 32) | (streamingKeyLength & 0xFFFFFFFFL);
+        bufferWriteLong(combined);
+        streamingLengthBytes = 2 * INT_SIZE;
+      }
+      bufferWriteBytes(key.getBytesRaw(), key.getOffset(), streamingKeyLength);
+    }
+
+    public void writeValBytes(byte[] bytes, int offset, int length) throws IOException {
+      if (streamingValueLength < 0) {
+        throw new IOException("Value length has not been written");
+      }
+      if (length < 0 || offset < 0 || offset + length > bytes.length) {
+        throw new IOException("Invalid value byte range");
+      }
+      if (streamingValueBytesWritten + length > streamingValueLength) {
+        throw new IOException("Too many value bytes written");
+      }
+      bufferWriteBytes(bytes, offset, length);
+      streamingValueBytesWritten += length;
+    }
+
+    public void closeVal() throws IOException {
+      if (streamingValueLength < 0) {
+        throw new IOException("Value length has not been written");
+      }
+      if (streamingValueBytesWritten != streamingValueLength) {
+        throw new IOException("Expected " + streamingValueLength + " value bytes, wrote "
+            + streamingValueBytesWritten);
+      }
+      if (useMaxKeyValLen) {
+        incrementDecompressedBytesWritten(streamingLengthBytes + streamingKeyLength + streamingValueLength);
+      } else {
+        incrementDecompressedBytesWritten(streamingKeyLength + streamingValueLength + INT_SIZE + INT_SIZE);
+      }
+      numSerializedBytesWritten += streamingKeyLength + streamingValueLength;
+      ++numRecordsWritten;
+      streamingValueLength = -1;
+      streamingValueBytesWritten = 0;
+      streamingKeyLength = 0;
+      streamingLengthBytes = 0;
     }
 
     public void appendNoRle(BytesWritable key, BytesWritable value) throws IOException {
