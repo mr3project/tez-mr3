@@ -46,8 +46,8 @@ public abstract class KeyValueWriterEdge implements WriterEdge {
   public abstract void write(BytesWritable key, BytesWritable value) throws IOException;
 
   // Return:
-  //   >= 0: unordered edge
-  //   -1: ordered edge
+  //   >= 0: unordered edge and Tez shuffle
+  //   -1: ordered edge or MapReduce shuffle
   public abstract int getNumUnorderedPartitions();
 
   public abstract void writeWithPartition(BytesWritable key, BytesWritable value, int partition) throws IOException;

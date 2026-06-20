@@ -532,7 +532,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
 
   @Override
   public int getNumUnorderedPartitions() {
-    return numPartitions;
+    return compositeFetch ? numPartitions : -1;
   }
 
   // should match TezRuntimeUtils.instantiatePartitioner()
