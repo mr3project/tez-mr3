@@ -444,7 +444,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
         new SynchronousQueue<Runnable>(),
         new ThreadFactoryBuilder()
             .setDaemon(true)
-            .setNameFormat("UnorderedOutSpiller {" + outputContext.getDestinationVertexName() + "} #%d")
+            .setNameFormat("UnorderedOutSpiller {" + outputContext.getUniqueIdentifierForOutputFiles() + "} #%d")
             .build()
     );
     // to restrict submission of more tasks than threads (e.g numBuffers > numThreads)
@@ -614,6 +614,61 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     } else {
       writeRecord(key, value, partition);
     }
+  }
+
+  @Override
+  public WriteValueBytes requestWriteValueBytes(BytesWritable key, int partition) throws IOException {
+    Preconditions.checkArgument(compositeFetch && numPartitions > 1);
+
+    if (writerState != WriterState.RUNNING) {
+      throw new IOException("Write already closed or spill failed");
+    }
+
+    int metaSkip = alignToIntBoundary(currentBuffer.nextPosition) - currentBuffer.nextPosition;
+    int requiredBeforeValue = metaSkip + PARTITIONED_META_SIZE + key.getLength();
+    if (currentBuffer.full || currentBuffer.availableSize < requiredBeforeValue) {
+      return null;
+    }
+
+    int maxValueBytes = currentBuffer.availableSize - requiredBeforeValue;
+    if (maxValueBytes == 0) {
+      return null;
+    }
+
+    return new WriteValueBytes(currentBuffer.buffer,
+        currentBuffer.nextPosition + requiredBeforeValue, maxValueBytes);
+  }
+
+  // Invariant:
+  //   completeWriteValueBytes() is the next call after requestWriteValueBytes()
+  //   0 <= valLen <= WriteValueBytes.maxValueBytes
+  @Override
+  public void completeWriteValueBytes(BytesWritable key, int valLen, int partition) throws IOException {
+    if (trackMaxKeyValLen) {
+      maxKeyLen = Math.max(maxKeyLen, key.getLength());
+      maxValLen = Math.max(maxValLen, valLen);
+    }
+
+    final int keyLen = key.getLength();
+    final int nextPosition = currentBuffer.nextPosition;
+    final int availableSize = currentBuffer.availableSize;
+    final int metaSkip = alignToIntBoundary(nextPosition) - nextPosition;
+    final int requiredBeforeValue = metaSkip + PARTITIONED_META_SIZE + keyLen;
+    final long recordBytesWithOverhead = (long) requiredBeforeValue + valLen;
+
+    assert recordBytesWithOverhead <= availableSize;  // because valLen <= WriteValueBytes.maxValueBytes
+
+    final int metaStart = nextPosition + metaSkip;
+    final int keyStart = metaStart + PARTITIONED_META_SIZE;
+    final int valStart = keyStart + keyLen;
+    final int newNextPosition = valStart + valLen;
+
+    System.arraycopy(key.getBytesRaw(), key.getOffset(), currentBuffer.buffer, keyStart, keyLen);
+
+    currentBuffer.nextPosition = newNextPosition;
+    currentBuffer.availableSize = availableSize - (int) recordBytesWithOverhead;
+
+    updateRecordMetadata(metaSkip, metaStart, valStart, partition);
   }
 
   private void writeSinglePartitionPipelined(BytesWritable key, BytesWritable value) throws IOException {
@@ -797,6 +852,10 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       }
     }
 
+    updateRecordMetadata(metaSkip, metaStart, valStart, partition);
+  }
+
+  private void updateRecordMetadata(int metaSkip, int metaStart, int valStart, int partition) {
     // Meta-data updates
     int metaIndex = metaStart / INT_SIZE;
 

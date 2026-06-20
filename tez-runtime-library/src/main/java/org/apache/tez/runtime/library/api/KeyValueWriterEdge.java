@@ -55,4 +55,64 @@ public abstract class KeyValueWriterEdge implements WriterEdge {
   // return value = 0: use key hash to get partition
   // return value = 1: use value hash to get partition
   public abstract int getPartitionerType();
+
+  /*
+    The new methods are valid only when getNumUnorderedPartitions() returns an
+    integer larger than 1.
+
+    The caller first calls requestWriteValueBytes(key, partition) with a key and
+    partition for a record whose value bytes will be produced later. The method is
+    a strict current-buffer peek: it does not switch buffers, reserve space, write
+    metadata, write the key, or update writer state.
+
+    If requestWriteValueBytes() returns null, no direct value-byte region is
+    available in the current buffer. The caller should use a fallback path, such as
+    building a BytesWritable value and calling writeWithPartition().
+
+    If requestWriteValueBytes() returns a non-null WriteValueBytes object, then:
+
+      buffer
+          is the internal byte array where value bytes may be written.
+
+      offsetToValueBytes
+          is the first index in buffer where the caller may write value bytes.
+
+      maxValueBytes
+          is the maximum number of value bytes the caller may write starting at
+          offsetToValueBytes.
+
+    The caller may write at most maxValueBytes bytes into:
+
+      buffer[offsetToValueBytes ... offsetToValueBytes + maxValueBytes)
+
+    After writing the value bytes directly into the buffer, the caller must call
+    completeWriteValueBytes(key, valLen, partition), where valLen is the number of
+    value bytes actually written (>= 0). The key and partition must correspond to the
+    earlier requestWriteValueBytes() call.
+
+    completeWriteValueBytes() commits the record as if writeWithPartition() had
+    been called with a BytesWritable value of length valLen, except that it does
+    not copy the value bytes because the caller already wrote them directly into
+    the exposed buffer. It writes the key and metadata, advances writer positions,
+    updates counters, and updates partition bookkeeping.
+
+    No other write operation may occur on the same writer between a successful
+    requestWriteValueBytes() call and its corresponding completeWriteValueBytes() call.
+   */
+
+  public static class WriteValueBytes {
+    public final byte[] buffer;
+    public final int offsetToValueBytes;
+    public final int maxValueBytes;
+
+    public WriteValueBytes(byte[] buffer, int offsetToValueBytes, int maxValueBytes) {
+      this.buffer = buffer;
+      this.offsetToValueBytes = offsetToValueBytes;
+      this.maxValueBytes = maxValueBytes;
+    }
+  }
+
+  public abstract WriteValueBytes requestWriteValueBytes(BytesWritable key, int partition) throws IOException;
+
+  public abstract void completeWriteValueBytes(BytesWritable key, int valLen, int partition) throws IOException;
 }

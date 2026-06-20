@@ -145,6 +145,17 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput implements
       }
 
       @Override
+      public WriteValueBytes requestWriteValueBytes(BytesWritable key, int partition) throws IOException {
+        assert false;
+        return null;
+      }
+
+      @Override
+      public void completeWriteValueBytes(BytesWritable key, int valLen, int partition) throws IOException {
+        assert false;
+      }
+
+      @Override
       public int getPartitionerType() {
         assert false;
         return 0;
