@@ -25,6 +25,18 @@ import org.apache.tez.runtime.api.WriterEdge;
 
 public abstract class KeyValueWriterEdge implements WriterEdge {
 
+  public static class WriteValueBytes {
+    public final byte[] buffer;
+    public final int offsetToValueBytes;
+    public final int maxValueBytes;
+
+    public WriteValueBytes(byte[] buffer, int offsetToValueBytes, int maxValueBytes) {
+      this.buffer = buffer;
+      this.offsetToValueBytes = offsetToValueBytes;
+      this.maxValueBytes = maxValueBytes;
+    }
+  }
+
   // Invariant:
   //   1. closeWriter() must be called and is called only after the last call of write().
   //   2. write()/closeWriter() are called from the same thread (thus never concurrently).
@@ -51,6 +63,10 @@ public abstract class KeyValueWriterEdge implements WriterEdge {
   public abstract int getNumUnorderedPartitions();
 
   public abstract void writeWithPartition(BytesWritable key, BytesWritable value, int partition) throws IOException;
+
+  public abstract WriteValueBytes requestWriteValueBytes(BytesWritable key, int partition) throws IOException;
+
+  public abstract void completeWriteValueBytes(BytesWritable key, int valLen, int partition) throws IOException;
 
   // return value = 0: use key hash to get partition
   // return value = 1: use value hash to get partition

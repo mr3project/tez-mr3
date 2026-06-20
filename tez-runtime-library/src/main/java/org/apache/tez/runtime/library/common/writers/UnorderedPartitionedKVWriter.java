@@ -616,6 +616,75 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     }
   }
 
+  @Override
+  public WriteValueBytes requestWriteValueBytes(BytesWritable key, int partition) throws IOException {
+    if (writerState != WriterState.RUNNING) {
+      throw new IOException("Write already closed or spill failed");
+    }
+
+    if (!compositeFetch || numPartitions == 1) {
+      return null;
+    }
+
+    int metaSkip = alignToIntBoundary(currentBuffer.nextPosition) - currentBuffer.nextPosition;
+    int requiredBeforeValue = metaSkip + PARTITIONED_META_SIZE + key.getLength();
+    if (currentBuffer.full || currentBuffer.availableSize < requiredBeforeValue) {
+      return null;
+    }
+
+    int maxValueBytes = currentBuffer.availableSize - requiredBeforeValue;
+    if (maxValueBytes == 0) {
+      return null;
+    }
+
+    return new WriteValueBytes(currentBuffer.buffer,
+        currentBuffer.nextPosition + requiredBeforeValue, maxValueBytes);
+  }
+
+  @Override
+  public void completeWriteValueBytes(BytesWritable key, int valLen, int partition) throws IOException {
+    if (writerState != WriterState.RUNNING) {
+      throw new IOException("Write already closed or spill failed");
+    }
+
+    if (valLen < 0) {
+      throw new IOException("Value length cannot be negative: " + valLen);
+    }
+
+    if (!compositeFetch || numPartitions == 1) {
+      throw new IOException("Direct value-byte writes are supported only for multiple unordered partitions"
+          + " with composite fetch");
+    }
+
+    if (trackMaxKeyValLen) {
+      maxKeyLen = Math.max(maxKeyLen, key.getLength());
+      maxValLen = Math.max(maxValLen, valLen);
+    }
+
+    int metaSkip = alignToIntBoundary(currentBuffer.nextPosition) - currentBuffer.nextPosition;
+    int requiredBeforeValue = metaSkip + PARTITIONED_META_SIZE + key.getLength();
+    long recordBytesWithOverhead = (long) requiredBeforeValue + valLen;
+    if (currentBuffer.full || recordBytesWithOverhead > currentBuffer.availableSize) {
+      throw new IOException("Requested value bytes do not fit in the current buffer");
+    }
+
+    currentBuffer.nextPosition += metaSkip;
+    int metaStart = currentBuffer.nextPosition;
+    currentBuffer.availableSize -= (PARTITIONED_META_SIZE + metaSkip);
+    currentBuffer.nextPosition += PARTITIONED_META_SIZE;
+
+    System.arraycopy(key.getBytesRaw(), key.getOffset(), currentBuffer.buffer,
+        currentBuffer.nextPosition, key.getLength());
+    currentBuffer.nextPosition += key.getLength();
+    currentBuffer.availableSize -= key.getLength();
+
+    int valStart = currentBuffer.nextPosition;
+    currentBuffer.nextPosition += valLen;
+    currentBuffer.availableSize -= valLen;
+
+    updateRecordMetadata(metaSkip, metaStart, valStart, partition);
+  }
+
   private void writeSinglePartitionPipelined(BytesWritable key, BytesWritable value) throws IOException {
     // Encode directly into the final spill format.
     // Closing a spill is synchronous so caller-owned key/value arrays never have to be retained.
@@ -797,6 +866,10 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       }
     }
 
+    updateRecordMetadata(metaSkip, metaStart, valStart, partition);
+  }
+
+  private void updateRecordMetadata(int metaSkip, int metaStart, int valStart, int partition) {
     // Meta-data updates
     int metaIndex = metaStart / INT_SIZE;
 
