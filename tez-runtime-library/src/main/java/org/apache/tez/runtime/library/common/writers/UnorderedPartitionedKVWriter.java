@@ -805,7 +805,6 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     // This new record is currently the end of its partition's list in this buffer.
     currentBuffer.metaBuffer.put(metaIndex + INDEX_NEXT, WrappedBuffer.PARTITION_ABSENT_POSITION);
 
-    currentBuffer.skipSize += metaSkip; // For size estimation
     // Update stats on number of records
     localOutputRecordBytesCounter += (currentBuffer.nextPosition - (metaStart + PARTITIONED_META_SIZE));
     localOutputBytesWithOverheadCounter += ((currentBuffer.nextPosition - metaStart) + metaSkip);
@@ -1912,7 +1911,6 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     private int availableSize;
 
     private int numRecords = 0;
-    private int skipSize = 0;
     private int nextPosition = 0;
     private boolean full = false;
 
@@ -1940,7 +1938,6 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       Arrays.fill(sizePerPartition, 0L);
       numRecords = 0;
       nextPosition = 0;
-      skipSize = 0;
       availableSize = size;
       full = false;
     }
