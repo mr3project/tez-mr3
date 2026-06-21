@@ -856,37 +856,44 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
   }
 
   private void updateRecordMetadata(int metaSkip, int metaStart, int valStart, int partition) {
-    // Meta-data updates
-    int metaIndex = metaStart / INT_SIZE;
+    final WrappedBuffer buffer = currentBuffer;
+    final int nextPosition = buffer.nextPosition;
 
-    currentBuffer.metaBuffer.put(metaIndex + INDEX_KEYLEN, (valStart - (metaStart + PARTITIONED_META_SIZE)));
-    currentBuffer.metaBuffer.put(metaIndex + INDEX_VALLEN, (currentBuffer.nextPosition - valStart));
-    // This new record is currently the end of its partition's list in this buffer.
-    currentBuffer.metaBuffer.put(metaIndex + INDEX_NEXT, WrappedBuffer.PARTITION_ABSENT_POSITION);
+    final int dataStart = metaStart + PARTITIONED_META_SIZE;
+    final int keyLen = valStart - dataStart;
+    final int valLen = nextPosition - valStart;
+    final int recordBytes = nextPosition - dataStart;
+    final int bytesWithOverhead = recordBytes + PARTITIONED_META_SIZE + metaSkip;
 
-    // Update stats on number of records
-    localOutputRecordBytesCounter += (currentBuffer.nextPosition - (metaStart + PARTITIONED_META_SIZE));
-    localOutputBytesWithOverheadCounter += ((currentBuffer.nextPosition - metaStart) + metaSkip);
+    final int metaIndex = metaStart / INT_SIZE;
+    final IntBuffer metaBuffer = buffer.metaBuffer;
+
+    metaBuffer.put(metaIndex + INDEX_KEYLEN, keyLen);
+    metaBuffer.put(metaIndex + INDEX_VALLEN, valLen);
+    metaBuffer.put(metaIndex + INDEX_NEXT, WrappedBuffer.PARTITION_ABSENT_POSITION);
+
+    localOutputRecordBytesCounter += recordBytes;
+    localOutputBytesWithOverheadCounter += bytesWithOverhead;
     localOutputRecordsCounter++;
+
     if (localOutputRecordBytesCounter % NOTIFY_THRESHOLD == 0) {
       updateTezCountersAndNotify();
     }
 
-    int currentPartitionTailOffset = currentBuffer.partitionTails[partition];
-    if (currentPartitionTailOffset != WrappedBuffer.PARTITION_ABSENT_POSITION) {
-      // If there was a previous tail for this partition, link it to this new record.
-      int previousTailMetaIndexInInts = currentPartitionTailOffset / INT_SIZE;
-      currentBuffer.metaBuffer.put(previousTailMetaIndexInInts + INDEX_NEXT, metaStart);
-    } else {
-      // This is the first record for this partition in this buffer.
-      currentBuffer.partitionHeads[partition] = metaStart;
-    }
-    // This new record becomes the new tail for this partition in this buffer.
-    currentBuffer.partitionTails[partition] = metaStart;
+    final int previousTail = buffer.partitionTails[partition];
 
-    currentBuffer.recordsPerPartition[partition]++;
-    currentBuffer.sizePerPartition[partition] += currentBuffer.nextPosition - (metaStart + PARTITIONED_META_SIZE);
-    currentBuffer.numRecords++;
+    if (previousTail != WrappedBuffer.PARTITION_ABSENT_POSITION) {
+      final int previousTailMetaIndex = previousTail >> 2;
+      metaBuffer.put(previousTailMetaIndex + INDEX_NEXT, metaStart);
+    } else {
+      buffer.partitionHeads[partition] = metaStart;
+    }
+
+    buffer.partitionTails[partition] = metaStart;
+
+    buffer.recordsPerPartition[partition]++;
+    buffer.sizePerPartition[partition] += recordBytes;
+    buffer.numRecords++;
   }
 
   private void updateTezCountersAndNotify() {
