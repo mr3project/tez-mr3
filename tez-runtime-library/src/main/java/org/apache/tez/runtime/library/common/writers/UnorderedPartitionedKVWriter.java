@@ -626,7 +626,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
 
     assert currentBuffer.availableSize == currentBuffer.buffer.length - currentBuffer.nextPosition;
 
-    int metaSkip = alignToIntBoundary(currentBuffer.nextPosition) - currentBuffer.nextPosition;
+    int metaSkip = computeMetaSkip(currentBuffer.nextPosition);
     int requiredBeforeValue = metaSkip + PARTITIONED_META_SIZE + key.getLength();
     if (currentBuffer.full || currentBuffer.availableSize < requiredBeforeValue) {
       return null;
@@ -655,7 +655,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
 
     final int keyLen = key.getLength();
     final int nextPosition = currentBuffer.nextPosition;
-    final int metaSkip = alignToIntBoundary(nextPosition) - nextPosition;
+    final int metaSkip = computeMetaSkip(nextPosition);
     final int requiredBeforeValue = metaSkip + PARTITIONED_META_SIZE + keyLen;
     final long recordBytesWithOverhead = (long) requiredBeforeValue + valLen;
 
@@ -812,7 +812,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
 
   private void writeRecord(BytesWritable key, BytesWritable value, int partition) throws IOException {
     // Wrap to 4 byte (Int) boundary for metaData
-    int metaSkip = alignToIntBoundary(currentBuffer.nextPosition) - currentBuffer.nextPosition;
+    int metaSkip = computeMetaSkip(currentBuffer.nextPosition);
     if ((currentBuffer.availableSize < (PARTITIONED_META_SIZE + metaSkip)) || (currentBuffer.full)) {
       // Move over to the next buffer.
       metaSkip = 0;
@@ -1187,9 +1187,9 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
         valBuffer);
   }
 
-  private static int alignToIntBoundary(int position) {
+  private static int computeMetaSkip(int position) {
     int mod = position % INT_SIZE;
-    return mod == 0 ? position : position + INT_SIZE - mod;
+    return mod == 0 ? 0 : INT_SIZE - mod;
   }
 
   public static long getInitialMemoryRequirement(Configuration conf, long totalTaskMemoryBytes) {
