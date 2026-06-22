@@ -624,6 +624,8 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       throw new IOException("Write already closed or spill failed");
     }
 
+    assert currentBuffer.availableSize == currentBuffer.buffer.length - currentBuffer.nextPosition;
+
     int metaSkip = alignToIntBoundary(currentBuffer.nextPosition) - currentBuffer.nextPosition;
     int requiredBeforeValue = metaSkip + PARTITIONED_META_SIZE + key.getLength();
     if (currentBuffer.full || currentBuffer.availableSize < requiredBeforeValue) {
@@ -649,14 +651,18 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       maxValLen = Math.max(maxValLen, valLen);
     }
 
+    assert currentBuffer.availableSize == currentBuffer.buffer.length - currentBuffer.nextPosition;
+
     final int keyLen = key.getLength();
     final int nextPosition = currentBuffer.nextPosition;
-    final int availableSize = currentBuffer.availableSize;
     final int metaSkip = alignToIntBoundary(nextPosition) - nextPosition;
     final int requiredBeforeValue = metaSkip + PARTITIONED_META_SIZE + keyLen;
     final long recordBytesWithOverhead = (long) requiredBeforeValue + valLen;
 
-    assert recordBytesWithOverhead <= availableSize;  // because valLen <= WriteValueBytes.maxValueBytes
+    // because valLen <= WriteValueBytes.maxValueBytes
+    Preconditions.checkArgument(
+      recordBytesWithOverhead <= currentBuffer.availableSize,
+      "record bytes=" + recordBytesWithOverhead + ", availableSize=" + currentBuffer.availableSize);
 
     final int metaStart = nextPosition + metaSkip;
     final int keyStart = metaStart + PARTITIONED_META_SIZE;
@@ -666,7 +672,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     System.arraycopy(key.getBytesRaw(), key.getOffset(), currentBuffer.buffer, keyStart, keyLen);
 
     currentBuffer.nextPosition = newNextPosition;
-    currentBuffer.availableSize = availableSize - (int) recordBytesWithOverhead;
+    currentBuffer.availableSize -= (int) recordBytesWithOverhead;
 
     updateRecordMetadata(metaSkip, metaStart, valStart, partition);
   }
