@@ -684,11 +684,8 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       openSinglePartitionPipelinedSpill();
     }
 
-    if (compositeFetch) {
-      writer.appendNoRleTez(key, value);
-    } else {
-      writer.appendNoRle(key, value);
-    }
+    assert compositeFetch;
+    writer.appendNoRleTez(key, value);
 
     long recordBytes = (long) key.getLength() + value.getLength();
     singlePartitionSpillRecordBytes += recordBytes;
