@@ -48,10 +48,10 @@ public class InputInitializerEvent extends Event
     return targetInputName;
   }
 
-  private String targetVertexName;
-  private String targetInputName;
+  private final String targetVertexName;
+  private final String targetInputName;
 
-  private ByteBuffer eventPayload;
+  private final ByteBuffer eventPayload;
   private String sourceVertexName;
 
   private InputInitializerEvent(String targetVertexName, String targetInputName,

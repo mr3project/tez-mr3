@@ -25,7 +25,7 @@ import java.nio.ByteBuffer;
 public class CustomProcessorEvent extends Event
   implements com.datamonad.mr3.api.EventToProcessor {
 
-  private ByteBuffer payload;
+  private final ByteBuffer payload;
 
   /**
    * Version number to indicate what app attempt generated this Event
