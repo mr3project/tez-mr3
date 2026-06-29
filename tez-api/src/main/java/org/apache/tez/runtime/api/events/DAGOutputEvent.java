@@ -30,15 +30,17 @@ public final class DAGOutputEvent extends Event {
 
   private final String resultId;
   private final ByteString dagOutput;
+  private final int numRows;
 
-  private DAGOutputEvent(String resultId, ByteString dagOutput) {
+  private DAGOutputEvent(String resultId, ByteString dagOutput, int numRows) {
     super();
     this.resultId = resultId;
     this.dagOutput = dagOutput;
+    this.numRows = numRows;
   }
 
-  public static DAGOutputEvent create(String resultId, ByteString dagOutput) {
-    return new DAGOutputEvent(resultId, dagOutput);
+  public static DAGOutputEvent create(String resultId, ByteString dagOutput, int numRows) {
+    return new DAGOutputEvent(resultId, dagOutput, numRows);
   }
 
   public String getResultId() {
@@ -49,4 +51,7 @@ public final class DAGOutputEvent extends Event {
     return dagOutput;
   }
 
+  public int getNumRows() {
+    return numRows;
+  }
 }
