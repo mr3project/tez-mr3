@@ -443,10 +443,11 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       for (int k = 0; k < partitionCount; k++) {
         int reduceId = partitionId + k;
         InputAttemptIdentifier srcAttemptId = pathToAttemptMap.get(new PathPartition(pathComponent, reduceId));
-        long startTime = System.currentTimeMillis();
-
         FetchedInput fetchedInput = null;
+
         try {
+          long startTime = System.currentTimeMillis();
+
           // pathComponent == srcAttemptId.getPathComponent(), so we compute spillRecord and inputFilePath only once
           if (spillRecord == null) {
             AbstractMap.SimpleEntry<TezSpillRecord, Path> pair = ShuffleUtils.getTezSpillRecordInputFilePath(
@@ -464,7 +465,9 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
             }
           }
           TezIndexRecord indexRecord = spillRecord.getIndex(reduceId);
-          // TODO: continue if !indexRecord.hasData()
+          if (!indexRecord.hasData()) {
+            continue;
+          }
 
           fetchedInput = getLocalFetchedInput(srcAttemptId, pathComponent, indexRecord, inputFilePath);
           if (offsetRecordMap != null) {
