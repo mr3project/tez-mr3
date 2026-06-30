@@ -548,7 +548,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       try {
         ShuffleUtils.shuffleToMemory(memoryFetchedInput.getBytes(),
             inputStream, (int) indexRecord.getRawLength(), (int) indexRecord.getPartLength(), codec,
-            fetcherConfig.ifileReadAhead, fetcherConfig.ifileReadAheadLength, LOG,
+            fetcherConfig.ifileReadAhead, fetcherConfig.ifileReadAheadLength,
             memoryFetchedInput.getInputAttemptIdentifier(), taskContext, true);
         return memoryFetchedInput;
       } catch (IOException | RuntimeException e) {
@@ -799,7 +799,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         if (fetchedInput.getType() == ShuffleClient.Type.MEMORY) {
           ShuffleUtils.shuffleToMemory(((MemoryFetchedInput) fetchedInput).getBytes(),
               input, (int) decompressedLength, (int) compressedLength, codec,
-              fetcherConfig.ifileReadAhead, fetcherConfig.ifileReadAheadLength, LOG,
+              fetcherConfig.ifileReadAhead, fetcherConfig.ifileReadAheadLength,
               fetchedInput.getInputAttemptIdentifier(), taskContext, true);
         } else if (fetchedInput.getType() == ShuffleClient.Type.DISK) {
           ShuffleUtils.shuffleToDisk(((DiskFetchedInput) fetchedInput).getOutputStream(),

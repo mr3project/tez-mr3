@@ -221,7 +221,7 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
       ShuffleUtils.shuffleToMemory(((MemoryFetchedInput) fetchedInput).getBytes(),
           dataProto.getData().newInput(), dataProto.getRawLength(),
           dataProto.getCompressedLength(),
-          codec, ifileReadAhead, ifileReadAheadLength, LOG,
+          codec, ifileReadAhead, ifileReadAheadLength,
           fetchedInput.getInputAttemptIdentifier(), inputContext, false);
       break;
     case WAIT:

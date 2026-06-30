@@ -603,7 +603,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         if (mapOutput.getType() == ShuffleClient.Type.MEMORY) {
           ShuffleUtils.shuffleToMemory(mapOutput.getMemory(), input, (int) decompressedLength,
               (int) compressedLength, codec, fetcherConfig.ifileReadAhead,
-              fetcherConfig.ifileReadAheadLength, LOG,
+              fetcherConfig.ifileReadAheadLength,
               mapOutput.getAttemptIdentifier(), taskContext, true);
         } else if (mapOutput.getType() == ShuffleClient.Type.DISK) {
           ShuffleUtils.shuffleToDisk(mapOutput.getDisk(), host,
