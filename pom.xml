@@ -35,38 +35,39 @@
   </organization>
 
   <properties>
-    <mr3.version>2.0</mr3.version>
-    <scala.version>2.12.18</scala.version>
     <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
-    <hadoop.version>3.4.1</hadoop.version>
-    <slf4j.version>1.7.30</slf4j.version>
     <distMgmtSnapshotsId>apache.snapshots.https</distMgmtSnapshotsId>
     <distMgmtSnapshotsName>Apache Development Snapshot Repository</distMgmtSnapshotsName>
     <distMgmtSnapshotsUrl>https://repository.apache.org/content/repositories/snapshots</distMgmtSnapshotsUrl>
     <distMgmtStagingId>apache.staging.https</distMgmtStagingId>
     <distMgmtStagingName>Apache Release Distribution Repository</distMgmtStagingName>
     <distMgmtStagingUrl>https://repository.apache.org/service/local/staging/deploy/maven2</distMgmtStagingUrl>
-    <protoc.jar.version>3.11.4</protoc.jar.version>
-    <protobuf.version>3.24.4</protobuf.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <scm.url>scm:git:https://git-wip-us.apache.org/repos/asf/tez.git</scm.url>
     <build.time>${maven.build.timestamp}</build.time>
     <shade-maven-plugin.version>3.5.0</shade-maven-plugin.version>
-    <log4j.version>1.2.17</log4j.version>
-    <aws-java-sdk.version>1.12.499</aws-java-sdk.version>
-    <guava.version>22.0</guava.version>
-    <jettison.version>1.5.4</jettison.version>
     <junit.version>4.13.2</junit.version>
-    <snappy.version>1.1.10.4</snappy.version>
     <commons-cli.version>1.5.0</commons-cli.version>
     <commons-codec.version>1.15</commons-codec.version>
     <commons-collections4.version>4.1</commons-collections4.version>
     <commons-compress.version>1.26.0</commons-compress.version>
-    <commons-io.version>2.14.0</commons-io.version>
-    <commons-lang3.version>3.12.0</commons-lang3.version>
-    <commons-text.version>1.10.0</commons-text.version>
+    <commons-io.version>2.16.1</commons-io.version>
+    <commons-lang3.version>3.14.0</commons-lang3.version>
     <commons-math3.version>3.6.1</commons-math3.version>
+    <commons-text.version>1.10.0</commons-text.version>
+    <hadoop.version>3.4.1</hadoop.version>
+    <log4j.version>1.2.17</log4j.version>
+    <guava.version>22.0</guava.version>
+    <jettison.version>1.5.4</jettison.version>
     <netty.version>4.1.127.Final</netty.version>
+    <protobuf.version>3.25.5</protobuf.version>
+    <protoc.jar.version>3.11.4</protoc.jar.version>
+    <roaringbit.version>1.2.1</roaringbit.version>
+    <slf4j.version>1.7.30</slf4j.version>
+    <snappy.version>1.1.10.4</snappy.version>
+    <aws-java-sdk.version>1.12.720</aws-java-sdk.version>
+    <scala.version>2.12.18</scala.version>
+    <mr3.version>2.0</mr3.version>
   </properties>
   <scm>
     <connection>${scm.url}</connection>
@@ -166,7 +167,7 @@
       <dependency>
         <groupId>org.roaringbitmap</groupId>
         <artifactId>RoaringBitmap</artifactId>
-        <version>1.2.1</version>
+        <version>${roaringbit.version}</version>
       </dependency>
       <dependency>
         <groupId>junit</groupId>
@@ -865,16 +866,15 @@
       <id>aws</id>
       <dependencies>
         <dependency>
-          <groupId>com.amazonaws</groupId>
-          <artifactId>aws-java-sdk-bundle</artifactId>
-          <version>${aws-java-sdk.version}</version>
-        </dependency>
-        <dependency>
           <groupId>org.apache.hadoop</groupId>
           <artifactId>hadoop-cloud-storage</artifactId>
           <scope>runtime</scope>
           <version>${hadoop.version}</version>
           <exclusions>
+            <exclusion>
+              <groupId>org.apache.hadoop</groupId>
+              <artifactId>hadoop-huaweicloud</artifactId>
+            </exclusion>
             <exclusion>
               <groupId>org.apache.hadoop</groupId>
               <artifactId>hadoop-cos</artifactId>
@@ -914,6 +914,12 @@
           <artifactId>hadoop-aws</artifactId>
           <scope>runtime</scope>
           <version>${hadoop.version}</version>
+          <exclusions>
+            <exclusion>
+              <groupId>software.amazon.awssdk</groupId>
+              <artifactId>bundle</artifactId>
+            </exclusion>
+          </exclusions>
         </dependency>
       </dependencies>
     </profile>
