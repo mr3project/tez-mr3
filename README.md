@@ -34,9 +34,6 @@ Tez for MR3
 Tez for MR3 is a runtime library derived from Apache Tez and significantly modified
 to support MR3.
 
-* For the runtime library compatible with Apache Hive 4.0.0 on MR3,
-check out [branch `master4.0-java17`](https://github.com/mr3project/tez-mr3/tree/master4.0-java17).
-
 For the full documentation on MR3 (including Quick Start Guide), please visit:
 
   https://mr3docs.datamonad.com/
