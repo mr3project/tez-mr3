@@ -41,7 +41,6 @@ import org.apache.hadoop.io.compress.SnappyCodec;
 import org.apache.hadoop.io.compress.ZStandardCodec;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
-import org.apache.tez.common.security.JobTokenSecretManager;
 import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.FetcherConfigCommon;
@@ -52,6 +51,8 @@ import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.sort.impl.IFileInputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.datamonad.mr3.common.security.JobTokenSecretManager;
 
 import javax.crypto.SecretKey;
 

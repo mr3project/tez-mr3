@@ -21,11 +21,12 @@ package org.apache.tez.http;
 import org.apache.tez.common.Preconditions;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.tez.common.security.JobTokenSecretManager;
 import org.apache.tez.runtime.library.common.security.SecureShuffleUtils;
 import org.apache.tez.runtime.library.common.shuffle.orderedgrouped.ShuffleHeader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.datamonad.mr3.common.security.JobTokenSecretManager;
 
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;

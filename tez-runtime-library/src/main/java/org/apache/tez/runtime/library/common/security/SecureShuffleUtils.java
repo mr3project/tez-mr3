@@ -26,7 +26,8 @@ import javax.crypto.SecretKey;
 import com.google.common.base.Charsets;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.io.WritableComparator;
-import org.apache.tez.common.security.JobTokenSecretManager;
+
+import com.datamonad.mr3.common.security.JobTokenSecretManager;
 
 /**
  * 

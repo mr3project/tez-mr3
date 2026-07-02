@@ -26,7 +26,6 @@ import java.net.URL;
 import java.nio.ByteBuffer;
 
 import org.apache.hadoop.io.DataInputByteBuffer;
-import org.apache.tez.common.security.JobTokenSecretManager;
 import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.http.BaseHttpConnection;
 import org.apache.tez.http.HttpConnection;
@@ -44,6 +43,8 @@ import org.apache.tez.runtime.library.api.Partitioner;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.api.TezTaskOutput;
 import org.apache.tez.runtime.library.common.task.local.output.TezTaskOutputFiles;
+
+import com.datamonad.mr3.common.security.JobTokenSecretManager;
 
 public class TezRuntimeUtils {
 

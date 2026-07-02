@@ -4,8 +4,9 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.tez.common.security.JobTokenSecretManager;
 import org.apache.tez.http.HttpConnectionParams;
+
+import com.datamonad.mr3.common.security.JobTokenSecretManager;
 
 // parameters common to Fetchers
 public class FetcherConfigCommon {
