@@ -146,10 +146,11 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       }
 
       boolean isFetchFromLocal;
-      boolean isFetchFromLocalInternal = false;   // true if inputs originate from the current ContainerWorker
+      boolean isFetchFromLocalInternal = false;   // true if inputs originate from the current process
       if (host.equals(fetcherConfigCommon.localHostName)) {
         isFetchFromLocal = true;
-        isFetchFromLocalInternal = inputHost.getHostPort().getEnvContainerId().equals(
+        // port == 0 iff local mode (where envContainerId's can be different, e.g., L@1 and L@2)
+        isFetchFromLocalInternal = port == 0 || inputHost.getHostPort().getEnvContainerId().equals(
             taskContext.getExecutionContext().getEnvContainerId());
       } else {
         isFetchFromLocal = false;
