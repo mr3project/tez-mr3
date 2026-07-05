@@ -259,9 +259,6 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
   // notify after x records
   private static final int NOTIFY_THRESHOLD = 100_000;
 
-  // uncompressed size for each partition
-  private volatile long spilledSize = 0;
-
   // 'single' implies 'numPartitions == 1' and 'Spill' implies pipelined
   private FSDataOutputStream singlePartitionSpillOutput;
   private SpillPathDetails singlePartitionSpillPathDetails;
@@ -2097,10 +2094,6 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     // onSuccess() is called only for intermediate spills, while finalSpill() calls SpillCallable.call() directly.
     @Override
     public void onSuccess(SpillResult result) {
-      synchronized (UnorderedPartitionedKVWriter.this) {
-        spilledSize += result.spillSize;
-      }
-
       computePartitionStats(result);
 
       if (isPipelinedShuffle) {
