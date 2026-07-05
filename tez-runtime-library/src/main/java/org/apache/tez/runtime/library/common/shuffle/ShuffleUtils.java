@@ -660,8 +660,15 @@ public class ShuffleUtils {
     }
   }
 
-  public static String getUniqueIdentifierSpillId(OutputContext outputContext, int spillId) {
-    return outputContext.getUniqueIdentifier() + "_" + spillId;
+  public static String getPathComponent(OutputContext outputContext, boolean compositeFetch) {
+    return compositeFetch ? outputContext.getUniqueIdentifier() :
+        outputContext.getUniqueIdentifierForOutputFiles();
+  }
+
+  public static String getPathComponentSpillId(OutputContext outputContext,
+      boolean compositeFetch, int spillId) {
+    return compositeFetch ? outputContext.getUniqueIdentifier() + "_" + spillId :
+      outputContext.getUniqueIdentifierForOutputFiles() + "_" + spillId ;
   }
 
   // spillId is not included in pathComponent
@@ -698,8 +705,8 @@ public class ShuffleUtils {
       @Nullable MultiByteArrayOutputStream byteArrayOutput,
       @Nullable Map<Integer, TezOffsetRecord> offsetRecordMap) {
     assert !(outputFilePath != null && byteArrayOutput != null);
-    String pathComponent = ShuffleUtils.getUniqueIdentifierSpillId(outputContext, spillId);
-    String mapId = ShuffleUtils.buildTezShuffleMapId(outputContext.getTaskVertexIndex(), pathComponent);
+    String pathComponent = getPathComponentSpillId(outputContext, true, spillId);
+    String mapId = buildTezShuffleMapId(outputContext.getTaskVertexIndex(), pathComponent);
 
     IndexPathCache indexPathCache = outputContext.getIndexPathCache();
     indexPathCache.add(mapId, outputFilePath, spillRecord.getByteBuffer(), offsetRecordMap);
