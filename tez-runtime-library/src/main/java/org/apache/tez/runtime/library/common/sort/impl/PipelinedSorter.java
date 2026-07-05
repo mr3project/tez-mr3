@@ -479,7 +479,8 @@ public final class PipelinedSorter {
   // if pipelined shuffle is enabled, this method is called to send events for every spill
   private void sendPipelinedShuffleEvents() throws IOException{
     List<Event> events = Lists.newLinkedList();
-    String pathComponent = ShuffleUtils.getUniqueIdentifierSpillId(outputContext, numSpills - 1);
+    String pathComponent = ShuffleUtils.getPathComponentSpillId(
+        outputContext, compositeFetch, numSpills - 1);
     ShuffleUtils.generateEventOnSpill(events, isFinalMergeEnabled, false,
         outputContext, (numSpills - 1), spillInfoList.get(numSpills - 1).spillRecord,
         partitions, pathComponent, partitionStats,
@@ -895,7 +896,8 @@ public final class PipelinedSorter {
 
         for (int i = startIndex; i < endIndex; i++) {
           boolean isLastEvent = (i == numSpills - 1);
-          String pathComponent = (outputContext.getUniqueIdentifier() + "_" + i);
+          String pathComponent = ShuffleUtils.getPathComponentSpillId(
+              outputContext, compositeFetch, i);
           ShuffleUtils.generateEventOnSpill(finalEvents, isFinalMergeEnabled, isLastEvent,
               outputContext, i, spillInfoList.get(i).spillRecord, partitions,
               pathComponent, partitionStats,
@@ -937,7 +939,7 @@ public final class PipelinedSorter {
           LOG.debug(outputContext.getDestinationVertexName() + ": numSpills=" + numSpills);
         }
 
-        String uniqueId = ShuffleUtils.getUniqueIdentifierSpillId(outputContext, 0);
+        String uniqueId = ShuffleUtils.getPathComponentSpillId(outputContext, compositeFetch, 0);
         String pathComponent = compositeFetch ?
             ShuffleUtils.buildTezShuffleMapId(outputContext.getTaskVertexIndex(), uniqueId) : uniqueId;
         // read back TezSpillRecord (which might be on local disk)

@@ -664,6 +664,16 @@ public class ShuffleUtils {
     return outputContext.getUniqueIdentifier() + "_" + spillId;
   }
 
+  public static String getPathComponent(OutputContext outputContext, boolean compositeFetch) {
+    return compositeFetch ? outputContext.getUniqueIdentifier() :
+        outputContext.getUniqueIdentifierForOutputFiles();
+  }
+
+  public static String getPathComponentSpillId(OutputContext outputContext,
+      boolean compositeFetch, int spillId) {
+    return getPathComponent(outputContext, compositeFetch) + "_" + spillId;
+  }
+
   // spillId is not included in pathComponent
   // only one of outputFilePath and byteArrayOutput is valid, and specifies the location of the output
   // should be called only when using tez_shuffle (i.e., compositeFetch == true)

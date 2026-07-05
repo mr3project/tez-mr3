@@ -1298,7 +1298,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
           }
         }
         eventList.add(generateDMEvent(false, -1, false,
-            outputContext.getUniqueIdentifier(), emptyPartitions));
+            ShuffleUtils.getPathComponent(outputContext, compositeFetch), emptyPartitions));
 
         cleanup();
         return eventList;
@@ -1386,7 +1386,8 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
 
   private Event generateDMEvent() throws IOException {
     BitSet emptyPartitions = getEmptyPartitions(numRecordsPerPartition);
-    return generateDMEvent(false, -1, false, outputContext.getUniqueIdentifier(), emptyPartitions);
+    return generateDMEvent(false, -1, false,
+        ShuffleUtils.getPathComponent(outputContext, compositeFetch), emptyPartitions);
   }
 
   private Event generateDMEvent(boolean addSpillDetails, int spillId,
@@ -2025,7 +2026,8 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       BitSet emptyPartitions, long[] sizePerPartition,
       int spillNumber, boolean isFinalUpdate) throws IOException {
     List<Event> eventList = Lists.newLinkedList();
-    String pathComponent = generatePathComponent(outputContext.getUniqueIdentifier(), spillNumber);
+    String pathComponent = generatePathComponent(
+        ShuffleUtils.getPathComponent(outputContext, compositeFetch), spillNumber);
     if (isFinalUpdate) {
       eventList.add(ShuffleUtils.generateVMEvent(outputContext,
           sizePerPartition, reportDetailedPartitionStats(), deflater.get()));
