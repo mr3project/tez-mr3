@@ -140,7 +140,9 @@ public class TezTaskOutputFiles implements TezTaskOutput {
   public Path getOutputFileForWrite() throws IOException {
     Path attemptOutput =
       new Path(getAttemptOutputDir(), Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING);
-    return lDirAlloc.getLocalPathForWrite(attemptOutput.toString(), 0L, conf, false);
+    Path path = lDirAlloc.getLocalPathForWrite(attemptOutput.toString(), 0L, conf, false);
+    LOG.error("Writing shuffle data file: {}", path);
+    return path;
   }
 
   /**
@@ -160,7 +162,9 @@ public class TezTaskOutputFiles implements TezTaskOutput {
     Path attemptIndexOutput =
       new Path(getAttemptOutputDir(), Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING +
                                       Constants.TEZ_RUNTIME_TASK_OUTPUT_INDEX_SUFFIX_STRING);
-    return lDirAlloc.getLocalPathForWrite(attemptIndexOutput.toString(), 0L, conf, false);
+    Path path = lDirAlloc.getLocalPathForWrite(attemptIndexOutput.toString(), 0L, conf, false);
+    LOG.error("Writing shuffle index file: {}", path);
+    return path;
   }
 
   @Override
@@ -176,7 +180,9 @@ public class TezTaskOutputFiles implements TezTaskOutput {
     } else {
       outputPath = new Path(getAttemptOutputDir(), uniqueName);
     }
-    return lDirAlloc.getLocalPathForWrite(outputPath.toString(), 0L, conf, false);
+    Path path = lDirAlloc.getLocalPathForWrite(outputPath.toString(), 0L, conf, false);
+    LOG.error("Writing shuffle data file: {}", path);
+    return path;
   }
 
   /**
@@ -203,7 +209,9 @@ public class TezTaskOutputFiles implements TezTaskOutput {
         + Path.SEPARATOR + Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING
         + Constants.TEZ_RUNTIME_TASK_OUTPUT_INDEX_SUFFIX_STRING;
     }
-    return lDirAlloc.getLocalPathForWrite(outputDirStr, 0L, conf, false);
+    Path path = lDirAlloc.getLocalPathForWrite(outputDirStr, 0L, conf, false);
+    LOG.error("Writing shuffle index file: {}", path);
+    return path;
   }
 
   /**
@@ -229,7 +237,9 @@ public class TezTaskOutputFiles implements TezTaskOutput {
     String dagPath = compositeFetch ?
         new Path(getAttemptOutputDir(), fileName).toString() :
         getDagOutputDir(fileName);
-    return lDirAlloc.getLocalPathForWrite(dagPath, size, conf, false);
+    Path path = lDirAlloc.getLocalPathForWrite(dagPath, size, conf, false);
+    LOG.error("Writing shuffle data file: {}", path);
+    return path;
   }
 
   // do not use size because we can get only approximate size
@@ -238,7 +248,9 @@ public class TezTaskOutputFiles implements TezTaskOutput {
     String namePart = removeFinalExtension(fileName);
     String outputPathString = getDagOutputDir(namePart);
     Path outputPathInit = lDirAlloc.getLocalPathForWrite(outputPathString, 0L, conf, false);
-    return outputPathInit.suffix(Constants.MERGED_OUTPUT_PREFIX + mergeNumber);
+    Path path = outputPathInit.suffix(Constants.MERGED_OUTPUT_PREFIX + mergeNumber);
+    LOG.error("Writing shuffle data file: {}", path);
+    return path;
   }
 
   /**

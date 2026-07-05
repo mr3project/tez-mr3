@@ -216,6 +216,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       // inputsForPathComponents[] is a View, so do not update it
       URL url = ShuffleUtils.constructInputURL(baseURI.toString(), inputsForPathComponents,
           httpConnectionParams.isKeepAlive());
+      LOG.error("{}: Sending shuffle HTTP request: {}", logIdentifier, url);
 
       httpConnection = ShuffleUtils.getHttpConnection(url, httpConnectionParams,
           logIdentifier, fetcherConfigCommon.jobTokenSecretMgr);
