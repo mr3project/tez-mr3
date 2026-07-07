@@ -355,4 +355,7 @@ public interface VertexManagerPluginContext {
 
   boolean canReduceParallelism();
   boolean hasOneToOneOutputEdge();
+
+  // may return null
+  com.datamonad.mr3.DAGAPI.ConfigurationProto getCommonJobConf();
 }
