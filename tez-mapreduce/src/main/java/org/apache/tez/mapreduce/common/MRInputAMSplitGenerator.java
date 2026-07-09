@@ -19,6 +19,7 @@
 package org.apache.tez.mapreduce.common;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.collect.Lists;
@@ -74,7 +75,12 @@ public class MRInputAMSplitGenerator extends InputInitializer {
       for (com.datamonad.mr3.DAGAPI.KeyValueProto kv : commonJobConf.getConfKeyValuesList()) {
         conf.set(kv.getKey(), kv.getValue());
       }
-      conf.addResource(TezUtils.createConfFromByteString(userPayloadProto.getConfigurationBytes()));
+
+      Configuration inputConf = TezUtils.createConfFromByteString(userPayloadProto.getConfigurationBytes());
+      // do not use conf.addResource()
+      for (Map.Entry<String, String> kv : inputConf) {
+        conf.set(kv.getKey(), kv.getValue());
+      }
     } else {
       conf = TezUtils.createConfFromByteString(userPayloadProto.getConfigurationBytes());
     }

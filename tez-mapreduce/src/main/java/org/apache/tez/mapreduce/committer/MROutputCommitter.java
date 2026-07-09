@@ -44,6 +44,7 @@ import org.apache.tez.runtime.api.OutputCommitter;
 import org.apache.tez.runtime.api.OutputCommitterContext;
 
 import java.io.IOException;
+import java.util.Map;
 
 /**
  * Implements the {@link OutputCommitter} and provide Map Reduce compatible
@@ -72,9 +73,17 @@ public class MROutputCommitter extends OutputCommitter {
         jobConf.set(kv.getKey(), kv.getValue());
       }
     }
+
     UserPayload diffUserPayload = getContext().getOutputUserPayload();
     if (diffUserPayload.hasPayload()) {
-      jobConf.addResource(TezUtils.createConfFromUserPayload(diffUserPayload));
+      Configuration vertexConf = TezUtils.createConfFromUserPayload(diffUserPayload);
+      // jobConf.addResource(vertexConf) is wrong because we have to override jobConf, e.g.,
+      //   for mapred.output.committer.class,
+      //   jobConf:  org.apache.hadoop.hive.ql.io.HiveFileFormatUtils$NullOutputCommitter
+      //   vertexConf: org.apache.hadoop.hive.ql.txn.compactor.MRCompactor$CompactorOutputCommitter
+      for (Map.Entry<String, String> kv : vertexConf) {
+        jobConf.set(kv.getKey(), kv.getValue());
+      }
     }
 
     // Read all credentials into the credentials instance stored in JobConf.

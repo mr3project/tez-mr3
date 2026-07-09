@@ -26,6 +26,7 @@ import java.text.NumberFormat;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.tez.common.Preconditions;
@@ -386,8 +387,12 @@ public class MROutput extends AbstractLogicalOutput {
 
     Configuration commonJobConf = getContext().getCommonJobConf(false);
     this.jobConf = new JobConf(commonJobConf);
-    Configuration diff = getContext().getConfigurationFromUserPayload(false);
-    jobConf.addResource(diff);
+
+    Configuration outputConf = getContext().getConfigurationFromUserPayload(false);
+    // do not use jobConf.addResource()
+    for (Map.Entry<String, String> kv : outputConf) {
+      jobConf.set(kv.getKey(), kv.getValue());
+    }
 
     // Add tokens to the jobConf - in case they are accessed within the RW / OF
     jobConf.getCredentials().mergeAll(UserGroupInformation.getCurrentUser().getCredentials());

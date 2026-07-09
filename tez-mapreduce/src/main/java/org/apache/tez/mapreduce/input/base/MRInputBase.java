@@ -40,6 +40,7 @@ import org.apache.tez.runtime.api.InputContext;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 
 public abstract class MRInputBase extends AbstractLogicalInput {
@@ -68,8 +69,12 @@ public abstract class MRInputBase extends AbstractLogicalInput {
 
     Configuration commonJobConf = getContext().getCommonJobConf(false);
     this.jobConf = new JobConf(commonJobConf);
-    Configuration diff = TezUtils.createConfFromByteString(mrUserPayload.getConfigurationBytes());
-    jobConf.addResource(diff);
+
+    Configuration inputConf = TezUtils.createConfFromByteString(mrUserPayload.getConfigurationBytes());
+    // do not use jobConf.addResource()
+    for (Map.Entry<String, String> kv : inputConf) {
+      jobConf.set(kv.getKey(), kv.getValue());
+    }
 
     useNewApi = this.jobConf.getUseNewMapper();
     if (isGrouped) {
