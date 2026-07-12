@@ -84,8 +84,9 @@ public final class UserPayload {
     return version;
   }
 
+  // return true when the payload contains at least one readable byte
   public boolean hasPayload() {
-    return payload != null && payload != EMPTY_BYTE;
+    return payload != null && payload.hasRemaining();
   }
 
   public byte[] deepCopyAsArray() {
