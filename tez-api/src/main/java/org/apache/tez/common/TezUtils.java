@@ -121,7 +121,11 @@ public class TezUtils {
    * @throws java.io.IOException
    */
   public static Configuration createConfFromUserPayload(UserPayload payload) throws IOException {
-    return createConfFromByteString(UnsafeByteOperations.unsafeWrap(payload.getPayload()));
+    if (payload.hasPayload()) {
+      return createConfFromByteString(UnsafeByteOperations.unsafeWrap(payload.getPayload()));
+    } else {
+      return new Configuration(false);
+    }
   }
 
 
