@@ -43,6 +43,7 @@
       <plugin>
         <groupId>com.github.os72</groupId>
         <artifactId>protoc-jar-maven-plugin</artifactId>
+        <version>${protoc.jar.version}</version>
         <executions>
           <execution>
             <phase>generate-sources</phase>
