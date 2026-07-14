@@ -66,22 +66,19 @@ public class MROutputCommitter extends OutputCommitter {
 
   @Override
   public void initialize() throws IOException {
-    jobConf = new JobConf();
-    com.datamonad.mr3.DAGAPI.ConfigurationProto commonJobConf = getContext().getCommonJobConf();
+    OutputCommitterContext outputCommitterContext = getContext();
+    com.datamonad.mr3.DAGAPI.ConfigurationProto commonJobConf = outputCommitterContext.getCommonJobConf();  // can be null
+    UserPayload vertexJobConfDiffUserPayload = outputCommitterContext.getOutputUserPayload();
+    jobConf = new JobConf(false);
     if (commonJobConf != null) {
       for (com.datamonad.mr3.DAGAPI.KeyValueProto kv : commonJobConf.getConfKeyValuesList()) {
         jobConf.set(kv.getKey(), kv.getValue());
       }
     }
-
-    UserPayload diffUserPayload = getContext().getOutputUserPayload();
-    if (diffUserPayload.hasPayload()) {
-      Configuration vertexConf = TezUtils.createConfFromUserPayload(diffUserPayload);
-      // jobConf.addResource(vertexConf) is wrong because we have to override jobConf, e.g.,
-      //   for mapred.output.committer.class,
-      //   jobConf:  org.apache.hadoop.hive.ql.io.HiveFileFormatUtils$NullOutputCommitter
-      //   vertexConf: org.apache.hadoop.hive.ql.txn.compactor.MRCompactor$CompactorOutputCommitter
-      for (Map.Entry<String, String> kv : vertexConf) {
+    if (vertexJobConfDiffUserPayload.hasPayload()) {
+      Configuration vertexJobConf = TezUtils.createConfFromUserPayload(vertexJobConfDiffUserPayload);
+      // jobConf.addResource(vertexConf) is wrong because we have to override jobConf
+      for (Map.Entry<String, String> kv : vertexJobConf) {
         jobConf.set(kv.getKey(), kv.getValue());
       }
     }

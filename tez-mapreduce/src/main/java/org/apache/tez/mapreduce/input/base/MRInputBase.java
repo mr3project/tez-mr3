@@ -67,13 +67,16 @@ public abstract class MRInputBase extends AbstractLogicalInput {
     Preconditions.checkArgument(!mrUserPayload.hasSplits(),
         "Split information not expected in {}", this.getClass().getName());
 
-    Configuration commonJobConf = getContext().getCommonJobConf(false);
-    this.jobConf = new JobConf(commonJobConf);
-
-    Configuration inputConf = TezUtils.createConfFromByteString(mrUserPayload.getConfigurationBytes());
+    InputContext inputContext = getContext();
+    Configuration commonJobConf = inputContext.getCommonJobConf(false);   // not null
+    Configuration vertexJobConfDiff = TezUtils.createConfFromByteString(mrUserPayload.getConfigurationBytes());
+    this.jobConf = new JobConf(false);
+    for (Map.Entry<String, String> kv : commonJobConf) {
+      this.jobConf.set(kv.getKey(), kv.getValue());
+    }
     // do not use jobConf.addResource()
-    for (Map.Entry<String, String> kv : inputConf) {
-      jobConf.set(kv.getKey(), kv.getValue());
+    for (Map.Entry<String, String> kv : vertexJobConfDiff) {
+      this.jobConf.set(kv.getKey(), kv.getValue());
     }
 
     useNewApi = this.jobConf.getUseNewMapper();

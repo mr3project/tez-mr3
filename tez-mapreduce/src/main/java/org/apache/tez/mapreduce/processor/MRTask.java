@@ -24,6 +24,7 @@ import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -128,8 +129,16 @@ public abstract class MRTask extends AbstractLogicalIOProcessor {
             processorContext.getTaskIndex()),
         processorContext.getTaskAttemptNumber());
 
-    Configuration conf = processorContext.getConfigurationFromUserPayload(false);
-    this.jobConf = new JobConf(conf);
+    Configuration commonJobConf = processorContext.getCommonJobConf(false);   // not null
+    Configuration vertexJobConfDiff = processorContext.getConfigurationFromUserPayload(false);
+    this.jobConf = new JobConf(false);
+    for (Map.Entry<String, String> kv : commonJobConf) {
+      this.jobConf.set(kv.getKey(), kv.getValue());
+    }
+    for (Map.Entry<String, String> kv : vertexJobConfDiff) {
+      this.jobConf.set(kv.getKey(), kv.getValue());
+    }
+
     jobConf.set(Constants.TEZ_RUNTIME_TASK_ATTEMPT_ID, taskAttemptId.toString());
     jobConf.set(MRJobConfig.TASK_ATTEMPT_ID, taskAttemptId.toString());
     jobConf.setInt(MRJobConfig.APPLICATION_ATTEMPT_ID, processorContext.getDAGAttemptNumber());

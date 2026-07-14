@@ -385,13 +385,15 @@ public class MROutput extends AbstractLogicalOutput {
     nonTaskNumberFormat.setMinimumIntegerDigits(3);
     nonTaskNumberFormat.setGroupingUsed(false);
 
-    Configuration commonJobConf = getContext().getCommonJobConf(false);
-    this.jobConf = new JobConf(commonJobConf);
-
-    Configuration outputConf = getContext().getConfigurationFromUserPayload(false);
-    // do not use jobConf.addResource()
-    for (Map.Entry<String, String> kv : outputConf) {
-      jobConf.set(kv.getKey(), kv.getValue());
+    OutputContext outputContext = getContext();
+    Configuration commonJobConf = outputContext.getCommonJobConf(false);  // not null
+    Configuration vertexJobConfDiff = outputContext.getConfigurationFromUserPayload(false);
+    this.jobConf = new JobConf(false);
+    for (Map.Entry<String, String> kv : commonJobConf) {
+      this.jobConf.set(kv.getKey(), kv.getValue());
+    }
+    for (Map.Entry<String, String> kv : vertexJobConfDiff) {
+      this.jobConf.set(kv.getKey(), kv.getValue());
     }
 
     // Add tokens to the jobConf - in case they are accessed within the RW / OF

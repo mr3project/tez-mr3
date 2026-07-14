@@ -75,10 +75,9 @@ public class MRInputAMSplitGenerator extends InputInitializer {
       for (com.datamonad.mr3.DAGAPI.KeyValueProto kv : commonJobConf.getConfKeyValuesList()) {
         conf.set(kv.getKey(), kv.getValue());
       }
-
-      Configuration inputConf = TezUtils.createConfFromByteString(userPayloadProto.getConfigurationBytes());
+      Configuration vertexJobConfDiff = TezUtils.createConfFromByteString(userPayloadProto.getConfigurationBytes());
       // do not use conf.addResource()
-      for (Map.Entry<String, String> kv : inputConf) {
+      for (Map.Entry<String, String> kv : vertexJobConfDiff) {
         conf.set(kv.getKey(), kv.getValue());
       }
     } else {
