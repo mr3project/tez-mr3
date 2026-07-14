@@ -85,7 +85,16 @@ public class UnorderedKVInput extends AbstractLogicalInput implements LogicalInp
   @Override
   public synchronized List<Event> initialize() throws Exception {
     Preconditions.checkArgument(getNumPhysicalInputs() != -1, "Number of Inputs has not been set");
-    this.conf = getContext().getConfigurationFromUserPayload(true);
+
+    Configuration commonJobConf = getContext().getCommonJobConf(false);  // not null
+    Configuration vertexJobConfDiff = getContext().getConfigurationFromUserPayload(false);
+    this.conf = new Configuration(false);
+    for (Map.Entry<String, String> kv : commonJobConf) {
+      this.conf.set(kv.getKey(), kv.getValue());
+    }
+    for (Map.Entry<String, String> kv : vertexJobConfDiff) {
+      this.conf.set(kv.getKey(), kv.getValue());
+    }
 
     this.compositeFetch = ShuffleUtils.isTezShuffleHandler(conf);
 

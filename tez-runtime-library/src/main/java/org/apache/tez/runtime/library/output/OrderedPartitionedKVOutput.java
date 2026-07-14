@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.Deflater;
@@ -78,7 +79,16 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput implements
 
   @Override
   public synchronized List<Event> initialize() throws IOException {
-    this.conf = getContext().getConfigurationFromUserPayload(true);
+    Configuration commonJobConf = getContext().getCommonJobConf(false);  // not null
+    Configuration vertexJobConfDiff = getContext().getConfigurationFromUserPayload(false);
+    this.conf = new Configuration(false);
+    for (Map.Entry<String, String> kv : commonJobConf) {
+      this.conf.set(kv.getKey(), kv.getValue());
+    }
+    for (Map.Entry<String, String> kv : vertexJobConfDiff) {
+      this.conf.set(kv.getKey(), kv.getValue());
+    }
+
     this.localFs = (RawLocalFileSystem) FileSystem.getLocal(conf).getRaw();
     // Initializing this parameter in this conf since it is used in multiple
     // places (wherever LocalDirAllocator is used) - TezTaskOutputFiles, TezMerger, etc.

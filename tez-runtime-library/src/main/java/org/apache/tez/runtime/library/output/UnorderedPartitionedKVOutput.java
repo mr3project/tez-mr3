@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -62,7 +63,16 @@ public class UnorderedPartitionedKVOutput extends AbstractLogicalOutput implemen
 
   @Override
   public synchronized List<Event> initialize() throws Exception {
-    this.conf = getContext().getConfigurationFromUserPayload(true);
+    Configuration commonJobConf = getContext().getCommonJobConf(false);  // not null
+    Configuration vertexJobConfDiff = getContext().getConfigurationFromUserPayload(false);
+    this.conf = new Configuration(false);
+    for (Map.Entry<String, String> kv : commonJobConf) {
+      this.conf.set(kv.getKey(), kv.getValue());
+    }
+    for (Map.Entry<String, String> kv : vertexJobConfDiff) {
+      this.conf.set(kv.getKey(), kv.getValue());
+    }
+
     this.conf.setStrings(TezRuntimeFrameworkConfigs.LOCAL_DIRS, getContext().getWorkDirs());
     this.conf.setInt(TezRuntimeFrameworkConfigs.TEZ_RUNTIME_NUM_EXPECTED_PARTITIONS,
         getNumPhysicalOutputs());

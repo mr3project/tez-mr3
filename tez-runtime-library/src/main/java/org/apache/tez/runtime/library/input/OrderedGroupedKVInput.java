@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -89,7 +90,15 @@ public class OrderedGroupedKVInput extends AbstractLogicalInput implements Logic
 
   @Override
   public synchronized List<Event> initialize() throws IOException {
-    this.conf = getContext().getConfigurationFromUserPayload(true);
+    Configuration commonJobConf = getContext().getCommonJobConf(false);  // not null
+    Configuration vertexJobConfDiff = getContext().getConfigurationFromUserPayload(false);
+    this.conf = new Configuration(false);
+    for (Map.Entry<String, String> kv : commonJobConf) {
+      this.conf.set(kv.getKey(), kv.getValue());
+    }
+    for (Map.Entry<String, String> kv : vertexJobConfDiff) {
+      this.conf.set(kv.getKey(), kv.getValue());
+    }
 
     if (this.getNumPhysicalInputs() == 0) {
       getContext().requestInitialMemory(0L, null);
