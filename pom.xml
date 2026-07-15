@@ -208,6 +208,10 @@
             <artifactId>commons-logging</artifactId>
           </exclusion>
           <exclusion>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging-api</artifactId>
+          </exclusion>
+          <exclusion>
             <groupId>org.apache.curator</groupId>
             <artifactId>curator-client</artifactId>
           </exclusion>
@@ -222,10 +226,6 @@
           <exclusion>
             <groupId>javax.servlet</groupId>
             <artifactId>servlet-api</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>commons-logging</groupId>
-            <artifactId>commons-logging-api</artifactId>
           </exclusion>
           <exclusion>
             <groupId>org.eclipse.jetty</groupId>
@@ -472,6 +472,10 @@
             <groupId>com.google.inject</groupId>
             <artifactId>guice</artifactId>
           </exclusion>
+          <exclusion>
+            <groupId>com.google.inject.extensions</groupId>
+            <artifactId>guice-servlet</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -578,6 +582,38 @@
             <groupId>com.sun.jersey</groupId>
             <artifactId>jersey-client</artifactId>
           </exclusion>
+          <exclusion>
+            <groupId>org.apache.curator</groupId>
+            <artifactId>curator-client</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.curator</groupId>
+            <artifactId>curator-framework</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.curator</groupId>
+            <artifactId>curator-recipes</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.fasterxml.jackson.module</groupId>
+            <artifactId>jackson-module-jaxb-annotations</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.microsoft.sqlserver</groupId>
+            <artifactId>mssql-jdbc</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -644,6 +680,26 @@
           <exclusion>
             <groupId>io.netty</groupId>
             <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.fusesource.leveldbjni</groupId>
+            <artifactId>leveldbjni-all</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
