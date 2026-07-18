@@ -69,7 +69,19 @@ public class TezRuntimeUtils {
     } else if (UnorderedKVOutput.CustomPartitioner.class.getName().equals(className)) {
       return new UnorderedKVOutput.CustomPartitioner();
     } else {
-      throw new TezUncheckedException("Unsupported Partitioner class: " + className);
+      // for MR3 testing
+      Class<? extends Partitioner> clazz;
+      Partitioner partitioner;
+      try {
+        clazz = (Class<? extends Partitioner>) conf.getClassByName(className);
+        Constructor<? extends Partitioner> ctorWithConf = clazz.getConstructor(Configuration.class);
+        partitioner = ctorWithConf.newInstance(conf);
+      } catch (ClassNotFoundException e) {
+        throw new IOException("Unable to find Partitioner class specified in config: " + className, e);
+      } catch (Exception e) {
+        throw new IOException(e);
+      }
+      return partitioner;
     }
   }
 
