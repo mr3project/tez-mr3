@@ -332,7 +332,10 @@ public class ShuffleServer implements FetcherCallback {
       LOG.info("New envContainerIdFinished = {}, dagIdIdsInScheduling = {}",
           String.join(", ", envContainerIdsFinished), dagIdIdsInSchedulingStr);
 
-      processEnvContainerIdsFinished(envContainerIdsFinished);
+      // if mapreduce_shuffle, reachability is not affected by envContainerIdFinishedMap[]
+      if (fetcherConfigCommon.compositeFetch) {
+        processEnvContainerIdsFinished(envContainerIdsFinished);
+      }
 
       synchronized (registerLock) {
         if (dagIdIdsInScheduling.isEmpty()) {
@@ -711,7 +714,8 @@ public class ShuffleServer implements FetcherCallback {
   public void addKnownInput(ShuffleClient<?> shuffleClient,
                             String hostName, String containerId, int port,
                             CompositeInputAttemptIdentifier srcAttemptIdentifier, int partitionId) {
-    if (hasContainerIdFinished) {
+    // if mapreduce_shuffle, reachability is not affected by envContainerIdFinishedMap[]
+    if (fetcherConfigCommon.compositeFetch && hasContainerIdFinished) {
       synchronized (registerLock) {
         if (envContainerIdFinishedMap.containsKey(containerId)) {
           LOG.warn("Immediately fail {} because {} is already finished", srcAttemptIdentifier, containerId);
@@ -893,14 +897,14 @@ public class ShuffleServer implements FetcherCallback {
   }
 
   private boolean isInputHostReachable(InputHost inputHost) {
-    if (hasContainerIdFinished) {
+    if (fetcherConfigCommon.compositeFetch && hasContainerIdFinished) {
       synchronized (registerLock) {
         if (envContainerIdFinishedMap.containsKey(inputHost.getHostPort().getEnvContainerId())) {
           return false;
         }
       }
     }
-    return true;
+    return true;  // if mapreduce_shuffle, reachability is not affected by envContainerIdFinishedMap[]
   }
 
   private class FetchFutureCallback implements FutureCallback<FetchResult> {
