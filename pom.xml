@@ -19,7 +19,7 @@
   <groupId>org.apache.tez</groupId>
   <artifactId>tez</artifactId>
   <packaging>pom</packaging>
-  <version>0.9.1.mr3.2.0</version>
+  <version>0.9.1.mr3.3.0</version>
   <name>tez</name>
 
   <licenses>
@@ -67,7 +67,7 @@
     <snappy.version>1.1.10.4</snappy.version>
     <aws-java-sdk.version>1.12.720</aws-java-sdk.version>
     <scala.version>2.12.18</scala.version>
-    <mr3.version>2.0</mr3.version>
+    <mr3.version>3.0</mr3.version>
   </properties>
   <scm>
     <connection>${scm.url}</connection>
