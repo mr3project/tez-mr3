@@ -19,7 +19,6 @@ package org.apache.tez.runtime.library.common.shuffle.orderedgrouped;
 
 import org.apache.tez.common.Preconditions;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.ChecksumFileSystem;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalFileSystem;
@@ -149,8 +148,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
   private final AtomicInteger mergeFileSequenceId = new AtomicInteger(0);
 
-  private final boolean cleanup;
-
   private final boolean useFreeMemoryFetchedInput;
   private final long freeMemoryThreshold;   // minimum size of free memory for useFreeMemoryFetchedInput
   private final long freeMemoryLimit;       // free memory that can be assigned to this LogicalInput
@@ -201,9 +198,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
     this.numMemToDiskMerges = inputContext.getCounters().findCounter(TaskCounter.MERGE_NUM_MEM_TO_DISK_MERGES);
     this.additionalSpillBytesWritten = inputContext.getCounters().findCounter(TaskCounter.SPILL_BYTES_DISK);
     this.additionalSpillBytesRead = inputContext.getCounters().findCounter(TaskCounter.SPILL_BYTES_READ_ADDITIONAL);
-
-    this.cleanup = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT,
-        TezRuntimeConfiguration.TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT_DEFAULT);
 
     this.codec = codec;
     this.ifileReadAhead = ifileReadAheadEnabled;
@@ -653,11 +647,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
           TezRawKeyValueIterator kvIter = finalMerge(conf, rfs, memory, disk);
           return kvIter;
         } catch (InterruptedException e) {
-          // Clean up the disk segments
-          if (cleanup) {
-            cleanup(localFS, disk);
-            cleanup(localFS, onDiskMapOutputs);
-          }
           Thread.currentThread().interrupt(); //reset interrupt status
           throw e;
         }
@@ -668,24 +657,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
   public boolean isShutdown() {
     return isShutdown.get();
-  }
-
-  static void cleanup(FileSystem fs, Collection<FileChunk> fileChunkList) {
-    for (FileChunk fileChunk : fileChunkList) {
-      cleanup(fs, fileChunk.getPath());
-    }
-  }
-
-  static void cleanup(FileSystem fs, Path path) {
-    if (path == null) {
-      return;
-    }
-
-    try {
-      fs.delete(path, true);
-    } catch (IOException e) {
-      LOG.warn("Error in deleting {}", path);
-    }
   }
 
   /**
@@ -800,12 +771,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       // Note the output of the merge
       closeInMemoryMergedFile(mergedMapOutputs);
     }
-
-    @Override
-    public void cleanup(List<MapOutput> inputs, boolean deleteData)
-        throws IOException, InterruptedException {
-      //No OP
-    }
   }
   
   /**
@@ -902,17 +867,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       // Note the output of the merge
       closeOnDiskFile(new FileChunk(outputPath, 0, outFileLen));
     }
-
-    @Override
-    public void cleanup(List<MapOutput> inputs, boolean deleteData) {
-      if (deleteData) {
-        // Additional check at task level
-        if (cleanup) {
-          LOG.info("Try deleting stale data: {}", outputPath);
-          MergeManager.cleanup(localFS, outputPath);
-        }
-      }
-    }
   }
 
   /**
@@ -1004,18 +958,6 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
       LOG.info("{} Finished merging {} map output files on disk. Local output file is {} of size {}",
           inputContext.getSourceVertexName(), inputs.size(), outputPath, outputLen);
-    }
-
-    @Override
-    public void cleanup(List<FileChunk> inputs, boolean deleteData) throws IOException, InterruptedException {
-      if (deleteData) {
-        // Additional check at task level
-        if (cleanup) {
-          LOG.info("Try deleting stale chunks and data: {}", outputPath);
-          MergeManager.cleanup(localFS, inputs);
-          MergeManager.cleanup(localFS, outputPath);
-        }
-      }
     }
   }
   

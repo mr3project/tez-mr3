@@ -243,15 +243,6 @@ public class TezRuntimeConfiguration {
     TEZ_RUNTIME_PREFIX + "pipelined-shuffle.ordered.enabled";
   public static final boolean TEZ_RUNTIME_PIPELINED_SHUFFLE_ORDERED_ENABLED_DEFAULT = false;
 
-  /**
-   * Used only for internal testing. Strictly not recommended to be used elsewhere. This
-   * parameter could be changed/dropped later.
-   */
-  @ConfigurationProperty(type = "boolean")
-  public static final String TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT =
-      TEZ_RUNTIME_PREFIX + "cleanup.files.on.interrupt";
-  public static final boolean TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT_DEFAULT = false;
-
   @ConfigurationProperty(type = "boolean")
   public static final String TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT =
       TEZ_RUNTIME_PREFIX + "use.free.memory.fetched.input";
@@ -435,7 +426,6 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_MAX_SIZE);
     tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SHUFFLE_UNORDERED_ENABLED);
     tezRuntimeKeys.add(TEZ_RUNTIME_PIPELINED_SHUFFLE_ORDERED_ENABLED);
-    tezRuntimeKeys.add(TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT);
     tezRuntimeKeys.add(TEZ_RUNTIME_USE_FREE_MEMORY_FETCHED_INPUT);
     tezRuntimeKeys.add(TEZ_RUNTIME_FREE_MEMORY_FACTOR_FOR_FETCHED_INPUT);
     tezRuntimeKeys.add(TEZ_RUNTIME_SHUFFLE_UNORDERED_MEMORY_STREAMING);

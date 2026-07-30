@@ -53,16 +53,8 @@ abstract class MergeThread<T> extends Thread {
     closed = true;
     if (!Thread.currentThread().isInterrupted()) {
       waitForMerge();
-      interrupt();
-    } else {
-      try {
-        interrupt();
-        cleanup(inputs, Thread.currentThread().isInterrupted());
-      } catch (IOException e) {
-        //ignore
-        LOG.warn("Error cleaning up", e);
-      }
     }
+    interrupt();
   }
 
   public void setParentThread(Thread shuffleSchedulerThread) {
@@ -142,8 +134,5 @@ abstract class MergeThread<T> extends Thread {
   }
 
   public abstract void merge(List<T> inputs) 
-      throws IOException, InterruptedException;
-
-  public abstract void cleanup(List<T> inputs, boolean deleteData)
       throws IOException, InterruptedException;
 }

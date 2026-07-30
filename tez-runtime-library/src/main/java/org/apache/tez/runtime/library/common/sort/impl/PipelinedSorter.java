@@ -87,7 +87,6 @@ public final class PipelinedSorter {
   private final long[] partitionStats;
 
   private int numSpills;
-  private final boolean cleanup;
   private final long assignedMemoryMb;
   private final Partitioner partitioner;
   private final CompressionCodec codec;
@@ -197,8 +196,6 @@ public final class PipelinedSorter {
     this.partitionStats = reportPartitionStats.isEnabled() ? (new long[partitions]) : null;
 
     this.numSpills = 0;
-    this.cleanup = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT,
-        TezRuntimeConfiguration.TEZ_RUNTIME_CLEANUP_FILES_ON_INTERRUPT_DEFAULT);
 
     if (isDebugEnabled) {
       LOG.debug(outputContext.getDestinationVertexName() + ": Initial Mem bytes : " +
@@ -805,9 +802,6 @@ public final class PipelinedSorter {
   private boolean isThreadInterrupted() throws IOException {
     if (Thread.currentThread().isInterrupted()) {
       cancelActiveSortTasks();
-      if (cleanup) {
-        cleanup();
-      }
       return true;
     }
     return false;
@@ -842,10 +836,8 @@ public final class PipelinedSorter {
   }
 
   synchronized public void flush() throws IOException {
-    /**
-     * Possible that the thread got interrupted when flush was happening or when the flush was
-     * never invoked. As a part of cleanup activity in TezTaskRunner, it would invoke close()
-     * on all I/O. At that time, this is safe to cleanup
+    /*
+     * Possible that the thread got interrupted when flush was happening or when the flush was never invoked.
      */
     if (isThreadInterrupted()) {
       return;
@@ -1098,9 +1090,6 @@ public final class PipelinedSorter {
       spillInfoList.clear();
     } catch(InterruptedException ie) {
       cancelActiveSortTasks();
-      if (cleanup) {
-        cleanup();
-      }
       Thread.currentThread().interrupt();
       throw new IOInterruptedException("Interrupted while closing Output", ie);
     }
@@ -1158,40 +1147,6 @@ public final class PipelinedSorter {
 
   public int getNumSpills() {
     return numSpills;
-  }
-
-  private synchronized void cleanup() throws IOException {
-    if (!cleanup) {
-      return;
-    }
-    cleanup(spillFilePaths);
-    cleanup(finalOutputFile);
-
-    if (writeSpillRecord) {
-      cleanup(spillFileIndexPaths);
-      cleanup(finalIndexFile);
-    }
-  }
-
-  private synchronized void cleanup(Path path) {
-    if (path == null || !cleanup) {
-      return;
-    }
-    try {
-      LOG.info("Deleting " + path);
-      localFs.delete(path, true);
-    } catch (IOException ioe) {
-      LOG.warn("Error in deleting " + path);
-    }
-  }
-
-  private synchronized void cleanup(Map<Integer, Path> spillMap) {
-    if (!cleanup) {
-      return;
-    }
-    for (Map.Entry<Integer, Path> entry : spillMap.entrySet()) {
-      cleanup(entry.getValue());
-    }
   }
 
   public long[] getPartitionStats() {
