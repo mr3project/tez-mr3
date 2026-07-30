@@ -28,7 +28,6 @@ Below we describe the configuration keys for Tez runtime in MR3.
 |tez.shuffle-vertex-manager.min-src-fraction|0.25|Fraction of source Tasks that should complete before scheduling Tasks in a Vertex with a ScatterGather edge.|
 |tez.shuffle-vertex-manager.max-src-fraction|0.75|Fraction of source Tasks at which all Tasks in a Vertex with a ScatterGather edge can be scheduled. Between the minimum and maximum fractions, the number of Tasks ready for scheduling increases linearly.|
 |tez.shuffle-vertex-manager.use-stats-auto-parallelism|false|**true**: analyze input statistics when applying auto parallelism. **false**: do not use input statistics.|
-|tez.shuffle.vertex.manager.auto.parallelism.min.percent|20|Lower limit when normalizing input statistics. For example, if the value is set to 20, input statistics are normalized between 20 and 100. That is, an input size of zero is normalized to 20 while the maximum input size is mapped to 100.|
 
 ## Runtime data comparison and partitioning
 
@@ -76,7 +75,7 @@ Below we describe the configuration keys for Tez runtime in MR3.
 
 |**Name**|**Default value**|Description|
 |--------|:----------------|:----------|
-|tez.runtime.pipelined-shuffle.enabled|false|**true**: use pipelined shuffling for unordered output. **false**: do not use pipelined shuffling for unordered output. If set to true/false, `tez.runtime.enable.final-merge.in.output` is automatically set to false/true, respectively. Using speculative execution with pipelined shuffling is not recommended.|
+|tez.runtime.pipelined-shuffle.enabled|false|**true**: use pipelined shuffling for unordered output. **false**: do not use pipelined shuffling for unordered output. If set to true/false, `tez.runtime.enable.final-merge.in.output` is automatically set to false/true, respectively.|
 |tez.runtime.pipelined-shuffle.ordered.enabled|false|**true**: use pipelined shuffling for ordered output. **false**: do not use pipelined shuffling for ordered output.|
 |tez.runtime.transfer.data-via-events.enabled|true|**true**: embed unordered data directly in messages of type `DataMovementEvent`. **false**: do not embed unordered data. Effective only for Vertexes with a single output partition.|
 |tez.runtime.transfer.data-via-events.max-size|2048|Maximum size in bytes of unordered data that can be embedded directly in a `DataMovementEvent`.|
@@ -88,7 +87,7 @@ Below we describe the configuration keys for Tez runtime in MR3.
 |tez.runtime.use.free.memory.fetched.input|false|**true**: if enough free memory is available, fetchers keep shuffle input in memory instead of spilling to local disks. **false**: fetchers do not consider the size of free memory.|
 |tez.runtime.free.memory.factor.for.fetched.input|1.0|Multiplier used in calculating the total amount of free memory for storing shuffle input data per LogicalInput.|
 |tez.runtime.shuffle.unordered.memory.streaming|false|**true**: fetchers do not write unordered data to local disks. **false**: fetchers may write unordered data to local disks.|
-|tez.runtime.use.free.memory.writer.output|false|**true**: if enough free memory is available, Tasks store their output in memory instead of writing to local disks. **false**: Tasks write their output to local disks. If set to true, set `hive.mr3.delete.vertex.local.directory` to true in `hive-site.xml`. Effective only with pipelined shuffling.|
+|tez.runtime.use.free.memory.writer.output|false|**true**: if enough free memory is available, Tasks store their output in memory instead of writing to local disks. **false**: Tasks write their output to local disks. If set to true, set `hive.mr3.delete.vertex.local.directory` to true in `hive-site.xml`.|
 |tez.runtime.free.memory.writer.output.threshold.mb|6144|Free memory threshold in MB for writing output in memory when `tez.runtime.use.free.memory.writer.output` is set to true.|
 
 ## ShuffleServer and fetchers
@@ -137,3 +136,22 @@ Below we describe the configuration keys for Tez runtime in MR3.
 |tez.runtime.shuffle.stuck.fetcher.threshold.millis|2500|Elapsed time in milliseconds for a fetcher before triggering backpressure and blocking further connections to the shuffle handler.|
 |tez.runtime.shuffle.stuck.fetcher.release.millis|10000|Elapsed time in milliseconds after which backpressure is lifted, resuming the creation of fetchers that contact the previously blocked shuffle handler.|
 |tez.runtime.shuffle.max.speculative.fetch.attempts|2|Maximum number of speculative fetchers for each fetch attempt.|
+
+## Configuration keys fixed per application
+
+The following configuration keys are read when starting ShuffleServer and are fixed for all DAGs
+in the same application. They cannot be changed for each DAG's LogicalInput or LogicalOutput.
+
+* `tez.runtime.shuffle.total.parallel.copies`
+* `tez.runtime.shuffle.fetch.max.task.output.at.once`
+* `tez.runtime.shuffle.ranges.scheme`
+* `tez.runtime.shuffle.connection.fail.all.input`
+* `tez.runtime.shuffle.connect.timeout`
+* `tez.runtime.shuffle.keep-alive.enabled`
+* `tez.runtime.shuffle.keep-alive.max.connections`
+* `tez.runtime.shuffle.read.timeout`
+* `tez.runtime.shuffle.buffersize`
+* `tez.runtime.shuffle.ssl.enable`
+* `tez.runtime.shuffle.fetch.verify-disk-checksum`
+* `tez.runtime.optimize.local.fetch`
+* `tez.runtime.optimize.local.fetch.ordered`
