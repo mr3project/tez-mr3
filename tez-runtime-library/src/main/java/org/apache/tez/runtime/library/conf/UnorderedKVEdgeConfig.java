@@ -34,8 +34,7 @@ import org.apache.tez.runtime.library.output.UnorderedKVOutput;
 /**
  * Configure payloads for the UnorderedKVOutput and UnorderedKVInput pair </p>
  *
- * Values will be picked up from tez-site if not specified, otherwise defaults from
- * {@link org.apache.tez.runtime.library.api.TezRuntimeConfiguration} will be used.
+ * Component payloads contain only configuration explicitly supplied to the builder.
  */
 public class UnorderedKVEdgeConfig extends KeyValuesBasedBaseEdgeConfig {
 
@@ -150,8 +149,7 @@ public class UnorderedKVEdgeConfig extends KeyValuesBasedBaseEdgeConfig {
 
     @Override
     /**
-     * Edge config options are derived from client-side tez-site.xml (recommended).
-     * Optionally invoke setFromConfiguration to override these config options via commandline arguments.
+     * Add qualifying edge configuration options from the supplied configuration.
      *
      * @param conf
      * @return this object for further chained method calls

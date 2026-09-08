@@ -21,7 +21,6 @@
 package org.apache.tez.runtime.library.conf;
 
 import java.io.IOException;
-import java.util.Map;
 import java.util.Objects;
 
 import org.apache.tez.common.Preconditions;
@@ -36,8 +35,8 @@ import org.apache.tez.runtime.library.output.OrderedPartitionedKVOutput;
 /**
  * Configure {@link org.apache.tez.runtime.library.output.OrderedPartitionedKVOutput} </p>
  * 
- * Values will be picked up from tez-site if not specified, otherwise defaults from
- * {@link org.apache.tez.runtime.library.api.TezRuntimeConfiguration} will be used.
+ * The payload contains only configuration explicitly supplied to the builder and the
+ * partitioner class supplied as a builder argument.
  */
 public class OrderedPartitionedKVOutputConfig {
 
@@ -75,15 +74,7 @@ public class OrderedPartitionedKVOutputConfig {
      * @param partitionerClassName the partitioner class name
      */
     Builder(String keyClassName, String valueClassName, String partitionerClassName) {
-      this();
       setPartitioner(partitionerClassName);
-    }
-
-    Builder() {
-      Map<String, String> tezDefaults = ConfigUtils.extractConfigurationMap(
-          TezRuntimeConfiguration.getTezRuntimeConfigDefaults(),
-          OrderedPartitionedKVOutput.getConfigurationKeySet());
-      ConfigUtils.addConfigMapToConfiguration(this.conf, tezDefaults);
     }
 
     Builder setPartitioner(String partitionerClassName) {
@@ -125,4 +116,3 @@ public class OrderedPartitionedKVOutputConfig {
     }
   }
 }
-
