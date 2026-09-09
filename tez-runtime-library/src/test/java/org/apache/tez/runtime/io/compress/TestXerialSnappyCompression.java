@@ -22,6 +22,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.lang.reflect.Proxy;
 import java.util.Arrays;
 import java.util.Random;
 
@@ -32,6 +33,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.api.CompressorPool;
 import org.apache.tez.runtime.api.DecompressorPool;
+import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.library.common.sort.impl.IFile;
 import org.junit.Test;
 
@@ -161,7 +163,7 @@ public class TestXerialSnappyCompression {
 
     byte[] raw = new byte[(int) writer.getRawLength()];
     IFile.Reader.readToMemory(raw, new ByteArrayInputStream(physical.toByteArray()),
-        physical.size(), new SnappyCodec(), false, 0, pool, false);
+        physical.size(), new SnappyCodec(), false, 0, taskContext(pool), false);
     assertEquals(1, pool.borrowedDecompressors);
     assertEquals(1, pool.returnedDecompressors);
     assertArrayEquals(Arrays.copyOf(IFile.HEADER, 3), Arrays.copyOf(raw, 3));
@@ -279,6 +281,21 @@ public class TestXerialSnappyCompression {
       decompressor.reset();
       returnedDecompressors++;
     }
+  }
+
+  private static TaskContext taskContext(TrackingPool pool) {
+    return (TaskContext) Proxy.newProxyInstance(
+        TaskContext.class.getClassLoader(), new Class<?>[] {TaskContext.class},
+        (proxy, method, arguments) -> {
+          if ("getDecompressor".equals(method.getName())) {
+            return pool.getDecompressor((CompressionAlgorithm) arguments[0]);
+          }
+          if ("returnDecompressor".equals(method.getName())) {
+            pool.returnDecompressor((Decompressor) arguments[0]);
+            return null;
+          }
+          throw new UnsupportedOperationException(method.getName());
+        });
   }
 
   private interface CheckedRunnable {
