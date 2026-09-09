@@ -389,7 +389,6 @@ public class IFile {
     void setupOutputStream(CompressionCodec codec) throws IOException {
       this.checksumOut = new IFileOutputStream(this.rawOut);
       if (codec != null) {
-        boolean borrowed = compressorExternal == null;
         if (compressorExternal != null) {
           this.compressor = compressorExternal;
         } else {
@@ -399,18 +398,10 @@ public class IFile {
           throw new IOException("Compressor pool returned null for "
               + CompressionResolver.resolveAlgorithm(codec));
         }
-        try {
-          this.compressor.reset();
-          this.compressedOut = CodecUtils.createOutputStream(codec, checksumOut, compressor);
-          this.out = new DataOutputStream(this.compressedOut);
-          this.compressOutput = true;
-        } catch (IOException | RuntimeException e) {
-          if (borrowed) {
-            taskContext.returnCompressor(compressor);
-            compressor = null;
-          }
-          throw e;
-        }
+        this.compressor.reset();
+        this.compressedOut = CodecUtils.createOutputStream(codec, checksumOut, compressor);
+        this.out = new DataOutputStream(this.compressedOut);
+        this.compressOutput = true;
       } else {
         this.out = new DataOutputStream(checksumOut);
       }
