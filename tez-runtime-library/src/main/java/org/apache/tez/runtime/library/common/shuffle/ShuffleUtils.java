@@ -145,12 +145,18 @@ public class ShuffleUtils {
         // The codec for lz0,lz4,snappy,bz2,etc. throw java.lang.InternalError
         // on decompression failures. Catching and re-throwing as IOException
         // to allow fetch failure logic to be processed.
-        throw new IOException(e);
+        throw new IOException("Codec internal error while decompressing shuffle input " + identifier
+            + " into memory; compressed length=" + compressedLength
+            + ", decompressed length=" + decompressedLength, e);
       } else if (e instanceof IOException) {
-        throw e;
+        throw new IOException("I/O failure while reading or decompressing shuffle input " + identifier
+            + " into memory; compressed length=" + compressedLength
+            + ", decompressed length=" + decompressedLength, e);
       } else {
         // Re-throw as an IOException
-        throw new IOException(e);
+        throw new IOException("Error while reading or decompressing shuffle input " + identifier
+            + " into memory; compressed length=" + compressedLength
+            + ", decompressed length=" + decompressedLength, e);
       }
     }
   }

@@ -34,6 +34,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.FetcherConfigCommon;
@@ -171,7 +172,9 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         // set the status back
         Thread.currentThread().interrupt();
       } catch (Throwable t) {
-        exceptionReporter.reportException(t);
+        exceptionReporter.reportException(new TezUncheckedException(
+            "Ordered shuffle fetcher " + logIdentifier + " failed while fetching inputs from "
+                + inputHost.getHostPort() + " for shuffle client " + shuffleClientId, t));
         // Shuffle knows how to deal with failures post shutdown via the onFailure hook
       }
 
@@ -578,7 +581,13 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
             // Kill the reduce attempt
             shuffleErrorCounterGroup.ioErrs.increment(1);
             LOG.error("{}: Shuffle failed because of a local error", logIdentifier, e);
-            exceptionReporter.reportException(e);
+            exceptionReporter.reportException(new IOException(
+                "Failed to reserve local shuffle storage for ordered input " + srcAttemptId
+                    + "; compressed length=" + compressedLength
+                    + ", decompressed length=" + decompressedLength
+                    + ", host=" + inputHost.getHostPort()
+                    + ", fetcher=" + logIdentifier,
+                e));
           } else {
             if (isDebugEnabled) {
               LOG.debug("Already stopped. Ignoring error from merger.reserve");
@@ -612,8 +621,8 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
               fetcherConfig.ifileReadAhead, fetcherConfig.ifileReadAheadLength,
               fetcherConfigCommon.verifyDiskChecksum);
         } else {
-          throw new IOException("Unknown mapOutput type while fetching shuffle data:" +
-              mapOutput.getType());
+          throw new IOException("Cannot fetch ordered shuffle input " + srcAttemptId + " from "
+              + inputHost.getHostPort() + ": " + mapOutput.getType());
         }
 
         // Inform the shuffle scheduler
@@ -791,7 +800,8 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
     org.apache.tez.runtime.api.MultiByteArrayOutputStream byteArrayOutput =
         taskContext.getConcurrentByteCache().get(pathComponent);
     if (byteArrayOutput == null) {
-      throw new IOException("ConcurrentByteCache not found for pathComponent=" + pathComponent);
+      throw new IOException("Cannot directly fetch ordered shuffle input " + srcAttemptId
+          + " because concurrent byte-cache entry " + pathComponent + " is missing");
     }
     InputStream inputStream = byteArrayOutput.createInputStreamFrom(
         indexRecord.getStartOffset(), indexRecord.getPartLength());

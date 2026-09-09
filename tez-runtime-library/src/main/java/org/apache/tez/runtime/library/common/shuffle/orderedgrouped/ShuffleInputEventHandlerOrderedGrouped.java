@@ -99,7 +99,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
       try {
         shufflePayload = DataMovementEventPayloadProto.parseFrom(UnsafeByteOperations.unsafeWrap(dmEvent.getUserPayload()));
       } catch (InvalidProtocolBufferException e) {
-        throw new TezUncheckedException("Unable to parse DataMovementEvent payload", e);
+        throw new TezUncheckedException("Unable to parse shuffle payload for " + dmEvent, e);
       }
       BitSet emptyPartitionsBitSet = null;
       if (shufflePayload.hasEmptyPartitions()) {
@@ -107,7 +107,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
           byte[] emptyPartitions = TezCommonUtils.decompressByteStringToByteArray(shufflePayload.getEmptyPartitions(), inflater);
           emptyPartitionsBitSet = TezUtilsInternal.fromByteArray(emptyPartitions);
         } catch (IOException e) {
-          throw new TezUncheckedException("Unable to set the empty partition to succeeded", e);
+          throw new TezUncheckedException("Unable to decompress or decode empty-partitions metadata from " + dmEvent, e);
         }
       }
       processDataMovementEvent(dmEvent, shufflePayload, emptyPartitionsBitSet);
@@ -117,7 +117,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
       try {
         shufflePayload = DataMovementEventPayloadProto.parseFrom(UnsafeByteOperations.unsafeWrap(crdme.getUserPayload()));
       } catch (InvalidProtocolBufferException e) {
-        throw new TezUncheckedException("Unable to parse DataMovementEvent payload", e);
+        throw new TezUncheckedException("Unable to parse shuffle payload for " + crdme, e);
       }
       BitSet emptyPartitionsBitSet = null;
       if (shufflePayload.hasEmptyPartitions()) {
@@ -125,7 +125,7 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
           byte[] emptyPartitions = TezCommonUtils.decompressByteStringToByteArray(shufflePayload.getEmptyPartitions(), inflater);
           emptyPartitionsBitSet = TezUtilsInternal.fromByteArray(emptyPartitions);
         } catch (IOException e) {
-          throw new TezUncheckedException("Unable to set the empty partition to succeeded", e);
+          throw new TezUncheckedException("Unable to decompress or decode empty-partitions metadata from " + crdme, e);
         }
       }
       if (compositeFetch) {
@@ -173,7 +173,8 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
           return;
         }
       } catch (IOException e) {
-        throw new TezUncheckedException("Unable to set the empty partition to succeeded", e);
+        throw new TezUncheckedException("Unable to register empty source partition " + partitionId
+            + " as complete for " + srcAttemptIdentifier, e);
       }
     }
     int port = getShufflePort(shufflePayload, dmEvent.getTargetIndex());
@@ -268,4 +269,3 @@ public class ShuffleInputEventHandlerOrderedGrouped implements ShuffleEventHandl
     return srcAttemptIdentifier;
   }
 }
-

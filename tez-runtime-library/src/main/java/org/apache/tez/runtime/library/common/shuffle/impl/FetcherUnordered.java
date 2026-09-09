@@ -541,7 +541,8 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         org.apache.tez.runtime.api.MultiByteArrayOutputStream byteArrayOutput =
             taskContext.getConcurrentByteCache().get(pathComponent);
         if (byteArrayOutput == null) {
-          throw new IOException("ConcurrentByteCache not found for pathComponent=" + pathComponent);
+          throw new IOException("Cannot directly fetch unordered shuffle input " + srcAttemptId
+              + " because concurrent byte-cache entry " + pathComponent + " is missing");
         }
         inputStream = byteArrayOutput.createInputStreamFrom(
             indexRecord.getStartOffset(), indexRecord.getPartLength());
@@ -567,7 +568,8 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       org.apache.tez.runtime.api.MultiByteArrayOutputStream byteArrayOutput =
           taskContext.getConcurrentByteCache().get(pathComponent);
       if (byteArrayOutput == null) {
-        throw new IOException("ConcurrentByteCache not found for pathComponent=" + pathComponent);
+        throw new IOException("Cannot directly fetch unordered shuffle input " + srcAttemptId
+            + " because concurrent byte-cache entry " + pathComponent + " is missing");
       }
       InputStream inputStream = byteArrayOutput.createInputStreamFrom(
           indexRecord.getStartOffset(), indexRecord.getPartLength());
@@ -808,8 +810,8 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
               fetchedInput.getInputAttemptIdentifier(),
               fetcherConfig.ifileReadAhead, fetcherConfig.ifileReadAheadLength, fetcherConfigCommon.verifyDiskChecksum);
         } else {
-          throw new TezUncheckedException("Bad fetchedInput type while fetching shuffle data " +
-              fetchedInput);
+          throw new TezUncheckedException("Cannot fetch unordered shuffle input " + srcAttemptId
+              + " from " + host + ": " + fetchedInput.getType());
         }
 
         // Inform the shuffle scheduler

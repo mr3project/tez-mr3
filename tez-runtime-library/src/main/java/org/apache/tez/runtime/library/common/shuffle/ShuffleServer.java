@@ -289,7 +289,9 @@ public class ShuffleServer implements FetcherCallback {
 
     synchronized (throwableLock) {
       if (throwableFromFetcherOnFailure != null) {
-        throw new TezUncheckedException(throwableFromFetcherOnFailure);
+        throw new TezUncheckedException(
+            "Shuffle server " + serverName + " terminated because a fetcher failed",
+            throwableFromFetcherOnFailure);
       }
     }
   }
