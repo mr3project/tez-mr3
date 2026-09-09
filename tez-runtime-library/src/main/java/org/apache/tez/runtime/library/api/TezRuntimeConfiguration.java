@@ -17,15 +17,10 @@
  */
 package org.apache.tez.runtime.library.api;
 
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.tez.common.annotation.ConfigurationProperty;
-import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.dag.api.TezConstants;
 
 import static org.apache.tez.dag.api.TezConfiguration.TEZ_AM_PREFIX;
@@ -37,11 +32,8 @@ public class TezRuntimeConfiguration {
   // We allow only keys in tezRuntimeKeys[] to be updated at runtime by users.
   // tezRuntimeKeys[] = sum of confKeys[] in:
   //   OrderedGroupedKVInput, UnorderedKVInput, OrderedPartitionedKVOutput, UnorderedKVOutput, UnorderedPartitionedKVOutput
+  // TODO: currently used only for documentation and not used
   private static final Set<String> tezRuntimeKeys = new HashSet<String>();
-  private static final Set<String> umnodifiableTezRuntimeKeySet;
-
-  // from tez-site.xml, in tezRuntimeKeys
-  private static final Map<String, String> tezSiteXmlRuntimeConfMap = new HashMap<String, String>();
 
   //
   // constants
@@ -438,31 +430,6 @@ public class TezRuntimeConfiguration {
     tezRuntimeKeys.add(TEZ_RUNTIME_UNORDERED_NON_PIPELINED_SPILL_COMPRESS);
     tezRuntimeKeys.add(TEZ_RUNTIME_COMPRESS);
     tezRuntimeKeys.add(TEZ_RUNTIME_COMPRESS_CODEC);
-
-    // Do not keep defaultConf as a static member because it holds a reference to ClassLoader
-    // of the Thread that is active at the time of loading this class. The active Thread usually
-    // belongs to a running DAG, so keeping defaultConf gives rise to memory leak of DAGClassLoader.
-    Configuration defaultConf = new Configuration(false);
-
-    // Tez runtime uses only Tez configurations.
-    //  - do not include core-site.xml.
-    //  - do not use 'allowed prefixes'
-    defaultConf.addResource(TezConfiguration.TEZ_SITE_XML);
-
-    for (Map.Entry<String, String> confEntry : defaultConf) {
-      if (tezRuntimeKeys.contains(confEntry.getKey())) {
-        tezSiteXmlRuntimeConfMap.put(confEntry.getKey(), confEntry.getValue());
-      }
-    }
-    umnodifiableTezRuntimeKeySet = Collections.unmodifiableSet(tezRuntimeKeys);
-  }
-
-  public static Set<String> getTezRuntimeConfigKeySet() {
-    return umnodifiableTezRuntimeKeySet;
-  }
-
-  public static Map<String, String> getTezRuntimeConfigDefaults() {
-    return Collections.unmodifiableMap(tezSiteXmlRuntimeConfMap);
   }
 
   public enum ReportPartitionStats {

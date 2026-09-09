@@ -36,8 +36,8 @@ import org.apache.tez.runtime.library.output.OrderedPartitionedKVOutput;
 /**
  * Configure {@link org.apache.tez.runtime.library.output.OrderedPartitionedKVOutput} </p>
  * 
- * Values will be picked up from tez-site if not specified, otherwise defaults from
- * {@link org.apache.tez.runtime.library.api.TezRuntimeConfiguration} will be used.
+ * The payload contains only configuration explicitly supplied to the builder and the
+ * partitioner class supplied as a builder argument.
  */
 public class OrderedPartitionedKVOutputConfig {
 
@@ -75,15 +75,7 @@ public class OrderedPartitionedKVOutputConfig {
      * @param partitionerClassName the partitioner class name
      */
     Builder(String keyClassName, String valueClassName, String partitionerClassName) {
-      this();
       setPartitioner(partitionerClassName);
-    }
-
-    Builder() {
-      Map<String, String> tezDefaults = ConfigUtils.extractConfigurationMap(
-          TezRuntimeConfiguration.getTezRuntimeConfigDefaults(),
-          OrderedPartitionedKVOutput.getConfigurationKeySet());
-      ConfigUtils.addConfigMapToConfiguration(this.conf, tezDefaults);
     }
 
     Builder setPartitioner(String partitionerClassName) {
@@ -107,7 +99,6 @@ public class OrderedPartitionedKVOutputConfig {
 
     @SuppressWarnings("unchecked")
     public Builder setFromConfiguration(Configuration conf) {
-      // Maybe ensure this is the first call ? Otherwise this can end up overriding other parameters
       Preconditions.checkArgument(conf != null, "Configuration cannot be null");
       Map<String, String> map = ConfigUtils.extractConfigurationMap(conf,
           OrderedPartitionedKVOutput.getConfigurationKeySet());
@@ -125,4 +116,3 @@ public class OrderedPartitionedKVOutputConfig {
     }
   }
 }
-

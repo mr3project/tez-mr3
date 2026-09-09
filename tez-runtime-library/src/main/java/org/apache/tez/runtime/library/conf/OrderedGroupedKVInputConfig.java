@@ -29,15 +29,13 @@ import org.apache.tez.common.Preconditions;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.tez.common.TezUtils;
 import org.apache.tez.dag.api.UserPayload;
-import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.ConfigUtils;
 import org.apache.tez.runtime.library.input.OrderedGroupedKVInput;
 
 /**
  * Configure {@link org.apache.tez.runtime.library.input.OrderedGroupedKVInput} </p>
  *
- * Values will be picked up from tez-site if not specified, otherwise defaults from
- * {@link org.apache.tez.runtime.library.api.TezRuntimeConfiguration} will be used.
+ * The payload contains only configuration explicitly supplied to the builder.
  */
 public class OrderedGroupedKVInputConfig {
 
@@ -81,14 +79,6 @@ public class OrderedGroupedKVInputConfig {
      * @param valueClassName       the value class name
      */
     Builder(String keyClassName, String valueClassName) {
-      this();
-    }
-
-    Builder() {
-      Map<String, String> tezDefaults = ConfigUtils.extractConfigurationMap(
-          TezRuntimeConfiguration.getTezRuntimeConfigDefaults(),
-          OrderedGroupedKVInput.getConfigurationKeySet());
-      ConfigUtils.addConfigMapToConfiguration(this.conf, tezDefaults);
     }
 
     @SuppressWarnings("unchecked")
@@ -106,7 +96,6 @@ public class OrderedGroupedKVInputConfig {
 
     @SuppressWarnings("unchecked")
     public Builder setFromConfiguration(Configuration conf) {
-      // Maybe ensure this is the first call ? Otherwise this can end up overriding other parameters
       Preconditions.checkArgument(conf != null, "Configuration cannot be null");
       Map<String, String> map = ConfigUtils.extractConfigurationMap(conf,
           OrderedGroupedKVInput.getConfigurationKeySet());
