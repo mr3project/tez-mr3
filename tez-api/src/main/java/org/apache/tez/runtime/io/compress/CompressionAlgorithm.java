@@ -15,13 +15,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.tez.runtime.io.compress;
 
-package org.apache.tez.runtime.api;
-
-import org.apache.tez.runtime.io.compress.CompressionAlgorithm;
-import org.apache.tez.runtime.io.compress.Decompressor;
-
-public interface DecompressorPool {
-  Decompressor getDecompressor(CompressionAlgorithm algorithm);
-  void returnDecompressor(Decompressor decompressor);
+/** Stable identifiers for compression algorithms understood by Tez. */
+public enum CompressionAlgorithm {
+  SNAPPY,
+  ZSTD
 }

@@ -58,7 +58,8 @@ import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.library.common.sort.impl.RawDataBuffer;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.hadoop.io.compress.Compressor;
+import org.apache.tez.runtime.io.compress.Compressor;
+import org.apache.tez.runtime.io.compress.CompressionResolver;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.tez.common.TezCommonUtils;
 import org.apache.tez.common.TezUtilsInternal;
@@ -1094,7 +1095,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
               }
               if (writer == null) {
                 if (codec != null && compressorExternal == null) {
-                  compressorExternal = outputContext.getCompressor(codec);
+                  compressorExternal = outputContext.getCompressor(CompressionResolver.resolveAlgorithm(codec));
                 }
                 // all Writer instances share the same FSDataOutputStream out
                 writer = new WriterDataInputBuffer(
@@ -1130,7 +1131,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
         }
       } finally {
         if (compressorExternal != null) {
-          outputContext.returnCompressor(codec.getCompressorType(), compressorExternal);
+          outputContext.returnCompressor(compressorExternal);
         }
         if (fsOutput != null) {
           fsOutput.close();
@@ -1705,12 +1706,6 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
                   reader = new IFile.Reader(input, indexRecord.getPartLength(), spillCodecForReader, null, null,
                       ifileReadAhead, ifileReadAheadLength, outputContext, spillOffsetRecord);
                 }
-                // reader.close() may not be called if the following while{} block throws IOException.
-                // In this case, reader.decompressor is not returned to the pool.
-                // However, this is not memory leak because reader is eventually garbage collected, at which point
-                // reader.decompressor is also garbage collected. It is just that reader.decompressor is not reused.
-                // Note that reader.close() itself may throw IOException and reader.decompressor may not be returned to the pool.
-                // For the same reason, this not memory leak because reader.decompressor is eventually garbage collected.
                 try {
                   while (reader.readRawKey(keyBufferIFile) != IFile.Reader.KeyState.NO_KEY) {
                     // TODO Inefficient for large records, since the entire record will be read into memory.

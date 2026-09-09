@@ -23,19 +23,13 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Map;
 
-import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.RawLocalFileSystem;
-import org.apache.hadoop.io.compress.CodecPool;
 import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.hadoop.io.compress.CompressionInputStream;
-import org.apache.hadoop.io.compress.CompressionOutputStream;
-import org.apache.hadoop.io.compress.Compressor;
-import org.apache.hadoop.io.compress.Decompressor;
 import org.apache.hadoop.io.compress.DefaultCodec;
 import org.apache.hadoop.io.compress.SnappyCodec;
 import org.apache.hadoop.io.compress.ZStandardCodec;
@@ -45,6 +39,11 @@ import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.FetcherConfigCommon;
 import org.apache.tez.runtime.api.TaskContext;
+import org.apache.tez.runtime.io.compress.CompressionProvider;
+import org.apache.tez.runtime.io.compress.CompressionResolver;
+import org.apache.tez.runtime.io.compress.Compressor;
+import org.apache.tez.runtime.io.compress.Decompressor;
+import org.apache.tez.runtime.io.compress.TezCompressionOutputStream;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.ConfigUtils;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
@@ -183,155 +182,25 @@ public final class CodecUtils {
 
     CompressionCodec codec = ReflectionUtils.newInstance(codecClass, codecConf);
 
-    if (codec != null) {
-      Class<? extends Compressor> compressorType = null;
-      Throwable cause = null;
-      try {
-        compressorType = codec.getCompressorType();
-      } catch (RuntimeException e) {
-        cause = e;
-      }
-
-      if (compressorType == null) {
-        String errMsg = String.format(
-            "Unable to get CompressorType for codec (%s). This is most likely due to missing native libraries for the codec.",
-            codecConf.get(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS_CODEC));
-        throw new IOException(errMsg, cause);
-      }
-
-      if (bufferSize != -1) {
-        if (codecClass == SnappyCodec.class) {
-          SnappyCodec snappyCodec = (SnappyCodec)codec;
-          synchronized (snappyCodec.getConf()) {
-            snappyCodec.setBufferSize(bufferSize);
-          }
-        } else if (codecClass == ZStandardCodec.class) {
-          ZStandardCodec zstdCodec = (ZStandardCodec)codec;
-          synchronized (zstdCodec.getConf()) {
-            zstdCodec.setBufferSize(bufferSize);
-          }
-        }
-      }
-    }
+    // Resolve eagerly using only the configured codec class name. In particular, do not call
+    // getCompressorType(), since Hadoop codecs may perform native-library checks there.
+    CompressionResolver.getProvider(codec);
     return codec;
   }
 
-  public static Compressor getCompressor(CompressionCodec codec) {
-    synchronized (((Configurable) codec).getConf()) {
-      return CodecPool.getCompressor(codec);
-    }
-  }
-
-  // never used because MR3 TezDecompressorPool calls CodecPool.getDecompressor()
-  public static Decompressor getDecompressor(CompressionCodec codec) {
-    synchronized (((Configurable) codec).getConf()) {
-      return CodecPool.getDecompressor(codec);
-    }
-  }
-
-  public static CompressionOutputStream createOutputStream(CompressionCodec codec,
+  public static TezCompressionOutputStream createOutputStream(CompressionCodec codec,
       OutputStream checksumOut, Compressor compressor) throws IOException {
-    synchronized (((Configurable) codec).getConf()) {
-      return codec.createOutputStream(checksumOut, compressor);
-    }
+    CompressionProvider provider = CompressionResolver.getProvider(codec);
+    return provider.createOutputStream(
+        checksumOut, compressor, CompressionResolver.DEFAULT_BUFFER_SIZE);
   }
 
   public static InputStream getDecompressedInputStreamWithBufferSize(CompressionCodec codec,
       IFileInputStream checksumIn, Decompressor decompressor, int compressedLength)
       throws IOException {
-    String bufferSizeProp = getBufferSizeProperty(codec);
-    CompressionInputStream in;
-    Configuration conf = ((Configurable) codec).getConf();
-
-    if (bufferSizeProp != null) {
-      if (bufferSizeProp.equals(CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_KEY)) {
-        SnappyCodec snappyCodec = (SnappyCodec)codec;
-        synchronized (conf) {
-          int originalSize = snappyCodec.getBufferSize();
-          int newBufSize = Math.min(compressedLength, originalSize);
-          if (originalSize != newBufSize) {
-            snappyCodec.setBufferSize(newBufSize);
-            try {
-              in = snappyCodec.createInputStream(checksumIn, decompressor);
-            } finally {
-              snappyCodec.setBufferSize(originalSize);
-            }
-          } else {
-            in = snappyCodec.createInputStream(checksumIn, decompressor);
-          }
-        }
-        return in;
-      }
-
-      if (bufferSizeProp.equals(CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_KEY)) {
-        ZStandardCodec zstdCodec = (ZStandardCodec)codec;
-        // TODO: IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_DEFAULT == 0, so we always have 'newBufSize == 0'
-        synchronized (conf) {
-          int originalSize = zstdCodec.getBufferSize();
-          int newBufSize = Math.min(compressedLength, originalSize);
-          if (originalSize != newBufSize) {
-            zstdCodec.setBufferSize(newBufSize);
-            try {
-              in = zstdCodec.createInputStream(checksumIn, decompressor);
-            } finally {
-              zstdCodec.setBufferSize(originalSize);
-            }
-          } else {
-            in = zstdCodec.createInputStream(checksumIn, decompressor);
-          }
-        }
-        return in;
-      }
-
-      synchronized (conf) {
-        int defaultBufferSize = getDefaultBufferSize(codec);
-        int originalSize = conf.getInt(bufferSizeProp, defaultBufferSize);
-        int newBufSize = Math.min(compressedLength, defaultBufferSize);
-
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("buffer size was set according to min({}, {}) => {}={}",
-              compressedLength, defaultBufferSize, bufferSizeProp, newBufSize);
-        }
-
-        if (originalSize != newBufSize) {
-          conf.setInt(bufferSizeProp, newBufSize);
-        }
-        in = codec.createInputStream(checksumIn, decompressor);
-        /*
-         * We would better reset the original buffer size into the codec. Basically the buffer size
-         * is used at 2 places.
-         *
-         * 1. It can tell the inputstream/outputstream buffersize (which is created by
-         * codec.createInputStream/codec.createOutputStream). This is something which might and
-         * should be optimized in config, as inputstreams instantiate and use their own buffer and
-         * won't reuse buffers from previous streams (TEZ-4135).
-         *
-         * 2. The same buffersize is used when a codec creates a new Compressor/Decompressor. The
-         * fundamental difference is that Compressor/Decompressor instances are expensive and reused
-         * by hadoop's CodecPool. Here is a hidden mismatch, which can happen when a codec is
-         * created with a small buffersize config. Once it creates a Compressor/Decompressor
-         * instance from its config field, the reused Compressor/Decompressor instance will be
-         * reused later, even when application handles large amount of data. This way we can end up
-         * in large stream buffers + small compressor/decompressor buffers, which can be suboptimal,
-         * moreover, it can lead to strange errors, when a compressed output exceeds the size of the
-         * buffer (TEZ-4234).
-         *
-         * An interesting outcome is that - as the codec buffersize config affects both
-         * compressor(output) and decompressor(input) paths - an altered codec config can cause the
-         * issues above for Compressor instances as well, even when we tried to leverage from
-         * smaller buffer size only on decompression paths.
-         */
-        if (originalSize != newBufSize) {
-          conf.setInt(bufferSizeProp, originalSize);
-        }
-      }
-      return in;
-    }
-
-    synchronized (conf) {
-      in = codec.createInputStream(checksumIn, decompressor);
-    }
-    return in;
+    CompressionProvider provider = CompressionResolver.getProvider(codec);
+    return provider.createInputStream(
+        checksumIn, decompressor, CompressionResolver.DEFAULT_BUFFER_SIZE);
   }
 
   public static String getBufferSizeProperty(CompressionCodec codec) {

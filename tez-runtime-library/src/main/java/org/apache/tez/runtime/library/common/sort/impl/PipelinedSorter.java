@@ -32,7 +32,8 @@ import java.util.zip.Deflater;
 import com.google.common.collect.Maps;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.hadoop.io.compress.Compressor;
+import org.apache.tez.runtime.io.compress.Compressor;
+import org.apache.tez.runtime.io.compress.CompressionResolver;
 import org.apache.tez.common.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -730,7 +731,7 @@ public final class PipelinedSorter {
         boolean hasNext = kvIter.hasNext();
         if (hasNext) {
           if (codec != null && compressorExternal == null) {
-            compressorExternal = outputContext.getCompressor(codec);
+            compressorExternal = outputContext.getCompressor(CompressionResolver.resolveAlgorithm(codec));
           }
           writer = new WriterDataInputBuffer(
               fsOutput,
@@ -761,7 +762,7 @@ public final class PipelinedSorter {
       } // end of for loop
     } finally {
       if (compressorExternal != null) {
-        outputContext.returnCompressor(codec.getCompressorType(), compressorExternal);
+        outputContext.returnCompressor(compressorExternal);
       }
       if (fsOutput != null) {
         fsOutput.close();

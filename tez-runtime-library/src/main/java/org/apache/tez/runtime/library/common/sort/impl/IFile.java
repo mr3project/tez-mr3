@@ -38,13 +38,13 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.tez.runtime.library.utils.CodecUtils;
+import org.apache.tez.runtime.io.compress.CompressionResolver;
 import org.apache.tez.util.FastByteComparisons;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.io.compress.CodecPool;
 import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.hadoop.io.compress.CompressionOutputStream;
-import org.apache.hadoop.io.compress.Compressor;
-import org.apache.hadoop.io.compress.Decompressor;
+import org.apache.tez.runtime.io.compress.TezCompressionOutputStream;
+import org.apache.tez.runtime.io.compress.Compressor;
+import org.apache.tez.runtime.io.compress.Decompressor;
 import org.apache.tez.common.counters.TezCounter;
 
 import javax.annotation.Nullable;
@@ -324,7 +324,7 @@ public class IFile {
     private final CompressionCodec codec;
 
     private IFileOutputStream checksumOut;
-    private CompressionOutputStream compressedOut;
+    private TezCompressionOutputStream compressedOut;
     private Compressor compressor;
     private boolean compressOutput = false;
     protected DataOutputStream out;
@@ -389,19 +389,27 @@ public class IFile {
     void setupOutputStream(CompressionCodec codec) throws IOException {
       this.checksumOut = new IFileOutputStream(this.rawOut);
       if (codec != null) {
+        boolean borrowed = compressorExternal == null;
         if (compressorExternal != null) {
           this.compressor = compressorExternal;
         } else {
-          this.compressor = taskContext.getCompressor(codec);
+          this.compressor = taskContext.getCompressor(CompressionResolver.resolveAlgorithm(codec));
         }
-        if (this.compressor != null) {
+        if (this.compressor == null) {
+          throw new IOException("Compressor pool returned null for "
+              + CompressionResolver.resolveAlgorithm(codec));
+        }
+        try {
           this.compressor.reset();
           this.compressedOut = CodecUtils.createOutputStream(codec, checksumOut, compressor);
           this.out = new DataOutputStream(this.compressedOut);
           this.compressOutput = true;
-        } else {
-          LOG.warn("Could not obtain compressor from CodecPool");
-          this.out = new DataOutputStream(checksumOut);
+        } catch (IOException | RuntimeException e) {
+          if (borrowed) {
+            taskContext.returnCompressor(compressor);
+            compressor = null;
+          }
+          throw e;
         }
       } else {
         this.out = new DataOutputStream(checksumOut);
@@ -428,49 +436,47 @@ public class IFile {
         throw new IOException("Writer was already closed earlier");
       }
 
-      onClose();
+      try {
+        onClose();
 
-      // Write EOF_MARKER for key/value length
-      long combined = ((long) EOF_MARKER << 32) | (EOF_MARKER & 0xFFFFFFFFL);
-      bufferWriteLong(combined);
+        // Write EOF_MARKER for key/value length
+        long combined = ((long) EOF_MARKER << 32) | (EOF_MARKER & 0xFFFFFFFFL);
+        bufferWriteLong(combined);
 
-      decompressedBytesWritten += 2 * INT_SIZE;
-      //account for header bytes
-      decompressedBytesWritten += HEADER.length;
+        decompressedBytesWritten += 2 * INT_SIZE;
+        //account for header bytes
+        decompressedBytesWritten += HEADER.length;
 
-      flushWriteBuffer();   // Ensure all buffered data is written to 'out'
+        flushWriteBuffer();   // Ensure all buffered data is written to 'out'
 
-      // Close the underlying stream iff we own it
-      if (ownOutputStream) {
-        out.close();
-      } else {
-        if (compressOutput) {
-          // Flush
-          compressedOut.finish();
-          compressedOut.resetState();
+        // Close the underlying stream iff we own it
+        if (ownOutputStream) {
+          out.close();
+        } else {
+          if (compressOutput) {
+            // Flush
+            compressedOut.finish();
+            compressedOut.resetState();
+          }
+          // Write the checksum and flush the buffer
+          checksumOut.finish();
         }
-        // Write the checksum and flush the buffer
-        checksumOut.finish();
-      }
-      // header bytes are already included in rawOut
-      compressedBytesWritten = rawOut.getPos() - start;
-
-      if (compressOutput) {
-        // Return back the compressor
-        // if compressorExternal != null, this Writer does not own compressor, so do not return it to CodecPool
-        if (compressorExternal == null) {
-          // this Writer owns compressor
-          taskContext.returnCompressor(codec.getCompressorType(), compressor);
+        // header bytes are already included in rawOut
+        compressedBytesWritten = rawOut.getPos() - start;
+        out = null;
+        if (writtenRecordsCounter != null) {
+          writtenRecordsCounter.increment(numRecordsWritten);
+        }
+        if (serializedUncompressedBytes != null) {
+          serializedUncompressedBytes.increment(numSerializedBytesWritten);
+        }
+      } finally {
+        // An externally supplied compressor remains owned by its caller. An internally borrowed
+        // compressor is returned exactly once, including when finishing the stream fails.
+        if (compressor != null && compressorExternal == null) {
+          taskContext.returnCompressor(compressor);
         }
         compressor = null;
-      }
-
-      out = null;
-      if (writtenRecordsCounter != null) {
-        writtenRecordsCounter.increment(numRecordsWritten);
-      }
-      if (serializedUncompressedBytes != null) {
-        serializedUncompressedBytes.increment(numSerializedBytesWritten);
       }
     }
 
@@ -1009,17 +1015,26 @@ public class IFile {
       this.bytesReadCounter = bytesReadCounter;
 
       checksumIn = new IFileInputStream(in, length, readAhead, readAheadLength/* , isCompressed */);
-      if (isCompressed && codec != null) {
+      if (isCompressed && codec == null) {
+        throw new IOException("Compressed IFile has no configured compression codec");
+      }
+      if (isCompressed) {
         assert taskContext != null;
         this.codec = codec;
         this.taskContext = taskContext;
-        decompressor = taskContext.getDecompressor(codec);
-        if (decompressor != null) {
+        decompressor = taskContext.getDecompressor(CompressionResolver.resolveAlgorithm(codec));
+        if (decompressor == null) {
+          throw new IOException("Decompressor pool returned null for "
+              + CompressionResolver.resolveAlgorithm(codec));
+        }
+        try {
           this.in = CodecUtils.getDecompressedInputStreamWithBufferSize(
               codec, checksumIn, decompressor, (int)Math.min(length, Integer.MAX_VALUE));
-        } else {
-          LOG.warn("Could not obtain decompressor from CodecPool");
-          this.in = checksumIn;
+        } catch (IOException | RuntimeException e) {
+          decompressor.reset();
+          taskContext.returnDecompressor(decompressor);
+          decompressor = null;
+          throw e;
         }
       } else {
         this.in = checksumIn;
@@ -1046,7 +1061,7 @@ public class IFile {
      */
     public static void readToMemory(byte[] buffer, InputStream sourceIn, int compressedLength,
         CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLength,
-        TaskContext taskContext, boolean useThreadLocalDecompressor)
+        DecompressorPool taskContext, boolean useThreadLocalDecompressor)
         throws IOException {
       byte[] header = new byte[HEADER.length];
       byte headerFlag = readHeader(sourceIn, header);
@@ -1057,25 +1072,36 @@ public class IFile {
           sourceIn, checksumInLength, ifileReadAhead, ifileReadAheadLength);
       InputStream in = checksumIn;
       Decompressor decompressor = null;
-      if (isCompressed && codec != null) {
+      if (isCompressed && codec == null) {
+        throw new IOException("Compressed IFile has no configured compression codec");
+      }
+      if (isCompressed) {
         if (useThreadLocalDecompressor) {
           decompressor = decompressorHolder.get();
           if (decompressor == null) {
             assert taskContext != null;
-            decompressor = taskContext.getDecompressor(codec);
+            decompressor = taskContext.getDecompressor(CompressionResolver.resolveAlgorithm(codec));
             decompressorHolder.set(decompressor);
           }
         } else {
           assert taskContext != null;
-          decompressor = taskContext.getDecompressor(codec);
+          decompressor = taskContext.getDecompressor(CompressionResolver.resolveAlgorithm(codec));
         }
-        if (decompressor != null) {
+        if (decompressor == null) {
+          throw new IOException("Decompressor pool returned null for "
+              + CompressionResolver.resolveAlgorithm(codec));
+        }
+        try {
           decompressor.reset();
           in = CodecUtils.getDecompressedInputStreamWithBufferSize(
               codec, checksumIn, decompressor, checksumInLength);
-        } else {
-          LOG.warn("Could not obtain decompressor from CodecPool");
-          in = checksumIn;
+        } catch (IOException | RuntimeException e) {
+          decompressor.reset();
+          if (!useThreadLocalDecompressor) {
+            taskContext.returnDecompressor(decompressor);
+            decompressor = null;
+          }
+          throw e;
         }
       }
       try {
@@ -1107,9 +1133,9 @@ public class IFile {
           // if useThreadLocalDecompressor == true, never return decompressor which will be garbage-collected
           if (!useThreadLocalDecompressor) {
             if (taskContext != null) {
-              taskContext.returnDecompressor(codec.getCompressorType(), decompressor);
+              taskContext.returnDecompressor(decompressor);
             } else {
-              CodecPool.returnDecompressor(decompressor);
+              decompressor.close();
             }
           }
         }
@@ -1554,26 +1580,28 @@ public class IFile {
     }
 
     public void close() throws IOException {
-      // Close the underlying stream
-      in.close();
+      try {
+        // Close the underlying stream and force checksum validation.
+        in.close();
 
-      if (readRecordsCounter != null) {
-        readRecordsCounter.increment(numRecordsRead);
-      }
-
-      if (bytesReadCounter != null) {
-        bytesReadCounter.increment(checksumIn.getPosition() - startPos + checksumIn.getSize());
-      }
-
-      // Return the decompressor
-      if (decompressor != null) {
-        decompressor.reset();
-        if (taskContext != null) {
-          taskContext.returnDecompressor(codec.getCompressorType(), decompressor);
-        } else {
-          CodecPool.returnDecompressor(decompressor);
+        if (readRecordsCounter != null) {
+          readRecordsCounter.increment(numRecordsRead);
         }
-        decompressor = null;
+
+        if (bytesReadCounter != null) {
+          bytesReadCounter.increment(checksumIn.getPosition() - startPos + checksumIn.getSize());
+        }
+      } finally {
+        // Return the decompressor exactly once even when stream close/checksum validation fails.
+        if (decompressor != null) {
+          decompressor.reset();
+          if (taskContext != null) {
+            taskContext.returnDecompressor(decompressor);
+          } else {
+            decompressor.close();
+          }
+          decompressor = null;
+        }
       }
     }
   }
