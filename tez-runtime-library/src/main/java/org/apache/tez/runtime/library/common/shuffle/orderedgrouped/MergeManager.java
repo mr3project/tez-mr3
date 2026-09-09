@@ -222,7 +222,9 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         TezRuntimeConfiguration.TEZ_RUNTIME_INPUT_POST_MERGE_BUFFER_PERCENT,
         TezRuntimeConfiguration.TEZ_RUNTIME_INPUT_BUFFER_PERCENT_DEFAULT);
     if (maxRedPer > 1.0 || maxRedPer < 0.0) {
-      throw new TezUncheckedException(TezRuntimeConfiguration.TEZ_RUNTIME_INPUT_POST_MERGE_BUFFER_PERCENT + maxRedPer);
+      throw new TezUncheckedException("Invalid "
+          + TezRuntimeConfiguration.TEZ_RUNTIME_INPUT_POST_MERGE_BUFFER_PERCENT + " value "
+          + maxRedPer + "; expected a value between 0.0 and 1.0 inclusive");
     }
     long maxRedBuffer = (long)(totalTaskMemoryBytes * maxRedPer);
     this.postMergeMemoryLimitBytes = Math.min(assignedMemoryBytes, maxRedBuffer);
@@ -336,8 +338,9 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
         TezRuntimeConfiguration.TEZ_RUNTIME_INPUT_POST_MERGE_BUFFER_PERCENT,
         TezRuntimeConfiguration.TEZ_RUNTIME_INPUT_BUFFER_PERCENT_DEFAULT);
     if (maxRedPer > 1.0 || maxRedPer < 0.0) {
-      throw new TezUncheckedException(
-        TezRuntimeConfiguration.TEZ_RUNTIME_INPUT_POST_MERGE_BUFFER_PERCENT + ": " + maxRedPer);
+      throw new TezUncheckedException("Invalid "
+          + TezRuntimeConfiguration.TEZ_RUNTIME_INPUT_POST_MERGE_BUFFER_PERCENT + " value "
+          + maxRedPer + "; expected a value between 0.0 and 1.0 inclusive");
     }
     final long maxRedBuffer = (long) (totalTaskMemoryBytes * maxRedPer);
 

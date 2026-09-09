@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -117,7 +118,10 @@ abstract class MergeThread<T> extends Thread {
           Thread.currentThread().interrupt();
           return;
         } catch(Throwable t) {
-          reporter.reportException(t);
+          reporter.reportException(new TezUncheckedException(
+              "Shuffle merge failed in " + getName() + " while merging " + inputs.size()
+                  + " inputs",
+              t));
           return;
         } finally {
           synchronized (this) {

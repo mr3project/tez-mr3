@@ -297,7 +297,9 @@ public class ShuffleScheduler extends ShuffleClient<MapOutput> {
           if (eventInfo != null && inputAttemptIdentifier.getAttemptNumber() == eventInfo.attemptNum) {
             // Some spills with the same attempt number have been downloaded, so this TaskAttempt cannot succeed.
             // ShuffleServer.fetchFailed already verified !existsConcurrentNotFailedFetcher, so we should kill here.
-            exceptionReporter.reportException(new TezUncheckedException("Failed to fetch input " + inputAttemptIdentifier));
+            exceptionReporter.reportException(new TezUncheckedException(
+                "Failed to fetch ordered pipelined input because a spill from the same source "
+                    + "attempt has already been downloaded: " + inputAttemptIdentifier));
           } else {
             LOG.warn("Ordered fetch failed, but do not kill yet because no spill has been downloaded yet: {}", inputAttemptIdentifier);
           }

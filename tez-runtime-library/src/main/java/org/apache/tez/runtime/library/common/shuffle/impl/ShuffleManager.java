@@ -388,7 +388,9 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
           if (eventInfo != null && inputAttemptIdentifier.getAttemptNumber() == eventInfo.attemptNum) {
             // some spills with the same attempt number have been downloaded, so this TaskAttempt cannot succeed
             // ShuffleServer.fetchFailed already verified !existsConcurrentNotFailedFetcher, so we should kill here.
-            reportNonFatalError("Failed to fetch input " + inputAttemptIdentifier);
+            reportNonFatalError(
+                "Failed to fetch unordered pipelined input because a spill from the same source "
+                    + "attempt has already been downloaded: " + inputAttemptIdentifier);
           } else {
             LOG.warn("Unordered fetch failed, but do not kill yet because no spill has been downloaded yet: {}", inputAttemptIdentifier);
           }
