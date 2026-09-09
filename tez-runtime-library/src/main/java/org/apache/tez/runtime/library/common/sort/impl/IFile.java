@@ -427,47 +427,49 @@ public class IFile {
         throw new IOException("Writer was already closed earlier");
       }
 
-      try {
-        onClose();
+      onClose();
 
-        // Write EOF_MARKER for key/value length
-        long combined = ((long) EOF_MARKER << 32) | (EOF_MARKER & 0xFFFFFFFFL);
-        bufferWriteLong(combined);
+      // Write EOF_MARKER for key/value length
+      long combined = ((long) EOF_MARKER << 32) | (EOF_MARKER & 0xFFFFFFFFL);
+      bufferWriteLong(combined);
 
-        decompressedBytesWritten += 2 * INT_SIZE;
-        //account for header bytes
-        decompressedBytesWritten += HEADER.length;
+      decompressedBytesWritten += 2 * INT_SIZE;
+      //account for header bytes
+      decompressedBytesWritten += HEADER.length;
 
-        flushWriteBuffer();   // Ensure all buffered data is written to 'out'
+      flushWriteBuffer();   // Ensure all buffered data is written to 'out'
 
-        // Close the underlying stream iff we own it
-        if (ownOutputStream) {
-          out.close();
-        } else {
-          if (compressOutput) {
-            // Flush
-            compressedOut.finish();
-            compressedOut.resetState();
-          }
-          // Write the checksum and flush the buffer
-          checksumOut.finish();
+      // Close the underlying stream iff we own it
+      if (ownOutputStream) {
+        out.close();
+      } else {
+        if (compressOutput) {
+          // Flush
+          compressedOut.finish();
+          compressedOut.resetState();
         }
-        // header bytes are already included in rawOut
-        compressedBytesWritten = rawOut.getPos() - start;
-        out = null;
-        if (writtenRecordsCounter != null) {
-          writtenRecordsCounter.increment(numRecordsWritten);
-        }
-        if (serializedUncompressedBytes != null) {
-          serializedUncompressedBytes.increment(numSerializedBytesWritten);
-        }
-      } finally {
-        // An externally supplied compressor remains owned by its caller. An internally borrowed
-        // compressor is returned exactly once, including when finishing the stream fails.
-        if (compressor != null && compressorExternal == null) {
+        // Write the checksum and flush the buffer
+        checksumOut.finish();
+      }
+      // header bytes are already included in rawOut
+      compressedBytesWritten = rawOut.getPos() - start;
+
+      if (compressOutput) {
+        // Return back the compressor
+        // if compressorExternal != null, this Writer does not own compressor, so do not return it to CodecPool
+        if (compressorExternal == null) {
+          // this Writer owns compressor
           taskContext.returnCompressor(compressor);
         }
         compressor = null;
+      }
+
+      out = null;
+      if (writtenRecordsCounter != null) {
+        writtenRecordsCounter.increment(numRecordsWritten);
+      }
+      if (serializedUncompressedBytes != null) {
+        serializedUncompressedBytes.increment(numSerializedBytesWritten);
       }
     }
 
