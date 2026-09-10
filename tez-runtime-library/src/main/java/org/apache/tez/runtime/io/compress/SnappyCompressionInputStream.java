@@ -35,10 +35,9 @@ final class SnappyCompressionInputStream extends InputStream {
   SnappyCompressionInputStream(
       InputStream input, XerialSnappyDecompressor decompressor, int bufferSize)
       throws IOException {
-    assert input != null;
-    assert decompressor != null;
-    assert bufferSize > 0;
-    assert bufferSize <= SnappyCompressionOutputStream.MAX_BLOCK_SIZE;
+    if (bufferSize <= 0 || bufferSize > SnappyCompressionOutputStream.MAX_BLOCK_SIZE) {
+      throw new IOException("Invalid Snappy block size: " + bufferSize);
+    }
     this.input = new DataInputStream(input);
     this.decompressor = decompressor;
     this.maximumBlockSize = bufferSize;

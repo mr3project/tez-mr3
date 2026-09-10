@@ -275,18 +275,18 @@ public class TestXerialSnappyCompression {
     try {
       compressor.maxCompressedLength(-1);
       fail("negative length accepted");
-    } catch (AssertionError expected) {
+    } catch (IllegalArgumentException expected) {
     }
     try {
       compressor.maxCompressedLength(Integer.MAX_VALUE);
       fail("overflowing length accepted");
-    } catch (AssertionError expected) {
+    } catch (IllegalArgumentException expected) {
     }
     byte[] bytes = new byte[4];
-    assertAssertionFailure(() -> compressor.compress(bytes, -1, 1, bytes, 0, 4));
-    assertAssertionFailure(() -> compressor.compress(bytes, 3, 2, bytes, 0, 4));
-    assertAssertionFailure(() -> compressor.compress(bytes, 0, 1, bytes, 3, 2));
-    assertAssertionFailure(() -> decompressor.decompress(bytes, 0, -1, bytes, 0, 4));
+    assertIndexFailure(() -> compressor.compress(bytes, -1, 1, bytes, 0, 4));
+    assertIndexFailure(() -> compressor.compress(bytes, 3, 2, bytes, 0, 4));
+    assertIndexFailure(() -> compressor.compress(bytes, 0, 1, bytes, 3, 2));
+    assertIndexFailure(() -> decompressor.decompress(bytes, 0, -1, bytes, 0, 4));
   }
 
   private static final class TrackingOutputStream extends ByteArrayOutputStream {
@@ -366,6 +366,14 @@ public class TestXerialSnappyCompression {
       runnable.run();
       fail("expected AssertionError");
     } catch (AssertionError expected) {
+    }
+  }
+
+  private static void assertIndexFailure(CheckedRunnable runnable) throws Exception {
+    try {
+      runnable.run();
+      fail("expected IndexOutOfBoundsException");
+    } catch (IndexOutOfBoundsException expected) {
     }
   }
 }

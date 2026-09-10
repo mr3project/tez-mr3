@@ -25,9 +25,9 @@ public interface Decompressor extends AutoCloseable {
   CompressionAlgorithm getAlgorithm();
 
   /**
-   * Decompresses exactly one complete provider-defined unit. The caller supplies valid array
-   * ranges and enough output capacity. Implementations retain no caller arrays, reject invalid
-   * input, and throw {@link IOException} without partial caller output if decompression fails.
+   * Decompresses exactly one complete provider-defined unit. Implementations validate both array
+   * ranges, retain no caller arrays, reject invalid input, and throw {@link IOException} without
+   * partial caller output if capacity is insufficient or decompression fails.
    */
   int decompress(byte[] input, int inputOffset, int inputLength,
       byte[] output, int outputOffset, int outputCapacity) throws IOException;

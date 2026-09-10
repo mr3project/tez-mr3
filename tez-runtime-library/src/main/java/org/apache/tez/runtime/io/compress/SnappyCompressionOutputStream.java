@@ -41,10 +41,9 @@ final class SnappyCompressionOutputStream extends CompressionOutputStream {
   SnappyCompressionOutputStream(
       OutputStream output, XerialSnappyCompressor compressor, int bufferSize)
       throws IOException {
-    assert output != null;
-    assert compressor != null;
-    assert bufferSize > 0;
-    assert bufferSize <= MAX_BLOCK_SIZE;
+    if (bufferSize <= 0 || bufferSize > MAX_BLOCK_SIZE) {
+      throw new IOException("Invalid Snappy block size: " + bufferSize);
+    }
     this.output = new DataOutputStream(output);
     this.compressor = compressor;
     this.inputBuffer = compressor.ensureInputCapacity(bufferSize);
