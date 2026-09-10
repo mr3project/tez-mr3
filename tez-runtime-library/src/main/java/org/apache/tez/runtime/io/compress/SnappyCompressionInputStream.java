@@ -25,16 +25,15 @@ import java.io.InputStream;
 /** Decoder for the provider-private chunk framing documented by the output stream. */
 final class SnappyCompressionInputStream extends InputStream {
   private final DataInputStream input;
-  private final Decompressor decompressor;
+  private final XerialSnappyDecompressor decompressor;
   private final int maximumBlockSize;
-  private byte[] compressed = new byte[0];
-  private byte[] uncompressed = new byte[0];
   private int position;
   private int limit;
   private boolean ended;
   private boolean closed;
 
-  SnappyCompressionInputStream(InputStream input, Decompressor decompressor, int bufferSize)
+  SnappyCompressionInputStream(
+      InputStream input, XerialSnappyDecompressor decompressor, int bufferSize)
       throws IOException {
     if (input == null || decompressor == null) {
       throw new NullPointerException();
@@ -60,7 +59,7 @@ final class SnappyCompressionInputStream extends InputStream {
     if (!ensureData()) {
       return -1;
     }
-    return uncompressed[position++] & 0xff;
+    return decompressor.getDecompressedBuffer()[position++] & 0xff;
   }
 
   @Override
@@ -73,7 +72,7 @@ final class SnappyCompressionInputStream extends InputStream {
       return -1;
     }
     int copied = Math.min(length, limit - position);
-    System.arraycopy(uncompressed, position, data, offset, copied);
+    System.arraycopy(decompressor.getDecompressedBuffer(), position, data, offset, copied);
     position += copied;
     return copied;
   }
@@ -114,19 +113,13 @@ final class SnappyCompressionInputStream extends InputStream {
     if (compressedLength <= 0 || compressedLength > maximumCompressed) {
       throw new IOException("Invalid Tez Snappy compressed chunk length: " + compressedLength);
     }
-    if (compressed.length < compressedLength) {
-      compressed = new byte[compressedLength];
-    }
-    if (uncompressed.length < rawLength) {
-      uncompressed = new byte[rawLength];
-    }
+    byte[] compressed = decompressor.ensureCompressedCapacity(compressedLength);
     try {
       input.readFully(compressed, 0, compressedLength);
     } catch (EOFException e) {
       throw new IOException("Truncated Tez Snappy chunk payload", e);
     }
-    int actual = decompressor.decompress(
-        compressed, 0, compressedLength, uncompressed, 0, rawLength);
+    int actual = decompressor.decompressBuffered(compressedLength, rawLength);
     if (actual != rawLength) {
       throw new IOException("Tez Snappy chunk length mismatch: expected " + rawLength
           + ", decoded " + actual);
