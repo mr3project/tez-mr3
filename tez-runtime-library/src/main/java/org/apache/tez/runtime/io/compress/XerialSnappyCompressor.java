@@ -18,7 +18,6 @@
 package org.apache.tez.runtime.io.compress;
 
 import java.io.IOException;
-import java.util.Arrays;
 
 import org.xerial.snappy.Snappy;
 
@@ -104,7 +103,6 @@ public final class XerialSnappyCompressor implements Compressor {
   @Override
   public void close() {
     closed = true;
-    Arrays.fill(scratch, (byte) 0);
     scratch = new byte[0];
   }
 }
