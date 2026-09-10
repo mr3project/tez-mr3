@@ -20,9 +20,10 @@ import static org.junit.Assert.fail;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
-import java.io.DataInputStream;
 import java.io.IOException;
 import java.lang.reflect.Proxy;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.Random;
 
@@ -167,18 +168,20 @@ public class TestXerialSnappyCompression {
     assertEquals(1, pool.borrowedDecompressors);
     assertEquals(1, pool.returnedDecompressors);
     assertArrayEquals(Arrays.copyOf(IFile.HEADER, 3), Arrays.copyOf(raw, 3));
-    DataInputStream records = new DataInputStream(
-        new ByteArrayInputStream(raw, IFile.HEADER.length, raw.length - IFile.HEADER.length));
-    assertEquals(key.length, records.readInt());
-    assertEquals(value.length, records.readInt());
+    ByteBuffer records = ByteBuffer.wrap(raw, IFile.HEADER.length,
+        raw.length - IFile.HEADER.length).order(ByteOrder.nativeOrder());
+    long lengths = records.getLong();
+    assertEquals(key.length, (int) lengths);
+    assertEquals(value.length, (int) (lengths >>> 32));
     byte[] restoredKey = new byte[key.length];
     byte[] restoredValue = new byte[value.length];
-    records.readFully(restoredKey);
-    records.readFully(restoredValue);
+    records.get(restoredKey);
+    records.get(restoredValue);
     assertArrayEquals(key, restoredKey);
     assertArrayEquals(value, restoredValue);
-    assertEquals(IFile.EOF_MARKER, records.readInt());
-    assertEquals(IFile.EOF_MARKER, records.readInt());
+    long eof = records.getLong();
+    assertEquals(IFile.EOF_MARKER, (int) eof);
+    assertEquals(IFile.EOF_MARKER, (int) (eof >>> 32));
   }
 
   private static byte[][] values() {
