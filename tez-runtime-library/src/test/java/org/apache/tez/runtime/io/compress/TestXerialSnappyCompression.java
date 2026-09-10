@@ -74,8 +74,8 @@ public class TestXerialSnappyCompression {
     compressor.close();
     decompressor.close();
     decompressor.close();
-    assertIllegalState(() -> compressor.maxCompressedLength(1));
-    assertIllegalState(decompressor::reset);
+    assertAssertionFailure(() -> compressor.maxCompressedLength(1));
+    assertAssertionFailure(decompressor::reset);
   }
 
   @Test
@@ -275,18 +275,18 @@ public class TestXerialSnappyCompression {
     try {
       compressor.maxCompressedLength(-1);
       fail("negative length accepted");
-    } catch (IllegalArgumentException expected) {
+    } catch (AssertionError expected) {
     }
     try {
       compressor.maxCompressedLength(Integer.MAX_VALUE);
       fail("overflowing length accepted");
-    } catch (IllegalArgumentException expected) {
+    } catch (AssertionError expected) {
     }
     byte[] bytes = new byte[4];
-    assertIndexFailure(() -> compressor.compress(bytes, -1, 1, bytes, 0, 4));
-    assertIndexFailure(() -> compressor.compress(bytes, 3, 2, bytes, 0, 4));
-    assertIndexFailure(() -> compressor.compress(bytes, 0, 1, bytes, 3, 2));
-    assertIndexFailure(() -> decompressor.decompress(bytes, 0, -1, bytes, 0, 4));
+    assertAssertionFailure(() -> compressor.compress(bytes, -1, 1, bytes, 0, 4));
+    assertAssertionFailure(() -> compressor.compress(bytes, 3, 2, bytes, 0, 4));
+    assertAssertionFailure(() -> compressor.compress(bytes, 0, 1, bytes, 3, 2));
+    assertAssertionFailure(() -> decompressor.decompress(bytes, 0, -1, bytes, 0, 4));
   }
 
   private static final class TrackingOutputStream extends ByteArrayOutputStream {
@@ -361,19 +361,11 @@ public class TestXerialSnappyCompression {
     }
   }
 
-  private static void assertIllegalState(CheckedRunnable runnable) throws Exception {
+  private static void assertAssertionFailure(CheckedRunnable runnable) throws Exception {
     try {
       runnable.run();
-      fail("expected IllegalStateException");
-    } catch (IllegalStateException expected) {
-    }
-  }
-
-  private static void assertIndexFailure(CheckedRunnable runnable) throws Exception {
-    try {
-      runnable.run();
-      fail("expected IndexOutOfBoundsException");
-    } catch (IndexOutOfBoundsException expected) {
+      fail("expected AssertionError");
+    } catch (AssertionError expected) {
     }
   }
 }

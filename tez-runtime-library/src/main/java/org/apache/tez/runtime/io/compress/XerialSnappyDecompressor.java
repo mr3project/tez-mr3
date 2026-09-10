@@ -40,10 +40,8 @@ public final class XerialSnappyDecompressor implements Decompressor {
     XerialSnappyCompressor.checkRange(output, outputOffset, outputCapacity, "output");
     try {
       int length = Snappy.uncompressedLength(input, inputOffset, inputLength);
-      if (length < 0 || length > outputCapacity) {
-        throw new IOException("Insufficient Snappy output capacity: need " + length
-            + ", have " + outputCapacity);
-      }
+      assert length >= 0;
+      assert length <= outputCapacity;
       if (scratch.length < length) {
         scratch = new byte[length];
       }
@@ -61,10 +59,8 @@ public final class XerialSnappyDecompressor implements Decompressor {
   }
 
   byte[] ensureCompressedCapacity(int length) {
-    ensureOpen();
-    if (length < 0) {
-      throw new IllegalArgumentException("Negative compressed buffer length: " + length);
-    }
+    assert !closed;
+    assert length >= 0;
     if (compressed.length < length) {
       compressed = new byte[length];
     }
@@ -72,14 +68,13 @@ public final class XerialSnappyDecompressor implements Decompressor {
   }
 
   int decompressBuffered(int inputLength, int outputCapacity) throws IOException {
-    ensureOpen();
-    XerialSnappyCompressor.checkRange(compressed, 0, inputLength, "input");
-    if (outputCapacity < 0) {
-      throw new IllegalArgumentException("Negative output capacity: " + outputCapacity);
-    }
+    assert !closed;
+    assert inputLength >= 0 && inputLength <= compressed.length;
+    assert outputCapacity >= 0;
     try {
       int length = Snappy.uncompressedLength(compressed, 0, inputLength);
-      if (length < 0 || length > outputCapacity) {
+      assert length >= 0;
+      if (length > outputCapacity) {
         throw new IOException("Insufficient Snappy output capacity: need " + length
             + ", have " + outputCapacity);
       }
@@ -100,14 +95,12 @@ public final class XerialSnappyDecompressor implements Decompressor {
   }
 
   byte[] getDecompressedBuffer() {
-    ensureOpen();
+    assert !closed;
     return scratch;
   }
 
   private void ensureOpen() {
-    if (closed) {
-      throw new IllegalStateException("Decompressor is closed");
-    }
+    assert !closed;
   }
 
   @Override

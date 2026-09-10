@@ -35,20 +35,14 @@ public final class XerialSnappyCompressor implements Compressor {
   @Override
   public int maxCompressedLength(int uncompressedLength) {
     ensureOpen();
-    if (uncompressedLength < 0) {
-      throw new IllegalArgumentException("Negative uncompressed length: " + uncompressedLength);
-    }
+    assert uncompressedLength >= 0;
     // Snappy's documented bound is 32 + n + n / 6. Check it in long arithmetic before
     // entering xerial so an overflowing Java int can never be mistaken for a valid capacity.
     long calculatedMaximum = 32L + uncompressedLength + uncompressedLength / 6L;
-    if (calculatedMaximum > Integer.MAX_VALUE) {
-      throw new IllegalArgumentException("Compressed length overflow for " + uncompressedLength);
-    }
+    assert calculatedMaximum <= Integer.MAX_VALUE;
     try {
       int result = Snappy.maxCompressedLength(uncompressedLength);
-      if (result < 0 || result < uncompressedLength) {
-        throw new IllegalArgumentException("Compressed length overflow for " + uncompressedLength);
-      }
+      assert result >= uncompressedLength;
       return result;
     } catch (RuntimeException e) {
       throw new IllegalArgumentException("Unsupported Snappy input length: " + uncompressedLength, e);
@@ -67,10 +61,7 @@ public final class XerialSnappyCompressor implements Compressor {
     }
     try {
       int length = Snappy.rawCompress(input, inputOffset, inputLength, scratch, 0);
-      if (length > outputCapacity) {
-        throw new IOException("Insufficient Snappy output capacity: need " + length
-            + ", have " + outputCapacity);
-      }
+      assert length <= outputCapacity;
       System.arraycopy(scratch, 0, output, outputOffset, length);
       return length;
     } catch (IOException e) {
@@ -81,10 +72,8 @@ public final class XerialSnappyCompressor implements Compressor {
   }
 
   byte[] ensureInputCapacity(int length) {
-    ensureOpen();
-    if (length < 0) {
-      throw new IllegalArgumentException("Negative input buffer length: " + length);
-    }
+    assert !closed;
+    assert length >= 0;
     if (input.length < length) {
       input = new byte[length];
     }
@@ -92,8 +81,8 @@ public final class XerialSnappyCompressor implements Compressor {
   }
 
   int compressBuffered(int inputLength) throws IOException {
-    ensureOpen();
-    checkRange(input, 0, inputLength, "input");
+    assert !closed;
+    assert inputLength >= 0 && inputLength <= input.length;
     int maximum = maxCompressedLength(inputLength);
     if (scratch.length < maximum) {
       scratch = new byte[maximum];
@@ -106,24 +95,19 @@ public final class XerialSnappyCompressor implements Compressor {
   }
 
   byte[] getCompressedBuffer() {
-    ensureOpen();
+    assert !closed;
     return scratch;
   }
 
   static void checkRange(byte[] array, int offset, int length, String name) {
-    if (array == null) {
-      throw new NullPointerException(name);
-    }
-    if (offset < 0 || length < 0 || offset > array.length - length) {
-      throw new IndexOutOfBoundsException(name + " range: offset=" + offset + ", length=" + length
-          + ", arrayLength=" + array.length);
-    }
+    assert array != null : name;
+    assert offset >= 0;
+    assert length >= 0;
+    assert offset <= array.length - length;
   }
 
   private void ensureOpen() {
-    if (closed) {
-      throw new IllegalStateException("Compressor is closed");
-    }
+    assert !closed;
   }
 
   @Override

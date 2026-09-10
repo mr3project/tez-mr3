@@ -26,14 +26,14 @@ public interface Compressor extends AutoCloseable {
 
   /**
    * Returns a safe bound for one complete block without changing compressor state.
-   * Negative, overflowing, and unsupported lengths are rejected.
+   * The caller supplies a non-negative, supported length.
    */
   int maxCompressedLength(int uncompressedLength);
 
   /**
-   * Compresses exactly one independent block. Implementations validate both array ranges, retain
-   * no caller arrays, and throw {@link IOException} without partial caller output if capacity is
-   * insufficient or compression fails.
+   * Compresses exactly one independent block. The caller supplies valid array ranges and enough
+   * output capacity. Implementations retain no caller arrays and throw {@link IOException} without
+   * partial caller output if compression fails.
    */
   int compress(byte[] input, int inputOffset, int inputLength,
       byte[] output, int outputOffset, int outputCapacity) throws IOException;

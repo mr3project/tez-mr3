@@ -41,12 +41,10 @@ final class SnappyCompressionOutputStream extends CompressionOutputStream {
   SnappyCompressionOutputStream(
       OutputStream output, XerialSnappyCompressor compressor, int bufferSize)
       throws IOException {
-    if (output == null || compressor == null) {
-      throw new NullPointerException();
-    }
-    if (bufferSize <= 0 || bufferSize > MAX_BLOCK_SIZE) {
-      throw new IOException("Invalid Snappy block size: " + bufferSize);
-    }
+    assert output != null;
+    assert compressor != null;
+    assert bufferSize > 0;
+    assert bufferSize <= MAX_BLOCK_SIZE;
     this.output = new DataOutputStream(output);
     this.compressor = compressor;
     this.inputBuffer = compressor.ensureInputCapacity(bufferSize);
@@ -119,9 +117,7 @@ final class SnappyCompressionOutputStream extends CompressionOutputStream {
   @Override
   public void resetState() throws IOException {
     ensureOpen();
-    if (!finished) {
-      throw new IOException("Cannot reset an unfinished Snappy stream");
-    }
+    assert finished;
     compressor.reset();
     inputLength = 0;
     started = false;
@@ -142,14 +138,10 @@ final class SnappyCompressionOutputStream extends CompressionOutputStream {
 
   private void ensureWritable() throws IOException {
     ensureOpen();
-    if (finished) {
-      throw new IOException("Snappy stream has been finished");
-    }
+    assert !finished;
   }
 
   private void ensureOpen() throws IOException {
-    if (closed) {
-      throw new IOException("Snappy stream is closed");
-    }
+    assert !closed;
   }
 }

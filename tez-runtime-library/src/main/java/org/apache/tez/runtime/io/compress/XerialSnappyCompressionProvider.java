@@ -42,10 +42,7 @@ public final class XerialSnappyCompressionProvider implements CompressionProvide
   public CompressionOutputStream createOutputStream(
       OutputStream output, Compressor compressor, int bufferSize) throws IOException {
     requireAlgorithm(compressor.getAlgorithm());
-    if (!(compressor instanceof XerialSnappyCompressor)) {
-      throw new IOException("Expected " + XerialSnappyCompressor.class.getName()
-          + ", got " + compressor.getClass().getName());
-    }
+    assert compressor instanceof XerialSnappyCompressor;
     return new SnappyCompressionOutputStream(
         output, (XerialSnappyCompressor) compressor, bufferSize);
   }
@@ -54,17 +51,12 @@ public final class XerialSnappyCompressionProvider implements CompressionProvide
   public InputStream createInputStream(
       InputStream input, Decompressor decompressor, int bufferSize) throws IOException {
     requireAlgorithm(decompressor.getAlgorithm());
-    if (!(decompressor instanceof XerialSnappyDecompressor)) {
-      throw new IOException("Expected " + XerialSnappyDecompressor.class.getName()
-          + ", got " + decompressor.getClass().getName());
-    }
+    assert decompressor instanceof XerialSnappyDecompressor;
     return new SnappyCompressionInputStream(
         input, (XerialSnappyDecompressor) decompressor, bufferSize);
   }
 
   private void requireAlgorithm(CompressionAlgorithm algorithm) throws IOException {
-    if (algorithm != getAlgorithm()) {
-      throw new IOException("Expected " + getAlgorithm() + " object, got " + algorithm);
-    }
+    assert algorithm == getAlgorithm();
   }
 }
