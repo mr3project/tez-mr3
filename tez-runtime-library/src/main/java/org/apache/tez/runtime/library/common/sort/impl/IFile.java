@@ -38,13 +38,13 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.tez.runtime.library.utils.CodecUtils;
+import org.apache.tez.runtime.io.compress.CompressionResolver;
 import org.apache.tez.util.FastByteComparisons;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.io.compress.CodecPool;
 import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.hadoop.io.compress.CompressionOutputStream;
-import org.apache.hadoop.io.compress.Compressor;
-import org.apache.hadoop.io.compress.Decompressor;
+import org.apache.tez.runtime.io.compress.TezCompressionOutputStream;
+import org.apache.tez.runtime.io.compress.Compressor;
+import org.apache.tez.runtime.io.compress.Decompressor;
 import org.apache.tez.common.counters.TezCounter;
 
 import javax.annotation.Nullable;
@@ -324,7 +324,7 @@ public class IFile {
     private final CompressionCodec codec;
 
     private IFileOutputStream checksumOut;
-    private CompressionOutputStream compressedOut;
+    private TezCompressionOutputStream compressedOut;
     private Compressor compressor;
     private boolean compressOutput = false;
     protected DataOutputStream out;
@@ -392,7 +392,7 @@ public class IFile {
         if (compressorExternal != null) {
           this.compressor = compressorExternal;
         } else {
-          this.compressor = taskContext.getCompressor(codec);
+          this.compressor = taskContext.getCompressor(CompressionResolver.resolveAlgorithm(codec));
         }
         if (this.compressor != null) {
           this.compressor.reset();
@@ -460,7 +460,7 @@ public class IFile {
         // if compressorExternal != null, this Writer does not own compressor, so do not return it to CodecPool
         if (compressorExternal == null) {
           // this Writer owns compressor
-          taskContext.returnCompressor(codec.getCompressorType(), compressor);
+          taskContext.returnCompressor(compressor);
         }
         compressor = null;
       }
@@ -1013,7 +1013,7 @@ public class IFile {
         assert taskContext != null;
         this.codec = codec;
         this.taskContext = taskContext;
-        decompressor = taskContext.getDecompressor(codec);
+        decompressor = taskContext.getDecompressor(CompressionResolver.resolveAlgorithm(codec));
         if (decompressor != null) {
           this.in = CodecUtils.getDecompressedInputStreamWithBufferSize(
               codec, checksumIn, decompressor, (int)Math.min(length, Integer.MAX_VALUE));
@@ -1062,12 +1062,12 @@ public class IFile {
           decompressor = decompressorHolder.get();
           if (decompressor == null) {
             assert taskContext != null;
-            decompressor = taskContext.getDecompressor(codec);
+            decompressor = taskContext.getDecompressor(CompressionResolver.resolveAlgorithm(codec));
             decompressorHolder.set(decompressor);
           }
         } else {
           assert taskContext != null;
-          decompressor = taskContext.getDecompressor(codec);
+          decompressor = taskContext.getDecompressor(CompressionResolver.resolveAlgorithm(codec));
         }
         if (decompressor != null) {
           decompressor.reset();
@@ -1107,9 +1107,9 @@ public class IFile {
           // if useThreadLocalDecompressor == true, never return decompressor which will be garbage-collected
           if (!useThreadLocalDecompressor) {
             if (taskContext != null) {
-              taskContext.returnDecompressor(codec.getCompressorType(), decompressor);
+              taskContext.returnDecompressor(decompressor);
             } else {
-              CodecPool.returnDecompressor(decompressor);
+              decompressor.close();
             }
           }
         }
@@ -1569,9 +1569,9 @@ public class IFile {
       if (decompressor != null) {
         decompressor.reset();
         if (taskContext != null) {
-          taskContext.returnDecompressor(codec.getCompressorType(), decompressor);
+          taskContext.returnDecompressor(decompressor);
         } else {
-          CodecPool.returnDecompressor(decompressor);
+          decompressor.close();
         }
         decompressor = null;
       }

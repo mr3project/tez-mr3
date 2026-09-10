@@ -58,7 +58,8 @@ import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.library.common.sort.impl.RawDataBuffer;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.hadoop.io.compress.Compressor;
+import org.apache.tez.runtime.io.compress.Compressor;
+import org.apache.tez.runtime.io.compress.CompressionResolver;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.tez.common.TezCommonUtils;
 import org.apache.tez.common.TezUtilsInternal;
@@ -1094,7 +1095,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
               }
               if (writer == null) {
                 if (codec != null && compressorExternal == null) {
-                  compressorExternal = outputContext.getCompressor(codec);
+                  compressorExternal = outputContext.getCompressor(CompressionResolver.resolveAlgorithm(codec));
                 }
                 // all Writer instances share the same FSDataOutputStream out
                 writer = new WriterDataInputBuffer(
@@ -1130,7 +1131,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
         }
       } finally {
         if (compressorExternal != null) {
-          outputContext.returnCompressor(codec.getCompressorType(), compressorExternal);
+          outputContext.returnCompressor(compressorExternal);
         }
         if (fsOutput != null) {
           fsOutput.close();

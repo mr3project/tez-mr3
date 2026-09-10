@@ -18,10 +18,10 @@
 
 package org.apache.tez.runtime.api;
 
-import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.hadoop.io.compress.Compressor;
+import org.apache.tez.runtime.io.compress.CompressionAlgorithm;
+import org.apache.tez.runtime.io.compress.Compressor;
 
 public interface CompressorPool {
-  public Compressor getCompressor(CompressionCodec codec);
-  public void returnCompressor(Class<? extends Compressor> compressorType, Compressor compressor);
+  Compressor getCompressor(CompressionAlgorithm algorithm);
+  void returnCompressor(Compressor compressor);
 }
