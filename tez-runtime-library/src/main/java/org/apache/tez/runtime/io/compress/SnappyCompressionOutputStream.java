@@ -31,15 +31,15 @@ final class SnappyCompressionOutputStream extends CompressionOutputStream {
   static final int MAX_BLOCK_SIZE = 64 * 1024 * 1024;
 
   private final DataOutputStream output;
-  private final Compressor compressor;
+  private final XerialSnappyCompressor compressor;
   private final byte[] inputBuffer;
-  private byte[] compressedBuffer;
   private int inputLength;
   private boolean started;
   private boolean finished;
   private boolean closed;
 
-  SnappyCompressionOutputStream(OutputStream output, Compressor compressor, int bufferSize)
+  SnappyCompressionOutputStream(
+      OutputStream output, XerialSnappyCompressor compressor, int bufferSize)
       throws IOException {
     if (output == null || compressor == null) {
       throw new NullPointerException();
@@ -49,8 +49,7 @@ final class SnappyCompressionOutputStream extends CompressionOutputStream {
     }
     this.output = new DataOutputStream(output);
     this.compressor = compressor;
-    this.inputBuffer = new byte[bufferSize];
-    this.compressedBuffer = new byte[compressor.maxCompressedLength(bufferSize)];
+    this.inputBuffer = compressor.ensureInputCapacity(bufferSize);
   }
 
   @Override
@@ -90,15 +89,10 @@ final class SnappyCompressionOutputStream extends CompressionOutputStream {
       return;
     }
     start();
-    int maximum = compressor.maxCompressedLength(inputLength);
-    if (compressedBuffer.length < maximum) {
-      compressedBuffer = new byte[maximum];
-    }
-    int compressedLength = compressor.compress(
-        inputBuffer, 0, inputLength, compressedBuffer, 0, compressedBuffer.length);
+    int compressedLength = compressor.compressBuffered(inputLength);
     output.writeInt(inputLength);
     output.writeInt(compressedLength);
-    output.write(compressedBuffer, 0, compressedLength);
+    output.write(compressor.getCompressedBuffer(), 0, compressedLength);
     inputLength = 0;
   }
 

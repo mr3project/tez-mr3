@@ -23,6 +23,7 @@ import org.xerial.snappy.Snappy;
 
 /** Raw xerial Snappy block compressor. A scratch buffer prevents partial caller output. */
 public final class XerialSnappyCompressor implements Compressor {
+  private byte[] input = new byte[0];
   private byte[] scratch = new byte[0];
   private boolean closed;
 
@@ -79,6 +80,36 @@ public final class XerialSnappyCompressor implements Compressor {
     }
   }
 
+  byte[] ensureInputCapacity(int length) {
+    ensureOpen();
+    if (length < 0) {
+      throw new IllegalArgumentException("Negative input buffer length: " + length);
+    }
+    if (input.length < length) {
+      input = new byte[length];
+    }
+    return input;
+  }
+
+  int compressBuffered(int inputLength) throws IOException {
+    ensureOpen();
+    checkRange(input, 0, inputLength, "input");
+    int maximum = maxCompressedLength(inputLength);
+    if (scratch.length < maximum) {
+      scratch = new byte[maximum];
+    }
+    try {
+      return Snappy.rawCompress(input, 0, inputLength, scratch, 0);
+    } catch (Throwable e) {
+      throw new IOException("xerial Snappy compression failed", e);
+    }
+  }
+
+  byte[] getCompressedBuffer() {
+    ensureOpen();
+    return scratch;
+  }
+
   static void checkRange(byte[] array, int offset, int length, String name) {
     if (array == null) {
       throw new NullPointerException(name);
@@ -103,6 +134,7 @@ public final class XerialSnappyCompressor implements Compressor {
   @Override
   public void close() {
     closed = true;
+    input = new byte[0];
     scratch = new byte[0];
   }
 }

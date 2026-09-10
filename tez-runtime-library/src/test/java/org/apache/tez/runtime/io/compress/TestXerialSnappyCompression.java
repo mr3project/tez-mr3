@@ -118,6 +118,22 @@ public class TestXerialSnappyCompression {
   }
 
   @Test
+  public void testOutputStreamReusesCompressorWorkspace() throws Exception {
+    XerialSnappyCompressor compressor = new XerialSnappyCompressor();
+    byte[] firstValue = new byte[257];
+    new Random(37).nextBytes(firstValue);
+    assertArrayEquals(firstValue, decode(encode(firstValue, 257, compressor), 257));
+    byte[] input = compressor.ensureInputCapacity(0);
+    byte[] compressed = compressor.getCompressedBuffer();
+
+    byte[] secondValue = new byte[113];
+    new Random(41).nextBytes(secondValue);
+    assertArrayEquals(secondValue, decode(encode(secondValue, 257, compressor), 257));
+    assertSame(input, compressor.ensureInputCapacity(0));
+    assertSame(compressed, compressor.getCompressedBuffer());
+  }
+
+  @Test
   public void testMalformedAndTruncatedStreams() throws Exception {
     byte[] encoded = encode(new byte[100], 17);
     for (int length : new int[] {0, 1, 3, 7, encoded.length - 1}) {
@@ -211,11 +227,16 @@ public class TestXerialSnappyCompression {
   }
 
   private static byte[] encode(byte[] value, int blockSize) throws Exception {
+    return encode(value, blockSize, new XerialSnappyCompressor());
+  }
+
+  private static byte[] encode(
+      byte[] value, int blockSize, XerialSnappyCompressor compressor) throws Exception {
     ByteArrayOutputStream sink = new ByteArrayOutputStream();
     SnappyCompressionOutputStream out = new SnappyCompressionOutputStream(
-        sink, new XerialSnappyCompressor(), blockSize);
+        sink, compressor, blockSize);
     out.write(value);
-    out.finish();
+    out.close();
     return sink.toByteArray();
   }
 
