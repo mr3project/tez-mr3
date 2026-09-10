@@ -1706,6 +1706,12 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
                   reader = new IFile.Reader(input, indexRecord.getPartLength(), spillCodecForReader, null, null,
                       ifileReadAhead, ifileReadAheadLength, outputContext, spillOffsetRecord);
                 }
+                // reader.close() may not be called if the following while{} block throws IOException.
+                // In this case, reader.decompressor is not returned to the pool.
+                // However, this is not memory leak because reader is eventually garbage collected, at which point
+                // reader.decompressor is also garbage collected. It is just that reader.decompressor is not reused.
+                // Note that reader.close() itself may throw IOException and reader.decompressor may not be returned to the pool.
+                // For the same reason, this not memory leak because reader.decompressor is eventually garbage collected.
                 try {
                   while (reader.readRawKey(keyBufferIFile) != IFile.Reader.KeyState.NO_KEY) {
                     // TODO Inefficient for large records, since the entire record will be read into memory.
