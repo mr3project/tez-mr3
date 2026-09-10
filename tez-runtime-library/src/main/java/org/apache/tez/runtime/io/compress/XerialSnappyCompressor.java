@@ -18,12 +18,12 @@
 package org.apache.tez.runtime.io.compress;
 
 import java.io.IOException;
-import java.util.Arrays;
 
 import org.xerial.snappy.Snappy;
 
 /** Raw xerial Snappy block compressor. A scratch buffer prevents partial caller output. */
 public final class XerialSnappyCompressor implements Compressor {
+  private byte[] input = new byte[0];
   private byte[] scratch = new byte[0];
   private boolean closed;
 
@@ -80,10 +80,37 @@ public final class XerialSnappyCompressor implements Compressor {
     }
   }
 
-  static void checkRange(byte[] array, int offset, int length, String name) {
-    if (array == null) {
-      throw new NullPointerException(name);
+  byte[] ensureInputCapacity(int length) {
+    assert !closed;
+    if (length < 0) {
+      throw new IllegalArgumentException("Negative input buffer length: " + length);
     }
+    if (input.length < length) {
+      input = new byte[length];
+    }
+    return input;
+  }
+
+  int compressBuffered(int inputLength) throws IOException {
+    assert !closed;
+    checkRange(input, 0, inputLength, "input");
+    int maximum = maxCompressedLength(inputLength);
+    if (scratch.length < maximum) {
+      scratch = new byte[maximum];
+    }
+    try {
+      return Snappy.rawCompress(input, 0, inputLength, scratch, 0);
+    } catch (Throwable e) {
+      throw new IOException("xerial Snappy compression failed", e);
+    }
+  }
+
+  byte[] getCompressedBuffer() {
+    assert !closed;
+    return scratch;
+  }
+
+  static void checkRange(byte[] array, int offset, int length, String name) {
     if (offset < 0 || length < 0 || offset > array.length - length) {
       throw new IndexOutOfBoundsException(name + " range: offset=" + offset + ", length=" + length
           + ", arrayLength=" + array.length);
@@ -91,9 +118,7 @@ public final class XerialSnappyCompressor implements Compressor {
   }
 
   private void ensureOpen() {
-    if (closed) {
-      throw new IllegalStateException("Compressor is closed");
-    }
+    assert !closed;
   }
 
   @Override
@@ -104,7 +129,7 @@ public final class XerialSnappyCompressor implements Compressor {
   @Override
   public void close() {
     closed = true;
-    Arrays.fill(scratch, (byte) 0);
+    input = new byte[0];
     scratch = new byte[0];
   }
 }

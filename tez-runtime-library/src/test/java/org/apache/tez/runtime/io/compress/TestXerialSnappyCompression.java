@@ -14,6 +14,7 @@ package org.apache.tez.runtime.io.compress;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -73,8 +74,8 @@ public class TestXerialSnappyCompression {
     compressor.close();
     decompressor.close();
     decompressor.close();
-    assertIllegalState(() -> compressor.maxCompressedLength(1));
-    assertIllegalState(decompressor::reset);
+    assertAssertionFailure(() -> compressor.maxCompressedLength(1));
+    assertAssertionFailure(decompressor::reset);
   }
 
   @Test
@@ -98,6 +99,38 @@ public class TestXerialSnappyCompression {
     byte[] both = sink.toByteArray();
     assertTrue(both.length > first.length);
     assertArrayEquals(new byte[0], decode(Arrays.copyOfRange(both, first.length, both.length), 16));
+  }
+
+  @Test
+  public void testInputStreamReusesDecompressorWorkspace() throws Exception {
+    XerialSnappyDecompressor decompressor = new XerialSnappyDecompressor();
+    byte[] firstValue = new byte[257];
+    new Random(29).nextBytes(firstValue);
+    assertArrayEquals(firstValue, decode(encode(firstValue, 257), 257, decompressor));
+    byte[] compressed = decompressor.ensureCompressedCapacity(0);
+    byte[] uncompressed = decompressor.getDecompressedBuffer();
+
+    byte[] secondValue = new byte[113];
+    new Random(31).nextBytes(secondValue);
+    assertArrayEquals(secondValue, decode(encode(secondValue, 257), 257, decompressor));
+    assertSame(compressed, decompressor.ensureCompressedCapacity(0));
+    assertSame(uncompressed, decompressor.getDecompressedBuffer());
+  }
+
+  @Test
+  public void testOutputStreamReusesCompressorWorkspace() throws Exception {
+    XerialSnappyCompressor compressor = new XerialSnappyCompressor();
+    byte[] firstValue = new byte[257];
+    new Random(37).nextBytes(firstValue);
+    assertArrayEquals(firstValue, decode(encode(firstValue, 257, compressor), 257));
+    byte[] input = compressor.ensureInputCapacity(0);
+    byte[] compressed = compressor.getCompressedBuffer();
+
+    byte[] secondValue = new byte[113];
+    new Random(41).nextBytes(secondValue);
+    assertArrayEquals(secondValue, decode(encode(secondValue, 257, compressor), 257));
+    assertSame(input, compressor.ensureInputCapacity(0));
+    assertSame(compressed, compressor.getCompressedBuffer());
   }
 
   @Test
@@ -194,22 +227,36 @@ public class TestXerialSnappyCompression {
   }
 
   private static byte[] encode(byte[] value, int blockSize) throws Exception {
+    return encode(value, blockSize, new XerialSnappyCompressor());
+  }
+
+  private static byte[] encode(
+      byte[] value, int blockSize, XerialSnappyCompressor compressor) throws Exception {
     ByteArrayOutputStream sink = new ByteArrayOutputStream();
     SnappyCompressionOutputStream out = new SnappyCompressionOutputStream(
-        sink, new XerialSnappyCompressor(), blockSize);
+        sink, compressor, blockSize);
     out.write(value);
-    out.finish();
+    out.close();
     return sink.toByteArray();
   }
 
   private static byte[] decode(byte[] encoded, int blockSize) throws Exception {
+    return decode(encoded, blockSize, new XerialSnappyDecompressor());
+  }
+
+  private static byte[] decode(
+      byte[] encoded, int blockSize, XerialSnappyDecompressor decompressor) throws Exception {
     SnappyCompressionInputStream input = new SnappyCompressionInputStream(
-        new ByteArrayInputStream(encoded), new XerialSnappyDecompressor(), blockSize);
+        new ByteArrayInputStream(encoded), decompressor, blockSize);
     ByteArrayOutputStream restored = new ByteArrayOutputStream();
-    byte[] buffer = new byte[11];
-    int count;
-    while ((count = input.read(buffer)) != -1) {
-      restored.write(buffer, 0, count);
+    try {
+      byte[] buffer = new byte[11];
+      int count;
+      while ((count = input.read(buffer)) != -1) {
+        restored.write(buffer, 0, count);
+      }
+    } finally {
+      input.close();
     }
     return restored.toByteArray();
   }
@@ -314,11 +361,11 @@ public class TestXerialSnappyCompression {
     }
   }
 
-  private static void assertIllegalState(CheckedRunnable runnable) throws Exception {
+  private static void assertAssertionFailure(CheckedRunnable runnable) throws Exception {
     try {
       runnable.run();
-      fail("expected IllegalStateException");
-    } catch (IllegalStateException expected) {
+      fail("expected AssertionError");
+    } catch (AssertionError expected) {
     }
   }
 
