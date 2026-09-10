@@ -15,13 +15,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.tez.runtime.io.compress;
 
-package org.apache.tez.runtime.api;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 
-import org.apache.tez.runtime.io.compress.CompressionAlgorithm;
-import org.apache.tez.runtime.io.compress.Decompressor;
+/** Creates the low-level objects and private stream format for one algorithm. */
+public interface CompressionProvider {
 
-public interface DecompressorPool {
-  Decompressor getDecompressor(CompressionAlgorithm algorithm);
-  void returnDecompressor(Decompressor decompressor);
+  CompressionAlgorithm getAlgorithm();
+
+  Compressor createCompressor() throws IOException;
+  Decompressor createDecompressor() throws IOException;
+
+  CompressionOutputStream createOutputStream(
+      OutputStream output, Compressor compressor, int bufferSize) throws IOException;
+  InputStream createInputStream(
+      InputStream input, Decompressor decompressor, int bufferSize) throws IOException;
 }

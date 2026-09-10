@@ -15,13 +15,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.tez.runtime.io.compress;
 
-package org.apache.tez.runtime.api;
+/** A reusable, block-oriented Tez compressor */
+public interface Compressor {
+  /** Returns the stable algorithm identity used to prevent cross-pool returns. */
+  CompressionAlgorithm getAlgorithm();
 
-import org.apache.tez.runtime.io.compress.CompressionAlgorithm;
-import org.apache.tez.runtime.io.compress.Decompressor;
+  /** Restores new-borrower state while retaining reusable allocations. */
+  void reset();
 
-public interface DecompressorPool {
-  Decompressor getDecompressor(CompressionAlgorithm algorithm);
-  void returnDecompressor(Decompressor decompressor);
+  /** Permanently releases resources. This operation is idempotent and does not return to a pool. */
+  void close();
 }

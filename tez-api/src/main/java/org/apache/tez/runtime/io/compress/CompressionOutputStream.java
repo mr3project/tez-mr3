@@ -15,13 +15,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.tez.runtime.io.compress;
 
-package org.apache.tez.runtime.api;
+import java.io.IOException;
+import java.io.OutputStream;
 
-import org.apache.tez.runtime.io.compress.CompressionAlgorithm;
-import org.apache.tez.runtime.io.compress.Decompressor;
-
-public interface DecompressorPool {
-  Decompressor getDecompressor(CompressionAlgorithm algorithm);
-  void returnDecompressor(Decompressor decompressor);
+/** Output stream lifecycle used by an IFile partition writer. */
+public abstract class CompressionOutputStream extends OutputStream {
+  public abstract void finish() throws IOException;
+  public abstract void resetState() throws IOException;
 }
