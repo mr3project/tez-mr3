@@ -60,9 +60,10 @@ public class TestXerialSnappyCompression {
       assertIOException(() -> compressor.compress(
           value, 0, value.length, new byte[Math.max(0, compressedLength - 1)], 0,
           Math.max(0, compressedLength - 1)));
-      assertIOException(() -> decompressor.decompress(
-          exact, 0, exact.length, new byte[Math.max(0, value.length - 1)], 0,
-          Math.max(0, value.length - 1)));
+      if (value.length > 0) {
+        assertIOException(() -> decompressor.decompress(
+            exact, 0, exact.length, new byte[value.length - 1], 0, value.length - 1));
+      }
       compressor.reset();
       decompressor.reset();
     }
