@@ -956,8 +956,7 @@ public class IFile {
      * Construct an IFile Reader.
      *
      * @param in   The input stream
-     * @param length Length of the data in the stream, including the checksum
-     *               bytes.
+     * @param length Length of the data in the stream, including the checksum bytes.
      * @param codec codec
      * @param readsCounter Counter for records read from disk
      * @throws IOException
@@ -1015,8 +1014,7 @@ public class IFile {
         this.taskContext = taskContext;
         decompressor = taskContext.getDecompressor(CompressionResolver.resolveAlgorithm(codec));
         if (decompressor != null) {
-          this.in = CodecUtils.getDecompressedInputStreamWithBufferSize(
-              codec, checksumIn, decompressor, (int)Math.min(length, Integer.MAX_VALUE));
+          this.in = CodecUtils.getDecompressedInputStreamWithBufferSize(codec, checksumIn, decompressor);
         } else {
           LOG.warn("Could not obtain decompressor from CodecPool");
           this.in = checksumIn;
@@ -1071,8 +1069,7 @@ public class IFile {
         }
         if (decompressor != null) {
           decompressor.reset();
-          in = CodecUtils.getDecompressedInputStreamWithBufferSize(
-              codec, checksumIn, decompressor, checksumInLength);
+          in = CodecUtils.getDecompressedInputStreamWithBufferSize(codec, checksumIn, decompressor);
         } else {
           LOG.warn("Could not obtain decompressor from CodecPool");
           in = checksumIn;

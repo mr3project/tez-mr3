@@ -196,7 +196,7 @@ public final class CodecUtils {
   }
 
   public static InputStream getDecompressedInputStreamWithBufferSize(CompressionCodec codec,
-      IFileInputStream checksumIn, Decompressor decompressor, int compressedLength)
+      IFileInputStream checksumIn, Decompressor decompressor)
       throws IOException {
     CompressionProvider provider = CompressionResolver.getProvider(codec);
     return provider.createInputStream(

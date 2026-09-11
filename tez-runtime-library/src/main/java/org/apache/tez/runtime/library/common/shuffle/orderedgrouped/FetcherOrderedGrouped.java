@@ -611,6 +611,7 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
         }
 
         if (mapOutput.getType() == ShuffleClient.Type.MEMORY) {
+          // (int) decompressedLength and (int) compressedLength are safe because of Type.MEMORY
           ShuffleUtils.shuffleToMemory(mapOutput.getMemory(), input, (int) decompressedLength,
               (int) compressedLength, codec, fetcherConfig.ifileReadAhead,
               fetcherConfig.ifileReadAheadLength,

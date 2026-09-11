@@ -528,8 +528,11 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     // It is always a win to use MemoryFetchedInput if memory is available because
     // even with LocalDiskFetchedInput and InputStreamFetchedInput, we eventually allocate BytesArray for every record.
     // Thus, it is more efficient to allocate BytesArray for the entire payload at once.
-    MemoryFetchedInput memoryFetchedInput = shuffleManager.getInputManager().getMemoryFetchedInput(
-        indexRecord.getRawLength(), srcAttemptId, true);
+    MemoryFetchedInput memoryFetchedInput =
+        indexRecord.getRawLength() <= Integer.MAX_VALUE && indexRecord.getPartLength() <= Integer.MAX_VALUE
+        ? shuffleManager.getInputManager().getMemoryFetchedInput(
+            indexRecord.getRawLength(), srcAttemptId, true)
+        : null;
 
     if (memoryFetchedInput != null) {
       InputStream inputStream;
@@ -548,6 +551,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
             indexRecord.getStartOffset(), indexRecord.getPartLength());
       }
       try {
+        // (int) indexRecord.getRawLength(), (int) indexRecord.getPartLength() are safe because of memoryFetchedInput
         ShuffleUtils.shuffleToMemory(memoryFetchedInput.getBytes(),
             inputStream, (int) indexRecord.getRawLength(), (int) indexRecord.getPartLength(), codec,
             fetcherConfig.ifileReadAhead, fetcherConfig.ifileReadAheadLength,
@@ -800,6 +804,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         }
 
         if (fetchedInput.getType() == ShuffleClient.Type.MEMORY) {
+          // (int) decompressedLength and (int) compressedLength are safe because of Type.MEMORY
           ShuffleUtils.shuffleToMemory(((MemoryFetchedInput) fetchedInput).getBytes(),
               input, (int) decompressedLength, (int) compressedLength, codec,
               fetcherConfig.ifileReadAhead, fetcherConfig.ifileReadAheadLength,

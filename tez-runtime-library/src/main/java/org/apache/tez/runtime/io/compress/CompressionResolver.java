@@ -21,11 +21,14 @@ import java.io.IOException;
 
 import org.apache.hadoop.io.compress.CompressionCodec;
 
-/** Central codec-name to Tez provider resolver. It never invokes methods on the codec. */
+/** Central codec-name to compression provider resolver */
 public final class CompressionResolver {
+
   public static final int DEFAULT_BUFFER_SIZE = 256 * 1024;
+
   private static final String SNAPPY_CODEC = "org.apache.hadoop.io.compress.SnappyCodec";
   private static final String ZSTD_CODEC = "org.apache.hadoop.io.compress.ZStandardCodec";
+
   private static final CompressionProvider SNAPPY_PROVIDER = new XerialSnappyCompressionProvider();
 
   private CompressionResolver() {

@@ -36,6 +36,7 @@ public class MemoryFetchedInput extends FetchedInput {
       InputAttemptIdentifier inputAttemptIdentifier,
       FetchedInputCallback callbackHandler) {
     super(inputAttemptIdentifier, callbackHandler);
+    assert actualSize <= Integer.MAX_VALUE;
     this.byteArray = new byte[(int) actualSize];
   }
 
