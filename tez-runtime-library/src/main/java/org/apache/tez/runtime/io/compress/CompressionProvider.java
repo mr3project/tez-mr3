@@ -25,13 +25,13 @@ import java.io.OutputStream;
 public interface CompressionProvider {
 
   CompressionAlgorithm getAlgorithm();
-  int getDefaultBufferSize();
+  int getBufferSize();
 
   Compressor createCompressor() throws IOException;
   Decompressor createDecompressor() throws IOException;
 
   CompressionOutputStream createOutputStream(
-      OutputStream output, Compressor compressor, int bufferSize) throws IOException;
+      OutputStream output, Compressor compressor) throws IOException;
   InputStream createInputStream(
-      InputStream input, Decompressor decompressor, int bufferSize) throws IOException;
+      InputStream input, Decompressor decompressor) throws IOException;
 }

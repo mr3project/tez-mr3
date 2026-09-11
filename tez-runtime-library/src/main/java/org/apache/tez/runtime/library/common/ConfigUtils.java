@@ -28,28 +28,10 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.RawComparator;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.io.WritableComparator;
-import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.hadoop.io.compress.DefaultCodec;
-import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
 public class ConfigUtils {
-
-  public static Class<? extends CompressionCodec> getIntermediateOutputCompressorClass(
-      Configuration conf, Class<DefaultCodec> defaultValue) {
-    Class<? extends CompressionCodec> codecClass = defaultValue;
-    String name = conf.get(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS_CODEC);
-    if (name != null) {
-      try {
-        codecClass = conf.getClassByName(name).asSubclass(CompressionCodec.class);
-      } catch (ClassNotFoundException e) {
-        throw new IllegalArgumentException("Compression codec " + name
-            + " was not found.", e);
-      }
-    }
-    return codecClass;
-  }
 
   public static boolean shouldCompressIntermediateOutput(Configuration conf) {
     return conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS, false);

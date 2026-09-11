@@ -34,7 +34,7 @@ import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.tez.runtime.io.compress.CompressionProvider;
 import org.apache.tez.common.TezRuntimeFrameworkConfigs;
 import org.apache.tez.common.counters.TaskCounter;
 import org.apache.tez.common.counters.TezCounter;
@@ -48,7 +48,6 @@ import org.apache.tez.runtime.library.common.shuffle.ShuffleEventHandler;
 import org.apache.tez.runtime.library.common.shuffle.impl.ShuffleInputEventHandlerImpl;
 import org.apache.tez.runtime.library.common.shuffle.impl.ShuffleManager;
 import org.apache.tez.runtime.library.common.shuffle.impl.SimpleFetchedInputAllocator;
-import org.apache.tez.runtime.library.utils.CodecUtils;
 import org.apache.tez.common.Preconditions;
 
 /**
@@ -124,13 +123,7 @@ public class UnorderedKVInput extends AbstractLogicalInput implements LogicalInp
       memoryUpdateCallbackHandler.validateUpdateReceived();
 
       Object shuffleServer = getContext().peekShuffleServer();
-      Configuration codecConf = ShuffleServer.getCodecConf(shuffleServer, conf);
-      Class<? extends CompressionCodec> codecClass =
-          ShuffleServer.getCodecClass(shuffleServer, codecConf);
-      CompressionCodec codec = CodecUtils.getCodec(
-          codecConf,
-          codecClass,
-          ShuffleServer.getCodecBufferSize(shuffleServer, codecConf, codecClass));
+      CompressionProvider codec = ShuffleServer.getCompressionProvider(shuffleServer);
 
       boolean ifileReadAhead = conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD,
           TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_DEFAULT);
@@ -252,7 +245,7 @@ public class UnorderedKVInput extends AbstractLogicalInput implements LogicalInp
     return null;
   }
 
-  private UnorderedKVReader createReader(TezCounter inputRecordCounter, CompressionCodec codec,
+  private UnorderedKVReader createReader(TezCounter inputRecordCounter, CompressionProvider codec,
       boolean ifileReadAheadEnabled, int ifileReadAheadLength)
       throws IOException {
     return new UnorderedKVReader(shuffleManager, conf, codec, ifileReadAheadEnabled,

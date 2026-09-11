@@ -62,7 +62,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.apache.hadoop.io.DataInputByteBuffer;
-import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.tez.runtime.io.compress.CompressionProvider;
 import org.apache.hadoop.security.token.Token;
 import org.apache.tez.common.TezCommonUtils;
 import org.apache.tez.common.TezUtilsInternal;
@@ -126,7 +126,7 @@ public class ShuffleUtils {
 
   public static void shuffleToMemory(byte[] shuffleData,
       InputStream input, int decompressedLength, int compressedLength,
-      CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLength,
+      CompressionProvider codec, boolean ifileReadAhead, int ifileReadAheadLength,
       InputAttemptIdentifier identifier,
       TaskContext taskContext, boolean useThreadLocalDecompressor) throws IOException {
     try {

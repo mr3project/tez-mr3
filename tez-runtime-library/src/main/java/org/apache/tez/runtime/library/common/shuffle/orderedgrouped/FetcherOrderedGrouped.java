@@ -33,7 +33,6 @@ import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.FetcherConfig;
@@ -54,7 +53,6 @@ import org.apache.tez.runtime.library.common.shuffle.api.ShuffleHandlerError;
 import org.apache.tez.runtime.library.common.sort.impl.TezIndexRecord;
 import org.apache.tez.runtime.library.common.sort.impl.TezSpillRecord;
 import org.apache.tez.runtime.library.exceptions.FetcherReadTimeoutException;
-import org.apache.tez.runtime.library.utils.CodecUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -156,16 +154,6 @@ public class FetcherOrderedGrouped extends Fetcher<MapOutput> {
 
       Map<CompositeInputAttemptIdentifier, InputHost.PartitionRange> pendingInputs = null;
       try {
-        codec = codecHolder.get();
-        if (codec == null) {
-          // clone codecConf because Decompressor uses locks on the Configuration object
-          Configuration codecConf = new Configuration(fetcherConfigCommon.codecConf);
-          CompressionCodec newCodec = CodecUtils.getCodec(
-              codecConf, fetcherConfigCommon.codecClass, fetcherConfigCommon.bufferSize);
-          codec = newCodec;
-          codecHolder.set(newCodec);
-        }
-
         pendingInputs = fetchNext();
       } catch (InterruptedException ie) {
         // TODO: might not be respected when fetcher is in progress / server is busy. TEZ-711

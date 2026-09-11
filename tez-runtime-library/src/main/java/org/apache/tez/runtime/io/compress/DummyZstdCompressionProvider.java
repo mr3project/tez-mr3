@@ -21,18 +21,17 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
-/** Provider for the Tez chunk-framed xerial Snappy stream format. */
-public final class XerialSnappyCompressionProvider implements CompressionProvider {
-
+/** Placeholder until the Tez ZStandard implementation is available. */
+public final class DummyZstdCompressionProvider implements CompressionProvider {
   private final int bufferSize;
 
-  public XerialSnappyCompressionProvider(int bufferSize) {
+  public DummyZstdCompressionProvider(int bufferSize) {
     this.bufferSize = bufferSize;
   }
 
   @Override
   public CompressionAlgorithm getAlgorithm() {
-    return CompressionAlgorithm.SNAPPY;
+    return CompressionAlgorithm.ZSTD;
   }
 
   @Override
@@ -41,32 +40,28 @@ public final class XerialSnappyCompressionProvider implements CompressionProvide
   }
 
   @Override
-  public Compressor createCompressor() {
-    return new XerialSnappyCompressor();
+  public Compressor createCompressor() throws IOException {
+    throw unavailable();
   }
 
   @Override
-  public Decompressor createDecompressor() {
-    return new XerialSnappyDecompressor();
+  public Decompressor createDecompressor() throws IOException {
+    throw unavailable();
   }
 
   @Override
   public CompressionOutputStream createOutputStream(
       OutputStream output, Compressor compressor) throws IOException {
-    assert compressor.getAlgorithm() == CompressionAlgorithm.SNAPPY;
-    assert compressor instanceof XerialSnappyCompressor;
-
-    return new SnappyCompressionOutputStream(
-        output, (XerialSnappyCompressor) compressor, bufferSize);
+    throw unavailable();
   }
 
   @Override
   public InputStream createInputStream(
       InputStream input, Decompressor decompressor) throws IOException {
-    assert decompressor.getAlgorithm() == CompressionAlgorithm.SNAPPY;
-    assert decompressor instanceof XerialSnappyDecompressor;
+    throw unavailable();
+  }
 
-    return new SnappyCompressionInputStream(
-        input, (XerialSnappyDecompressor) decompressor, bufferSize);
+  private IOException unavailable() {
+    return new IOException("ZStandard IFile compression is not implemented");
   }
 }
