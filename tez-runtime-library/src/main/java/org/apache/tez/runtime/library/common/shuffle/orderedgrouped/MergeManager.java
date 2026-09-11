@@ -393,6 +393,9 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       long actualSize,
       long compressedLength,
       int fetcher) throws IOException {
+    if (actualSize > Integer.MAX_VALUE || compressedLength > Integer.MAX_VALUE) {
+      return getDiskMapOutput(compressedLength, srcAttemptIdentifier, fetcher);
+    }
     if (actualSize > maxSingleShuffleLimit) {
       if (useFreeMemoryFetchedInput) {
         synchronized (this) {

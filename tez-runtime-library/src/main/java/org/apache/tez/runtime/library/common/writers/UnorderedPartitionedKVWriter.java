@@ -1197,7 +1197,9 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
   }
 
   private boolean canSendDataOverDME() {
-    return considerDataViaEvents && writer.getCompressedLength() <= dataViaEventsMaxSize;
+    return considerDataViaEvents
+        && writer.getRawLength() <= Integer.MAX_VALUE
+        && writer.getCompressedLength() <= dataViaEventsMaxSize;
   }
 
   private ByteBuffer readDataForDME() throws IOException {
