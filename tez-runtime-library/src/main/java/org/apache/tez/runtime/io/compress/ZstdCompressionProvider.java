@@ -20,14 +20,17 @@ package org.apache.tez.runtime.io.compress;
 import org.apache.tez.runtime.api.CompressionAlgorithm;
 import org.apache.tez.runtime.api.CompressionProvider;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
 public final class ZstdCompressionProvider implements CompressionProvider {
   private final int bufferSize;
+  private final int compressionLevel;
 
-  public ZstdCompressionProvider(int bufferSize) {
+  public ZstdCompressionProvider(int bufferSize, int compressionLevel) {
     this.bufferSize = bufferSize;
+    this.compressionLevel = compressionLevel;
   }
 
   @Override
@@ -42,25 +45,31 @@ public final class ZstdCompressionProvider implements CompressionProvider {
 
   @Override
   public Compressor createCompressor() {
-    assert false;
-    return null;
+    return new ZstdJniCompressor(compressionLevel);
   }
 
   @Override
   public Decompressor createDecompressor() {
-    assert false;
-    return null;
+    return new ZstdJniDecompressor();
   }
 
   @Override
-  public CompressionOutputStream createOutputStream(OutputStream output, Compressor compressor) {
-    assert false;
-    return null;
+  public CompressionOutputStream createOutputStream(
+      OutputStream output, Compressor compressor) throws IOException {
+    assert compressor.getAlgorithm() == CompressionAlgorithm.ZSTD;
+    assert compressor instanceof ZstdJniCompressor;
+
+    return new ZstdCompressionOutputStream(
+        output, (ZstdJniCompressor) compressor, bufferSize);
   }
 
   @Override
-  public InputStream createInputStream(InputStream input, Decompressor decompressor) {
-    assert false;
-    return null;
+  public InputStream createInputStream(
+      InputStream input, Decompressor decompressor) throws IOException {
+    assert decompressor.getAlgorithm() == CompressionAlgorithm.ZSTD;
+    assert decompressor instanceof ZstdJniDecompressor;
+
+    return new ZstdCompressionInputStream(
+        input, (ZstdJniDecompressor) decompressor, bufferSize);
   }
 }

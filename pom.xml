@@ -65,6 +65,7 @@
     <roaringbit.version>1.2.1</roaringbit.version>
     <slf4j.version>1.7.30</slf4j.version>
     <snappy.version>1.1.10.4</snappy.version>
+    <zstd-jni.version>1.5.6-10</zstd-jni.version>
     <scala.version>2.12.18</scala.version>
     <mr3.version>3.0</mr3.version>
   </properties>
