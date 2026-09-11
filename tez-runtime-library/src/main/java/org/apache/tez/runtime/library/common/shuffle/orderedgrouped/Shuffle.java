@@ -36,7 +36,7 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.tez.runtime.io.compress.CompressionProvider;
 import org.apache.tez.common.TezUtilsInternal;
 import org.apache.tez.common.counters.TaskCounter;
 import org.apache.tez.common.counters.TezCounter;
@@ -46,7 +46,6 @@ import org.apache.tez.runtime.api.InputContext;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.sort.impl.TezRawKeyValueIterator;
 import org.apache.tez.runtime.library.exceptions.InputAlreadyClosedException;
-import org.apache.tez.runtime.library.utils.CodecUtils;
 import org.apache.tez.common.Preconditions;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
@@ -95,13 +94,7 @@ public class Shuffle implements ExceptionReporter {
     this.srcNameTrimmed = TezUtilsInternal.cleanVertexName(inputContext.getSourceVertexName());
 
     Object shuffleServer = inputContext.peekShuffleServer();
-    Configuration codecConf = ShuffleServer.getCodecConf(shuffleServer, conf);
-    Class<? extends CompressionCodec> codecClass =
-        ShuffleServer.getCodecClass(shuffleServer, codecConf);
-    CompressionCodec codec = CodecUtils.getCodec(
-        codecConf,
-        codecClass,
-        ShuffleServer.getCodecBufferSize(shuffleServer, codecConf, codecClass));
+    CompressionProvider codec = ShuffleServer.getCompressionProvider(shuffleServer);
 
     boolean ifileReadAhead = conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD,

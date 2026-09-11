@@ -25,7 +25,7 @@ import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.tez.runtime.library.common.sort.impl.RawDataBuffer;
 import org.apache.hadoop.io.FileChunk;
-import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.tez.runtime.io.compress.CompressionProvider;
 import org.apache.tez.common.counters.TaskCounter;
 import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.dag.api.TezUncheckedException;
@@ -137,7 +137,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
   private final TezCounter additionalSpillBytesWritten;
   private final TezCounter additionalSpillBytesRead;
   
-  private final CompressionCodec codec;
+  private final CompressionProvider codec;
   
   private final boolean ifileReadAhead;
   private final int ifileReadAheadLength;
@@ -172,7 +172,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
                       TezCounter mergedMapOutputsCounter,
                       ExceptionReporter exceptionReporter,
                       long assignedMemoryBytes,
-                      CompressionCodec codec,
+                      CompressionProvider codec,
                       boolean ifileReadAheadEnabled,
                       int ifileReadAheadLength) {
     this.inputContext = inputContext;

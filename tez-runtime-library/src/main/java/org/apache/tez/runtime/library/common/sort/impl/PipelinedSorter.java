@@ -31,16 +31,14 @@ import java.util.zip.Deflater;
 
 import com.google.common.collect.Maps;
 import org.apache.hadoop.io.BytesWritable;
-import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.tez.runtime.io.compress.CompressionProvider;
 import org.apache.tez.runtime.io.compress.Compressor;
-import org.apache.tez.runtime.io.compress.CompressionResolver;
 import org.apache.tez.common.Preconditions;
 import com.google.common.collect.Lists;
 
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.tez.runtime.api.MultiByteArrayOutputStream;
 import org.apache.tez.runtime.library.api.IOInterruptedException;
-import org.apache.tez.runtime.library.utils.CodecUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -90,7 +88,7 @@ public final class PipelinedSorter {
   private int numSpills;
   private final long assignedMemoryMb;
   private final Partitioner partitioner;
-  private final CompressionCodec codec;
+  private final CompressionProvider codec;
   private final boolean ifileReadAhead;
   private final int ifileReadAheadLength;
   private final String auxiliaryService;
@@ -208,13 +206,7 @@ public final class PipelinedSorter {
     this.partitioner = TezRuntimeUtils.instantiatePartitioner(this.conf);
 
     Object shuffleServer = outputContext.peekShuffleServer();
-    Configuration codecConf = ShuffleServer.getCodecConf(shuffleServer, conf);
-    Class<? extends CompressionCodec> codecClass =
-        ShuffleServer.getCodecClass(shuffleServer, codecConf);
-    this.codec = CodecUtils.getCodec(
-        codecConf,
-        codecClass,
-        ShuffleServer.getCodecBufferSize(shuffleServer, codecConf, codecClass));
+    this.codec = ShuffleServer.getCompressionProvider(shuffleServer);
 
     this.ifileReadAhead = this.conf.getBoolean(
         TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD,
@@ -731,7 +723,7 @@ public final class PipelinedSorter {
         boolean hasNext = kvIter.hasNext();
         if (hasNext) {
           if (codec != null && compressorExternal == null) {
-            compressorExternal = outputContext.getCompressor(CompressionResolver.resolveAlgorithm(codec));
+            compressorExternal = outputContext.getCompressor(codec.getAlgorithm());
           }
           writer = new WriterDataInputBuffer(
               fsOutput,

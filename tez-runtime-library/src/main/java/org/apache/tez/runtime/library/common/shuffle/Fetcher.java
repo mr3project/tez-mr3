@@ -19,7 +19,7 @@
 package org.apache.tez.runtime.library.common.shuffle;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.tez.runtime.io.compress.CompressionProvider;
 import org.apache.tez.http.BaseHttpConnection;
 import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.FetcherConfigCommon;
@@ -36,7 +36,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 // T = FetcherInput
 public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchResult> {
 
-  protected static final ThreadLocal<CompressionCodec> codecHolder = new ThreadLocal<>();
   protected static final AtomicInteger fetcherIdGen = new AtomicInteger(0);
 
   protected final ShuffleServer fetcherCallback;
@@ -77,7 +76,7 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
   protected volatile BaseHttpConnection httpConnection;
   protected volatile DataInputStream input;
 
-  protected CompressionCodec codec;
+  protected final CompressionProvider codec;
 
   // Set at the start of call(), so may be invalid when accessed from ShuffleServer.call() thread
   // Hence, we initialize it to Long.MAX_VALUE.
@@ -193,6 +192,7 @@ public abstract class Fetcher<T extends ShuffleInput> implements Callable<FetchR
     this.fetcherConfigCommon = fetcherConfigCommon;
     this.fetcherConfig = fetcherConfig;
     this.taskContext = taskContext;
+    this.codec = ShuffleServer.getCompressionProvider(fetcherCallback);
 
     this.inputHost = inputHost;
     this.host = inputHost.getHostPort().getHost();

@@ -57,9 +57,8 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.library.common.sort.impl.RawDataBuffer;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.tez.runtime.io.compress.CompressionProvider;
 import org.apache.tez.runtime.io.compress.Compressor;
-import org.apache.tez.runtime.io.compress.CompressionResolver;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.tez.common.TezCommonUtils;
 import org.apache.tez.common.TezUtilsInternal;
@@ -92,7 +91,6 @@ import org.apache.tez.runtime.library.output.UnorderedKVOutput;
 import org.apache.tez.runtime.library.partitioner.HashPartitioner;
 import org.apache.tez.runtime.library.shuffle.impl.ShuffleUserPayloads;
 import org.apache.tez.runtime.library.shuffle.impl.ShuffleUserPayloads.DataMovementEventPayloadProto;
-import org.apache.tez.runtime.library.utils.CodecUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -148,7 +146,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
   private final RawLocalFileSystem localFs;
   private final boolean localFsSpillFilePerms;
 
-  private final CompressionCodec codec;
+  private final CompressionProvider codec;
 
   private final TezTaskOutput outputFileHandler;
 
@@ -289,15 +287,8 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       this.localFsSpillFilePerms = false;
     }
 
-    try {
-      Object shuffleServer = outputContext.peekShuffleServer();
-      Configuration codecConf = ShuffleServer.getCodecConf(shuffleServer, conf);
-      Class<? extends CompressionCodec> codecClass = ShuffleServer.getCodecClass(shuffleServer, codecConf);
-      this.codec = CodecUtils.getCodec(codecConf, codecClass,
-          ShuffleServer.getCodecBufferSize(shuffleServer, codecConf, codecClass));
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
+    Object shuffleServer = outputContext.peekShuffleServer();
+    this.codec = ShuffleServer.getCompressionProvider(shuffleServer);
 
     this.outputFileHandler = TezRuntimeUtils.instantiateTaskOutputManager(
         this.conf, outputContext, this.compositeFetch);
@@ -743,7 +734,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       }
     }
 
-    CompressionCodec spillCodec = spillCompressed ? codec : null;
+    CompressionProvider spillCodec = spillCompressed ? codec : null;
     writer = new IFile.WriterBytesWritable(singlePartitionSpillOutput, spillCodec, null, null,
         compositeFetch, maxKeyLen, maxValLen, IFile.allocateWriteBuffer(), null, outputContext);
     singlePartitionSpillRecordBytes = 0;
@@ -963,7 +954,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     // TODO: introduce a runtime configuration key for controlling spillToFreeMemory in non-pipelined shuffling
     boolean spillToFreeMemory = isPipelinedShuffle && useFreeMemoryWriterOutput;
 
-    CompressionCodec spillCodec = spillCompressed ? codec : null;
+    CompressionProvider spillCodec = spillCompressed ? codec : null;
     WrappedBuffer oldestBuffer = filledBuffers.remove(0);
     ListenableFuture<SpillResult> future = spillExecutor.submit(new SpillCallable(
         Collections.singletonList(oldestBuffer), spillCodec, spilledRecordsCounter,
@@ -1013,13 +1004,13 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
   private class SpillCallable implements Callable<SpillResult> {
 
     private final List<WrappedBuffer> filledBuffers;
-    private final CompressionCodec codec;
+    private final CompressionProvider codec;
     private final TezCounter numRecordsCounter;
     private SpillPathDetails spillPathDetails;
     private final int spillNumber;
     private final boolean spillToFreeMemory;
 
-    public SpillCallable(List<WrappedBuffer> filledBuffers, CompressionCodec codec,
+    public SpillCallable(List<WrappedBuffer> filledBuffers, CompressionProvider codec,
         TezCounter numRecordsCounter, SpillPathDetails spillPathDetails, boolean spillToFreeMemory) {
       this(filledBuffers, codec, numRecordsCounter, spillPathDetails.spillIndex, spillToFreeMemory);
       Preconditions.checkArgument(spillToFreeMemory || spillPathDetails.outputFilePath != null,
@@ -1027,7 +1018,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       this.spillPathDetails = spillPathDetails;
     }
 
-    public SpillCallable(List<WrappedBuffer> filledBuffers, CompressionCodec codec,
+    public SpillCallable(List<WrappedBuffer> filledBuffers, CompressionProvider codec,
         TezCounter numRecordsCounter, int spillNumber, boolean spillToFreeMemory) {
       this.filledBuffers = filledBuffers;
       this.codec = codec;
@@ -1095,7 +1086,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
               }
               if (writer == null) {
                 if (codec != null && compressorExternal == null) {
-                  compressorExternal = outputContext.getCompressor(CompressionResolver.resolveAlgorithm(codec));
+                  compressorExternal = outputContext.getCompressor(codec.getAlgorithm());
                 }
                 // all Writer instances share the same FSDataOutputStream out
                 writer = new WriterDataInputBuffer(
@@ -1490,7 +1481,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       //     this spill is the final output and must follow final-output compression (codec).
       //  2) otherwise (pipelined path / additional spill generation):
       //     keep spill compression consistent with prior intermediate spills.
-      CompressionCodec finalSpillCodec =
+      CompressionProvider finalSpillCodec =
           (!isPipelinedShuffle && hasNoPreviousSpills) ? codec : (spillCompressed ? codec : null);
       SpillCallable spillCallable = new SpillCallable(
           filledBuffers, finalSpillCodec, null, spillPathDetails, useMemoryOutput);
@@ -1695,7 +1686,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
                   }
                 }
               } else {
-                CompressionCodec spillCodecForReader = spillCompressed ? codec : null;
+                CompressionProvider spillCodecForReader = spillCompressed ? codec : null;
                 if (spillInfo.byteArrayOutput == null) {
                   FSDataInputStream in = rfs.open(spillInfo.outPath);
                   in.seek(indexRecord.getStartOffset());
