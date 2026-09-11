@@ -24,16 +24,14 @@ import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.tez.runtime.api.CompressionAlgorithm;
 import org.apache.tez.runtime.api.CompressionProvider;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
-import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
-/** Central codec-name to compression provider resolver */
 public final class CompressionResolver {
 
-  private static final Logger LOG = LoggerFactory.getLogger(ShuffleServer.class);
+  private static final Logger LOG = LoggerFactory.getLogger(CompressionResolver.class);
 
   private static final String SNAPPY_CODEC = "org.apache.hadoop.io.compress.SnappyCodec";
   private static final String ZSTD_CODEC = "org.apache.hadoop.io.compress.ZStandardCodec";
@@ -49,21 +47,27 @@ public final class CompressionResolver {
       throw new IOException(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS_CODEC
           + " must be set when intermediate compression is enabled");
     }
+
     CompressionAlgorithm algorithm = resolveAlgorithm(codecClassName);
     if (algorithm == CompressionAlgorithm.SNAPPY) {
       int bufferSize = conf.getInt(
-        CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_KEY,
-        CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_DEFAULT);
+          CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_KEY,
+          CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_DEFAULT);
       LOG.info("Using codec {}, buffer size = {}", algorithm, bufferSize);
       return new XerialSnappyCompressionProvider(bufferSize);
     }
+
     if (algorithm == CompressionAlgorithm.ZSTD) {
       int bufferSize = conf.getInt(
-        CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_KEY,
-        CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_DEFAULT);
-      LOG.info("Using codec {}, buffer size = {}", algorithm, bufferSize);
-      return new ZstdCompressionProvider(bufferSize);
+          CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_KEY,
+          CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_DEFAULT);
+     int compressionLevel = conf.getInt(
+         CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_LEVEL_KEY,
+         CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_LEVEL_DEFAULT);
+      LOG.info("Using codec {}, buffer size = {}, compression level = {}", algorithm, bufferSize, compressionLevel);
+      return new ZstdCompressionProvider(bufferSize, compressionLevel);
     }
+
     return null;  // no compression
   }
 
