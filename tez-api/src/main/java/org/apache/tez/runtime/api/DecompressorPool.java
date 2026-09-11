@@ -18,10 +18,9 @@
 
 package org.apache.tez.runtime.api;
 
-import org.apache.tez.runtime.io.compress.CompressionAlgorithm;
 import org.apache.tez.runtime.io.compress.Decompressor;
 
 public interface DecompressorPool {
-  Decompressor getDecompressor(CompressionAlgorithm algorithm);
+  Decompressor getDecompressor(CompressionProvider codec);
   void returnDecompressor(Decompressor decompressor);
 }

@@ -20,21 +20,19 @@ package org.apache.tez.runtime.io.compress;
 import org.apache.tez.runtime.api.CompressionAlgorithm;
 import org.apache.tez.runtime.api.CompressionProvider;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
-public final class XerialSnappyCompressionProvider implements CompressionProvider {
-
+public final class ZstdCompressionProvider implements CompressionProvider {
   private final int bufferSize;
 
-  public XerialSnappyCompressionProvider(int bufferSize) {
+  public ZstdCompressionProvider(int bufferSize) {
     this.bufferSize = bufferSize;
   }
 
   @Override
   public CompressionAlgorithm getAlgorithm() {
-    return CompressionAlgorithm.SNAPPY;
+    return CompressionAlgorithm.ZSTD;
   }
 
   @Override
@@ -44,31 +42,25 @@ public final class XerialSnappyCompressionProvider implements CompressionProvide
 
   @Override
   public Compressor createCompressor() {
-    return new XerialSnappyCompressor();
+    assert false;
+    return null;
   }
 
   @Override
   public Decompressor createDecompressor() {
-    return new XerialSnappyDecompressor();
+    assert false;
+    return null;
   }
 
   @Override
-  public CompressionOutputStream createOutputStream(
-      OutputStream output, Compressor compressor) throws IOException {
-    assert compressor.getAlgorithm() == CompressionAlgorithm.SNAPPY;
-    assert compressor instanceof XerialSnappyCompressor;
-
-    return new SnappyCompressionOutputStream(
-        output, (XerialSnappyCompressor) compressor, bufferSize);
+  public CompressionOutputStream createOutputStream(OutputStream output, Compressor compressor) {
+    assert false;
+    return null;
   }
 
   @Override
-  public InputStream createInputStream(
-      InputStream input, Decompressor decompressor) throws IOException {
-    assert decompressor.getAlgorithm() == CompressionAlgorithm.SNAPPY;
-    assert decompressor instanceof XerialSnappyDecompressor;
-
-    return new SnappyCompressionInputStream(
-        input, (XerialSnappyDecompressor) decompressor, bufferSize);
+  public InputStream createInputStream(InputStream input, Decompressor decompressor) {
+    assert false;
+    return null;
   }
 }

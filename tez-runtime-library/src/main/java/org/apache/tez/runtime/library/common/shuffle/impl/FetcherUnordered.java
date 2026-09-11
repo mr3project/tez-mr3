@@ -33,7 +33,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.io.input.BoundedInputStream;
 import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.tez.http.HttpConnectionParams;
 import org.apache.tez.runtime.api.FetcherConfig;
 import org.apache.tez.runtime.api.FetcherConfigCommon;
@@ -54,7 +53,6 @@ import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleServer.PathPartition;
 import org.apache.tez.runtime.library.common.shuffle.ShuffleUtils;
 import org.apache.tez.runtime.library.common.shuffle.api.ShuffleHandlerError;
-import org.apache.tez.runtime.library.utils.CodecUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.commons.lang3.StringUtils;
@@ -134,16 +132,6 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
 
       startMillis = System.currentTimeMillis();
       buildPathToAttemptMap();
-
-      codec = codecHolder.get();
-      if (codec == null) {
-        // clone codecConf because Decompressor uses locks on the Configuration object
-        Configuration codecConf = new Configuration(fetcherConfigCommon.codecConf);
-        CompressionCodec newCodec = CodecUtils.getCodec(
-            codecConf, fetcherConfigCommon.codecClass, fetcherConfigCommon.bufferSize);
-        codec = newCodec;
-        codecHolder.set(newCodec);
-      }
 
       boolean isFetchFromLocal;
       boolean isFetchFromLocalInternal = false;   // true if inputs originate from the current process

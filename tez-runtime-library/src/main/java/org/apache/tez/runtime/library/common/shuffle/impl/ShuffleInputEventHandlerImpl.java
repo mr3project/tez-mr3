@@ -31,7 +31,7 @@ import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
 import org.apache.tez.util.StringInterner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.tez.runtime.api.CompressionProvider;
 import org.apache.tez.common.TezCommonUtils;
 import org.apache.tez.common.TezUtilsInternal;
 import org.apache.tez.dag.api.TezUncheckedException;
@@ -61,7 +61,7 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
   private final ShuffleManager shuffleManager;
   //TODO: unused. Consider removing later?
   private final FetchedInputAllocator inputAllocator;
-  private final CompressionCodec codec;
+  private final CompressionProvider codec;
   private final boolean ifileReadAhead;
   private final int ifileReadAheadLength;
   private final InputContext inputContext;
@@ -76,7 +76,7 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
 
   public ShuffleInputEventHandlerImpl(InputContext inputContext,
                                       ShuffleManager shuffleManager,
-                                      FetchedInputAllocator inputAllocator, CompressionCodec codec,
+                                      FetchedInputAllocator inputAllocator, CompressionProvider codec,
                                       boolean ifileReadAhead, int ifileReadAheadLength, boolean compositeFetch) {
     this.inputContext = inputContext;
     this.shuffleManager = shuffleManager;

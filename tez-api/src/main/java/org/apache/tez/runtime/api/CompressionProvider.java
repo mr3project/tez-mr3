@@ -15,7 +15,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.tez.runtime.io.compress;
+package org.apache.tez.runtime.api;
+
+import org.apache.tez.runtime.io.compress.CompressionOutputStream;
+import org.apache.tez.runtime.io.compress.Compressor;
+import org.apache.tez.runtime.io.compress.Decompressor;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -25,13 +29,13 @@ import java.io.OutputStream;
 public interface CompressionProvider {
 
   CompressionAlgorithm getAlgorithm();
-  int getDefaultBufferSize();
+  int getBufferSize();
 
-  Compressor createCompressor() throws IOException;
-  Decompressor createDecompressor() throws IOException;
+  Compressor createCompressor();
+  Decompressor createDecompressor();
 
   CompressionOutputStream createOutputStream(
-      OutputStream output, Compressor compressor, int bufferSize) throws IOException;
+      OutputStream output, Compressor compressor) throws IOException;
   InputStream createInputStream(
-      InputStream input, Decompressor decompressor, int bufferSize) throws IOException;
+      InputStream input, Decompressor decompressor) throws IOException;
 }

@@ -19,6 +19,7 @@ package org.apache.tez.runtime.io.compress;
 
 import java.io.IOException;
 
+import org.apache.tez.runtime.api.CompressionAlgorithm;
 import org.xerial.snappy.Snappy;
 
 /** Raw xerial Snappy block decompressor. */

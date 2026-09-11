@@ -27,7 +27,7 @@ import org.apache.tez.runtime.library.common.shuffle.ShuffleClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.tez.runtime.api.CompressionProvider;
 import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.runtime.library.api.KeyValueReaderEdge;
 import org.apache.tez.runtime.library.common.shuffle.impl.ShuffleManager;
@@ -41,7 +41,7 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
   private static final Logger LOG = LoggerFactory.getLogger(UnorderedKVReader.class);
   
   private final ShuffleManager shuffleManager;
-  private final CompressionCodec codec;
+  private final CompressionProvider codec;
   
   private final boolean ifileReadAhead;
   private final int ifileReadAheadLength;
@@ -58,7 +58,7 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
   private long numRecordsRead = 0;
 
   public UnorderedKVReader(ShuffleManager shuffleManager, Configuration conf,
-      CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLength,
+      CompressionProvider codec, boolean ifileReadAhead, int ifileReadAheadLength,
       TezCounter inputRecordCounter, InputContext context) {
     this.shuffleManager = shuffleManager;
     this.context = context;

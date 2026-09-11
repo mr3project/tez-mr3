@@ -37,11 +37,9 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.tez.runtime.library.utils.CodecUtils;
-import org.apache.tez.runtime.io.compress.CompressionResolver;
 import org.apache.tez.util.FastByteComparisons;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.tez.runtime.api.CompressionProvider;
 import org.apache.tez.runtime.io.compress.CompressionOutputStream;
 import org.apache.tez.runtime.io.compress.Compressor;
 import org.apache.tez.runtime.io.compress.Decompressor;
@@ -131,7 +129,7 @@ public class IFile {
    * IFileWriter which stores data in memory for specified limit, beyond
    * which it falls back to file based writer. It creates files lazily on
    * need basis and avoids any disk hit (in cases, where data fits entirely in mem).
-   * <p>
+   *
    * This class should not make any changes to IFile logic and should just flip streams
    * from mem to disk on need basis.
    *
@@ -139,8 +137,7 @@ public class IFile {
    * store in buffer. Otherwise, it falls back to file based writer. Note that data stored
    * internally would be in compressed format (if codec is provided). However, for easier
    * comparison and spill over, uncompressed payload check is done. This is
-   * done intentionally, as it is not possible to know compressed data length
-   * upfront.
+   * done intentionally, as it is not possible to know compressed data length upfront.
    */
   public static class FileBackedInMemIFileWriter extends WriterBytesWritable {
 
@@ -152,7 +149,8 @@ public class IFile {
     private int totalSize;
 
     private Path outputPath;
-    private final CompressionCodec fileCodec;
+    @Nullable
+    private final CompressionProvider fileCodec;
     private final BoundedByteArrayOutputStream cacheStream;
 
     /**
@@ -168,7 +166,7 @@ public class IFile {
      * @throws IOException
      */
     public FileBackedInMemIFileWriter(FileSystem fs, TezTaskOutput taskOutput,
-        CompressionCodec codec, TezCounter writesCounter,
+        @Nullable CompressionProvider codec, TezCounter writesCounter,
         TezCounter serializedBytesCounter, int cacheSize,
         byte[] writeBuffer, CompressorPool taskContext) throws IOException {
       super(new FSDataOutputStream(createBoundedBuffer(cacheSize), null), null,
@@ -321,7 +319,8 @@ public class IFile {
 
     private final Compressor compressorExternal;  // not to be shared with concurrent threads
     private final CompressorPool taskContext;
-    private final CompressionCodec codec;
+    @Nullable
+    private final CompressionProvider codec;
 
     private IFileOutputStream checksumOut;
     private CompressionOutputStream compressedOut;
@@ -354,7 +353,7 @@ public class IFile {
     protected int eofPos = -1;
 
     protected Writer(FSDataOutputStream outputStream,
-                     CompressionCodec codec,
+                     @Nullable CompressionProvider codec,
                      TezCounter writesCounter, TezCounter serializedBytesCounter,
                      boolean useMaxKeyValLen,
                      boolean isRleEnabled,
@@ -386,17 +385,17 @@ public class IFile {
       writeHeader(outputStream);
     }
 
-    void setupOutputStream(CompressionCodec codec) throws IOException {
+    void setupOutputStream(@Nullable CompressionProvider codec) throws IOException {
       this.checksumOut = new IFileOutputStream(this.rawOut);
       if (codec != null) {
         if (compressorExternal != null) {
           this.compressor = compressorExternal;
         } else {
-          this.compressor = taskContext.getCompressor(CompressionResolver.resolveAlgorithm(codec));
+          this.compressor = taskContext.getCompressor(codec);
         }
         if (this.compressor != null) {
           this.compressor.reset();
-          this.compressedOut = CodecUtils.createOutputStream(codec, checksumOut, compressor);
+          this.compressedOut = codec.createOutputStream(checksumOut, compressor);
           this.out = new DataOutputStream(this.compressedOut);
           this.compressOutput = true;
         } else {
@@ -595,7 +594,7 @@ public class IFile {
     private static final int V_END_MARKER_SIZE = INT_SIZE;
 
     public WriterDataInputBuffer(FileSystem fs, Path file,
-                                 CompressionCodec codec,
+                                 @Nullable CompressionProvider codec,
                                  TezCounter writesCounter,
                                  TezCounter serializedBytesCounter,
                                  boolean isRleEnabled,
@@ -608,7 +607,7 @@ public class IFile {
     }
 
     public WriterDataInputBuffer(FSDataOutputStream outputStream,
-                                 CompressionCodec codec,
+                                 @Nullable CompressionProvider codec,
                                  TezCounter writesCounter,
                                  TezCounter serializedBytesCounter,
                                  boolean useMaxKeyValLen,
@@ -788,7 +787,7 @@ public class IFile {
   public static class WriterBytesWritable extends Writer implements WriterAppendBytesWritable {
 
     public WriterBytesWritable(FileSystem fs, Path file,
-        CompressionCodec codec,
+        @Nullable CompressionProvider codec,
         TezCounter writesCounter,
         TezCounter serializedBytesCounter,
         boolean useMaxKeyValLen,
@@ -802,7 +801,7 @@ public class IFile {
     }
 
     public WriterBytesWritable(FSDataOutputStream outputStream,
-        CompressionCodec codec, TezCounter writesCounter, TezCounter serializedBytesCounter,
+        @Nullable CompressionProvider codec, TezCounter writesCounter, TezCounter serializedBytesCounter,
         boolean useMaxKeyValLen,
         int maxKeyLen, int maxValLen,
         byte[] writeBuffer, @Nullable Compressor compressorExternal,
@@ -925,7 +924,8 @@ public class IFile {
     private final TezCounter readRecordsCounter;
     private final TezCounter bytesReadCounter;
 
-    private CompressionCodec codec;
+    @Nullable
+    private CompressionProvider codec;
     private DecompressorPool taskContext;
     private Decompressor decompressor;
     private final IFileInputStream checksumIn;
@@ -962,7 +962,7 @@ public class IFile {
      * @throws IOException
      */
     public Reader(InputStream in, long length,
-        CompressionCodec codec,
+        @Nullable CompressionProvider codec,
         TezCounter readsCounter, TezCounter bytesReadCounter,
         boolean readAhead, int readAheadLength,
         DecompressorPool taskContext) throws IOException {
@@ -971,7 +971,7 @@ public class IFile {
     }
 
     public Reader(InputStream in, long length,
-                  CompressionCodec codec,
+                  @Nullable CompressionProvider codec,
                   TezCounter readsCounter, TezCounter bytesReadCounter,
                   boolean readAhead, int readAheadLength,
                   DecompressorPool taskContext,
@@ -995,7 +995,7 @@ public class IFile {
      * @throws IOException
      */
     private Reader(InputStream in, long length,
-                  CompressionCodec codec,
+                  @Nullable CompressionProvider codec,
                   TezCounter readsCounter, TezCounter bytesReadCounter,
                   boolean readAhead, int readAheadLength,
                   DecompressorPool taskContext, byte headerFlag,
@@ -1012,9 +1012,9 @@ public class IFile {
         assert taskContext != null;
         this.codec = codec;
         this.taskContext = taskContext;
-        decompressor = taskContext.getDecompressor(CompressionResolver.resolveAlgorithm(codec));
+        decompressor = taskContext.getDecompressor(codec);
         if (decompressor != null) {
-          this.in = CodecUtils.getDecompressedInputStreamWithBufferSize(codec, checksumIn, decompressor);
+          this.in = codec.createInputStream(checksumIn, decompressor);
         } else {
           LOG.warn("Could not obtain decompressor from CodecPool");
           this.in = checksumIn;
@@ -1043,7 +1043,7 @@ public class IFile {
      * @throws IOException
      */
     public static void readToMemory(byte[] buffer, InputStream sourceIn, int compressedLength,
-        CompressionCodec codec, boolean ifileReadAhead, int ifileReadAheadLength,
+        @Nullable CompressionProvider codec, boolean ifileReadAhead, int ifileReadAheadLength,
         TaskContext taskContext, boolean useThreadLocalDecompressor)
         throws IOException {
       byte[] header = new byte[HEADER.length];
@@ -1060,16 +1060,16 @@ public class IFile {
           decompressor = decompressorHolder.get();
           if (decompressor == null) {
             assert taskContext != null;
-            decompressor = taskContext.getDecompressor(CompressionResolver.resolveAlgorithm(codec));
+            decompressor = taskContext.getDecompressor(codec);
             decompressorHolder.set(decompressor);
           }
         } else {
           assert taskContext != null;
-          decompressor = taskContext.getDecompressor(CompressionResolver.resolveAlgorithm(codec));
+          decompressor = taskContext.getDecompressor(codec);
         }
         if (decompressor != null) {
           decompressor.reset();
-          in = CodecUtils.getDecompressedInputStreamWithBufferSize(codec, checksumIn, decompressor);
+          in = codec.createInputStream(checksumIn, decompressor);
         } else {
           LOG.warn("Could not obtain decompressor from CodecPool");
           in = checksumIn;
