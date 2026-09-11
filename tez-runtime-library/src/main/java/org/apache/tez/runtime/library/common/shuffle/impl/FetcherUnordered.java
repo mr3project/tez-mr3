@@ -528,8 +528,10 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
     // It is always a win to use MemoryFetchedInput if memory is available because
     // even with LocalDiskFetchedInput and InputStreamFetchedInput, we eventually allocate BytesArray for every record.
     // Thus, it is more efficient to allocate BytesArray for the entire payload at once.
-    MemoryFetchedInput memoryFetchedInput = shuffleManager.getInputManager().getMemoryFetchedInput(
-        indexRecord.getRawLength(), srcAttemptId, true);
+    MemoryFetchedInput memoryFetchedInput = indexRecord.getPartLength() <= Integer.MAX_VALUE
+        ? shuffleManager.getInputManager().getMemoryFetchedInput(
+            indexRecord.getRawLength(), srcAttemptId, true)
+        : null;
 
     if (memoryFetchedInput != null) {
       InputStream inputStream;

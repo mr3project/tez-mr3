@@ -128,6 +128,9 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator, Fetch
   public synchronized FetchedInput allocate(long actualSize, long compressedSize,
       InputAttemptIdentifier inputAttemptIdentifier,
       boolean isFromShufflePayload, boolean isFetchFromLocal) throws IOException {
+    if (actualSize > Integer.MAX_VALUE || compressedSize > Integer.MAX_VALUE) {
+      return getDiskFetchedInput(compressedSize, inputAttemptIdentifier);
+    }
     if (actualSize > maxSingleMemoryShuffleBytes) {
       if (useFreeMemoryFetchedInput) {
         MemoryFetchedInput result = getMemoryFetchedInput(actualSize, inputAttemptIdentifier, true);
@@ -187,6 +190,9 @@ public class SimpleFetchedInputAllocator implements FetchedInputAllocator, Fetch
 
   public MemoryFetchedInput getMemoryFetchedInput(long actualSize, InputAttemptIdentifier inputAttemptIdentifier,
       boolean checkFreeMemory) {
+    if (actualSize > Integer.MAX_VALUE) {
+      return null;
+    }
     if (!checkFreeMemory || hasFreeMemoryForSize(actualSize)) {
       try {
         MemoryFetchedInput result = new MemoryFetchedInput(actualSize, inputAttemptIdentifier, this);
