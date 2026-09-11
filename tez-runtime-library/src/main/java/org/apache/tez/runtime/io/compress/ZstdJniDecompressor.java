@@ -70,7 +70,7 @@ public final class ZstdJniDecompressor implements Decompressor {
     } catch (IOException e) {
       throw e;
     } catch (Throwable e) {
-      throw new IOException("Invalid or corrupt zstd-jni block", e);
+      throw new IOException("Invalid or corrupt Zstd block", e);
     }
   }
 
