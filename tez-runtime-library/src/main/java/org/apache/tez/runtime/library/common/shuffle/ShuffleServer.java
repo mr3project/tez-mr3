@@ -25,11 +25,6 @@ import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
-import org.apache.hadoop.io.compress.CompressionCodec;
-import org.apache.hadoop.io.compress.DefaultCodec;
-import org.apache.hadoop.io.compress.SnappyCodec;
-import org.apache.hadoop.io.compress.ZStandardCodec;
 
 import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.runtime.api.FetcherConfig;
@@ -37,7 +32,8 @@ import org.apache.tez.runtime.api.FetcherConfigCommon;
 import org.apache.tez.runtime.api.ProcessorContext;
 import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
 import org.apache.tez.runtime.library.common.CompositeInputAttemptIdentifier;
-import org.apache.tez.runtime.library.common.ConfigUtils;
+import org.apache.tez.runtime.api.CompressionProvider;
+import org.apache.tez.runtime.io.compress.CompressionResolver;
 import org.apache.tez.runtime.library.common.InputAttemptIdentifier;
 import org.apache.tez.runtime.library.common.shuffle.impl.FetcherUnordered;
 import org.apache.tez.runtime.library.common.shuffle.impl.ShuffleManager;
@@ -78,50 +74,19 @@ public class ShuffleServer implements FetcherCallback {
   private final boolean isDebugEnabled = LOG.isDebugEnabled();
 
   public static ShuffleServer createInstance(
-    ProcessorContext context, Configuration conf) throws IOException {
+      ProcessorContext context, Configuration conf) throws IOException {
     int numFetchers = conf.getInt(
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_TOTAL_PARALLEL_COPIES,
         TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_TOTAL_PARALLEL_COPIES_DEFAULT);
     return new ShuffleServer(context, conf, numFetchers, context.getUniqueIdentifier());
   }
 
-  public static Configuration getCodecConf(Object instance, Configuration conf) {
-    // clone because Decompressor uses locks on the Configuration object
-    if (instance != null) {
-      return new Configuration(((ShuffleServer)instance).fetcherConfigCommon.codecConf);
-    } else {
-      return new Configuration(conf);
+  @Nullable
+  public static CompressionProvider getCompressionProvider(Object instance) {
+    if (instance == null) {
+      throw new IllegalStateException("ShuffleServer is not ready");
     }
-  }
-
-  public static Class<? extends CompressionCodec> getCodecClass(
-      Object instance, Configuration codecConf) {
-    if (instance != null) {
-      return ((ShuffleServer)instance).fetcherConfigCommon.codecClass;
-    }
-
-    if (ConfigUtils.shouldCompressIntermediateOutput(codecConf)) {
-      return ConfigUtils.getIntermediateOutputCompressorClass(codecConf, DefaultCodec.class);
-    }
-    return null;
-  }
-
-  public static int getCodecBufferSize(
-      Object instance, Configuration codecConf, Class<? extends CompressionCodec> codecClass) {
-    if (instance != null) {
-      return ((ShuffleServer)instance).fetcherConfigCommon.bufferSize;
-    }
-
-    if (codecClass == SnappyCodec.class) {
-      return codecConf.getInt(
-          CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_KEY,
-          CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_DEFAULT);
-    } else if (codecClass == ZStandardCodec.class) {
-      return codecConf.getInt(
-          CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_KEY,
-          CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_DEFAULT);
-    }
-    return -1;
+    return ((ShuffleServer) instance).compressionProvider;
   }
 
   public static class PathPartition {
@@ -180,6 +145,8 @@ public class ShuffleServer implements FetcherCallback {
 
   private final ListeningExecutorService fetcherExecutor;
   private final FetcherConfigCommon fetcherConfigCommon;
+  @Nullable
+  private final CompressionProvider compressionProvider;
   private final boolean sslShuffle;
 
   // TODO: Should we clean resolveHosts[]?
@@ -235,6 +202,7 @@ public class ShuffleServer implements FetcherCallback {
     this.taskContext = taskContext;
     this.maxNumFetchers = numFetchers;
     this.serverName = serverName;
+    this.compressionProvider = CompressionResolver.createProvider(conf);
 
     final ExecutorService fetcherRawExecutor;
     fetcherRawExecutor = Executors.newFixedThreadPool(numFetchers, new ThreadFactoryBuilder()

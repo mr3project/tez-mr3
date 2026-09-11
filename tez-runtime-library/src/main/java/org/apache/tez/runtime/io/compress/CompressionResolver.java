@@ -19,27 +19,55 @@ package org.apache.tez.runtime.io.compress;
 
 import java.io.IOException;
 
-import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.tez.runtime.api.CompressionAlgorithm;
+import org.apache.tez.runtime.api.CompressionProvider;
+import org.apache.tez.runtime.library.api.TezRuntimeConfiguration;
+import org.apache.tez.runtime.library.common.shuffle.ShuffleServer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nullable;
 
 /** Central codec-name to compression provider resolver */
 public final class CompressionResolver {
 
+  private static final Logger LOG = LoggerFactory.getLogger(ShuffleServer.class);
+
   private static final String SNAPPY_CODEC = "org.apache.hadoop.io.compress.SnappyCodec";
   private static final String ZSTD_CODEC = "org.apache.hadoop.io.compress.ZStandardCodec";
 
-  private static final CompressionProvider SNAPPY_PROVIDER = new XerialSnappyCompressionProvider();
-
-  private CompressionResolver() {
-  }
-
-  public static CompressionAlgorithm resolveAlgorithm(CompressionCodec codec) throws IOException {
-    if (codec == null) {
-      throw new IOException("Cannot resolve compression algorithm for a null codec");
+  @Nullable
+  public static CompressionProvider createProvider(Configuration conf) throws IOException {
+    if (!conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS, false)) {
+      return null;
     }
-    return resolveAlgorithm(codec.getClass().getName());
+
+    String codecClassName = conf.getTrimmed(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS_CODEC);
+    if (codecClassName == null || codecClassName.isEmpty()) {
+      throw new IOException(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS_CODEC
+          + " must be set when intermediate compression is enabled");
+    }
+    CompressionAlgorithm algorithm = resolveAlgorithm(codecClassName);
+    if (algorithm == CompressionAlgorithm.SNAPPY) {
+      int bufferSize = conf.getInt(
+        CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_KEY,
+        CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_DEFAULT);
+      LOG.info("Using codec {}, buffer size = {}", algorithm, bufferSize);
+      return new XerialSnappyCompressionProvider(bufferSize);
+    }
+    if (algorithm == CompressionAlgorithm.ZSTD) {
+      int bufferSize = conf.getInt(
+        CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_KEY,
+        CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_DEFAULT);
+      LOG.info("Using codec {}, buffer size = {}", algorithm, bufferSize);
+      return new ZstdCompressionProvider(bufferSize);
+    }
+    return null;  // no compression
   }
 
-  public static CompressionAlgorithm resolveAlgorithm(String codecClassName) throws IOException {
+  private static CompressionAlgorithm resolveAlgorithm(String codecClassName) throws IOException {
     if (SNAPPY_CODEC.equals(codecClassName)) {
       return CompressionAlgorithm.SNAPPY;
     }
@@ -47,17 +75,5 @@ public final class CompressionResolver {
       return CompressionAlgorithm.ZSTD;
     }
     throw new IOException("Unsupported IFile compression codec: " + codecClassName);
-  }
-
-  public static CompressionProvider getProvider(CompressionAlgorithm algorithm) throws IOException {
-    if (algorithm == CompressionAlgorithm.SNAPPY) {
-      return SNAPPY_PROVIDER;
-    }
-    throw new IOException("Tez IFile compression algorithm is recognized but has no provider: "
-        + algorithm);
-  }
-
-  public static CompressionProvider getProvider(CompressionCodec codec) throws IOException {
-    return getProvider(resolveAlgorithm(codec));
   }
 }

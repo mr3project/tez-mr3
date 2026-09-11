@@ -15,9 +15,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.tez.runtime.io.compress;
+package org.apache.tez.runtime.api;
 
-/** Stable identifiers for compression algorithms understood by Tez. */
 public enum CompressionAlgorithm {
   SNAPPY,
   ZSTD

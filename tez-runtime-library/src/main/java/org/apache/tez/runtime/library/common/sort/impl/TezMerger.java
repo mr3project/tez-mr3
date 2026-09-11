@@ -29,12 +29,11 @@ import org.apache.tez.runtime.api.TaskContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.ChecksumFileSystem;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.tez.runtime.api.CompressionProvider;
 import org.apache.tez.common.counters.TezCounter;
 import org.apache.tez.runtime.api.MultiByteArrayOutputStream;
 import org.apache.tez.runtime.api.TezTaskOutput;
@@ -53,7 +52,7 @@ public class TezMerger {
 
   public static
   TezRawKeyValueIterator merge(Configuration conf, FileSystem fs,
-      CompressionCodec codec,
+      CompressionProvider codec,
       List<Segment> segments,
       int mergeFactor, int inMemSegments,
       TezTaskOutput taskOutput, String mergeId,
@@ -194,7 +193,7 @@ public class TezMerger {
     FileSystem fs = null;
     Path file = null;
     boolean preserve = false;   // Signifies whether the segment should be kept after a merge is complete. Checked in the close method.
-    CompressionCodec codec = null;
+    CompressionProvider codec = null;
     long segmentOffset = 0;
     long segmentLength = -1;
     boolean ifileReadAhead;
@@ -203,7 +202,7 @@ public class TezMerger {
     final TaskContext taskContext;
 
     public DiskSegment(FileSystem fs, Path file,
-        long segmentOffset, long segmentLength, CompressionCodec codec,
+        long segmentOffset, long segmentLength, CompressionProvider codec,
         boolean ifileReadAhead, int ifileReadAheadLength,
         boolean preserve, TezCounter mergedMapOutputsCounter, TaskContext taskContext) {
       super(null, mergedMapOutputsCounter);
@@ -287,7 +286,7 @@ public class TezMerger {
 
     final Configuration conf;
     final FileSystem fs;
-    final CompressionCodec codec;
+    final CompressionProvider codec;
     final boolean checkForSameKeys;
     private final SegmentLoserTree loserTree = new SegmentLoserTree();
     static final boolean ifileReadAhead = TezRuntimeConfiguration.TEZ_RUNTIME_IFILE_READAHEAD_DEFAULT;
@@ -323,7 +322,7 @@ public class TezMerger {
 
     public MergeQueue(Configuration conf, FileSystem fs,
         List<Segment> segments,
-        boolean sortSegments, CompressionCodec codec,
+        boolean sortSegments, CompressionProvider codec,
         boolean checkForSameKeys) {
       this.conf = conf;
       this.fs = fs;

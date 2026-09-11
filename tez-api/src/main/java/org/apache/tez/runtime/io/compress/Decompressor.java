@@ -17,6 +17,8 @@
  */
 package org.apache.tez.runtime.io.compress;
 
+import org.apache.tez.runtime.api.CompressionAlgorithm;
+
 /** A reusable, block-oriented Tez decompressor */
 public interface Decompressor {
   /** Returns the stable algorithm identity used to prevent cross-pool returns. */
