@@ -24,9 +24,16 @@ import java.io.OutputStream;
 /** Provider for the Tez chunk-framed xerial Snappy stream format. */
 public final class XerialSnappyCompressionProvider implements CompressionProvider {
 
+  public static final int DEFAULT_BUFFER_SIZE = 256 * 1024;
+
   @Override
   public CompressionAlgorithm getAlgorithm() {
     return CompressionAlgorithm.SNAPPY;
+  }
+
+  @Override
+  public int getDefaultBufferSize() {
+    return DEFAULT_BUFFER_SIZE;
   }
 
   @Override

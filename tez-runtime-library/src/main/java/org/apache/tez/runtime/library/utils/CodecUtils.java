@@ -192,7 +192,7 @@ public final class CodecUtils {
                                                            OutputStream checksumOut, Compressor compressor) throws IOException {
     CompressionProvider provider = CompressionResolver.getProvider(codec);
     return provider.createOutputStream(
-        checksumOut, compressor, CompressionResolver.DEFAULT_BUFFER_SIZE);
+        checksumOut, compressor, provider.getDefaultBufferSize());
   }
 
   public static InputStream getDecompressedInputStreamWithBufferSize(CompressionCodec codec,
@@ -200,7 +200,7 @@ public final class CodecUtils {
       throws IOException {
     CompressionProvider provider = CompressionResolver.getProvider(codec);
     return provider.createInputStream(
-        checksumIn, decompressor, CompressionResolver.DEFAULT_BUFFER_SIZE);
+        checksumIn, decompressor, provider.getDefaultBufferSize());
   }
 
   public static String getBufferSizeProperty(CompressionCodec codec) {

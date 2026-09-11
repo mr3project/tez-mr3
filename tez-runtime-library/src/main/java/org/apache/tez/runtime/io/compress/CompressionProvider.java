@@ -25,6 +25,7 @@ import java.io.OutputStream;
 public interface CompressionProvider {
 
   CompressionAlgorithm getAlgorithm();
+  int getDefaultBufferSize();
 
   Compressor createCompressor() throws IOException;
   Decompressor createDecompressor() throws IOException;

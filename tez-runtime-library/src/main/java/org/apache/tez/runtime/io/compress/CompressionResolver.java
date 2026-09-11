@@ -24,8 +24,6 @@ import org.apache.hadoop.io.compress.CompressionCodec;
 /** Central codec-name to compression provider resolver */
 public final class CompressionResolver {
 
-  public static final int DEFAULT_BUFFER_SIZE = 256 * 1024;
-
   private static final String SNAPPY_CODEC = "org.apache.hadoop.io.compress.SnappyCodec";
   private static final String ZSTD_CODEC = "org.apache.hadoop.io.compress.ZStandardCodec";
 
