@@ -56,7 +56,6 @@ public final class XerialSnappyCompressionProvider implements CompressionProvide
   public CompressionOutputStream createOutputStream(
       OutputStream output, Compressor compressor) throws IOException {
     assert compressor.getAlgorithm() == CompressionAlgorithm.SNAPPY;
-    assert compressor instanceof XerialSnappyCompressor;
 
     return new SnappyCompressionOutputStream(
         output, (XerialSnappyCompressor) compressor, bufferSize);
@@ -66,7 +65,6 @@ public final class XerialSnappyCompressionProvider implements CompressionProvide
   public InputStream createInputStream(
       InputStream input, Decompressor decompressor) throws IOException {
     assert decompressor.getAlgorithm() == CompressionAlgorithm.SNAPPY;
-    assert decompressor instanceof XerialSnappyDecompressor;
 
     return new SnappyCompressionInputStream(
         input, (XerialSnappyDecompressor) decompressor, bufferSize);

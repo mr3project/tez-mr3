@@ -23,5 +23,5 @@ import java.io.OutputStream;
 /** Output stream lifecycle used by an IFile partition writer. */
 public abstract class CompressionOutputStream extends OutputStream {
   public abstract void finish() throws IOException;
-  public abstract void resetState() throws IOException;
+  public abstract void resetState();
 }

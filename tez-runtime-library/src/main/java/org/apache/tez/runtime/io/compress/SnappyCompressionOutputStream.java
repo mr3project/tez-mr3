@@ -83,10 +83,10 @@ final class SnappyCompressionOutputStream extends CompressionOutputStream {
   }
 
   private void writeChunk() throws IOException {
+    start();
     if (inputLength == 0) {
       return;
     }
-    start();
     int compressedLength = compressor.compressBuffered(inputLength);
     output.writeInt(inputLength);
     output.writeInt(compressedLength);
@@ -105,7 +105,6 @@ final class SnappyCompressionOutputStream extends CompressionOutputStream {
   public void finish() throws IOException {
     assert !closed;
     if (!finished) {
-      start();
       writeChunk();
       output.writeInt(0);
       output.writeInt(0);
@@ -115,7 +114,7 @@ final class SnappyCompressionOutputStream extends CompressionOutputStream {
   }
 
   @Override
-  public void resetState() throws IOException {
+  public void resetState() {
     assert !closed;
     assert finished;
     compressor.reset();

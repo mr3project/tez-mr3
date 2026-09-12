@@ -64,9 +64,7 @@ public final class XerialSnappyCompressor implements Compressor {
 
   byte[] ensureInputCapacity(int length) {
     assert !closed;
-    if (length < 0) {
-      throw new IllegalArgumentException("Negative input buffer length: " + length);
-    }
+    assert length > 0;
     if (input.length < length) {
       input = new byte[length];
     }

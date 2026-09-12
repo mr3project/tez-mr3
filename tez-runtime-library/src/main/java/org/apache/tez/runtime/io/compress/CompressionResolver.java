@@ -36,6 +36,11 @@ public final class CompressionResolver {
   private static final String SNAPPY_CODEC = "org.apache.hadoop.io.compress.SnappyCodec";
   private static final String ZSTD_CODEC = "org.apache.hadoop.io.compress.ZStandardCodec";
 
+  // Because all producers and consumers use the same buffer size,
+  // the uncompressed array is bounded by that configured size, and
+  // the compressed array is bounded by the codec’s maximum compressed size for that configured size.
+  // Hence, there is no unbounded or configuration-independent memory consumption by compressors/decompressors.
+
   @Nullable
   public static CompressionProvider createProvider(Configuration conf) throws IOException {
     if (!conf.getBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS, false)) {
