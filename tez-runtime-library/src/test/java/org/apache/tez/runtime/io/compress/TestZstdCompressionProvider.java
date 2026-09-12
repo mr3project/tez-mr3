@@ -69,6 +69,20 @@ public class TestZstdCompressionProvider {
   }
 
   @Test
+  public void testResolverUsesRecommendedBufferSizeWhenConfiguredSizeIsZero() throws Exception {
+    Configuration conf = new Configuration(false);
+    conf.setBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS, true);
+    conf.set(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS_CODEC,
+        "org.apache.hadoop.io.compress.ZStandardCodec");
+
+    CompressionProvider provider = CompressionResolver.createProvider(conf);
+    assertTrue(provider instanceof ZstdCompressionProvider);
+    assertTrue(provider.getBufferSize() > 0);
+    byte[] original = randomBytes(BUFFER_SIZE + 1);
+    assertArrayEquals(original, roundTrip(provider, original));
+  }
+
+  @Test
   public void testRoundTripsBlockBoundariesAndEmptyInput() throws Exception {
     int[] lengths = {0, 1, BUFFER_SIZE - 1, BUFFER_SIZE, BUFFER_SIZE + 1,
         2 * BUFFER_SIZE, 2 * BUFFER_SIZE + 17};

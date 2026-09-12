@@ -25,11 +25,14 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 public final class ZstdCompressionProvider implements CompressionProvider {
+  // Hadoop uses zero to request the codec's recommended native buffer size.
+  private static final int RECOMMENDED_BUFFER_SIZE = 128 * 1024;
+
   private final int bufferSize;
   private final int compressionLevel;
 
   public ZstdCompressionProvider(int bufferSize, int compressionLevel) {
-    this.bufferSize = bufferSize;
+    this.bufferSize = bufferSize == 0 ? RECOMMENDED_BUFFER_SIZE : bufferSize;
     this.compressionLevel = compressionLevel;
   }
 
