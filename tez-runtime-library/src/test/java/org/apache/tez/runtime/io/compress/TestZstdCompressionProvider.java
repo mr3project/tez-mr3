@@ -27,6 +27,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Random;
 
 import org.apache.hadoop.conf.Configuration;
@@ -40,6 +41,7 @@ public class TestZstdCompressionProvider {
 
   private static final int BUFFER_SIZE = 128;
   private static final int COMPRESSION_LEVEL = 3;
+  private static final int MEBIBYTE = 1024 * 1024;
 
   @Test
   public void testProviderIdentity() {
@@ -74,6 +76,26 @@ public class TestZstdCompressionProvider {
       byte[] original = randomBytes(length);
       assertArrayEquals("length=" + length, original, roundTrip(createProvider(), original));
     }
+  }
+
+  @Test
+  public void testTenMiBRandomData() throws Exception {
+    testLargeRandomData(10 * MEBIBYTE);
+  }
+
+  @Test
+  public void testTwentyMiBRandomData() throws Exception {
+    testLargeRandomData(20 * MEBIBYTE);
+  }
+
+  @Test
+  public void testFortyMiBRandomData() throws Exception {
+    testLargeRandomData(40 * MEBIBYTE);
+  }
+
+  @Test
+  public void testOneHundredMiBRandomData() throws Exception {
+    testLargeRandomData(100 * MEBIBYTE);
   }
 
   @Test
@@ -130,6 +152,39 @@ public class TestZstdCompressionProvider {
 
   private static ZstdCompressionProvider createProvider() {
     return new ZstdCompressionProvider(BUFFER_SIZE, COMPRESSION_LEVEL);
+  }
+
+  private static void testLargeRandomData(int size) throws Exception {
+    Configuration conf = new Configuration(false);
+    conf.setBoolean(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS, true);
+    conf.set(TezRuntimeConfiguration.TEZ_RUNTIME_COMPRESS_CODEC,
+        "org.apache.hadoop.io.compress.ZStandardCodec");
+    CompressionProvider provider = CompressionResolver.createProvider(conf);
+
+    byte[] original = randomBytes(size);
+    ByteArrayOutputStream compressedOut = new ByteArrayOutputStream();
+    Compressor compressor = provider.createCompressor();
+    try (OutputStream output = provider.createOutputStream(compressedOut, compressor)) {
+      output.write(original, 0, size);
+    } finally {
+      compressor.close();
+    }
+    byte[] compressed = compressedOut.toByteArray();
+
+    ByteArrayOutputStream decompressedOut = new ByteArrayOutputStream();
+    Decompressor decompressor = provider.createDecompressor();
+    try (InputStream input = provider.createInputStream(
+        new ByteArrayInputStream(compressed), decompressor)) {
+      byte[] buffer = new byte[1024];
+      int bytesRead;
+      while ((bytesRead = input.read(buffer)) != -1) {
+        decompressedOut.write(buffer, 0, bytesRead);
+      }
+    } finally {
+      decompressor.close();
+    }
+
+    assertArrayEquals("size=" + size, original, decompressedOut.toByteArray());
   }
 
   private static byte[] randomBytes(int length) {
