@@ -17,29 +17,33 @@
  */
 package org.apache.tez.runtime.io.compress;
 
-import org.apache.tez.runtime.api.CompressionAlgorithm;
-import org.apache.tez.runtime.api.CompressionProvider;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
-public final class ZstdCompressionProvider implements CompressionProvider {
+import net.jpountz.lz4.LZ4Factory;
+import org.apache.tez.runtime.api.CompressionAlgorithm;
+import org.apache.tez.runtime.api.CompressionProvider;
 
-  // Hadoop uses zero to request the codec's recommended native buffer size.
-  private static final int RECOMMENDED_BUFFER_SIZE = 128 * 1024;
+public final class Lz4CompressionProvider implements CompressionProvider {
 
   private final int bufferSize;
-  private final int compressionLevel;
+  private final boolean useHighCompression;
+  private final LZ4Factory LZ4_FACTORY;
 
-  public ZstdCompressionProvider(int bufferSize, int compressionLevel) {
-    this.bufferSize = bufferSize == 0 ? RECOMMENDED_BUFFER_SIZE : bufferSize;
-    this.compressionLevel = compressionLevel;
+  public Lz4CompressionProvider(int bufferSize, boolean useHighCompression, boolean useNativeInstance) {
+    this.bufferSize = bufferSize;
+    this.useHighCompression = useHighCompression;
+    if (useNativeInstance) {
+      this.LZ4_FACTORY = LZ4Factory.nativeInstance();
+    } else {
+      this.LZ4_FACTORY = LZ4Factory.fastestJavaInstance();
+    }
   }
 
   @Override
   public CompressionAlgorithm getAlgorithm() {
-    return CompressionAlgorithm.ZSTD;
+    return CompressionAlgorithm.LZ4;
   }
 
   @Override
@@ -49,29 +53,29 @@ public final class ZstdCompressionProvider implements CompressionProvider {
 
   @Override
   public Compressor createCompressor() {
-    return new ZstdJniCompressor(compressionLevel);
+    return new Lz4JniCompressor(LZ4_FACTORY, useHighCompression);
   }
 
   @Override
   public Decompressor createDecompressor() {
-    return new ZstdJniDecompressor();
+    return new Lz4JniDecompressor(LZ4_FACTORY);
   }
 
   @Override
   public CompressionOutputStream createOutputStream(
       OutputStream output, Compressor compressor) throws IOException {
-    assert compressor.getAlgorithm() == CompressionAlgorithm.ZSTD;
+    assert compressor.getAlgorithm() == CompressionAlgorithm.LZ4;
 
-    return new ZstdCompressionOutputStream(
-        output, (ZstdJniCompressor) compressor, bufferSize);
+    return new Lz4CompressionOutputStream(
+        output, (Lz4JniCompressor) compressor, bufferSize);
   }
 
   @Override
   public InputStream createInputStream(
       InputStream input, Decompressor decompressor) throws IOException {
-    assert decompressor.getAlgorithm() == CompressionAlgorithm.ZSTD;
+    assert decompressor.getAlgorithm() == CompressionAlgorithm.LZ4;
 
-    return new ZstdCompressionInputStream(
-        input, (ZstdJniDecompressor) decompressor, bufferSize);
+    return new Lz4CompressionInputStream(
+        input, (Lz4JniDecompressor) decompressor, bufferSize);
   }
 }

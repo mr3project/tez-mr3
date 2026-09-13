@@ -33,8 +33,13 @@ public final class CompressionResolver {
 
   private static final Logger LOG = LoggerFactory.getLogger(CompressionResolver.class);
 
+  private static final String LZ4_CODEC = "org.apache.hadoop.io.compress.Lz4Codec";
   private static final String SNAPPY_CODEC = "org.apache.hadoop.io.compress.SnappyCodec";
   private static final String ZSTD_CODEC = "org.apache.hadoop.io.compress.ZStandardCodec";
+
+  private static final String IO_COMPRESSION_CODEC_LZ4_USE_NATIVE_INSTANCE =
+      "io.compression.codec.lz4.use.native.instance";
+  private static final boolean IO_COMPRESSION_CODEC_LZ4_USE_NATIVE_INSTANCE_DEFAULT = true;
 
   // Because all producers and consumers use the same buffer size,
   // the uncompressed array is bounded by that configured size, and
@@ -54,6 +59,21 @@ public final class CompressionResolver {
     }
 
     CompressionAlgorithm algorithm = resolveAlgorithm(codecClassName);
+    if (algorithm == CompressionAlgorithm.LZ4) {
+      int bufferSize = conf.getInt(
+          CommonConfigurationKeys.IO_COMPRESSION_CODEC_LZ4_BUFFERSIZE_KEY,
+          CommonConfigurationKeys.IO_COMPRESSION_CODEC_LZ4_BUFFERSIZE_DEFAULT);
+      boolean useHighCompression = conf.getBoolean(
+          CommonConfigurationKeys.IO_COMPRESSION_CODEC_LZ4_USELZ4HC_KEY,
+          CommonConfigurationKeys.IO_COMPRESSION_CODEC_LZ4_USELZ4HC_DEFAULT);
+      boolean useNativeInstance = conf.getBoolean(
+          IO_COMPRESSION_CODEC_LZ4_USE_NATIVE_INSTANCE,
+          IO_COMPRESSION_CODEC_LZ4_USE_NATIVE_INSTANCE_DEFAULT);
+      LOG.info("Using codec {}, buffer size = {}, high compression = {}, use native instance = {}",
+          algorithm, bufferSize, useHighCompression, useNativeInstance);
+      return new Lz4CompressionProvider(bufferSize, useHighCompression, useNativeInstance);
+    }
+
     if (algorithm == CompressionAlgorithm.SNAPPY) {
       int bufferSize = conf.getInt(
           CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_KEY,
@@ -77,6 +97,9 @@ public final class CompressionResolver {
   }
 
   private static CompressionAlgorithm resolveAlgorithm(String codecClassName) throws IOException {
+    if (LZ4_CODEC.equals(codecClassName)) {
+      return CompressionAlgorithm.LZ4;
+    }
     if (SNAPPY_CODEC.equals(codecClassName)) {
       return CompressionAlgorithm.SNAPPY;
     }
