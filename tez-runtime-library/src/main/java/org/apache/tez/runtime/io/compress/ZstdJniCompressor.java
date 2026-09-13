@@ -70,7 +70,7 @@ public final class ZstdJniCompressor implements Compressor {
 
   int compressBuffered(int inputLength) throws IOException {
     assert !closed;
-    checkRange(input, 0, inputLength, "input");
+    CompressionStreamUtils.checkRange(input, 0, inputLength, "input");
     int maximum = maxCompressedLength(inputLength);
     if (scratch.length < maximum) {
       scratch = new byte[maximum];
@@ -95,13 +95,6 @@ public final class ZstdJniCompressor implements Compressor {
   byte[] getCompressedBuffer() {
     assert !closed;
     return scratch;
-  }
-
-  static void checkRange(byte[] array, int offset, int length, String name) {
-    if (offset < 0 || length < 0 || offset > array.length - length) {
-      throw new IndexOutOfBoundsException(
-          name + " range: offset=" + offset + ", length=" + length + ", arrayLength=" + array.length);
-    }
   }
 
   @Override

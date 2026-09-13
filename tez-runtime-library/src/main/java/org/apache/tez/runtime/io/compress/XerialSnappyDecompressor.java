@@ -38,6 +38,14 @@ public final class XerialSnappyDecompressor implements Decompressor {
     return CompressionAlgorithm.SNAPPY;
   }
 
+  int maximumCompressedLength(int uncompressedLength) throws IOException {
+    try {
+      return Snappy.maxCompressedLength(uncompressedLength);
+    } catch (RuntimeException e) {
+      throw new IOException("Invalid Snappy chunk length: " + uncompressedLength, e);
+    }
+  }
+
   byte[] ensureCompressedCapacity(int length) {
     assert !closed;
     if (length < 0) {
@@ -51,7 +59,7 @@ public final class XerialSnappyDecompressor implements Decompressor {
 
   int decompressBuffered(int inputLength, int outputCapacity) throws IOException {
     assert !closed;
-    XerialSnappyCompressor.checkRange(compressed, 0, inputLength, "input");
+    CompressionStreamUtils.checkRange(compressed, 0, inputLength, "input");
     if (outputCapacity < 0) {
       throw new IllegalArgumentException("Negative output capacity: " + outputCapacity);
     }
