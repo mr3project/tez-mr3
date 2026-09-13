@@ -48,6 +48,11 @@
       <version>${zstd-jni.version}</version>
     </dependency>
     <dependency>
+      <groupId>at.yawk.lz4</groupId>
+      <artifactId>lz4-java</artifactId>
+      <version>${lz4-java.version}</version>
+    </dependency>
+    <dependency>
      <groupId>com.google.protobuf</groupId>
      <artifactId>protobuf-java</artifactId>
     </dependency>

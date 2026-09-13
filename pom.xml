@@ -59,6 +59,7 @@
     <log4j.version>1.2.17</log4j.version>
     <guava.version>22.0</guava.version>
     <jettison.version>1.5.4</jettison.version>
+    <lz4-java.version>1.11.2</lz4-java.version>
     <netty.version>4.1.127.Final</netty.version>
     <protobuf.version>3.25.5</protobuf.version>
     <protoc.jar.version>3.11.4</protoc.jar.version>

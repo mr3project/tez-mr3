@@ -19,5 +19,6 @@ package org.apache.tez.runtime.api;
 
 public enum CompressionAlgorithm {
   SNAPPY,
-  ZSTD
+  ZSTD,
+  LZ4
 }
