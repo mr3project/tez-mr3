@@ -690,6 +690,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
 
       InputAttemptIdentifier dummyMapId = inputs.get(0).getAttemptIdentifier();
       List<Segment> inMemorySegments = new ArrayList<Segment>();
+      int numCompressedLocalByteCacheInputs = 0;
 
       MapOutput mergedMapOutputs = null;
 
@@ -716,7 +717,12 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
             }
           } else {
             mergeOutputSize += mo.getSizeForMergeMemoryAccounting();
-            inMemorySegments.add(createMapOutputSegment(mo));
+            Segment segment = createMapOutputSegment(mo);
+            inMemorySegments.add(segment);
+            if (segment instanceof InputStreamSegment &&
+                ((InputStreamSegment) segment).isCompressed()) {
+              numCompressedLocalByteCacheInputs++;
+            }
             lastAddedMapOutput = mo;
             it.remove();
             if (isDebugEnabled) {
@@ -749,8 +755,10 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       IFile.WriterAppendDataInputBuffer writer = new InMemoryWriter(mergedMapOutputs.getMemory());
 
       if (isDebugEnabled) {
-        LOG.debug("{}: Initiating Memory-to-Memory merge with {} segments of total-size: {}",
-            inputContext.getSourceVertexName(), noInMemorySegments, mergeOutputSize);
+        LOG.debug("{}: Initiating Memory-to-Memory merge with {} segments of total-size: {}, " +
+                "compressed LOCAL_BYTE_CACHE inputs: {}",
+            inputContext.getSourceVertexName(), noInMemorySegments, mergeOutputSize,
+            numCompressedLocalByteCacheInputs);
       }
 
       if (Thread.currentThread().isInterrupted()) {
