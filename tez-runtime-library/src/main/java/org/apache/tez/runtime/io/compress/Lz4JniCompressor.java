@@ -19,8 +19,8 @@ package org.apache.tez.runtime.io.compress;
 
 import java.io.IOException;
 
-import at.yawk.lz4.LZ4Compressor;
-import at.yawk.lz4.LZ4Factory;
+import net.jpountz.lz4.LZ4Compressor;
+import net.jpountz.lz4.LZ4Factory;
 import org.apache.tez.runtime.api.CompressionAlgorithm;
 
 /** Raw lz4-java JNI block compressor. A scratch buffer prevents partial caller output. */
