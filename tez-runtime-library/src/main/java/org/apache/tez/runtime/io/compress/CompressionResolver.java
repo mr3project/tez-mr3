@@ -33,6 +33,7 @@ public final class CompressionResolver {
 
   private static final Logger LOG = LoggerFactory.getLogger(CompressionResolver.class);
 
+  private static final String LZ4_CODEC = "org.apache.hadoop.io.compress.Lz4Codec";
   private static final String SNAPPY_CODEC = "org.apache.hadoop.io.compress.SnappyCodec";
   private static final String ZSTD_CODEC = "org.apache.hadoop.io.compress.ZStandardCodec";
 
@@ -54,6 +55,14 @@ public final class CompressionResolver {
     }
 
     CompressionAlgorithm algorithm = resolveAlgorithm(codecClassName);
+    if (algorithm == CompressionAlgorithm.LZ4) {
+      int bufferSize = conf.getInt(
+          CommonConfigurationKeys.IO_COMPRESSION_CODEC_LZ4_BUFFERSIZE_KEY,
+          CommonConfigurationKeys.IO_COMPRESSION_CODEC_LZ4_BUFFERSIZE_DEFAULT);
+      LOG.info("Using codec {}, buffer size = {}", algorithm, bufferSize);
+      return new Lz4CompressionProvider(bufferSize);
+    }
+
     if (algorithm == CompressionAlgorithm.SNAPPY) {
       int bufferSize = conf.getInt(
           CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_KEY,
@@ -77,6 +86,9 @@ public final class CompressionResolver {
   }
 
   private static CompressionAlgorithm resolveAlgorithm(String codecClassName) throws IOException {
+    if (LZ4_CODEC.equals(codecClassName)) {
+      return CompressionAlgorithm.LZ4;
+    }
     if (SNAPPY_CODEC.equals(codecClassName)) {
       return CompressionAlgorithm.SNAPPY;
     }
