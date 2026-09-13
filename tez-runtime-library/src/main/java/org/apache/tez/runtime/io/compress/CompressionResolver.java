@@ -59,8 +59,12 @@ public final class CompressionResolver {
       int bufferSize = conf.getInt(
           CommonConfigurationKeys.IO_COMPRESSION_CODEC_LZ4_BUFFERSIZE_KEY,
           CommonConfigurationKeys.IO_COMPRESSION_CODEC_LZ4_BUFFERSIZE_DEFAULT);
-      LOG.info("Using codec {}, buffer size = {}", algorithm, bufferSize);
-      return new Lz4CompressionProvider(bufferSize);
+      boolean useHighCompression = conf.getBoolean(
+          CommonConfigurationKeys.IO_COMPRESSION_CODEC_LZ4_USELZ4HC_KEY,
+          CommonConfigurationKeys.IO_COMPRESSION_CODEC_LZ4_USELZ4HC_DEFAULT);
+      LOG.info("Using codec {}, buffer size = {}, high compression = {}",
+          algorithm, bufferSize, useHighCompression);
+      return new Lz4CompressionProvider(bufferSize, useHighCompression);
     }
 
     if (algorithm == CompressionAlgorithm.SNAPPY) {

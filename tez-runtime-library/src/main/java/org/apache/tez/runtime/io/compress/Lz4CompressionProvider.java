@@ -27,9 +27,15 @@ import org.apache.tez.runtime.api.CompressionProvider;
 public final class Lz4CompressionProvider implements CompressionProvider {
 
   private final int bufferSize;
+  private final boolean useHighCompression;
 
   public Lz4CompressionProvider(int bufferSize) {
+    this(bufferSize, false);
+  }
+
+  public Lz4CompressionProvider(int bufferSize, boolean useHighCompression) {
     this.bufferSize = bufferSize;
+    this.useHighCompression = useHighCompression;
   }
 
   @Override
@@ -44,7 +50,7 @@ public final class Lz4CompressionProvider implements CompressionProvider {
 
   @Override
   public Compressor createCompressor() {
-    return new Lz4JniCompressor();
+    return new Lz4JniCompressor(useHighCompression);
   }
 
   @Override

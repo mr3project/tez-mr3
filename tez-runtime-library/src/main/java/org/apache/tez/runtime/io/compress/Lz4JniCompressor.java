@@ -32,7 +32,12 @@ public final class Lz4JniCompressor implements Compressor {
   private boolean closed;
 
   public Lz4JniCompressor() {
-    compressor = LZ4Factory.nativeInstance().fastCompressor();
+    this(false);
+  }
+
+  public Lz4JniCompressor(boolean useHighCompression) {
+    LZ4Factory factory = LZ4Factory.nativeInstance();
+    compressor = useHighCompression ? factory.highCompressor() : factory.fastCompressor();
     closed = false;
   }
 
