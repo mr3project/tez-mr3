@@ -34,7 +34,10 @@ public final class Lz4JniDecompressor implements Decompressor {
   private boolean closed;
 
   public Lz4JniDecompressor() {
-    LZ4Factory factory = LZ4Factory.nativeInstance();
+    this(Lz4CompressionProvider.getFactory());
+  }
+
+  Lz4JniDecompressor(LZ4Factory factory) {
     compressor = factory.fastCompressor();
     decompressor = factory.fastDecompressor();
     closed = false;

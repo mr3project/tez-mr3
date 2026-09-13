@@ -21,10 +21,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import net.jpountz.lz4.LZ4Factory;
 import org.apache.tez.runtime.api.CompressionAlgorithm;
 import org.apache.tez.runtime.api.CompressionProvider;
 
 public final class Lz4CompressionProvider implements CompressionProvider {
+
+  private static final LZ4Factory LZ4_FACTORY = LZ4Factory.nativeInstance();
 
   private final int bufferSize;
   private final boolean useHighCompression;
@@ -32,6 +35,10 @@ public final class Lz4CompressionProvider implements CompressionProvider {
   public Lz4CompressionProvider(int bufferSize, boolean useHighCompression) {
     this.bufferSize = bufferSize;
     this.useHighCompression = useHighCompression;
+  }
+
+  static LZ4Factory getFactory() {
+    return LZ4_FACTORY;
   }
 
   @Override
@@ -46,12 +53,12 @@ public final class Lz4CompressionProvider implements CompressionProvider {
 
   @Override
   public Compressor createCompressor() {
-    return new Lz4JniCompressor(useHighCompression);
+    return new Lz4JniCompressor(LZ4_FACTORY, useHighCompression);
   }
 
   @Override
   public Decompressor createDecompressor() {
-    return new Lz4JniDecompressor();
+    return new Lz4JniDecompressor(LZ4_FACTORY);
   }
 
   @Override
