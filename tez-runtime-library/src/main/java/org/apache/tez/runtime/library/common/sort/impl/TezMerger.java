@@ -249,8 +249,15 @@ public class TezMerger {
   }
 
   public static final class InputStreamSegment extends Segment {
+    private final boolean isCompressed;
+
     public InputStreamSegment(IFile.KeyValueReaderDataInputBuffer reader, TezCounter mapOutputsCounter) {
       super(reader, mapOutputsCounter);
+      this.isCompressed = ((IFile.Reader) reader).isCompressed();
+    }
+
+    public boolean isCompressed() {
+      return isCompressed;
     }
 
     @Override

@@ -928,6 +928,7 @@ public class IFile {
     private CompressionProvider codec;
     private DecompressorPool taskContext;
     private Decompressor decompressor;
+    private final boolean isCompressed;
     private final IFileInputStream checksumIn;
     private final InputStream in;   // Possibly decompressed stream that we read
     private final long startPos;
@@ -1001,7 +1002,7 @@ public class IFile {
                   DecompressorPool taskContext, byte headerFlag,
                   TezOffsetRecord tezOffsetRecord) throws IOException {
       assert in != null;
-      boolean isCompressed = (headerFlag & FLAG_COMPRESSED) != 0;
+      isCompressed = (headerFlag & FLAG_COMPRESSED) != 0;
       boolean isRleEnabled = (headerFlag & FLAG_RLE_ENABLED) != 0;
 
       this.readRecordsCounter = readsCounter;
@@ -1029,6 +1030,10 @@ public class IFile {
 
       assert !(tezOffsetRecord != null) || !isRleEnabled;
       this.tezOffsetRecord = tezOffsetRecord;
+    }
+
+    public boolean isCompressed() {
+      return isCompressed;
     }
 
     /**
