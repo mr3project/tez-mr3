@@ -37,6 +37,13 @@ import org.apache.tez.dag.api.UserPayload;
  */
 public interface TaskContext extends DecompressorPool, CompressorPool {
   /**
+   * Get the decompressor pool whose lifetime is scoped to the current DAG.
+   *
+   * @return the DAG-specific decompressor pool
+   */
+  public DecompressorPool getDagDecompressorPool();
+
+  /**
    * Get the {@link ApplicationId} for the running app
    * @return the {@link ApplicationId}
    */
