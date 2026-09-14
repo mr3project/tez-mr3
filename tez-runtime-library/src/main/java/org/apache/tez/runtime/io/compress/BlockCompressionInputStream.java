@@ -81,14 +81,8 @@ abstract class BlockCompressionInputStream extends InputStream {
   }
 
   private void readChunk() throws IOException {
-    final int rawLength;
-    final int compressedLength;
-    try {
-      rawLength = input.readInt();
-      compressedLength = input.readInt();
-    } catch (EOFException e) {
-      throw new IOException("Truncated " + codecName + " chunk header", e);
-    }
+    final int rawLength = input.readInt();
+    final int compressedLength = input.readInt();
     if (rawLength == 0 && compressedLength == 0) {
       if (input.read() != -1) {
         throw new IOException("Trailing data after " + codecName + " stream terminator");
@@ -106,11 +100,7 @@ abstract class BlockCompressionInputStream extends InputStream {
           "Invalid " + codecName + " compressed chunk length: " + compressedLength);
     }
     byte[] compressed = ensureCompressedCapacity(compressedLength);
-    try {
-      input.readFully(compressed, 0, compressedLength);
-    } catch (EOFException e) {
-      throw new IOException("Truncated " + codecName + " chunk payload", e);
-    }
+    input.readFully(compressed, 0, compressedLength);
     int actual = decompressBuffered(compressedLength, rawLength);
     if (actual != rawLength) {
       throw new IOException(codecName + " chunk length mismatch: expected " + rawLength
