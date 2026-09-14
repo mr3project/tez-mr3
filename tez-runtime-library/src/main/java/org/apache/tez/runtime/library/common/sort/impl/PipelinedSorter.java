@@ -814,7 +814,8 @@ public final class PipelinedSorter {
         indexRecord.getStartOffset(), indexRecord.getPartLength());
 
     IFile.KeyValueReaderDataInputBuffer reader = new IFile.Reader(input, indexRecord.getPartLength(),
-        codec, null, null, ifileReadAhead, ifileReadAheadLength, outputContext, null);
+        codec, null, null, ifileReadAhead, ifileReadAheadLength,
+        outputContext.getDagDecompressorPool(), null);
     // This spill output (byteArrayOutput) can be consumed for multiple partitions during the final merge.
     // Keep it alive across partition segments and clean once all partitions are merged in cleanSpillOutputBuffers().
     return new TezMerger.IntermediateMemorySegment(reader, byteArrayOutput, false);

@@ -225,7 +225,7 @@ public class TezMerger {
       FSDataInputStream in = fs.open(file);
       in.seek(segmentOffset);
       reader = new Reader(in, segmentLength, codec, readsCounter, bytesReadCounter, ifileReadAhead,
-          ifileReadAheadLength, taskContext);
+          ifileReadAheadLength, taskContext.getDagDecompressorPool());
     }
 
     @Override
@@ -718,7 +718,8 @@ public class TezMerger {
             IFile.KeyValueReaderDataInputBuffer reader = new Reader(
                 byteArrayOutput.createInputStreamFrom(0, byteArrayOutput.getTotalBytes()),
                 byteArrayOutput.getTotalBytes(),
-                codec, null, null, ifileReadAhead, ifileReadAheadLength, taskContext);
+                codec, null, null, ifileReadAhead, ifileReadAheadLength,
+                taskContext.getDagDecompressorPool());
             tempSegment = new IntermediateMemorySegment(reader, byteArrayOutput, true);
           }
 

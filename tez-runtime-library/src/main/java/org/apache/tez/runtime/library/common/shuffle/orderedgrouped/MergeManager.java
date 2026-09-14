@@ -1006,7 +1006,8 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       final long readerLength = mapOutput.getReaderLength();
       return new IFile.Reader(
           inputStream, readerLength, codec,
-          null, null, ifileReadAhead, ifileReadAheadLength, inputContext, null) {
+          null, null, ifileReadAhead, ifileReadAheadLength,
+          inputContext.getDagDecompressorPool(), null) {
         @Override
         public void close() throws IOException {
           try {
