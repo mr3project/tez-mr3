@@ -38,12 +38,8 @@ final class Lz4CompressionInputStream extends BlockCompressionInputStream {
   }
 
   @Override
-  int maximumCompressedLength(int uncompressedLength) throws IOException {
-    try {
-      return compressedLengthCalculator.maxCompressedLength(uncompressedLength);
-    } catch (RuntimeException e) {
-      throw new IOException("Invalid LZ4 chunk length: " + uncompressedLength, e);
-    }
+  int maximumCompressedLength(int uncompressedLength) {
+    return compressedLengthCalculator.maxCompressedLength(uncompressedLength);
   }
 
   @Override

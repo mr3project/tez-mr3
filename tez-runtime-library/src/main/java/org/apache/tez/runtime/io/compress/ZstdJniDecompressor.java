@@ -36,17 +36,8 @@ public final class ZstdJniDecompressor implements Decompressor {
     return CompressionAlgorithm.ZSTD;
   }
 
-  int maximumCompressedLength(int uncompressedLength) throws IOException {
-    final long maximum;
-    try {
-      maximum = Zstd.compressBound(uncompressedLength);
-    } catch (RuntimeException e) {
-      throw new IOException("Invalid Zstd chunk length: " + uncompressedLength, e);
-    }
-    if (maximum < 0 || maximum > Integer.MAX_VALUE) {
-      throw new IOException("Invalid Zstd chunk length: " + uncompressedLength);
-    }
-    return (int) maximum;
+  int maximumCompressedLength(int uncompressedLength) {
+    return (int) Zstd.compressBound(uncompressedLength);
   }
 
   byte[] ensureCompressedCapacity(int length) {

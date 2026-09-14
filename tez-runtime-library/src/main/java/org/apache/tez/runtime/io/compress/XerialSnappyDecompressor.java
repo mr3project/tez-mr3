@@ -38,12 +38,8 @@ public final class XerialSnappyDecompressor implements Decompressor {
     return CompressionAlgorithm.SNAPPY;
   }
 
-  int maximumCompressedLength(int uncompressedLength) throws IOException {
-    try {
-      return Snappy.maxCompressedLength(uncompressedLength);
-    } catch (RuntimeException e) {
-      throw new IOException("Invalid Snappy chunk length: " + uncompressedLength, e);
-    }
+  int maximumCompressedLength(int uncompressedLength) {
+    return Snappy.maxCompressedLength(uncompressedLength);
   }
 
   byte[] ensureCompressedCapacity(int length) {

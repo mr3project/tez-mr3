@@ -139,7 +139,7 @@ abstract class BlockCompressionInputStream extends InputStream {
     }
   }
 
-  abstract int maximumCompressedLength(int uncompressedLength) throws IOException;
+  abstract int maximumCompressedLength(int uncompressedLength);
 
   abstract byte[] ensureCompressedCapacity(int length);
 
