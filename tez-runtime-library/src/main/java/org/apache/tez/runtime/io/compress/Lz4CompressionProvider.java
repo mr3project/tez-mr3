@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import net.jpountz.lz4.LZ4Compressor;
 import net.jpountz.lz4.LZ4Factory;
 import org.apache.tez.runtime.api.CompressionAlgorithm;
 import org.apache.tez.runtime.api.CompressionProvider;
@@ -29,16 +30,19 @@ public final class Lz4CompressionProvider implements CompressionProvider {
 
   private final int bufferSize;
   private final boolean useHighCompression;
-  private final LZ4Factory LZ4_FACTORY;
+  private final LZ4Factory lz4Factory;
+  private final LZ4Compressor compressedLengthCalculator;
 
   public Lz4CompressionProvider(int bufferSize, boolean useHighCompression, boolean useNativeInstance) {
     this.bufferSize = bufferSize;
     this.useHighCompression = useHighCompression;
     if (useNativeInstance) {
-      this.LZ4_FACTORY = LZ4Factory.nativeInstance();
+      this.lz4Factory = LZ4Factory.nativeInstance();
     } else {
-      this.LZ4_FACTORY = LZ4Factory.fastestJavaInstance();
+      this.lz4Factory = LZ4Factory.fastestJavaInstance();
     }
+    // stateless LZ4Compressor instance for computing the maximum compressed length
+    this.compressedLengthCalculator = lz4Factory.fastCompressor();
   }
 
   @Override
@@ -53,12 +57,12 @@ public final class Lz4CompressionProvider implements CompressionProvider {
 
   @Override
   public Compressor createCompressor() {
-    return new Lz4JniCompressor(LZ4_FACTORY, useHighCompression);
+    return new Lz4JniCompressor(lz4Factory, useHighCompression);
   }
 
   @Override
   public Decompressor createDecompressor() {
-    return new Lz4JniDecompressor(LZ4_FACTORY);
+    return new Lz4JniDecompressor(lz4Factory);
   }
 
   @Override
@@ -76,6 +80,6 @@ public final class Lz4CompressionProvider implements CompressionProvider {
     assert decompressor.getAlgorithm() == CompressionAlgorithm.LZ4;
 
     return new Lz4CompressionInputStream(
-        input, (Lz4JniDecompressor) decompressor, bufferSize);
+        input, (Lz4JniDecompressor) decompressor, compressedLengthCalculator, bufferSize);
   }
 }
