@@ -19,7 +19,6 @@ package org.apache.tez.runtime.io.compress;
 
 import java.io.IOException;
 
-import net.jpountz.lz4.LZ4Compressor;
 import net.jpountz.lz4.LZ4Factory;
 import net.jpountz.lz4.LZ4FastDecompressor;
 import org.apache.tez.runtime.api.CompressionAlgorithm;
@@ -29,12 +28,10 @@ public final class Lz4JniDecompressor implements Decompressor {
 
   private byte[] compressed = new byte[0];
   private byte[] scratch = new byte[0];
-  private LZ4Compressor compressor;
   private LZ4FastDecompressor decompressor;
   private boolean closed;
 
   Lz4JniDecompressor(LZ4Factory factory) {
-    compressor = factory.fastCompressor();
     decompressor = factory.fastDecompressor();
     closed = false;
   }
@@ -42,14 +39,6 @@ public final class Lz4JniDecompressor implements Decompressor {
   @Override
   public CompressionAlgorithm getAlgorithm() {
     return CompressionAlgorithm.LZ4;
-  }
-
-  int maximumCompressedLength(int uncompressedLength) throws IOException {
-    try {
-      return compressor.maxCompressedLength(uncompressedLength);
-    } catch (RuntimeException e) {
-      throw new IOException("Invalid LZ4 chunk length: " + uncompressedLength, e);
-    }
   }
 
   byte[] ensureCompressedCapacity(int length) {
@@ -102,7 +91,6 @@ public final class Lz4JniDecompressor implements Decompressor {
     closed = true;
     compressed = null;
     scratch = null;
-    compressor = null;
     decompressor = null;
   }
 }
