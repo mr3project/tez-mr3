@@ -106,8 +106,8 @@ public final class ZstdJniCompressor implements Compressor {
   public void close() {
     if (!closed) {
       closed = true;
-      input = new byte[0];
-      scratch = new byte[0];
+      input = null;
+      scratch = null;
       context.close();
       context = null;
     }

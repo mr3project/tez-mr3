@@ -93,8 +93,8 @@ public final class Lz4JniCompressor implements Compressor {
   @Override
   public void close() {
     closed = true;
-    input = new byte[0];
-    scratch = new byte[0];
+    input = null;
+    scratch = null;
     compressor = null;
   }
 }

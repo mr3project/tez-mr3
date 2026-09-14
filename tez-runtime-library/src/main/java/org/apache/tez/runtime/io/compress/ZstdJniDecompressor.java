@@ -101,8 +101,8 @@ public final class ZstdJniDecompressor implements Decompressor {
   public void close() {
     if (!closed) {
       closed = true;
-      compressed = new byte[0];
-      scratch = new byte[0];
+      compressed = null;
+      scratch = null;
       context.close();
       context = null;
     }

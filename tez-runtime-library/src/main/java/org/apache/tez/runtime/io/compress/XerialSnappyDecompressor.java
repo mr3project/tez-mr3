@@ -100,7 +100,7 @@ public final class XerialSnappyDecompressor implements Decompressor {
   @Override
   public void close() {
     closed = true;
-    compressed = new byte[0];
-    scratch = new byte[0];
+    compressed = null;
+    scratch = null;
   }
 }

@@ -23,4 +23,8 @@ import org.apache.tez.runtime.io.compress.Decompressor;
 public interface DecompressorPool {
   Decompressor getDecompressor(CompressionProvider codec);
   void returnDecompressor(Decompressor decompressor);
+
+  // obtain/return a decompressor from/to the pool scoped to the current DAG
+  Decompressor getDecompressorPerDag(CompressionProvider codec);
+  void returnDecompressorPerDag(Decompressor decompressor);
 }
