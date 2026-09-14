@@ -191,7 +191,7 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
     } else {
       return new IFile.Reader(fetchedInput.getInputStream(),
           fetchedInput.getSize(), codec, null, null,
-          ifileReadAhead, ifileReadAheadLength, context, fetchedInput.getTezOffsetRecord());
+          ifileReadAhead, ifileReadAheadLength, context, fetchedInput.getTezOffsetRecord(), false);
     }
   }
 }

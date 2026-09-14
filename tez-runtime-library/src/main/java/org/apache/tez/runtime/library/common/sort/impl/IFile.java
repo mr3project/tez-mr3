@@ -928,6 +928,7 @@ public class IFile {
     private CompressionProvider codec;
     private DecompressorPool taskContext;
     private Decompressor decompressor;
+    private final boolean useDecompressorPoolPerDag;
     private final IFileInputStream checksumIn;
     private final InputStream in;   // Possibly decompressed stream that we read
     private final long startPos;
@@ -965,9 +966,10 @@ public class IFile {
         @Nullable CompressionProvider codec,
         TezCounter readsCounter, TezCounter bytesReadCounter,
         boolean readAhead, int readAheadLength,
-        DecompressorPool taskContext) throws IOException {
+        DecompressorPool taskContext,
+        boolean useDecompressorPoolPerDag) throws IOException {
       this(in, length, codec, readsCounter, bytesReadCounter,
-          readAhead, readAheadLength, taskContext, null);
+          readAhead, readAheadLength, taskContext, null, useDecompressorPoolPerDag);
     }
 
     public Reader(InputStream in, long length,
@@ -975,10 +977,11 @@ public class IFile {
                   TezCounter readsCounter, TezCounter bytesReadCounter,
                   boolean readAhead, int readAheadLength,
                   DecompressorPool taskContext,
-                  TezOffsetRecord tezOffsetRecord) throws IOException {
+                  TezOffsetRecord tezOffsetRecord,
+                  boolean useDecompressorPoolPerDag) throws IOException {
       this(in, length - HEADER.length, codec,
           readsCounter, bytesReadCounter, readAhead, readAheadLength,
-          taskContext, readHeaderFlag(in), tezOffsetRecord);
+          taskContext, readHeaderFlag(in), tezOffsetRecord, useDecompressorPoolPerDag);
       assert in != null;
       if (bytesReadCounter != null) {
         bytesReadCounter.increment(IFile.HEADER.length);
@@ -999,20 +1002,24 @@ public class IFile {
                   TezCounter readsCounter, TezCounter bytesReadCounter,
                   boolean readAhead, int readAheadLength,
                   DecompressorPool taskContext, byte headerFlag,
-                  TezOffsetRecord tezOffsetRecord) throws IOException {
+                  TezOffsetRecord tezOffsetRecord,
+                  boolean useDecompressorPoolPerDag) throws IOException {
       assert in != null;
       boolean isCompressed = (headerFlag & FLAG_COMPRESSED) != 0;
       boolean isRleEnabled = (headerFlag & FLAG_RLE_ENABLED) != 0;
 
       this.readRecordsCounter = readsCounter;
       this.bytesReadCounter = bytesReadCounter;
+      this.useDecompressorPoolPerDag = useDecompressorPoolPerDag;
 
       checksumIn = new IFileInputStream(in, length, readAhead, readAheadLength/* , isCompressed */);
       if (isCompressed && codec != null) {
         assert taskContext != null;
         this.codec = codec;
         this.taskContext = taskContext;
-        decompressor = taskContext.getDecompressor(codec);
+        decompressor = useDecompressorPoolPerDag
+            ? taskContext.getDecompressorPerDag(codec)
+            : taskContext.getDecompressor(codec);
         if (decompressor != null) {
           this.in = codec.createInputStream(checksumIn, decompressor);
         } else {
@@ -1566,7 +1573,11 @@ public class IFile {
       if (decompressor != null) {
         decompressor.reset();
         if (taskContext != null) {
-          taskContext.returnDecompressor(decompressor);
+          if (useDecompressorPoolPerDag) {
+            taskContext.returnDecompressorPerDag(decompressor);
+          } else {
+            taskContext.returnDecompressor(decompressor);
+          }
         } else {
           decompressor.close();
         }
