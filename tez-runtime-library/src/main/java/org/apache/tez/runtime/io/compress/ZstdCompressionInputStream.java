@@ -33,7 +33,7 @@ final class ZstdCompressionInputStream extends BlockCompressionInputStream {
   }
 
   @Override
-  int maximumCompressedLength(int uncompressedLength) throws IOException {
+  int maximumCompressedLength(int uncompressedLength) {
     return decompressor.maximumCompressedLength(uncompressedLength);
   }
 
