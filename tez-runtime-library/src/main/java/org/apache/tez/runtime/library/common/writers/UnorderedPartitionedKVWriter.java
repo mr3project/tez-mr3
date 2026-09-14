@@ -1692,12 +1692,12 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
                   in.seek(indexRecord.getStartOffset());
                   reader = new IFile.Reader(in, indexRecord.getPartLength(), spillCodecForReader, null,
                       additionalSpillBytesReadCounter, ifileReadAhead, ifileReadAheadLength,
-                      outputContext, spillOffsetRecord);
+                      outputContext, spillOffsetRecord, false);
                 } else {
                   InputStream input = spillInfo.byteArrayOutput.createInputStreamFrom(
                       indexRecord.getStartOffset(), indexRecord.getPartLength());
                   reader = new IFile.Reader(input, indexRecord.getPartLength(), spillCodecForReader, null, null,
-                      ifileReadAhead, ifileReadAheadLength, outputContext, spillOffsetRecord);
+                      ifileReadAhead, ifileReadAheadLength, outputContext, spillOffsetRecord, false);
                 }
                 // reader.close() may not be called if the following while{} block throws IOException.
                 // In this case, reader.decompressor is not returned to the pool.
