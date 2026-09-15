@@ -26,15 +26,12 @@ final class SnappyCompressionInputStream extends BlockCompressionInputStream {
   private final XerialSnappyDecompressor decompressor;
 
   SnappyCompressionInputStream(
-      InputStream input, XerialSnappyDecompressor decompressor, int bufferSize)
+      InputStream input, XerialSnappyDecompressor decompressor, int bufferSize,
+      int maximumCompressedLength)
       throws IOException {
-    super(input, bufferSize, SnappyCompressionOutputStream.MAGIC, "Snappy");
+    super(input, bufferSize, maximumCompressedLength, SnappyCompressionOutputStream.MAGIC,
+        "Snappy");
     this.decompressor = decompressor;
-  }
-
-  @Override
-  int maximumCompressedLength(int uncompressedLength) {
-    return decompressor.maximumCompressedLength(uncompressedLength);
   }
 
   @Override

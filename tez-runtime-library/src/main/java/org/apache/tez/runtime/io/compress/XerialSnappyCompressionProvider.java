@@ -19,6 +19,7 @@ package org.apache.tez.runtime.io.compress;
 
 import org.apache.tez.runtime.api.CompressionAlgorithm;
 import org.apache.tez.runtime.api.CompressionProvider;
+import org.xerial.snappy.Snappy;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -27,9 +28,11 @@ import java.io.OutputStream;
 public final class XerialSnappyCompressionProvider implements CompressionProvider {
 
   private final int bufferSize;
+  private final int maximumCompressedLength;
 
   public XerialSnappyCompressionProvider(int bufferSize) {
     this.bufferSize = bufferSize;
+    this.maximumCompressedLength = Snappy.maxCompressedLength(bufferSize);
   }
 
   @Override
@@ -44,12 +47,12 @@ public final class XerialSnappyCompressionProvider implements CompressionProvide
 
   @Override
   public Compressor createCompressor() {
-    return new XerialSnappyCompressor();
+    return new XerialSnappyCompressor(bufferSize, maximumCompressedLength);
   }
 
   @Override
   public Decompressor createDecompressor() {
-    return new XerialSnappyDecompressor();
+    return new XerialSnappyDecompressor(bufferSize, maximumCompressedLength);
   }
 
   @Override
@@ -67,6 +70,6 @@ public final class XerialSnappyCompressionProvider implements CompressionProvide
     assert decompressor.getAlgorithm() == CompressionAlgorithm.SNAPPY;
 
     return new SnappyCompressionInputStream(
-        input, (XerialSnappyDecompressor) decompressor, bufferSize);
+        input, (XerialSnappyDecompressor) decompressor, bufferSize, maximumCompressedLength);
   }
 }

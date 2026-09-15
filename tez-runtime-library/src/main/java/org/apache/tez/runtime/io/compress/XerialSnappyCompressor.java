@@ -25,11 +25,16 @@ import org.xerial.snappy.Snappy;
 /** Raw xerial Snappy block compressor. A scratch buffer prevents partial caller output. */
 public final class XerialSnappyCompressor implements Compressor {
 
-  private byte[] input = new byte[0];
-  private byte[] scratch = new byte[0];
+  private byte[] input;
+  private byte[] scratch;
   private boolean closed;
 
-  public XerialSnappyCompressor() {
+  public XerialSnappyCompressor(int bufferSize, int maximumCompressedLength) {
+    assert bufferSize > 0;
+    assert bufferSize <= BlockCompressionOutputStream.MAX_BLOCK_SIZE;
+    assert maximumCompressedLength >= bufferSize;
+    input = new byte[bufferSize];
+    scratch = new byte[maximumCompressedLength];
     this.closed = false;
   }
 
@@ -38,46 +43,17 @@ public final class XerialSnappyCompressor implements Compressor {
     return CompressionAlgorithm.SNAPPY;
   }
 
-  // Returns a safe bound for one complete block without changing compressor state.
-  // Negative, overflowing, and unsupported lengths are rejected.
-  private int maxCompressedLength(int uncompressedLength) {
-    assert !closed;
-    if (uncompressedLength < 0) {
-      throw new IllegalArgumentException("Negative uncompressed length: " + uncompressedLength);
-    }
-    // Snappy's documented bound is 32 + n + n / 6. Check it in long arithmetic before
-    // entering xerial so an overflowing Java int can never be mistaken for a valid capacity.
-    long calculatedMaximum = 32L + uncompressedLength + uncompressedLength / 6L;
-    if (calculatedMaximum > Integer.MAX_VALUE) {
-      throw new IllegalArgumentException("Compressed length overflow for " + uncompressedLength);
-    }
-    try {
-      int result = Snappy.maxCompressedLength(uncompressedLength);
-      if (result < 0 || result < uncompressedLength) {
-        throw new IllegalArgumentException("Compressed length overflow for " + uncompressedLength);
-      }
-      return result;
-    } catch (RuntimeException e) {
-      throw new IllegalArgumentException("Unsupported Snappy input length: " + uncompressedLength, e);
-    }
-  }
-
   byte[] ensureInputCapacity(int length) {
     assert !closed;
     assert length > 0;
-    if (input.length < length) {
-      input = new byte[length];
-    }
+    assert input.length >= length;
     return input;
   }
 
   int compressBuffered(int inputLength) throws IOException {
     assert !closed;
     CompressionStreamUtils.checkRange(input, 0, inputLength, "input");
-    int maximum = maxCompressedLength(inputLength);
-    if (scratch.length < maximum) {
-      scratch = new byte[maximum];
-    }
+    assert inputLength <= input.length;
     try {
       return Snappy.rawCompress(input, 0, inputLength, scratch, 0);
     } catch (Throwable e) {

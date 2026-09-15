@@ -26,40 +26,38 @@ import org.apache.tez.runtime.api.CompressionAlgorithm;
 /** Raw zstd-jni block decompressor. */
 public final class ZstdJniDecompressor implements Decompressor {
 
-  private byte[] compressed = new byte[0];
-  private byte[] scratch = new byte[0];
-  private ZstdDecompressCtx context = new ZstdDecompressCtx();
+  private byte[] compressed;
+  private byte[] scratch;
+  private ZstdDecompressCtx context;
   private boolean closed;
+
+  public ZstdJniDecompressor(int bufferSize, int maximumCompressedLength) {
+    assert bufferSize > 0;
+    assert bufferSize <= BlockCompressionOutputStream.MAX_BLOCK_SIZE;
+    assert maximumCompressedLength >= bufferSize;
+    compressed = new byte[maximumCompressedLength];
+    scratch = new byte[bufferSize];
+    context = new ZstdDecompressCtx();
+    closed = false;
+  }
 
   @Override
   public CompressionAlgorithm getAlgorithm() {
     return CompressionAlgorithm.ZSTD;
   }
 
-  int maximumCompressedLength(int uncompressedLength) {
-    return (int) Zstd.compressBound(uncompressedLength);
-  }
-
   byte[] ensureCompressedCapacity(int length) {
     assert !closed;
-    if (length < 0) {
-      throw new IllegalArgumentException("Negative compressed buffer length: " + length);
-    }
-    if (compressed.length < length) {
-      compressed = new byte[length];
-    }
+    assert length >= 0;
+    assert compressed.length >= length;
     return compressed;
   }
 
   int decompressBuffered(int inputLength, int outputCapacity) throws IOException {
     assert !closed;
     CompressionStreamUtils.checkRange(compressed, 0, inputLength, "input");
-    if (outputCapacity < 0) {
-      throw new IllegalArgumentException("Negative output capacity: " + outputCapacity);
-    }
-    if (scratch.length < outputCapacity) {
-      scratch = new byte[outputCapacity];
-    }
+    assert outputCapacity >= 0;
+    assert scratch.length >= outputCapacity;
     try {
       long result = context.decompressByteArray(
           scratch, 0, outputCapacity, compressed, 0, inputLength);
