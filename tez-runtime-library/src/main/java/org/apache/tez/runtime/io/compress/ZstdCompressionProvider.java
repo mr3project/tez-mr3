@@ -49,12 +49,12 @@ public final class ZstdCompressionProvider implements CompressionProvider {
 
   @Override
   public Compressor createCompressor() {
-    return new ZstdJniCompressor(compressionLevel);
+    return new ZstdJniCompressor(compressionLevel, bufferSize);
   }
 
   @Override
   public Decompressor createDecompressor() {
-    return new ZstdJniDecompressor();
+    return new ZstdJniDecompressor(bufferSize);
   }
 
   @Override

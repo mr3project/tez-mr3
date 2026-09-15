@@ -44,12 +44,12 @@ public final class XerialSnappyCompressionProvider implements CompressionProvide
 
   @Override
   public Compressor createCompressor() {
-    return new XerialSnappyCompressor();
+    return new XerialSnappyCompressor(bufferSize);
   }
 
   @Override
   public Decompressor createDecompressor() {
-    return new XerialSnappyDecompressor();
+    return new XerialSnappyDecompressor(bufferSize);
   }
 
   @Override

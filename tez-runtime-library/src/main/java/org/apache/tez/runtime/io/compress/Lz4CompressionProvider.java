@@ -57,12 +57,13 @@ public final class Lz4CompressionProvider implements CompressionProvider {
 
   @Override
   public Compressor createCompressor() {
-    return new Lz4JniCompressor(lz4Factory, useHighCompression);
+    return new Lz4JniCompressor(lz4Factory, useHighCompression, bufferSize);
   }
 
   @Override
   public Decompressor createDecompressor() {
-    return new Lz4JniDecompressor(lz4Factory);
+    return new Lz4JniDecompressor(
+        lz4Factory, bufferSize, compressedLengthCalculator.maxCompressedLength(bufferSize));
   }
 
   @Override

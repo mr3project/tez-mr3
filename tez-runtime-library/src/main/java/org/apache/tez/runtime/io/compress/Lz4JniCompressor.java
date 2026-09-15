@@ -26,13 +26,17 @@ import org.apache.tez.runtime.api.CompressionAlgorithm;
 /** Raw lz4-java JNI block compressor. A scratch buffer prevents partial caller output. */
 public final class Lz4JniCompressor implements Compressor {
 
-  private byte[] input = new byte[0];
-  private byte[] scratch = new byte[0];
+  private byte[] input;
+  private byte[] scratch;
   private LZ4Compressor compressor;
   private boolean closed;
 
-  Lz4JniCompressor(LZ4Factory factory, boolean useHighCompression) {
+  Lz4JniCompressor(LZ4Factory factory, boolean useHighCompression, int bufferSize) {
+    assert bufferSize > 0;
+    assert bufferSize <= BlockCompressionOutputStream.MAX_BLOCK_SIZE;
     compressor = useHighCompression ? factory.highCompressor() : factory.fastCompressor();
+    input = new byte[bufferSize];
+    scratch = new byte[maxCompressedLength(bufferSize)];
     closed = false;
   }
 
@@ -43,26 +47,16 @@ public final class Lz4JniCompressor implements Compressor {
 
   private int maxCompressedLength(int uncompressedLength) {
     assert !closed;
-    if (uncompressedLength < 0) {
-      throw new IllegalArgumentException("Negative uncompressed length: " + uncompressedLength);
-    }
-    try {
-      int maximum = compressor.maxCompressedLength(uncompressedLength);
-      if (maximum < 0) {
-        throw new IllegalArgumentException("Compressed length overflow for " + uncompressedLength);
-      }
-      return maximum;
-    } catch (RuntimeException e) {
-      throw new IllegalArgumentException("Unsupported LZ4 input length: " + uncompressedLength, e);
-    }
+    assert uncompressedLength >= 0;
+    int maximum = compressor.maxCompressedLength(uncompressedLength);
+    assert maximum >= uncompressedLength;
+    return maximum;
   }
 
   byte[] ensureInputCapacity(int length) {
     assert !closed;
     assert length > 0;
-    if (input.length < length) {
-      input = new byte[length];
-    }
+    assert input.length >= length;
     return input;
   }
 
@@ -70,9 +64,7 @@ public final class Lz4JniCompressor implements Compressor {
     assert !closed;
     CompressionStreamUtils.checkRange(input, 0, inputLength, "input");
     int maximum = maxCompressedLength(inputLength);
-    if (scratch.length < maximum) {
-      scratch = new byte[maximum];
-    }
+    assert scratch.length >= maximum;
     try {
       return compressor.compress(input, 0, inputLength, scratch, 0, scratch.length);
     } catch (Throwable e) {
