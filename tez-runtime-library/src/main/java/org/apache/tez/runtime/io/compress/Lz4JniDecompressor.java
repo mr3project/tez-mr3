@@ -26,12 +26,17 @@ import org.apache.tez.runtime.api.CompressionAlgorithm;
 /** Raw lz4-java JNI block decompressor. */
 public final class Lz4JniDecompressor implements Decompressor {
 
-  private byte[] compressed = new byte[0];
-  private byte[] scratch = new byte[0];
+  private byte[] compressed;
+  private byte[] scratch;
   private LZ4FastDecompressor decompressor;
   private boolean closed;
 
-  Lz4JniDecompressor(LZ4Factory factory) {
+  Lz4JniDecompressor(LZ4Factory factory, int bufferSize, int maxCompressedLength) {
+    assert bufferSize > 0;
+    assert bufferSize <= BlockCompressionOutputStream.MAX_BLOCK_SIZE;
+    assert maxCompressedLength >= bufferSize;
+    compressed = new byte[maxCompressedLength];
+    scratch = new byte[bufferSize];
     decompressor = factory.fastDecompressor();
     closed = false;
   }
@@ -43,24 +48,16 @@ public final class Lz4JniDecompressor implements Decompressor {
 
   byte[] ensureCompressedCapacity(int length) {
     assert !closed;
-    if (length < 0) {
-      throw new IllegalArgumentException("Negative compressed buffer length: " + length);
-    }
-    if (compressed.length < length) {
-      compressed = new byte[length];
-    }
+    assert length >= 0;
+    assert compressed.length >= length;
     return compressed;
   }
 
   int decompressBuffered(int inputLength, int outputCapacity) throws IOException {
     assert !closed;
     CompressionStreamUtils.checkRange(compressed, 0, inputLength, "input");
-    if (outputCapacity < 0) {
-      throw new IllegalArgumentException("Negative output capacity: " + outputCapacity);
-    }
-    if (scratch.length < outputCapacity) {
-      scratch = new byte[outputCapacity];
-    }
+    assert outputCapacity >= 0;
+    assert scratch.length >= outputCapacity;
     try {
       int consumed = decompressor.decompress(compressed, 0, scratch, 0, outputCapacity);
       if (consumed != inputLength) {

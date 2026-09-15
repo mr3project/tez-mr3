@@ -26,15 +26,20 @@ import org.apache.tez.runtime.api.CompressionAlgorithm;
 /** Raw zstd-jni block compressor. A scratch buffer prevents partial caller output. */
 public final class ZstdJniCompressor implements Compressor {
 
-  private byte[] input = new byte[0];
-  private byte[] scratch = new byte[0];
+  private byte[] input;
+  private byte[] scratch;
   private ZstdCompressCtx context;
   private boolean closed;
 
-  public ZstdJniCompressor(int compressionLevel) {
+  public ZstdJniCompressor(int compressionLevel, int bufferSize, int maxCompressedLength) {
+    assert bufferSize > 0;
+    assert bufferSize <= BlockCompressionOutputStream.MAX_BLOCK_SIZE;
+    assert maxCompressedLength >= bufferSize;
     context = new ZstdCompressCtx();
     context.setLevel(compressionLevel);
     context.setChecksum(true);
+    input = new byte[bufferSize];
+    scratch = new byte[maxCompressedLength];
     closed = false;
   }
 
@@ -43,38 +48,17 @@ public final class ZstdJniCompressor implements Compressor {
     return CompressionAlgorithm.ZSTD;
   }
 
-  private int maxCompressedLength(int uncompressedLength) {
-    assert !closed;
-    if (uncompressedLength < 0) {
-      throw new IllegalArgumentException("Negative uncompressed length: " + uncompressedLength);
-    }
-    try {
-      long maximum = Zstd.compressBound(uncompressedLength);
-      if (maximum < 0 || maximum > Integer.MAX_VALUE) {
-        throw new IllegalArgumentException("Compressed length overflow for " + uncompressedLength);
-      }
-      return (int) maximum;
-    } catch (RuntimeException e) {
-      throw new IllegalArgumentException("Unsupported Zstd input length: " + uncompressedLength, e);
-    }
-  }
-
   byte[] ensureInputCapacity(int length) {
     assert !closed;
     assert length > 0;
-    if (input.length < length) {
-      input = new byte[length];
-    }
+    assert input.length >= length;
     return input;
   }
 
   int compressBuffered(int inputLength) throws IOException {
     assert !closed;
     CompressionStreamUtils.checkRange(input, 0, inputLength, "input");
-    int maximum = maxCompressedLength(inputLength);
-    if (scratch.length < maximum) {
-      scratch = new byte[maximum];
-    }
+    assert inputLength <= input.length;
     try {
       long result = context.compressByteArray(
           scratch, 0, scratch.length, input, 0, inputLength);
