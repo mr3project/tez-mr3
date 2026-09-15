@@ -17,12 +17,13 @@
  */
 package org.apache.tez.runtime.io.compress;
 
-import org.apache.tez.runtime.api.CompressionAlgorithm;
-import org.apache.tez.runtime.api.CompressionProvider;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+
+import com.github.luben.zstd.Zstd;
+import org.apache.tez.runtime.api.CompressionAlgorithm;
+import org.apache.tez.runtime.api.CompressionProvider;
 
 public final class ZstdCompressionProvider implements CompressionProvider {
 
@@ -30,10 +31,18 @@ public final class ZstdCompressionProvider implements CompressionProvider {
   private static final int RECOMMENDED_BUFFER_SIZE = 128 * 1024;
 
   private final int bufferSize;
+  private final int maxCompressedLength;
   private final int compressionLevel;
 
   public ZstdCompressionProvider(int bufferSize, int compressionLevel) {
     this.bufferSize = bufferSize == 0 ? RECOMMENDED_BUFFER_SIZE : bufferSize;
+    assert this.bufferSize > 0;
+    assert this.bufferSize <= BlockCompressionOutputStream.MAX_BLOCK_SIZE;
+    this.maxCompressedLength = (int) Zstd.compressBound(this.bufferSize);
+    if (maxCompressedLength < this.bufferSize) {
+      throw new IllegalStateException("Invalid Zstd maximum compressed length: "
+          + maxCompressedLength + " for buffer size " + this.bufferSize);
+    }
     this.compressionLevel = compressionLevel;
   }
 
@@ -49,12 +58,12 @@ public final class ZstdCompressionProvider implements CompressionProvider {
 
   @Override
   public Compressor createCompressor() {
-    return new ZstdJniCompressor(compressionLevel);
+    return new ZstdJniCompressor(compressionLevel, bufferSize, maxCompressedLength);
   }
 
   @Override
   public Decompressor createDecompressor() {
-    return new ZstdJniDecompressor();
+    return new ZstdJniDecompressor(bufferSize, maxCompressedLength);
   }
 
   @Override
@@ -72,6 +81,6 @@ public final class ZstdCompressionProvider implements CompressionProvider {
     assert decompressor.getAlgorithm() == CompressionAlgorithm.ZSTD;
 
     return new ZstdCompressionInputStream(
-        input, (ZstdJniDecompressor) decompressor, bufferSize);
+        input, (ZstdJniDecompressor) decompressor, bufferSize, maxCompressedLength);
   }
 }

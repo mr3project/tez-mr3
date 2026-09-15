@@ -23,13 +23,15 @@ import org.apache.tez.runtime.api.CompressionAlgorithm;
 import org.xerial.snappy.Snappy;
 
 /** Raw xerial Snappy block decompressor. */
-public final class XerialSnappyDecompressor implements Decompressor {
+final class XerialSnappyDecompressor implements Decompressor {
 
-  private byte[] compressed = new byte[0];
-  private byte[] scratch = new byte[0];
+  private byte[] compressed;
+  private byte[] scratch;
   private boolean closed;
 
-  public XerialSnappyDecompressor() {
+  XerialSnappyDecompressor(int bufferSize, int maxCompressedLength) {
+    compressed = new byte[maxCompressedLength];
+    scratch = new byte[bufferSize];
     this.closed = false;
   }
 
@@ -38,35 +40,23 @@ public final class XerialSnappyDecompressor implements Decompressor {
     return CompressionAlgorithm.SNAPPY;
   }
 
-  int maximumCompressedLength(int uncompressedLength) {
-    return Snappy.maxCompressedLength(uncompressedLength);
-  }
-
   byte[] ensureCompressedCapacity(int length) {
     assert !closed;
-    if (length < 0) {
-      throw new IllegalArgumentException("Negative compressed buffer length: " + length);
-    }
-    if (compressed.length < length) {
-      compressed = new byte[length];
-    }
+    assert length >= 0;
+    assert compressed.length >= length;
     return compressed;
   }
 
   int decompressBuffered(int inputLength, int outputCapacity) throws IOException {
     assert !closed;
     CompressionStreamUtils.checkRange(compressed, 0, inputLength, "input");
-    if (outputCapacity < 0) {
-      throw new IllegalArgumentException("Negative output capacity: " + outputCapacity);
-    }
+    assert outputCapacity >= 0;
     try {
       int length = Snappy.uncompressedLength(compressed, 0, inputLength);
       if (length < 0 || length > outputCapacity) {
         throw new IOException("Insufficient Snappy output capacity: need " + length + ", have " + outputCapacity);
       }
-      if (scratch.length < length) {
-        scratch = new byte[length];
-      }
+      assert scratch.length >= length;
       int actual = Snappy.rawUncompress(compressed, 0, inputLength, scratch, 0);
       if (actual != length) {
         throw new IOException("Corrupt Snappy block: expected " + length + " bytes, decoded " + actual);

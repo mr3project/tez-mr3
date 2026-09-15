@@ -26,15 +26,11 @@ final class ZstdCompressionInputStream extends BlockCompressionInputStream {
   private final ZstdJniDecompressor decompressor;
 
   ZstdCompressionInputStream(
-      InputStream input, ZstdJniDecompressor decompressor, int bufferSize)
+      InputStream input, ZstdJniDecompressor decompressor, int bufferSize,
+      int maxCompressedLength)
       throws IOException {
-    super(input, bufferSize, ZstdCompressionOutputStream.MAGIC, "Zstd");
+    super(input, bufferSize, maxCompressedLength, ZstdCompressionOutputStream.MAGIC, "Zstd");
     this.decompressor = decompressor;
-  }
-
-  @Override
-  int maximumCompressedLength(int uncompressedLength) {
-    return decompressor.maximumCompressedLength(uncompressedLength);
   }
 
   @Override

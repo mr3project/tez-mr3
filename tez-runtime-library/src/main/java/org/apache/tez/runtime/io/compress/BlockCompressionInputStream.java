@@ -26,18 +26,20 @@ import java.io.InputStream;
 abstract class BlockCompressionInputStream extends InputStream {
 
   private final DataInputStream input;
-  private final int maximumBlockSize;
+  private final int maxBlockSize;
+  private final int maxCompressedLength;
   private final String codecName;
   private int position;
   private int limit;
   private boolean ended;
   private boolean closed;
 
-  BlockCompressionInputStream(InputStream input, int bufferSize, int magic, String codecName)
-      throws IOException {
+  BlockCompressionInputStream(InputStream input, int bufferSize, int maxCompressedLength,
+      int magic, String codecName) throws IOException {
     BlockCompressionOutputStream.validateBlockSize(bufferSize, codecName);
     this.input = new DataInputStream(input);
-    this.maximumBlockSize = bufferSize;
+    this.maxBlockSize = bufferSize;
+    this.maxCompressedLength = maxCompressedLength;
     this.codecName = codecName;
     try {
       int actualMagic = this.input.readInt();
@@ -90,12 +92,11 @@ abstract class BlockCompressionInputStream extends InputStream {
       ended = true;
       return;
     }
-    if (rawLength <= 0 || rawLength > maximumBlockSize) {
+    if (rawLength <= 0 || rawLength > maxBlockSize) {
       throw new IOException(
           "Invalid " + codecName + " uncompressed chunk length: " + rawLength);
     }
-    int maximumCompressed = maximumCompressedLength(rawLength);
-    if (compressedLength <= 0 || compressedLength > maximumCompressed) {
+    if (compressedLength <= 0 || compressedLength > maxCompressedLength) {
       throw new IOException(
           "Invalid " + codecName + " compressed chunk length: " + compressedLength);
     }
@@ -128,8 +129,6 @@ abstract class BlockCompressionInputStream extends InputStream {
       }
     }
   }
-
-  abstract int maximumCompressedLength(int uncompressedLength);
 
   abstract byte[] ensureCompressedCapacity(int length);
 
