@@ -29,28 +29,18 @@ public final class XerialSnappyCompressor implements Compressor {
   private byte[] scratch;
   private boolean closed;
 
-  public XerialSnappyCompressor(int bufferSize) {
+  public XerialSnappyCompressor(int bufferSize, int maximumCompressedLength) {
     assert bufferSize > 0;
     assert bufferSize <= BlockCompressionOutputStream.MAX_BLOCK_SIZE;
+    assert maximumCompressedLength >= bufferSize;
     input = new byte[bufferSize];
-    scratch = new byte[maxCompressedLength(bufferSize)];
+    scratch = new byte[maximumCompressedLength];
     this.closed = false;
   }
 
   @Override
   public CompressionAlgorithm getAlgorithm() {
     return CompressionAlgorithm.SNAPPY;
-  }
-
-  // Returns a safe bound for one complete block without changing compressor state.
-  private int maxCompressedLength(int uncompressedLength) {
-    assert !closed;
-    assert uncompressedLength >= 0;
-    long calculatedMaximum = 32L + uncompressedLength + uncompressedLength / 6L;
-    assert calculatedMaximum <= Integer.MAX_VALUE;
-    int result = Snappy.maxCompressedLength(uncompressedLength);
-    assert result >= uncompressedLength;
-    return result;
   }
 
   byte[] ensureInputCapacity(int length) {
@@ -63,8 +53,7 @@ public final class XerialSnappyCompressor implements Compressor {
   int compressBuffered(int inputLength) throws IOException {
     assert !closed;
     CompressionStreamUtils.checkRange(input, 0, inputLength, "input");
-    int maximum = maxCompressedLength(inputLength);
-    assert scratch.length >= maximum;
+    assert inputLength <= input.length;
     try {
       return Snappy.rawCompress(input, 0, inputLength, scratch, 0);
     } catch (Throwable e) {

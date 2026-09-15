@@ -31,10 +31,11 @@ public final class ZstdJniDecompressor implements Decompressor {
   private ZstdDecompressCtx context;
   private boolean closed;
 
-  public ZstdJniDecompressor(int bufferSize) {
+  public ZstdJniDecompressor(int bufferSize, int maximumCompressedLength) {
     assert bufferSize > 0;
     assert bufferSize <= BlockCompressionOutputStream.MAX_BLOCK_SIZE;
-    compressed = new byte[maximumCompressedLength(bufferSize)];
+    assert maximumCompressedLength >= bufferSize;
+    compressed = new byte[maximumCompressedLength];
     scratch = new byte[bufferSize];
     context = new ZstdDecompressCtx();
     closed = false;
@@ -43,10 +44,6 @@ public final class ZstdJniDecompressor implements Decompressor {
   @Override
   public CompressionAlgorithm getAlgorithm() {
     return CompressionAlgorithm.ZSTD;
-  }
-
-  int maximumCompressedLength(int uncompressedLength) {
-    return (int) Zstd.compressBound(uncompressedLength);
   }
 
   byte[] ensureCompressedCapacity(int length) {

@@ -17,12 +17,13 @@
  */
 package org.apache.tez.runtime.io.compress;
 
-import org.apache.tez.runtime.api.CompressionAlgorithm;
-import org.apache.tez.runtime.api.CompressionProvider;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+
+import com.github.luben.zstd.Zstd;
+import org.apache.tez.runtime.api.CompressionAlgorithm;
+import org.apache.tez.runtime.api.CompressionProvider;
 
 public final class ZstdCompressionProvider implements CompressionProvider {
 
@@ -30,10 +31,12 @@ public final class ZstdCompressionProvider implements CompressionProvider {
   private static final int RECOMMENDED_BUFFER_SIZE = 128 * 1024;
 
   private final int bufferSize;
+  private final int maximumCompressedLength;
   private final int compressionLevel;
 
   public ZstdCompressionProvider(int bufferSize, int compressionLevel) {
     this.bufferSize = bufferSize == 0 ? RECOMMENDED_BUFFER_SIZE : bufferSize;
+    this.maximumCompressedLength = (int) Zstd.compressBound(this.bufferSize);
     this.compressionLevel = compressionLevel;
   }
 
@@ -49,12 +52,12 @@ public final class ZstdCompressionProvider implements CompressionProvider {
 
   @Override
   public Compressor createCompressor() {
-    return new ZstdJniCompressor(compressionLevel, bufferSize);
+    return new ZstdJniCompressor(compressionLevel, bufferSize, maximumCompressedLength);
   }
 
   @Override
   public Decompressor createDecompressor() {
-    return new ZstdJniDecompressor(bufferSize);
+    return new ZstdJniDecompressor(bufferSize, maximumCompressedLength);
   }
 
   @Override
@@ -72,6 +75,6 @@ public final class ZstdCompressionProvider implements CompressionProvider {
     assert decompressor.getAlgorithm() == CompressionAlgorithm.ZSTD;
 
     return new ZstdCompressionInputStream(
-        input, (ZstdJniDecompressor) decompressor, bufferSize);
+        input, (ZstdJniDecompressor) decompressor, bufferSize, maximumCompressedLength);
   }
 }

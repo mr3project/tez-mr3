@@ -29,10 +29,11 @@ public final class XerialSnappyDecompressor implements Decompressor {
   private byte[] scratch;
   private boolean closed;
 
-  public XerialSnappyDecompressor(int bufferSize) {
+  public XerialSnappyDecompressor(int bufferSize, int maximumCompressedLength) {
     assert bufferSize > 0;
     assert bufferSize <= BlockCompressionOutputStream.MAX_BLOCK_SIZE;
-    compressed = new byte[maximumCompressedLength(bufferSize)];
+    assert maximumCompressedLength >= bufferSize;
+    compressed = new byte[maximumCompressedLength];
     scratch = new byte[bufferSize];
     this.closed = false;
   }
@@ -40,10 +41,6 @@ public final class XerialSnappyDecompressor implements Decompressor {
   @Override
   public CompressionAlgorithm getAlgorithm() {
     return CompressionAlgorithm.SNAPPY;
-  }
-
-  int maximumCompressedLength(int uncompressedLength) {
-    return Snappy.maxCompressedLength(uncompressedLength);
   }
 
   byte[] ensureCompressedCapacity(int length) {

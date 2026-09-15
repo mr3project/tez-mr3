@@ -31,26 +31,20 @@ public final class Lz4JniCompressor implements Compressor {
   private LZ4Compressor compressor;
   private boolean closed;
 
-  Lz4JniCompressor(LZ4Factory factory, boolean useHighCompression, int bufferSize) {
+  Lz4JniCompressor(LZ4Factory factory, boolean useHighCompression, int bufferSize,
+      int maximumCompressedLength) {
     assert bufferSize > 0;
     assert bufferSize <= BlockCompressionOutputStream.MAX_BLOCK_SIZE;
+    assert maximumCompressedLength >= bufferSize;
     compressor = useHighCompression ? factory.highCompressor() : factory.fastCompressor();
     input = new byte[bufferSize];
-    scratch = new byte[maxCompressedLength(bufferSize)];
+    scratch = new byte[maximumCompressedLength];
     closed = false;
   }
 
   @Override
   public CompressionAlgorithm getAlgorithm() {
     return CompressionAlgorithm.LZ4;
-  }
-
-  private int maxCompressedLength(int uncompressedLength) {
-    assert !closed;
-    assert uncompressedLength >= 0;
-    int maximum = compressor.maxCompressedLength(uncompressedLength);
-    assert maximum >= uncompressedLength;
-    return maximum;
   }
 
   byte[] ensureInputCapacity(int length) {
@@ -63,8 +57,7 @@ public final class Lz4JniCompressor implements Compressor {
   int compressBuffered(int inputLength) throws IOException {
     assert !closed;
     CompressionStreamUtils.checkRange(input, 0, inputLength, "input");
-    int maximum = maxCompressedLength(inputLength);
-    assert scratch.length >= maximum;
+    assert inputLength <= input.length;
     try {
       return compressor.compress(input, 0, inputLength, scratch, 0, scratch.length);
     } catch (Throwable e) {

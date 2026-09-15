@@ -31,29 +31,21 @@ public final class ZstdJniCompressor implements Compressor {
   private ZstdCompressCtx context;
   private boolean closed;
 
-  public ZstdJniCompressor(int compressionLevel, int bufferSize) {
+  public ZstdJniCompressor(int compressionLevel, int bufferSize, int maximumCompressedLength) {
     assert bufferSize > 0;
     assert bufferSize <= BlockCompressionOutputStream.MAX_BLOCK_SIZE;
+    assert maximumCompressedLength >= bufferSize;
     context = new ZstdCompressCtx();
     context.setLevel(compressionLevel);
     context.setChecksum(true);
     input = new byte[bufferSize];
-    scratch = new byte[maxCompressedLength(bufferSize)];
+    scratch = new byte[maximumCompressedLength];
     closed = false;
   }
 
   @Override
   public CompressionAlgorithm getAlgorithm() {
     return CompressionAlgorithm.ZSTD;
-  }
-
-  private int maxCompressedLength(int uncompressedLength) {
-    assert !closed;
-    assert uncompressedLength >= 0;
-    long maximum = Zstd.compressBound(uncompressedLength);
-    assert maximum >= uncompressedLength;
-    assert maximum <= Integer.MAX_VALUE;
-    return (int) maximum;
   }
 
   byte[] ensureInputCapacity(int length) {
@@ -66,8 +58,7 @@ public final class ZstdJniCompressor implements Compressor {
   int compressBuffered(int inputLength) throws IOException {
     assert !closed;
     CompressionStreamUtils.checkRange(input, 0, inputLength, "input");
-    int maximum = maxCompressedLength(inputLength);
-    assert scratch.length >= maximum;
+    assert inputLength <= input.length;
     try {
       long result = context.compressByteArray(
           scratch, 0, scratch.length, input, 0, inputLength);

@@ -20,26 +20,17 @@ package org.apache.tez.runtime.io.compress;
 import java.io.IOException;
 import java.io.InputStream;
 
-import net.jpountz.lz4.LZ4Compressor;
-
 /** Reader for Tez's provider-private LZ4 block framing. */
 final class Lz4CompressionInputStream extends BlockCompressionInputStream {
 
   private final Lz4JniDecompressor decompressor;
-  private final LZ4Compressor compressedLengthCalculator;
 
   Lz4CompressionInputStream(
-      InputStream input, Lz4JniDecompressor decompressor,
-      LZ4Compressor compressedLengthCalculator, int bufferSize)
+      InputStream input, Lz4JniDecompressor decompressor, int bufferSize,
+      int maximumCompressedLength)
       throws IOException {
-    super(input, bufferSize, Lz4CompressionOutputStream.MAGIC, "LZ4");
+    super(input, bufferSize, maximumCompressedLength, Lz4CompressionOutputStream.MAGIC, "LZ4");
     this.decompressor = decompressor;
-    this.compressedLengthCalculator = compressedLengthCalculator;
-  }
-
-  @Override
-  int maximumCompressedLength(int uncompressedLength) {
-    return compressedLengthCalculator.maxCompressedLength(uncompressedLength);
   }
 
   @Override
