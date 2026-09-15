@@ -23,16 +23,13 @@ import org.apache.tez.runtime.api.CompressionAlgorithm;
 import org.xerial.snappy.Snappy;
 
 /** Raw xerial Snappy block compressor. A scratch buffer prevents partial caller output. */
-public final class XerialSnappyCompressor implements Compressor {
+final class XerialSnappyCompressor implements Compressor {
 
   private byte[] input;
   private byte[] scratch;
   private boolean closed;
 
-  public XerialSnappyCompressor(int bufferSize, int maxCompressedLength) {
-    assert bufferSize > 0;
-    assert bufferSize <= BlockCompressionOutputStream.MAX_BLOCK_SIZE;
-    assert maxCompressedLength >= bufferSize;
+  XerialSnappyCompressor(int bufferSize, int maxCompressedLength) {
     input = new byte[bufferSize];
     scratch = new byte[maxCompressedLength];
     this.closed = false;

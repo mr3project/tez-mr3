@@ -24,17 +24,14 @@ import com.github.luben.zstd.ZstdCompressCtx;
 import org.apache.tez.runtime.api.CompressionAlgorithm;
 
 /** Raw zstd-jni block compressor. A scratch buffer prevents partial caller output. */
-public final class ZstdJniCompressor implements Compressor {
+final class ZstdJniCompressor implements Compressor {
 
   private byte[] input;
   private byte[] scratch;
   private ZstdCompressCtx context;
   private boolean closed;
 
-  public ZstdJniCompressor(int compressionLevel, int bufferSize, int maxCompressedLength) {
-    assert bufferSize > 0;
-    assert bufferSize <= BlockCompressionOutputStream.MAX_BLOCK_SIZE;
-    assert maxCompressedLength >= bufferSize;
+  ZstdJniCompressor(int compressionLevel, int bufferSize, int maxCompressedLength) {
     context = new ZstdCompressCtx();
     context.setLevel(compressionLevel);
     context.setChecksum(true);

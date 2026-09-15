@@ -23,16 +23,13 @@ import org.apache.tez.runtime.api.CompressionAlgorithm;
 import org.xerial.snappy.Snappy;
 
 /** Raw xerial Snappy block decompressor. */
-public final class XerialSnappyDecompressor implements Decompressor {
+final class XerialSnappyDecompressor implements Decompressor {
 
   private byte[] compressed;
   private byte[] scratch;
   private boolean closed;
 
-  public XerialSnappyDecompressor(int bufferSize, int maxCompressedLength) {
-    assert bufferSize > 0;
-    assert bufferSize <= BlockCompressionOutputStream.MAX_BLOCK_SIZE;
-    assert maxCompressedLength >= bufferSize;
+  XerialSnappyDecompressor(int bufferSize, int maxCompressedLength) {
     compressed = new byte[maxCompressedLength];
     scratch = new byte[bufferSize];
     this.closed = false;

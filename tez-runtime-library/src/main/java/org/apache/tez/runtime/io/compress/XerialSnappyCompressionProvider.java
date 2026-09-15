@@ -31,8 +31,14 @@ public final class XerialSnappyCompressionProvider implements CompressionProvide
   private final int maxCompressedLength;
 
   public XerialSnappyCompressionProvider(int bufferSize) {
+    assert bufferSize > 0;
+    assert bufferSize <= BlockCompressionOutputStream.MAX_BLOCK_SIZE;
     this.bufferSize = bufferSize;
     this.maxCompressedLength = Snappy.maxCompressedLength(bufferSize);
+    if (maxCompressedLength < bufferSize) {
+      throw new IllegalStateException("Invalid Snappy maximum compressed length: "
+          + maxCompressedLength + " for buffer size " + bufferSize);
+    }
   }
 
   @Override
