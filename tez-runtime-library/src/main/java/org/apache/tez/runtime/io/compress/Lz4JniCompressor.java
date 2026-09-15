@@ -24,7 +24,7 @@ import net.jpountz.lz4.LZ4Factory;
 import org.apache.tez.runtime.api.CompressionAlgorithm;
 
 /** Raw lz4-java JNI block compressor. A scratch buffer prevents partial caller output. */
-public final class Lz4JniCompressor implements Compressor {
+final class Lz4JniCompressor implements Compressor {
 
   private byte[] input;
   private byte[] scratch;
@@ -33,9 +33,6 @@ public final class Lz4JniCompressor implements Compressor {
 
   Lz4JniCompressor(LZ4Factory factory, boolean useHighCompression, int bufferSize,
       int maxCompressedLength) {
-    assert bufferSize > 0;
-    assert bufferSize <= BlockCompressionOutputStream.MAX_BLOCK_SIZE;
-    assert maxCompressedLength >= bufferSize;
     compressor = useHighCompression ? factory.highCompressor() : factory.fastCompressor();
     input = new byte[bufferSize];
     scratch = new byte[maxCompressedLength];

@@ -24,17 +24,14 @@ import com.github.luben.zstd.ZstdDecompressCtx;
 import org.apache.tez.runtime.api.CompressionAlgorithm;
 
 /** Raw zstd-jni block decompressor. */
-public final class ZstdJniDecompressor implements Decompressor {
+final class ZstdJniDecompressor implements Decompressor {
 
   private byte[] compressed;
   private byte[] scratch;
   private ZstdDecompressCtx context;
   private boolean closed;
 
-  public ZstdJniDecompressor(int bufferSize, int maxCompressedLength) {
-    assert bufferSize > 0;
-    assert bufferSize <= BlockCompressionOutputStream.MAX_BLOCK_SIZE;
-    assert maxCompressedLength >= bufferSize;
+  ZstdJniDecompressor(int bufferSize, int maxCompressedLength) {
     compressed = new byte[maxCompressedLength];
     scratch = new byte[bufferSize];
     context = new ZstdDecompressCtx();

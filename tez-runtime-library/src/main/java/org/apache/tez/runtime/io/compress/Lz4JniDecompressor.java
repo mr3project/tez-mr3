@@ -24,7 +24,7 @@ import net.jpountz.lz4.LZ4FastDecompressor;
 import org.apache.tez.runtime.api.CompressionAlgorithm;
 
 /** Raw lz4-java JNI block decompressor. */
-public final class Lz4JniDecompressor implements Decompressor {
+final class Lz4JniDecompressor implements Decompressor {
 
   private byte[] compressed;
   private byte[] scratch;
@@ -32,9 +32,6 @@ public final class Lz4JniDecompressor implements Decompressor {
   private boolean closed;
 
   Lz4JniDecompressor(LZ4Factory factory, int bufferSize, int maxCompressedLength) {
-    assert bufferSize > 0;
-    assert bufferSize <= BlockCompressionOutputStream.MAX_BLOCK_SIZE;
-    assert maxCompressedLength >= bufferSize;
     compressed = new byte[maxCompressedLength];
     scratch = new byte[bufferSize];
     decompressor = factory.fastDecompressor();

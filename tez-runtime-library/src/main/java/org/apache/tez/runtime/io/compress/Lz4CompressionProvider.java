@@ -33,6 +33,8 @@ public final class Lz4CompressionProvider implements CompressionProvider {
   private final int maxCompressedLength;
 
   public Lz4CompressionProvider(int bufferSize, boolean useHighCompression, boolean useNativeInstance) {
+    assert bufferSize > 0;
+    assert bufferSize <= BlockCompressionOutputStream.MAX_BLOCK_SIZE;
     this.bufferSize = bufferSize;
     this.useHighCompression = useHighCompression;
     if (useNativeInstance) {
@@ -41,6 +43,10 @@ public final class Lz4CompressionProvider implements CompressionProvider {
       this.lz4Factory = LZ4Factory.fastestJavaInstance();
     }
     this.maxCompressedLength = lz4Factory.fastCompressor().maxCompressedLength(bufferSize);
+    if (maxCompressedLength < bufferSize) {
+      throw new IllegalStateException("Invalid LZ4 maximum compressed length: "
+          + maxCompressedLength + " for buffer size " + bufferSize);
+    }
   }
 
   @Override
