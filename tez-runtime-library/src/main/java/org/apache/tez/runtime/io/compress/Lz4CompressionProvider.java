@@ -33,7 +33,7 @@ public final class Lz4CompressionProvider implements CompressionProvider {
   private final int maxCompressedLength;
 
   public Lz4CompressionProvider(int maxBufferSize, boolean useHighCompression, boolean useNativeInstance) {
-    assert maxBufferSize > 0;
+    assert maxBufferSize >= 8;
     assert maxBufferSize <= BlockCompressionOutputStream.MAX_BLOCK_SIZE;
     this.maxBufferSize = maxBufferSize;
     this.useHighCompression = useHighCompression;
@@ -68,6 +68,11 @@ public final class Lz4CompressionProvider implements CompressionProvider {
   @Override
   public Decompressor createDecompressor() {
     return new Lz4JniDecompressor(lz4Factory, maxBufferSize, maxCompressedLength);
+  }
+
+  @Override
+  public Decompressor createDecompressorPerDag() {
+    return new Lz4JniDecompressor(lz4Factory, maxBufferSize, maxCompressedLength, true);
   }
 
   @Override

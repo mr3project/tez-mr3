@@ -34,8 +34,8 @@ final class Lz4CompressionInputStream extends BlockCompressionInputStream {
   }
 
   @Override
-  byte[] ensureCompressedCapacity(int length) {
-    return decompressor.ensureCompressedCapacity(length);
+  byte[] ensureCapacity(int compressedLength, int rawLength) throws IOException {
+    return decompressor.ensureCapacity(compressedLength, rawLength);
   }
 
   @Override

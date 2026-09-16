@@ -100,7 +100,7 @@ abstract class BlockCompressionInputStream extends InputStream {
       throw new IOException(
           "Invalid " + codecName + " compressed chunk length: " + compressedLength);
     }
-    byte[] compressed = ensureCompressedCapacity(compressedLength);
+    byte[] compressed = ensureCapacity(compressedLength, rawLength);
     input.readFully(compressed, 0, compressedLength);
     int actual = decompressBuffered(compressedLength, rawLength);
     if (actual != rawLength) {
@@ -130,7 +130,7 @@ abstract class BlockCompressionInputStream extends InputStream {
     }
   }
 
-  abstract byte[] ensureCompressedCapacity(int length);
+  abstract byte[] ensureCapacity(int compressedLength, int rawLength) throws IOException;
 
   abstract int decompressBuffered(int inputLength, int outputCapacity) throws IOException;
 

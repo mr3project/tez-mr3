@@ -36,7 +36,7 @@ public final class ZstdCompressionProvider implements CompressionProvider {
 
   public ZstdCompressionProvider(int maxBufferSize, int compressionLevel) {
     this.maxBufferSize = maxBufferSize == 0 ? RECOMMENDED_BUFFER_SIZE : maxBufferSize;
-    assert this.maxBufferSize > 0;
+    assert this.maxBufferSize >= 8;
     assert this.maxBufferSize <= BlockCompressionOutputStream.MAX_BLOCK_SIZE;
     this.maxCompressedLength = (int) Zstd.compressBound(this.maxBufferSize);
     if (maxCompressedLength < this.maxBufferSize) {
@@ -64,6 +64,11 @@ public final class ZstdCompressionProvider implements CompressionProvider {
   @Override
   public Decompressor createDecompressor() {
     return new ZstdJniDecompressor(maxBufferSize, maxCompressedLength);
+  }
+
+  @Override
+  public Decompressor createDecompressorPerDag() {
+    return new ZstdJniDecompressor(maxBufferSize, maxCompressedLength, true);
   }
 
   @Override

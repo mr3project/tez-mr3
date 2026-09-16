@@ -19,6 +19,7 @@ package org.apache.tez.runtime.io.compress;
 
 import java.io.IOException;
 
+import net.jpountz.lz4.LZ4Compressor;
 import net.jpountz.lz4.LZ4Factory;
 import net.jpountz.lz4.LZ4FastDecompressor;
 import org.apache.tez.runtime.api.CompressionAlgorithm;
@@ -28,12 +29,21 @@ final class Lz4JniDecompressor implements Decompressor {
 
   private byte[] compressed;
   private byte[] scratch;
+  private final int maxBufferSize;
+  private final LZ4Compressor compressor;
   private LZ4FastDecompressor decompressor;
   private boolean closed;
 
   Lz4JniDecompressor(LZ4Factory factory, int bufferSize, int maxCompressedLength) {
-    compressed = new byte[maxCompressedLength];
-    scratch = new byte[bufferSize];
+    this(factory, bufferSize, maxCompressedLength, false);
+  }
+
+  Lz4JniDecompressor(
+      LZ4Factory factory, int bufferSize, int maxCompressedLength, boolean perDag) {
+    compressed = new byte[perDag ? 0 : maxCompressedLength];
+    scratch = new byte[perDag ? 0 : bufferSize];
+    maxBufferSize = bufferSize;
+    compressor = factory.fastCompressor();
     decompressor = factory.fastDecompressor();
     closed = false;
   }
@@ -43,10 +53,23 @@ final class Lz4JniDecompressor implements Decompressor {
     return CompressionAlgorithm.LZ4;
   }
 
-  byte[] ensureCompressedCapacity(int length) {
+  byte[] ensureCapacity(int compressedLength, int rawLength) throws IOException {
     assert !closed;
-    assert length >= 0;
-    assert compressed.length >= length;
+    int newScratchLength = CompressionStreamUtils.nextBufferSize(
+        scratch.length, rawLength, maxBufferSize);
+    if (newScratchLength != scratch.length) {
+      int newCompressedLength = compressor.maxCompressedLength(newScratchLength);
+      if (compressedLength > newCompressedLength) {
+        throw new IOException("Invalid LZ4 compressed chunk length " + compressedLength
+            + " for uncompressed chunk length " + rawLength);
+      }
+      scratch = new byte[newScratchLength];
+      compressed = new byte[newCompressedLength];
+    }
+    if (compressedLength > compressed.length) {
+      throw new IOException("Invalid LZ4 compressed chunk length " + compressedLength
+          + " for uncompressed chunk length " + rawLength);
+    }
     return compressed;
   }
 

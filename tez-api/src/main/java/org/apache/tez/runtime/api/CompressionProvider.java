@@ -33,6 +33,7 @@ public interface CompressionProvider {
 
   Compressor createCompressor();
   Decompressor createDecompressor();
+  Decompressor createDecompressorPerDag();
 
   CompressionOutputStream createOutputStream(
       OutputStream output, Compressor compressor) throws IOException;
