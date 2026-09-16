@@ -30,18 +30,18 @@ public final class ZstdCompressionProvider implements CompressionProvider {
   // Hadoop uses zero to request the codec's recommended native buffer size.
   private static final int RECOMMENDED_BUFFER_SIZE = 128 * 1024;
 
-  private final int bufferSize;
+  private final int maxBufferSize;
   private final int maxCompressedLength;
   private final int compressionLevel;
 
-  public ZstdCompressionProvider(int bufferSize, int compressionLevel) {
-    this.bufferSize = bufferSize == 0 ? RECOMMENDED_BUFFER_SIZE : bufferSize;
-    assert this.bufferSize > 0;
-    assert this.bufferSize <= BlockCompressionOutputStream.MAX_BLOCK_SIZE;
-    this.maxCompressedLength = (int) Zstd.compressBound(this.bufferSize);
-    if (maxCompressedLength < this.bufferSize) {
+  public ZstdCompressionProvider(int maxBufferSize, int compressionLevel) {
+    this.maxBufferSize = maxBufferSize == 0 ? RECOMMENDED_BUFFER_SIZE : maxBufferSize;
+    assert this.maxBufferSize > 0;
+    assert this.maxBufferSize <= BlockCompressionOutputStream.MAX_BLOCK_SIZE;
+    this.maxCompressedLength = (int) Zstd.compressBound(this.maxBufferSize);
+    if (maxCompressedLength < this.maxBufferSize) {
       throw new IllegalStateException("Invalid Zstd maximum compressed length: "
-          + maxCompressedLength + " for buffer size " + this.bufferSize);
+          + maxCompressedLength + " for buffer size " + this.maxBufferSize);
     }
     this.compressionLevel = compressionLevel;
   }
@@ -52,18 +52,18 @@ public final class ZstdCompressionProvider implements CompressionProvider {
   }
 
   @Override
-  public int getBufferSize() {
-    return bufferSize;
+  public int getMaxBufferSize() {
+    return maxBufferSize;
   }
 
   @Override
   public Compressor createCompressor() {
-    return new ZstdJniCompressor(compressionLevel, bufferSize, maxCompressedLength);
+    return new ZstdJniCompressor(compressionLevel, maxBufferSize, maxCompressedLength);
   }
 
   @Override
   public Decompressor createDecompressor() {
-    return new ZstdJniDecompressor(bufferSize, maxCompressedLength);
+    return new ZstdJniDecompressor(maxBufferSize, maxCompressedLength);
   }
 
   @Override
@@ -72,7 +72,7 @@ public final class ZstdCompressionProvider implements CompressionProvider {
     assert compressor.getAlgorithm() == CompressionAlgorithm.ZSTD;
 
     return new ZstdCompressionOutputStream(
-        output, (ZstdJniCompressor) compressor, bufferSize);
+        output, (ZstdJniCompressor) compressor, maxBufferSize);
   }
 
   @Override
@@ -81,6 +81,6 @@ public final class ZstdCompressionProvider implements CompressionProvider {
     assert decompressor.getAlgorithm() == CompressionAlgorithm.ZSTD;
 
     return new ZstdCompressionInputStream(
-        input, (ZstdJniDecompressor) decompressor, bufferSize, maxCompressedLength);
+        input, (ZstdJniDecompressor) decompressor, maxBufferSize, maxCompressedLength);
   }
 }

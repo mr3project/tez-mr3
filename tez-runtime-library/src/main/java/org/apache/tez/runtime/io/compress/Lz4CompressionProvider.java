@@ -27,25 +27,25 @@ import org.apache.tez.runtime.api.CompressionProvider;
 
 public final class Lz4CompressionProvider implements CompressionProvider {
 
-  private final int bufferSize;
+  private final int maxBufferSize;
   private final boolean useHighCompression;
   private final LZ4Factory lz4Factory;
   private final int maxCompressedLength;
 
-  public Lz4CompressionProvider(int bufferSize, boolean useHighCompression, boolean useNativeInstance) {
-    assert bufferSize > 0;
-    assert bufferSize <= BlockCompressionOutputStream.MAX_BLOCK_SIZE;
-    this.bufferSize = bufferSize;
+  public Lz4CompressionProvider(int maxBufferSize, boolean useHighCompression, boolean useNativeInstance) {
+    assert maxBufferSize > 0;
+    assert maxBufferSize <= BlockCompressionOutputStream.MAX_BLOCK_SIZE;
+    this.maxBufferSize = maxBufferSize;
     this.useHighCompression = useHighCompression;
     if (useNativeInstance) {
       this.lz4Factory = LZ4Factory.nativeInstance();
     } else {
       this.lz4Factory = LZ4Factory.fastestJavaInstance();
     }
-    this.maxCompressedLength = lz4Factory.fastCompressor().maxCompressedLength(bufferSize);
-    if (maxCompressedLength < bufferSize) {
+    this.maxCompressedLength = lz4Factory.fastCompressor().maxCompressedLength(maxBufferSize);
+    if (maxCompressedLength < maxBufferSize) {
       throw new IllegalStateException("Invalid LZ4 maximum compressed length: "
-          + maxCompressedLength + " for buffer size " + bufferSize);
+          + maxCompressedLength + " for buffer size " + maxBufferSize);
     }
   }
 
@@ -55,19 +55,19 @@ public final class Lz4CompressionProvider implements CompressionProvider {
   }
 
   @Override
-  public int getBufferSize() {
-    return bufferSize;
+  public int getMaxBufferSize() {
+    return maxBufferSize;
   }
 
   @Override
   public Compressor createCompressor() {
     return new Lz4JniCompressor(
-        lz4Factory, useHighCompression, bufferSize, maxCompressedLength);
+        lz4Factory, useHighCompression, maxBufferSize, maxCompressedLength);
   }
 
   @Override
   public Decompressor createDecompressor() {
-    return new Lz4JniDecompressor(lz4Factory, bufferSize, maxCompressedLength);
+    return new Lz4JniDecompressor(lz4Factory, maxBufferSize, maxCompressedLength);
   }
 
   @Override
@@ -76,7 +76,7 @@ public final class Lz4CompressionProvider implements CompressionProvider {
     assert compressor.getAlgorithm() == CompressionAlgorithm.LZ4;
 
     return new Lz4CompressionOutputStream(
-        output, (Lz4JniCompressor) compressor, bufferSize);
+        output, (Lz4JniCompressor) compressor, maxBufferSize);
   }
 
   @Override
@@ -85,6 +85,6 @@ public final class Lz4CompressionProvider implements CompressionProvider {
     assert decompressor.getAlgorithm() == CompressionAlgorithm.LZ4;
 
     return new Lz4CompressionInputStream(
-        input, (Lz4JniDecompressor) decompressor, bufferSize, maxCompressedLength);
+        input, (Lz4JniDecompressor) decompressor, maxBufferSize, maxCompressedLength);
   }
 }

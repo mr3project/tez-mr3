@@ -29,7 +29,7 @@ import java.io.OutputStream;
 public interface CompressionProvider {
 
   CompressionAlgorithm getAlgorithm();
-  int getBufferSize();
+  int getMaxBufferSize();
 
   Compressor createCompressor();
   Decompressor createDecompressor();

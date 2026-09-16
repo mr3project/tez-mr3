@@ -47,7 +47,7 @@ public class TestZstdCompressionProvider {
   public void testProviderIdentity() {
     ZstdCompressionProvider provider = createProvider();
     assertEquals(CompressionAlgorithm.ZSTD, provider.getAlgorithm());
-    assertEquals(BUFFER_SIZE, provider.getBufferSize());
+    assertEquals(BUFFER_SIZE, provider.getMaxBufferSize());
     assertEquals(CompressionAlgorithm.ZSTD, provider.createCompressor().getAlgorithm());
     assertEquals(CompressionAlgorithm.ZSTD, provider.createDecompressor().getAlgorithm());
   }
@@ -63,7 +63,7 @@ public class TestZstdCompressionProvider {
 
     CompressionProvider provider = CompressionResolver.createProvider(conf);
     assertTrue(provider instanceof ZstdCompressionProvider);
-    assertEquals(BUFFER_SIZE, provider.getBufferSize());
+    assertEquals(BUFFER_SIZE, provider.getMaxBufferSize());
     assertArrayEquals(randomBytes(BUFFER_SIZE + 1),
         roundTrip(provider, randomBytes(BUFFER_SIZE + 1)));
   }
@@ -77,7 +77,7 @@ public class TestZstdCompressionProvider {
 
     CompressionProvider provider = CompressionResolver.createProvider(conf);
     assertTrue(provider instanceof ZstdCompressionProvider);
-    assertTrue(provider.getBufferSize() > 0);
+    assertTrue(provider.getMaxBufferSize() > 0);
     byte[] original = randomBytes(BUFFER_SIZE + 1);
     assertArrayEquals(original, roundTrip(provider, original));
   }
