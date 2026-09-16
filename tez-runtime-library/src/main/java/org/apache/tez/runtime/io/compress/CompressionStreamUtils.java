@@ -28,4 +28,17 @@ final class CompressionStreamUtils {
               + ", arrayLength=" + array.length);
     }
   }
+
+  static int nextBufferSize(int currentLength, int requiredLength, int maxLength) {
+    assert currentLength >= 0;
+    assert requiredLength >= 0;
+    assert requiredLength <= maxLength;
+    assert maxLength >= 8;
+
+    int newLength = currentLength == 0 ? maxLength / 8 : currentLength;
+    while (newLength < requiredLength) {
+      newLength = Math.min(newLength * 2, maxLength);
+    }
+    return newLength;
+  }
 }
