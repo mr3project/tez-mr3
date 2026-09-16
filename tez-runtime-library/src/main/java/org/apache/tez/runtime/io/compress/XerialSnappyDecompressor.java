@@ -27,11 +27,13 @@ final class XerialSnappyDecompressor implements Decompressor {
 
   private byte[] compressed;
   private byte[] scratch;
+  private final int maxBufferSize;
   private boolean closed;
 
-  XerialSnappyDecompressor(int bufferSize, int maxCompressedLength) {
-    compressed = new byte[maxCompressedLength];
-    scratch = new byte[bufferSize];
+  XerialSnappyDecompressor(int maxBufferSize, int maxCompressedLength, boolean perDag) {
+    compressed = new byte[perDag ? 0 : maxCompressedLength];
+    scratch = new byte[perDag ? 0 : maxBufferSize];
+    this.maxBufferSize = maxBufferSize;
     this.closed = false;
   }
 
@@ -40,10 +42,20 @@ final class XerialSnappyDecompressor implements Decompressor {
     return CompressionAlgorithm.SNAPPY;
   }
 
-  byte[] ensureCompressedCapacity(int length) {
+  byte[] ensureCapacity(int compressedLength, int rawLength) {
     assert !closed;
-    assert length >= 0;
-    assert compressed.length >= length;
+    if (rawLength <= scratch.length) {
+      return compressed;
+    }
+
+    int newScratchLength = CompressionStreamUtils.nextBufferSize(
+        scratch.length, rawLength, maxBufferSize);
+    if (newScratchLength != scratch.length) {
+      int newCompressedLength = Snappy.maxCompressedLength(newScratchLength);
+      assert compressedLength <= newCompressedLength;   // because rawLength < scratch.length
+      scratch = new byte[newScratchLength];
+      compressed = new byte[newCompressedLength];
+    }
     return compressed;
   }
 

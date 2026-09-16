@@ -28,16 +28,14 @@ import org.apache.tez.runtime.api.CompressionProvider;
 public final class ZstdCompressionProvider implements CompressionProvider {
 
   // Hadoop uses zero to request the codec's recommended native buffer size.
-  private static final int RECOMMENDED_BUFFER_SIZE = 128 * 1024;
+  static final int RECOMMENDED_BUFFER_SIZE = 128 * 1024;
 
   private final int maxBufferSize;
   private final int maxCompressedLength;
   private final int compressionLevel;
 
   public ZstdCompressionProvider(int maxBufferSize, int compressionLevel) {
-    this.maxBufferSize = maxBufferSize == 0 ? RECOMMENDED_BUFFER_SIZE : maxBufferSize;
-    assert this.maxBufferSize > 0;
-    assert this.maxBufferSize <= BlockCompressionOutputStream.MAX_BLOCK_SIZE;
+    this.maxBufferSize = maxBufferSize;
     this.maxCompressedLength = (int) Zstd.compressBound(this.maxBufferSize);
     if (maxCompressedLength < this.maxBufferSize) {
       throw new IllegalStateException("Invalid Zstd maximum compressed length: "
@@ -63,7 +61,12 @@ public final class ZstdCompressionProvider implements CompressionProvider {
 
   @Override
   public Decompressor createDecompressor() {
-    return new ZstdJniDecompressor(maxBufferSize, maxCompressedLength);
+    return new ZstdJniDecompressor(maxBufferSize, maxCompressedLength, false);
+  }
+
+  @Override
+  public Decompressor createDecompressorPerDag() {
+    return new ZstdJniDecompressor(maxBufferSize, maxCompressedLength, true);
   }
 
   @Override

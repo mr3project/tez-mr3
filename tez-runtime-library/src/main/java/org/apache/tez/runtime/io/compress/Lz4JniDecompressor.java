@@ -19,6 +19,7 @@ package org.apache.tez.runtime.io.compress;
 
 import java.io.IOException;
 
+import net.jpountz.lz4.LZ4Compressor;
 import net.jpountz.lz4.LZ4Factory;
 import net.jpountz.lz4.LZ4FastDecompressor;
 import org.apache.tez.runtime.api.CompressionAlgorithm;
@@ -28,12 +29,17 @@ final class Lz4JniDecompressor implements Decompressor {
 
   private byte[] compressed;
   private byte[] scratch;
+  private final int maxBufferSize;
+  private final LZ4Compressor compressor;
   private LZ4FastDecompressor decompressor;
   private boolean closed;
 
-  Lz4JniDecompressor(LZ4Factory factory, int bufferSize, int maxCompressedLength) {
-    compressed = new byte[maxCompressedLength];
-    scratch = new byte[bufferSize];
+  Lz4JniDecompressor(
+      LZ4Factory factory, int maxBufferSize, int maxCompressedLength, boolean perDag) {
+    compressed = new byte[perDag ? 0 : maxCompressedLength];
+    scratch = new byte[perDag ? 0 : maxBufferSize];
+    this.maxBufferSize = maxBufferSize;
+    compressor = factory.fastCompressor();
     decompressor = factory.fastDecompressor();
     closed = false;
   }
@@ -43,10 +49,20 @@ final class Lz4JniDecompressor implements Decompressor {
     return CompressionAlgorithm.LZ4;
   }
 
-  byte[] ensureCompressedCapacity(int length) {
+  byte[] ensureCapacity(int compressedLength, int rawLength) {
     assert !closed;
-    assert length >= 0;
-    assert compressed.length >= length;
+    if (rawLength <= scratch.length) {
+      return compressed;
+    }
+
+    int newScratchLength = CompressionStreamUtils.nextBufferSize(
+        scratch.length, rawLength, maxBufferSize);
+    if (newScratchLength != scratch.length) {
+      int newCompressedLength = compressor.maxCompressedLength(newScratchLength);
+      assert compressedLength <= newCompressedLength;   // because rawLength < scratch.length
+      scratch = new byte[newScratchLength];
+      compressed = new byte[newCompressedLength];
+    }
     return compressed;
   }
 

@@ -28,12 +28,14 @@ final class ZstdJniDecompressor implements Decompressor {
 
   private byte[] compressed;
   private byte[] scratch;
+  private final int maxBufferSize;
   private ZstdDecompressCtx context;
   private boolean closed;
 
-  ZstdJniDecompressor(int bufferSize, int maxCompressedLength) {
-    compressed = new byte[maxCompressedLength];
-    scratch = new byte[bufferSize];
+  ZstdJniDecompressor(int maxBufferSize, int maxCompressedLength, boolean perDag) {
+    compressed = new byte[perDag ? 0 : maxCompressedLength];
+    scratch = new byte[perDag ? 0 : maxBufferSize];
+    this.maxBufferSize = maxBufferSize;
     context = new ZstdDecompressCtx();
     closed = false;
   }
@@ -43,10 +45,20 @@ final class ZstdJniDecompressor implements Decompressor {
     return CompressionAlgorithm.ZSTD;
   }
 
-  byte[] ensureCompressedCapacity(int length) {
+  byte[] ensureCapacity(int compressedLength, int rawLength) {
     assert !closed;
-    assert length >= 0;
-    assert compressed.length >= length;
+    if (rawLength <= scratch.length) {
+      return compressed;
+    }
+
+    int newScratchLength = CompressionStreamUtils.nextBufferSize(
+        scratch.length, rawLength, maxBufferSize);
+    if (newScratchLength != scratch.length) {
+      int newCompressedLength = (int) Zstd.compressBound(newScratchLength);
+      assert compressedLength <= newCompressedLength;   // because rawLength < scratch.length
+      scratch = new byte[newScratchLength];
+      compressed = new byte[newCompressedLength];
+    }
     return compressed;
   }
 

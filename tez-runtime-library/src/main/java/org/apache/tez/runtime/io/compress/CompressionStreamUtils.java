@@ -28,4 +28,17 @@ final class CompressionStreamUtils {
               + ", arrayLength=" + array.length);
     }
   }
+
+  static int nextBufferSize(int currentLength, int rawLength, int maxBufferSize) {
+    assert rawLength <= maxBufferSize;
+    assert maxBufferSize >= BlockCompressionOutputStream.MIN_BLOCK_SIZE;
+
+    int newLength = currentLength == 0 ?
+        Math.max(maxBufferSize / 16, BlockCompressionOutputStream.MIN_BLOCK_SIZE) :
+        currentLength;
+    while (newLength < rawLength) {
+      newLength = Math.min(newLength * 2, maxBufferSize);
+    }
+    return newLength;
+  }
 }

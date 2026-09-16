@@ -24,6 +24,7 @@ import java.io.OutputStream;
 /** Common writer for Tez's provider-private block-compression framing. */
 abstract class BlockCompressionOutputStream extends CompressionOutputStream {
 
+  static final int MIN_BLOCK_SIZE = 4 * 1024;
   static final int MAX_BLOCK_SIZE = 64 * 1024 * 1024;
 
   private final DataOutputStream output;

@@ -60,9 +60,11 @@ public final class CompressionResolver {
 
     CompressionAlgorithm algorithm = resolveAlgorithm(codecClassName);
     if (algorithm == CompressionAlgorithm.LZ4) {
-      int bufferSize = conf.getInt(
+      int maxBufferSize = conf.getInt(
           CommonConfigurationKeys.IO_COMPRESSION_CODEC_LZ4_BUFFERSIZE_KEY,
           CommonConfigurationKeys.IO_COMPRESSION_CODEC_LZ4_BUFFERSIZE_DEFAULT);
+      checkMaxBufferSize(maxBufferSize, CommonConfigurationKeys.IO_COMPRESSION_CODEC_LZ4_BUFFERSIZE_KEY);
+
       boolean useHighCompression = conf.getBoolean(
           CommonConfigurationKeys.IO_COMPRESSION_CODEC_LZ4_USELZ4HC_KEY,
           CommonConfigurationKeys.IO_COMPRESSION_CODEC_LZ4_USELZ4HC_DEFAULT);
@@ -70,30 +72,46 @@ public final class CompressionResolver {
           IO_COMPRESSION_CODEC_LZ4_USE_NATIVE_INSTANCE,
           IO_COMPRESSION_CODEC_LZ4_USE_NATIVE_INSTANCE_DEFAULT);
       LOG.info("Using codec {}, buffer size = {}, high compression = {}, use native instance = {}",
-          algorithm, bufferSize, useHighCompression, useNativeInstance);
-      return new Lz4CompressionProvider(bufferSize, useHighCompression, useNativeInstance);
+          algorithm, maxBufferSize, useHighCompression, useNativeInstance);
+      return new Lz4CompressionProvider(maxBufferSize, useHighCompression, useNativeInstance);
     }
 
     if (algorithm == CompressionAlgorithm.SNAPPY) {
-      int bufferSize = conf.getInt(
+      int maxBufferSize = conf.getInt(
           CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_KEY,
           CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_DEFAULT);
-      LOG.info("Using codec {}, buffer size = {}", algorithm, bufferSize);
-      return new XerialSnappyCompressionProvider(bufferSize);
+      checkMaxBufferSize(maxBufferSize, CommonConfigurationKeys.IO_COMPRESSION_CODEC_SNAPPY_BUFFERSIZE_KEY);
+
+      LOG.info("Using codec {}, buffer size = {}", algorithm, maxBufferSize);
+      return new XerialSnappyCompressionProvider(maxBufferSize);
     }
 
     if (algorithm == CompressionAlgorithm.ZSTD) {
-      int bufferSize = conf.getInt(
+      int maxBufferSize = conf.getInt(
           CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_KEY,
           CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_DEFAULT);
-     int compressionLevel = conf.getInt(
-         CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_LEVEL_KEY,
-         CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_LEVEL_DEFAULT);
-      LOG.info("Using codec {}, buffer size = {}, compression level = {}", algorithm, bufferSize, compressionLevel);
-      return new ZstdCompressionProvider(bufferSize, compressionLevel);
+      if (maxBufferSize == 0) {
+        maxBufferSize = ZstdCompressionProvider.RECOMMENDED_BUFFER_SIZE;
+      }
+      checkMaxBufferSize(maxBufferSize, CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_BUFFER_SIZE_KEY);
+
+      int compressionLevel = conf.getInt(
+          CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_LEVEL_KEY,
+          CommonConfigurationKeys.IO_COMPRESSION_CODEC_ZSTD_LEVEL_DEFAULT);
+      LOG.info("Using codec {}, buffer size = {}, compression level = {}", algorithm, maxBufferSize, compressionLevel);
+      return new ZstdCompressionProvider(maxBufferSize, compressionLevel);
     }
 
     return null;  // no compression
+  }
+
+  private static void checkMaxBufferSize(int maxBufferSize, String key) throws IOException{
+    if (maxBufferSize < BlockCompressionOutputStream.MIN_BLOCK_SIZE ||
+        maxBufferSize > BlockCompressionOutputStream.MAX_BLOCK_SIZE) {
+      throw new IOException(key + " out of range: " + maxBufferSize + " not in (" +
+        BlockCompressionOutputStream.MIN_BLOCK_SIZE + ", " +
+        BlockCompressionOutputStream.MAX_BLOCK_SIZE);
+    }
   }
 
   private static CompressionAlgorithm resolveAlgorithm(String codecClassName) throws IOException {

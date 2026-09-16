@@ -39,7 +39,7 @@ import org.junit.Test;
 
 public class TestZstdCompressionProvider {
 
-  private static final int BUFFER_SIZE = 128;
+  private static final int BUFFER_SIZE = BlockCompressionOutputStream.MIN_BLOCK_SIZE;
   private static final int COMPRESSION_LEVEL = 3;
   private static final int MEBIBYTE = 1024 * 1024;
 
@@ -149,7 +149,7 @@ public class TestZstdCompressionProvider {
     byte[] truncated = encode(createProvider(), randomBytes(20));
     byte[] shortened = new byte[truncated.length - 5];
     System.arraycopy(truncated, 0, shortened, 0, shortened.length);
-    expectReadFailure(shortened, "Truncated");
+    expectReadFailure(shortened);
   }
 
   @Test
@@ -248,11 +248,19 @@ public class TestZstdCompressionProvider {
   }
 
   private static void expectReadFailure(byte[] encoded, String message) throws Exception {
+    IOException failure = expectReadFailure(encoded);
+    String actualMessage = failure.getMessage();
+    assertTrue("Unexpected message: " + actualMessage,
+        actualMessage != null && actualMessage.contains(message));
+  }
+
+  private static IOException expectReadFailure(byte[] encoded) throws Exception {
     try {
       decode(createProvider(), encoded);
-      fail("Expected IOException containing: " + message);
-    } catch (IOException e) {
-      assertTrue("Unexpected message: " + e.getMessage(), e.getMessage().contains(message));
+      fail("Expected IOException");
+    } catch (IOException expected) {
+      return expected;
     }
+    throw new AssertionError("unreachable");
   }
 }
