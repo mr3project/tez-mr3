@@ -2097,11 +2097,12 @@ public final class PipelinedSorter {
         return horse;
       }
       SpanIterator current = heap.pop();
-      SpanIterator next = heap.peek();
-      if (next != null && current != null &&
-        ((Object)horse) == ((Object)current)) {
-        // TODO: a better threshold check than 1 key repeating
-        gallop = current.bisect(next.getKey(), next.getPartition())-1;
+      if (current != null && ((Object)horse) == ((Object)current)) {
+        SpanIterator next = heap.peek();
+        if (next != null) {
+          // TODO: a better threshold check than 1 key repeating
+          gallop = current.bisect(next.getKey(), next.getPartition())-1;
+        }
       }
       horse = current;
       return current;
