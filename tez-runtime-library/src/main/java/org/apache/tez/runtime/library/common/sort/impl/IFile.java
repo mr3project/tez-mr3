@@ -553,6 +553,20 @@ public class IFile {
       writeOffset += len;
     }
 
+    protected void bufferWriteContiguousKeyValue(
+        byte[] data, int keyOffset, int keyLength, int valueLength) throws IOException {
+      final int remaining = writeBufferLength - writeOffset;
+      final int length = keyLength + valueLength;
+      if (length <= remaining) {
+        System.arraycopy(data, keyOffset, writeBuffer, writeOffset, length);
+        writeOffset += length;
+      } else {
+        // preserve flush and direct-write boundaries when the whole payload does not fit
+        bufferWriteBytes(data, keyOffset, keyLength);
+        bufferWriteBytes(data, keyOffset + keyLength, valueLength);
+      }
+    }
+
     protected void flushWriteBuffer() throws IOException {
       if (writeOffset > 0) {
         out.write(writeBuffer, 0, writeOffset);
@@ -648,6 +662,35 @@ public class IFile {
       int keyLength = key.getLength();
       int valueLength = value.getLength();
 
+      int lengthBytes = writeTezLengthHeaders(keyLength, valueLength);
+      bufferWriteBytes(key.getData(), key.getPosition(), keyLength);
+      bufferWriteBytes(value.getData(), value.getPosition(), valueLength);
+
+      incrementDecompressedBytesWritten(lengthBytes + keyLength + valueLength);
+      numSerializedBytesWritten += keyLength + valueLength;
+      ++numRecordsWritten;
+    }
+
+    // append a key immediately followed by its value in the same input array
+    public void appendNoRleContiguous(
+        byte[] data, int keyOffset, int keyLength, int valueLength) throws IOException {
+      assert !isRleEnabled;
+      int lengthBytes;
+      if (useMaxKeyValLen) {  // corresponding to appendNoRleTez()
+        lengthBytes = writeTezLengthHeaders(keyLength, valueLength);
+      } else {                // corresponding to appendNoRle()
+        long combined = ((long) valueLength << 32) | (keyLength & 0xFFFFFFFFL);
+        bufferWriteLong(combined);
+        lengthBytes = INT_SIZE + INT_SIZE;
+      }
+      bufferWriteContiguousKeyValue(data, keyOffset, keyLength, valueLength);
+
+      incrementDecompressedBytesWritten(lengthBytes + keyLength + valueLength);
+      numSerializedBytesWritten += keyLength + valueLength;
+      ++numRecordsWritten;
+    }
+
+    private int writeTezLengthHeaders(int keyLength, int valueLength) throws IOException {
       if (maxKeyLen < 0 || maxValLen < 0) {
         maxKeyLen = keyLength;
         maxValLen = valueLength;
@@ -664,6 +707,7 @@ public class IFile {
         valLenTransitioned = true;
         firstValOffset = (int) getDecompressedBytesWritten();
       }
+
       if (keyLenTransitioned) {
         bufferWriteInt(keyLength);
         lengthBytes += INT_SIZE;
@@ -672,12 +716,8 @@ public class IFile {
         bufferWriteInt(valueLength);
         lengthBytes += INT_SIZE;
       }
-      bufferWriteBytes(key.getData(), key.getPosition(), keyLength);
-      bufferWriteBytes(value.getData(), value.getPosition(), valueLength);
 
-      incrementDecompressedBytesWritten(lengthBytes + keyLength + valueLength);
-      numSerializedBytesWritten += keyLength + valueLength;
-      ++numRecordsWritten;
+      return lengthBytes;
     }
 
     public void appendRle(RawDataBuffer key, RawDataBuffer value, boolean keyStable) throws IOException {

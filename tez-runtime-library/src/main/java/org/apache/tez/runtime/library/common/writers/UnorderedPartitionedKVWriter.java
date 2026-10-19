@@ -1070,8 +1070,6 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
               spillNumber, spillPathDetails.outputFilePath, canUseBuffers);
         }
 
-        RawDataBuffer key = new RawDataBuffer();
-        RawDataBuffer val = new RawDataBuffer();
         byte[] writeBuffer = IFile.allocateWriteBuffer();
 
         for (int i = 0; i < numPartitions; i++) {
@@ -1094,7 +1092,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
                     maxKeyLen, maxValLen,
                     writeBuffer, compressorExternal, outputContext);
               }
-              numRecords += writeBufferedPartition(i, buffer, writer, key, val);
+              numRecords += writeBufferedPartition(i, buffer, writer);
             }
             if (writer != null) {
               if (numRecordsCounter != null) {
@@ -1141,21 +1139,17 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     }
   }
 
-  private long writePartition(int pos, WrappedBuffer wrappedBuffer, WriterDataInputBuffer writer,
-                              RawDataBuffer keyBuffer, RawDataBuffer valBuffer) throws IOException {
+  private long writePartition(int pos, WrappedBuffer wrappedBuffer, WriterDataInputBuffer writer)
+      throws IOException {
     long numRecords = 0;
     while (pos != WrappedBuffer.PARTITION_ABSENT_POSITION) {
       int metaIndex = pos / INT_SIZE;
       int keyLength = wrappedBuffer.metaBuffer.get(metaIndex + INDEX_KEYLEN);
       int valLength = wrappedBuffer.metaBuffer.get(metaIndex + INDEX_VALLEN);
-      keyBuffer.reset(wrappedBuffer.buffer, pos + PARTITIONED_META_SIZE, keyLength);
-      valBuffer.reset(wrappedBuffer.buffer, pos + PARTITIONED_META_SIZE + keyLength, valLength);
-
-      if (compositeFetch) {
-        writer.appendNoRleTez(keyBuffer, valBuffer);
-      } else {
-        writer.appendNoRle(keyBuffer, valBuffer);
-      }
+      assert keyLength >= 0 && valLength >= 0
+          && (long) pos + PARTITIONED_META_SIZE + keyLength + valLength <= wrappedBuffer.buffer.length;
+      writer.appendNoRleContiguous(
+          wrappedBuffer.buffer, pos + PARTITIONED_META_SIZE, keyLength, valLength);
       numRecords++;
       pos = wrappedBuffer.metaBuffer.get(metaIndex + INDEX_NEXT);
     }
@@ -1167,10 +1161,8 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
   }
 
   private long writeBufferedPartition(int partition, WrappedBuffer wrappedBuffer,
-                                      WriterDataInputBuffer writer, RawDataBuffer keyBuffer,
-                                      RawDataBuffer valBuffer) throws IOException {
-    return writePartition(wrappedBuffer.partitionHeads[partition], wrappedBuffer, writer, keyBuffer,
-        valBuffer);
+                                      WriterDataInputBuffer writer) throws IOException {
+    return writePartition(wrappedBuffer.partitionHeads[partition], wrappedBuffer, writer);
   }
 
   private static int computeMetaSkip(int position) {
@@ -1594,9 +1586,6 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     final Map<Integer, TezOffsetRecord> spillOffsetRecordMap =
         (compositeFetch && !isFinalMergeRleEnabled) ? new HashMap<>() : null;
 
-    RawDataBuffer keyBuffer = new RawDataBuffer();
-    RawDataBuffer valBuffer = new RawDataBuffer();
-
     RawDataBuffer keyBufferIFile = new RawDataBuffer();
     RawDataBuffer valBufferIFile = new RawDataBuffer();
 
@@ -1629,12 +1618,12 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
         try {
           for (WrappedBuffer buffer : filledBuffers) {
             if (hasRecordsForPartition(i, buffer)) {
-              writeBufferedPartition(i, buffer, writer, keyBuffer, valBuffer);
+              writeBufferedPartition(i, buffer, writer);
             }
           }
           if (hasRecordsForPartition(i, currentBuffer)) {
             // Write current buffer last to preserve oldest->newest in-memory buffer ordering.
-            writeBufferedPartition(i, currentBuffer, writer, keyBuffer, valBuffer);
+            writeBufferedPartition(i, currentBuffer, writer);
           }
           synchronized (spillInfoList) {
             for (SpillInfo spillInfo : spillInfoList) {
