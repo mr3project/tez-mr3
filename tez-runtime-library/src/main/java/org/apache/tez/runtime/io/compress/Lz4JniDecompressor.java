@@ -67,12 +67,18 @@ final class Lz4JniDecompressor implements Decompressor {
   }
 
   int decompressBuffered(int inputLength, int outputCapacity) throws IOException {
+    assert scratch.length >= outputCapacity;
+    return decompressInto(inputLength, scratch, 0, outputCapacity);
+  }
+
+  int decompressInto(int inputLength, byte[] destination, int offset,
+      int outputCapacity) throws IOException {
     assert !closed;
     CompressionStreamUtils.checkRange(compressed, 0, inputLength, "input");
     assert outputCapacity >= 0;
-    assert scratch.length >= outputCapacity;
+    assert offset >= 0 && offset <= destination.length - outputCapacity;
     try {
-      int consumed = decompressor.decompress(compressed, 0, scratch, 0, outputCapacity);
+      int consumed = decompressor.decompress(compressed, 0, destination, offset, outputCapacity);
       if (consumed != inputLength) {
         throw new IOException(
             "LZ4 block length mismatch: expected " + inputLength
