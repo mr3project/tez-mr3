@@ -60,16 +60,22 @@ final class XerialSnappyDecompressor implements Decompressor {
   }
 
   int decompressBuffered(int inputLength, int outputCapacity) throws IOException {
+    assert scratch.length >= outputCapacity;
+    return decompressInto(inputLength, scratch, 0, outputCapacity);
+  }
+
+  int decompressInto(int inputLength, byte[] destination, int offset,
+      int outputCapacity) throws IOException {
     assert !closed;
     CompressionStreamUtils.checkRange(compressed, 0, inputLength, "input");
     assert outputCapacity >= 0;
+    assert offset >= 0 && offset <= destination.length - outputCapacity;
     try {
       int length = Snappy.uncompressedLength(compressed, 0, inputLength);
       if (length < 0 || length > outputCapacity) {
         throw new IOException("Insufficient Snappy output capacity: need " + length + ", have " + outputCapacity);
       }
-      assert scratch.length >= length;
-      int actual = Snappy.rawUncompress(compressed, 0, inputLength, scratch, 0);
+      int actual = Snappy.rawUncompress(compressed, 0, inputLength, destination, offset);
       if (actual != length) {
         throw new IOException("Corrupt Snappy block: expected " + length + " bytes, decoded " + actual);
       }
