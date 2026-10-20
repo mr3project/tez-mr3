@@ -19,7 +19,6 @@ package org.apache.tez.runtime.io.compress;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -379,6 +378,68 @@ public class TestDirectBlockDecompression {
   }
 
   @Test
+  public void testSingleByteReadUsesScratch() throws Exception {
+    byte[] first = randomBytes(31);
+    byte[] second = randomBytes(97);
+    TrackingBlockStream input = new TrackingBlockStream(
+        new TrackingInputStream(frame(first, second)));
+    assertEquals(first[0] & 0xff, input.read());
+    assertEquals(1, input.bufferedCalls);
+    assertEquals(0, input.directCalls);
+
+    byte[] tail = new byte[first.length - 1];
+    readFully(input, tail, 0, tail.length);
+    assertArrayEquals(Arrays.copyOfRange(first, 1, first.length), tail);
+    byte[] result = new byte[second.length];
+    assertEquals(second.length, input.read(result));
+    assertArrayEquals(second, result);
+    assertEquals(1, input.directCalls);
+    assertEquals(-1, input.read());
+    input.close();
+  }
+
+  @Test
+  public void testInjectedBufferedFailureKeepsCallerBufferUntouched() throws Exception {
+    TrackingInputStream source = new TrackingInputStream(frame(randomBytes(100)));
+    TrackingBlockStream input = new TrackingBlockStream(source);
+    input.failBuffered = true;
+    byte[] destination = new byte[100];
+    Arrays.fill(destination, CANARY);
+    try {
+      input.read(destination, 1, 99); // Smaller than the raw chunk.
+      fail("buffered decompression must fail");
+    } catch (IOException expected) {
+      assertTrue(expected.getMessage().contains("Injected"));
+    }
+    assertEquals(1, input.bufferedCalls);
+    assertEquals(0, input.directCalls);
+    for (byte b : destination) {
+      assertEquals(CANARY, b);
+    }
+    input.close();
+    assertTrue(source.closed);
+    assertEquals(1, input.resetCalls);
+  }
+
+  @Test
+  public void testWrongDecodedLengthRejected() throws Exception {
+    for (int capacity : new int[] {99, 100}) {
+      TrackingBlockStream input = new TrackingBlockStream(
+          new TrackingInputStream(frame(randomBytes(100))));
+      input.shortDecode = true;
+      try {
+        input.read(new byte[100], 0, capacity);
+        fail("decoded length mismatch must be rejected");
+      } catch (IOException expected) {
+        assertTrue(expected.getMessage().contains("chunk length mismatch"));
+      }
+      assertEquals(capacity == 100 ? 1 : 0, input.directCalls);
+      assertEquals(capacity == 99 ? 1 : 0, input.bufferedCalls);
+      input.close();
+    }
+  }
+
+  @Test
   public void testInjectedDecodeFailureAndCleanup() throws Exception {
     TrackingInputStream source = new TrackingInputStream(frame(randomBytes(100)));
     TrackingBlockStream input = new TrackingBlockStream(source);
@@ -604,6 +665,8 @@ public class TestDirectBlockDecompression {
     int directCalls;
     int resetCalls;
     boolean failDirect;
+    boolean failBuffered;
+    boolean shortDecode;
 
     TrackingBlockStream(InputStream input) throws IOException {
       super(input, BLOCK_SIZE, BLOCK_SIZE, TEST_MAGIC, "synthetic");
@@ -617,6 +680,11 @@ public class TestDirectBlockDecompression {
     @Override
     int decompressBuffered(int inputLength, int outputCapacity) throws IOException {
       bufferedCalls++;
+      if (failBuffered) {
+        failBuffered = false;
+        scratch[0] = compressed[0];
+        throw new IOException("Injected buffered decoding failure");
+      }
       return decode(inputLength, scratch, 0, outputCapacity);
     }
 
@@ -635,7 +703,7 @@ public class TestDirectBlockDecompression {
     private int decode(int inputLength, byte[] destination, int offset, int outputCapacity) {
       assertEquals(inputLength, outputCapacity);
       System.arraycopy(compressed, 0, destination, offset, inputLength);
-      return inputLength;
+      return shortDecode ? inputLength - 1 : inputLength;
     }
 
     @Override
