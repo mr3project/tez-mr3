@@ -63,13 +63,19 @@ final class ZstdJniDecompressor implements Decompressor {
   }
 
   int decompressBuffered(int inputLength, int outputCapacity) throws IOException {
+    assert scratch.length >= outputCapacity;
+    return decompressInto(inputLength, scratch, 0, outputCapacity);
+  }
+
+  int decompressInto(int inputLength, byte[] destination, int offset,
+      int outputCapacity) throws IOException {
     assert !closed;
     CompressionStreamUtils.checkRange(compressed, 0, inputLength, "input");
     assert outputCapacity >= 0;
-    assert scratch.length >= outputCapacity;
+    assert offset >= 0 && offset <= destination.length - outputCapacity;
     try {
       long result = context.decompressByteArray(
-          scratch, 0, outputCapacity, compressed, 0, inputLength);
+          destination, offset, outputCapacity, compressed, 0, inputLength);
       if (Zstd.isError(result)) {
         throw new IOException("Invalid or corrupt Zstd block: " + Zstd.getErrorName(result));
       }
