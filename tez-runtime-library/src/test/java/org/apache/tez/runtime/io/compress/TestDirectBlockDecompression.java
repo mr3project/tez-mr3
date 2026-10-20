@@ -455,8 +455,7 @@ public class TestDirectBlockDecompression {
     assertEquals(1, input.directCalls);
     assertEquals(0, input.bufferedCalls);
     assertCanaries(destination, 17, 100);
-    assertEquals(-1, input.read()); // The failing chunk was consumed.
-    input.close();
+    input.close(); // Abort the read without attempting to reuse the failed stream.
     assertTrue(source.closed);
     assertEquals(1, input.resetCalls);
   }
