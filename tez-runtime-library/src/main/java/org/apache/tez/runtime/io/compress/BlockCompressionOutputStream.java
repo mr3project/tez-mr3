@@ -33,9 +33,15 @@ public abstract class BlockCompressionOutputStream extends CompressionOutputStre
   private int inputLength;
   // IFile fills inputBuffer itself in this mode; no second position is maintained here.
   private boolean preparedInput;
-  private boolean started;
-  private boolean finished;
-  private boolean closed;
+
+  private enum State {
+    NEW,
+    STARTED,
+    FINISHED,
+    CLOSED
+  }
+
+  private State state = State.NEW;
 
   BlockCompressionOutputStream(OutputStream output, byte[] inputBuffer,
       int bufferSize, int magic, String codecName) throws IOException {
@@ -73,16 +79,16 @@ public abstract class BlockCompressionOutputStream extends CompressionOutputStre
   }
 
   private void start() throws IOException {
-    if (!started) {
+    if (state == State.NEW) {
       output.writeInt(magic);
-      started = true;
+      state = State.STARTED;
     }
   }
 
   // The caller owns the position in this array until a block is submitted.
   // The compression stream must not also accept ordinary writes in this mode.
   public final byte[] beginPreparedBlocks() {
-    assert !closed && !finished && !started;
+    assert state == State.NEW;
     assert inputLength == 0 && !preparedInput;
     preparedInput = true;
     return inputBuffer;
@@ -131,7 +137,7 @@ public abstract class BlockCompressionOutputStream extends CompressionOutputStre
 
   @Override
   public void flush() throws IOException {
-    assert !closed;
+    assert state != State.CLOSED;
     if (preparedInput) {
       assert inputLength == 0;
       start();
@@ -143,8 +149,8 @@ public abstract class BlockCompressionOutputStream extends CompressionOutputStre
 
   @Override
   public void finish() throws IOException {
-    assert !closed;
-    if (!finished) {
+    assert state != State.CLOSED;
+    if (state != State.FINISHED) {
       if (preparedInput) {
         assert inputLength == 0; // IFile submitted the final partial block.
         start();
@@ -154,36 +160,34 @@ public abstract class BlockCompressionOutputStream extends CompressionOutputStre
       output.writeInt(0);
       output.writeInt(0);
       output.flush();
-      finished = true;
+      state = State.FINISHED;
     }
   }
 
   @Override
   public void resetState() {
-    assert !closed;
-    assert finished;
+    assert state == State.FINISHED;
     resetCompressor();
     inputLength = 0;
     preparedInput = false;
-    started = false;
-    finished = false;
+    state = State.NEW;
   }
 
   @Override
   public void close() throws IOException {
-    if (!closed) {
+    if (state != State.CLOSED) {
       try {
         finish();
       } finally {
-        closed = true;
+        state = State.CLOSED;
         output.close();
       }
     }
   }
 
   private void ensureWritable() {
-    assert !closed;
-    assert !finished;
+    assert state == State.NEW || state == State.STARTED;
+    assert !preparedInput || inputLength == 0;
   }
 
   abstract int compressBuffered(int inputLength) throws IOException;
