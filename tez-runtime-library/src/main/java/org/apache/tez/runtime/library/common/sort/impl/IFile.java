@@ -312,9 +312,8 @@ public class IFile {
     protected final boolean useMaxKeyValLen;
     protected final boolean isRleEnabled;
 
-    // A compressed writer uses the compressor's input array as its write buffer.
-    // The supplied staging buffer is retained for uncompressed output.
-    private final byte[] suppliedWriteBuffer;
+    // A compressed writer borrows the compressor's input array; uncompressed
+    // output uses the buffer provided by its caller.
     private byte[] writeBuffer;
     private int writeBufferLength;        // must be larger than 8 (# of bytes in long)
     private int writeOffset;
@@ -361,9 +360,10 @@ public class IFile {
                      boolean useMaxKeyValLen,
                      boolean isRleEnabled,
                      int maxKeyLen, int maxValLen,
-                     byte[] writeBuffer,
+                     @Nullable byte[] writeBuffer,
                      @Nullable Compressor compressorExternal,
                      CompressorPool taskContext) throws IOException {
+      assert (codec == null) == (writeBuffer != null);
       this.rawOut = outputStream;
       this.writtenRecordsCounter = writesCounter;
       this.serializedUncompressedBytes = serializedBytesCounter;
@@ -376,9 +376,7 @@ public class IFile {
       assert !(useMaxKeyValLen && isRleEnabled);
       assert !(!useMaxKeyValLen) || (maxKeyLen == -1 && maxValLen == -1);
 
-      this.suppliedWriteBuffer = writeBuffer;
       this.writeBuffer = writeBuffer;
-      this.writeBufferLength = writeBuffer.length;
       this.writeOffset = 0;
 
       this.compressorExternal = compressorExternal;
@@ -393,9 +391,6 @@ public class IFile {
       // Also used when FileBackedInMemIFileWriter switches from memory to disk.
       assert writeOffset == 0;
       preparedCompressionOut = null;
-      writeBuffer = suppliedWriteBuffer;
-      writeBufferLength = writeBuffer.length;
-      assert writeBufferLength >= Long.BYTES;
       this.checksumOut = new IFileOutputStream(this.rawOut);
       if (codec != null) {
         if (compressorExternal != null) {
@@ -411,8 +406,6 @@ public class IFile {
           if (compressedOut instanceof BlockCompressionOutputStream) {
             preparedCompressionOut = (BlockCompressionOutputStream) compressedOut;
             writeBuffer = preparedCompressionOut.beginPreparedBlocks();
-            writeBufferLength = writeBuffer.length;
-            assert writeBufferLength >= Long.BYTES;
           }
         } else {
           LOG.warn("Could not obtain compressor from CodecPool");
@@ -421,6 +414,14 @@ public class IFile {
       } else {
         this.out = new DataOutputStream(checksumOut);
       }
+
+      // If acquiring a compressor failed, write uncompressed data instead.
+      // Reuse the existing staging array after a memory-to-disk transition.
+      if (writeBuffer == null) {
+        writeBuffer = IFile.allocateWriteBuffer();
+      }
+      writeBufferLength = writeBuffer.length;
+      assert writeBufferLength >= Long.BYTES;
     }
 
     protected void writeHeader(OutputStream outputStream) throws IOException {
@@ -483,8 +484,8 @@ public class IFile {
 
       // Do not retain the compressor's pooled input array after this writer closes.
       preparedCompressionOut = null;
-      writeBuffer = suppliedWriteBuffer;
-      writeBufferLength = writeBuffer.length;
+      writeBuffer = null;
+      writeBufferLength = 0;
       out = null;
       if (writtenRecordsCounter != null) {
         writtenRecordsCounter.increment(numRecordsWritten);
