@@ -336,7 +336,7 @@ public final class PipelinedSorter {
 
     this.finalEvents = Lists.newLinkedList();
 
-    this.writeBuffer = IFile.allocateWriteBuffer();
+    this.writeBuffer = codec == null ? IFile.allocateWriteBuffer() : null;
 
     this.freeMemoryThreshold = 1024L * 1024L * conf.getInt(
         TezRuntimeConfiguration.TEZ_RUNTIME_FREE_MEMORY_WRITER_OUTPUT_THRESHOLD_MB,

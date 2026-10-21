@@ -40,6 +40,11 @@ final class SnappyCompressionOutputStream extends BlockCompressionOutputStream {
   }
 
   @Override
+  int compressFrom(byte[] source, int offset, int inputLength) throws IOException {
+    return compressor.compressFrom(source, offset, inputLength);
+  }
+
+  @Override
   byte[] getCompressedBuffer() {
     return compressor.getCompressedBuffer();
   }

@@ -52,11 +52,16 @@ final class Lz4JniCompressor implements Compressor {
   }
 
   int compressBuffered(int inputLength) throws IOException {
+    assert inputLength > 0 && inputLength <= input.length;
+    return compressFrom(input, 0, inputLength);
+  }
+
+  int compressFrom(byte[] source, int offset, int inputLength) throws IOException {
     assert !closed;
-    CompressionStreamUtils.checkRange(input, 0, inputLength, "input");
-    assert inputLength <= input.length;
+    CompressionStreamUtils.checkRange(source, offset, inputLength, "input");
+    assert inputLength > 0 && inputLength <= input.length;
     try {
-      return compressor.compress(input, 0, inputLength, scratch, 0, scratch.length);
+      return compressor.compress(source, offset, inputLength, scratch, 0, scratch.length);
     } catch (Throwable e) {
       throw new IOException("lz4-java JNI compression failed", e);
     }
