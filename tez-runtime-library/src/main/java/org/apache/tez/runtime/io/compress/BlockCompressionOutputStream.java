@@ -22,7 +22,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 
 /** Common writer for Tez's provider-private block-compression framing. */
-abstract class BlockCompressionOutputStream extends CompressionOutputStream {
+public abstract class BlockCompressionOutputStream extends CompressionOutputStream {
 
   static final int MIN_BLOCK_SIZE = 4 * 1024;
   static final int MAX_BLOCK_SIZE = 64 * 1024 * 1024;
@@ -31,6 +31,8 @@ abstract class BlockCompressionOutputStream extends CompressionOutputStream {
   private final int magic;
   private final byte[] inputBuffer;
   private int inputLength;
+  // IFile fills inputBuffer itself in this mode; no second position is maintained here.
+  private boolean preparedInput;
   private boolean started;
   private boolean finished;
   private boolean closed;
@@ -46,6 +48,7 @@ abstract class BlockCompressionOutputStream extends CompressionOutputStream {
   @Override
   public void write(int value) throws IOException {
     ensureWritable();
+    assert !preparedInput;
     if (inputLength == inputBuffer.length) {
       writeChunk();
     }
@@ -56,6 +59,7 @@ abstract class BlockCompressionOutputStream extends CompressionOutputStream {
   public void write(byte[] data, int offset, int length) throws IOException {
     CompressionStreamUtils.checkRange(data, offset, length, "input");
     ensureWritable();
+    assert !preparedInput;
     while (length > 0) {
       int copied = Math.min(length, inputBuffer.length - inputLength);
       System.arraycopy(data, offset, inputBuffer, inputLength, copied);
@@ -75,22 +79,65 @@ abstract class BlockCompressionOutputStream extends CompressionOutputStream {
     }
   }
 
+  // The caller owns the position in this array until a block is submitted.
+  // The compression stream must not also accept ordinary writes in this mode.
+  public final byte[] beginPreparedBlocks() {
+    assert !closed && !finished && !started;
+    assert inputLength == 0 && !preparedInput;
+    preparedInput = true;
+    return inputBuffer;
+  }
+
+  public final void writePreparedBlock(int rawLength) throws IOException {
+    ensureWritable();
+    assert preparedInput && inputLength == 0;
+    assert rawLength > 0 && rawLength <= inputBuffer.length;
+    start();
+    int compressedLength = compressBuffered(rawLength);
+    writeFramedChunk(rawLength, compressedLength);
+  }
+
+  // Full blocks from caller arrays do not need to pass through inputBuffer.
+  public final void writeDirectBlock(byte[] source, int offset, int rawLength)
+      throws IOException {
+    CompressionStreamUtils.checkRange(source, offset, rawLength, "input");
+    ensureWritable();
+    assert preparedInput && inputLength == 0;
+    assert rawLength == inputBuffer.length;
+    start();
+    int compressedLength = compressFrom(source, offset, rawLength);
+    writeFramedChunk(rawLength, compressedLength);
+  }
+
   private void writeChunk() throws IOException {
+    assert !preparedInput;
+    assert inputLength >= 0 && inputLength <= inputBuffer.length;
     start();
     if (inputLength == 0) {
       return;
     }
     int compressedLength = compressBuffered(inputLength);
-    output.writeInt(inputLength);
+    writeFramedChunk(inputLength, compressedLength);
+    inputLength = 0;
+  }
+
+  private void writeFramedChunk(int rawLength, int compressedLength) throws IOException {
+    assert rawLength > 0 && rawLength <= inputBuffer.length;
+    assert compressedLength > 0 && compressedLength <= getCompressedBuffer().length;
+    output.writeInt(rawLength);
     output.writeInt(compressedLength);
     output.write(getCompressedBuffer(), 0, compressedLength);
-    inputLength = 0;
   }
 
   @Override
   public void flush() throws IOException {
     assert !closed;
-    writeChunk();
+    if (preparedInput) {
+      assert inputLength == 0;
+      start();
+    } else {
+      writeChunk();
+    }
     output.flush();
   }
 
@@ -98,7 +145,12 @@ abstract class BlockCompressionOutputStream extends CompressionOutputStream {
   public void finish() throws IOException {
     assert !closed;
     if (!finished) {
-      writeChunk();
+      if (preparedInput) {
+        assert inputLength == 0; // IFile submitted the final partial block.
+        start();
+      } else {
+        writeChunk();
+      }
       output.writeInt(0);
       output.writeInt(0);
       output.flush();
@@ -112,6 +164,7 @@ abstract class BlockCompressionOutputStream extends CompressionOutputStream {
     assert finished;
     resetCompressor();
     inputLength = 0;
+    preparedInput = false;
     started = false;
     finished = false;
   }
@@ -134,6 +187,8 @@ abstract class BlockCompressionOutputStream extends CompressionOutputStream {
   }
 
   abstract int compressBuffered(int inputLength) throws IOException;
+
+  abstract int compressFrom(byte[] source, int offset, int inputLength) throws IOException;
 
   abstract byte[] getCompressedBuffer();
 

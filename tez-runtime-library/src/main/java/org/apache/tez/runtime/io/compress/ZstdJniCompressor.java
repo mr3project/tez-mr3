@@ -53,12 +53,17 @@ final class ZstdJniCompressor implements Compressor {
   }
 
   int compressBuffered(int inputLength) throws IOException {
+    assert inputLength > 0 && inputLength <= input.length;
+    return compressFrom(input, 0, inputLength);
+  }
+
+  int compressFrom(byte[] source, int offset, int inputLength) throws IOException {
     assert !closed;
-    CompressionStreamUtils.checkRange(input, 0, inputLength, "input");
-    assert inputLength <= input.length;
+    CompressionStreamUtils.checkRange(source, offset, inputLength, "input");
+    assert inputLength > 0 && inputLength <= input.length;
     try {
       long result = context.compressByteArray(
-          scratch, 0, scratch.length, input, 0, inputLength);
+          scratch, 0, scratch.length, source, offset, inputLength);
       if (Zstd.isError(result)) {
         throw new IOException("Zstd compression failed: " + Zstd.getErrorName(result));
       }
