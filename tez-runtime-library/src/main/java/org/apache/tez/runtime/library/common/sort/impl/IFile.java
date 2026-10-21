@@ -454,6 +454,7 @@ public class IFile {
       decompressedBytesWritten += HEADER.length;
 
       flushWriteBuffer();   // Ensure all buffered data is written to 'out'
+      assert writeOffset == 0;
 
       // Close the underlying stream iff we own it
       if (ownOutputStream) {
@@ -480,6 +481,10 @@ public class IFile {
         compressor = null;
       }
 
+      // Do not retain the compressor's pooled input array after this writer closes.
+      preparedCompressionOut = null;
+      writeBuffer = suppliedWriteBuffer;
+      writeBufferLength = writeBuffer.length;
       out = null;
       if (writtenRecordsCounter != null) {
         writtenRecordsCounter.increment(numRecordsWritten);
@@ -571,6 +576,7 @@ public class IFile {
           assert writeOffset < writeBufferLength;
           if (writeOffset == 0 && len >= writeBufferLength) {
             // The caller array holds a complete block: compress without copying.
+            assert writeOffset == 0;
             preparedCompressionOut.writeDirectBlock(data, off, writeBufferLength);
             off += writeBufferLength;
             len -= writeBufferLength;
