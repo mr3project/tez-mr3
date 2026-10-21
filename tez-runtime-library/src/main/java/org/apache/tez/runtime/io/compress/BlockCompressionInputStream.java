@@ -65,6 +65,14 @@ abstract class BlockCompressionInputStream extends InputStream {
     if (length == 0) {
       return 0;
     }
+    assert !closed;
+    // A new block can be decoded directly when the caller can hold the whole block.
+    if (position == limit && !ended) {
+      int decoded = readChunk(data, offset, length);
+      if (decoded > 0) {
+        return decoded;
+      }
+    }
     if (!ensureData()) {
       return -1;
     }
@@ -77,12 +85,14 @@ abstract class BlockCompressionInputStream extends InputStream {
   private boolean ensureData() throws IOException {
     assert !closed;
     while (position == limit && !ended) {
-      readChunk();
+      readChunk(null, 0, 0);
     }
     return position < limit;
   }
 
-  private void readChunk() throws IOException {
+  // Returns the number of bytes decoded directly into destination, or zero
+  // when the chunk was buffered or the stream terminator was reached.
+  private int readChunk(byte[] destination, int offset, int capacity) throws IOException {
     final int rawLength = input.readInt();
     final int compressedLength = input.readInt();
     if (rawLength == 0 && compressedLength == 0) {
@@ -90,7 +100,7 @@ abstract class BlockCompressionInputStream extends InputStream {
         throw new IOException("Trailing data after " + codecName + " stream terminator");
       }
       ended = true;
-      return;
+      return 0;
     }
     if (rawLength <= 0 || rawLength > maxBlockSize) {
       throw new IOException(
@@ -102,13 +112,17 @@ abstract class BlockCompressionInputStream extends InputStream {
         "Invalid " + codecName + " compressed chunk length: " + compressedLength);
     }
     input.readFully(compressed, 0, compressedLength);
-    int actual = decompressBuffered(compressedLength, rawLength);
+    boolean direct = destination != null && rawLength <= capacity;
+    int actual = direct
+        ? decompressInto(compressedLength, destination, offset, rawLength)
+        : decompressBuffered(compressedLength, rawLength);
     if (actual != rawLength) {
       throw new IOException(codecName + " chunk length mismatch: expected " + rawLength
           + ", decoded " + actual);
     }
     position = 0;
-    limit = actual;
+    limit = direct ? 0 : actual;
+    return direct ? actual : 0;
   }
 
   @Override
@@ -133,6 +147,9 @@ abstract class BlockCompressionInputStream extends InputStream {
   abstract byte[] ensureCapacity(int compressedLength, int rawLength);
 
   abstract int decompressBuffered(int inputLength, int outputCapacity) throws IOException;
+
+  abstract int decompressInto(int inputLength, byte[] destination, int offset,
+      int outputCapacity) throws IOException;
 
   abstract byte[] getDecompressedBuffer();
 

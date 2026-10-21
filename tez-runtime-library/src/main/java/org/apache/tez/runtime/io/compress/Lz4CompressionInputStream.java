@@ -44,6 +44,12 @@ final class Lz4CompressionInputStream extends BlockCompressionInputStream {
   }
 
   @Override
+  int decompressInto(int inputLength, byte[] destination, int offset,
+      int outputCapacity) throws IOException {
+    return decompressor.decompressInto(inputLength, destination, offset, outputCapacity);
+  }
+
+  @Override
   byte[] getDecompressedBuffer() {
     return decompressor.getDecompressedBuffer();
   }
