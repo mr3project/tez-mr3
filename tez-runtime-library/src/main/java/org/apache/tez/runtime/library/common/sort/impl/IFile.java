@@ -317,7 +317,6 @@ public class IFile {
     private byte[] writeBuffer;
     private int writeBufferLength;        // must be larger than 8 (# of bytes in long)
     private int writeOffset;
-    private BlockCompressionOutputStream preparedCompressionOut;
 
     private final Compressor compressorExternal;  // not to be shared with concurrent threads
     private final CompressorPool taskContext;
@@ -325,9 +324,8 @@ public class IFile {
     private final CompressionProvider codec;
 
     private IFileOutputStream checksumOut;
-    private CompressionOutputStream compressedOut;
+    private BlockCompressionOutputStream compressedOut;
     private Compressor compressor;
-    private boolean compressOutput = false;
     protected DataOutputStream out;
 
     // true iff this Writer created and owns rawOut
@@ -390,7 +388,7 @@ public class IFile {
     void setupOutputStream(@Nullable CompressionProvider codec) throws IOException {
       // Also used when FileBackedInMemIFileWriter switches from memory to disk.
       assert writeOffset == 0;
-      preparedCompressionOut = null;
+      compressedOut = null;
       this.checksumOut = new IFileOutputStream(this.rawOut);
       if (codec != null) {
         if (compressorExternal != null) {
@@ -400,13 +398,11 @@ public class IFile {
         }
         if (this.compressor != null) {
           this.compressor.reset();
-          this.compressedOut = codec.createOutputStream(checksumOut, compressor);
+          CompressionOutputStream stream = codec.createOutputStream(checksumOut, compressor);
+          assert stream instanceof BlockCompressionOutputStream;
+          this.compressedOut = (BlockCompressionOutputStream) stream;
           this.out = new DataOutputStream(this.compressedOut);
-          this.compressOutput = true;
-          if (compressedOut instanceof BlockCompressionOutputStream) {
-            preparedCompressionOut = (BlockCompressionOutputStream) compressedOut;
-            writeBuffer = preparedCompressionOut.beginPreparedBlocks();
-          }
+          writeBuffer = compressedOut.beginPreparedBlocks();
         } else {
           LOG.warn("Could not obtain compressor from CodecPool");
           this.out = new DataOutputStream(checksumOut);
@@ -428,7 +424,7 @@ public class IFile {
       if (!headerWritten) {
         outputStream.write(HEADER, 0, HEADER.length - 1);
         byte flag = 0;
-        if (compressOutput) {
+        if (compressedOut != null) {
           flag |= FLAG_COMPRESSED;
         }
         if (isRleEnabled) {
@@ -461,7 +457,7 @@ public class IFile {
       if (ownOutputStream) {
         out.close();
       } else {
-        if (compressOutput) {
+        if (compressedOut != null) {
           // Flush
           compressedOut.finish();
           compressedOut.resetState();
@@ -472,7 +468,7 @@ public class IFile {
       // header bytes are already included in rawOut
       compressedBytesWritten = rawOut.getPos() - start;
 
-      if (compressOutput) {
+      if (compressedOut != null) {
         // Return back the compressor
         // if compressorExternal != null, this Writer does not own compressor, so do not return it to CodecPool
         if (compressorExternal == null) {
@@ -483,7 +479,7 @@ public class IFile {
       }
 
       // Do not retain the compressor's pooled input array after this writer closes.
-      preparedCompressionOut = null;
+      compressedOut = null;
       writeBuffer = null;
       writeBufferLength = 0;
       out = null;
@@ -569,7 +565,7 @@ public class IFile {
     protected void bufferWriteBytes(byte[] data, int off, int len) throws IOException {
       assert writeOffset >= 0 && writeOffset <= writeBufferLength;
       assert off >= 0 && len >= 0 && off <= data.length - len;
-      if (preparedCompressionOut != null) {
+      if (compressedOut != null) {
         while (len > 0) {
           if (writeOffset == writeBufferLength) {
             flushWriteBuffer();
@@ -578,7 +574,7 @@ public class IFile {
           if (writeOffset == 0 && len >= writeBufferLength) {
             // The caller array holds a complete block: compress without copying.
             assert writeOffset == 0;
-            preparedCompressionOut.writeDirectBlock(data, off, writeBufferLength);
+            compressedOut.writeDirectBlock(data, off, writeBufferLength);
             off += writeBufferLength;
             len -= writeBufferLength;
           } else {
@@ -621,8 +617,8 @@ public class IFile {
     protected void flushWriteBuffer() throws IOException {
       assert writeOffset >= 0 && writeOffset <= writeBufferLength;
       if (writeOffset > 0) {
-        if (preparedCompressionOut != null) {
-          preparedCompressionOut.writePreparedBlock(writeOffset);
+        if (compressedOut != null) {
+          compressedOut.writePreparedBlock(writeOffset);
         } else {
           out.write(writeBuffer, 0, writeOffset);
         }
