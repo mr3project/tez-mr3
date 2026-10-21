@@ -792,7 +792,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       super(manager, Integer.MAX_VALUE, exceptionReporter);
       setName("MemtoDiskMerger [" + inputContext.getSourceVertexName() + "_" + inputContext.getUniqueIdentifier()  + "]");
       setDaemon(true);
-      writeBuffer = IFile.allocateWriteBuffer();
+      writeBuffer = codec == null ? IFile.allocateWriteBuffer() : null;
     }
 
     @Override
@@ -887,7 +887,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
       super(manager, ioSortFactor, exceptionReporter);
       setName("DiskToDiskMerger [" +  inputContext.getSourceVertexName() + "_" + inputContext.getUniqueIdentifier() + "]");
       setDaemon(true);
-      writeBuffer = IFile.allocateWriteBuffer();
+      writeBuffer = codec == null ? IFile.allocateWriteBuffer() : null;
     }
 
     @Override
@@ -1101,7 +1101,7 @@ public class MergeManager implements FetchedInputAllocatorOrderedGrouped {
             mapOutputFile, getMergerId(),
             false, spilledRecordsCounter, null,
             additionalSpillBytesRead, true, inputContext);
-        final byte[] writeBuffer = IFile.allocateWriteBuffer();
+        final byte[] writeBuffer = codec == null ? IFile.allocateWriteBuffer() : null;
         final WriterDataInputBuffer writer = new WriterDataInputBuffer(fs, outputPath, codec, null, null,
             true, writeBuffer, inputContext);
         try {

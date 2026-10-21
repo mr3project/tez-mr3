@@ -48,11 +48,16 @@ final class XerialSnappyCompressor implements Compressor {
   }
 
   int compressBuffered(int inputLength) throws IOException {
+    assert inputLength > 0 && inputLength <= input.length;
+    return compressFrom(input, 0, inputLength);
+  }
+
+  int compressFrom(byte[] source, int offset, int inputLength) throws IOException {
     assert !closed;
-    CompressionStreamUtils.checkRange(input, 0, inputLength, "input");
-    assert inputLength <= input.length;
+    CompressionStreamUtils.checkRange(source, offset, inputLength, "input");
+    assert inputLength > 0 && inputLength <= input.length;
     try {
-      return Snappy.rawCompress(input, 0, inputLength, scratch, 0);
+      return Snappy.rawCompress(source, offset, inputLength, scratch, 0);
     } catch (Throwable e) {
       throw new IOException("Xerial Snappy compression failed", e);
     }

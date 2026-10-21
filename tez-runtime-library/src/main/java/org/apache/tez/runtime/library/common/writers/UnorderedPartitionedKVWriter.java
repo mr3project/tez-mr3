@@ -374,7 +374,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       this.singlePartitionSpillSizeLimit = isPipelinedShuffle ? assignedMemoryBytes : 0;
 
       if (!isPipelinedShuffle) {
-        byte[] writeBuffer = IFile.allocateWriteBuffer();
+        byte[] writeBuffer = codec == null ? IFile.allocateWriteBuffer() : null;
         this.singlePartitionByteArrayOutput =
             new MultiByteArrayOutputStream(rfs, outputFileHandler,
                 Constants.TEZ_RUNTIME_TASK_OUTPUT_FILENAME_STRING, assignedMemoryBytes);
@@ -736,7 +736,8 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
 
     CompressionProvider spillCodec = spillCompressed ? codec : null;
     writer = new IFile.WriterBytesWritable(singlePartitionSpillOutput, spillCodec, null, null,
-        compositeFetch, maxKeyLen, maxValLen, IFile.allocateWriteBuffer(), null, outputContext);
+        compositeFetch, maxKeyLen, maxValLen,
+        spillCodec == null ? IFile.allocateWriteBuffer() : null, null, outputContext);
     singlePartitionSpillRecordBytes = 0;
     singlePartitionSpillRecords = 0;
   }
@@ -1070,7 +1071,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
               spillNumber, spillPathDetails.outputFilePath, canUseBuffers);
         }
 
-        byte[] writeBuffer = IFile.allocateWriteBuffer();
+        byte[] writeBuffer = codec == null ? IFile.allocateWriteBuffer() : null;
 
         for (int i = 0; i < numPartitions; i++) {
           WriterDataInputBuffer writer = null;
@@ -1601,7 +1602,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       }
       WriterDataInputBuffer writer;
 
-      byte[] writeBuffer = IFile.allocateWriteBuffer();
+      byte[] writeBuffer = codec == null ? IFile.allocateWriteBuffer() : null;
       for (int i = 0; i < numPartitions; i++) {
         long segmentStart = out.getPos();
         if (numRecordsPerPartition[i] == 0) {
@@ -1829,7 +1830,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
             writer = new IFile.WriterBytesWritable(out, codec, null, null,
                 compositeFetch,
                 maxKeyLen, maxValLen,
-                IFile.allocateWriteBufferSingle(), null, outputContext);
+                codec == null ? IFile.allocateWriteBufferSingle() : null, null, outputContext);
             if (compositeFetch) {
               writer.appendNoRleTez(key, value);
             } else {

@@ -616,7 +616,7 @@ public class TezMerger {
       
       // create the MergeStreams from the sorted map created in the constructor
       // and dump the final output to a file
-      byte[] writeBuffer = IFile.allocateWriteBuffer();
+      byte[] writeBuffer = codec == null ? IFile.allocateWriteBuffer() : null;
       do {
         // get the factor for this pass of merge. We assume in-memory segments are
         // the first entries in the segment list and that the pass factor doesn't apply to them

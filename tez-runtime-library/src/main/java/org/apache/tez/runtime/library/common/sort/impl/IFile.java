@@ -40,6 +40,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.tez.util.FastByteComparisons;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.tez.runtime.api.CompressionProvider;
+import org.apache.tez.runtime.io.compress.BlockCompressionOutputStream;
 import org.apache.tez.runtime.io.compress.CompressionOutputStream;
 import org.apache.tez.runtime.io.compress.Compressor;
 import org.apache.tez.runtime.io.compress.Decompressor;
@@ -76,7 +77,7 @@ public class IFile {
   private static final int INT_SIZE = 4;
 
   // Cf. see TEZ_RUNTIME_TRANSFER_DATA_VIA_EVENTS_MAX_SIZE
-  public static final int WRITER_BUFFER_SIZE_DEFAULT = 4 * 1024;
+  public static final int WRITER_BUFFER_SIZE_DEFAULT = 4 * 1024;  // >= Long.BYTES
 
   public static byte[] allocateWriteBuffer() {
     return new byte[WRITER_BUFFER_SIZE_DEFAULT];
@@ -311,21 +312,18 @@ public class IFile {
     protected final boolean useMaxKeyValLen;
     protected final boolean isRleEnabled;
 
-    // We use writeBuffer[] to reduce the number of writes to 'out' and thus
-    // to reduce the number of writes to 'compressedOut'.
-    private final byte[] writeBuffer;
-    private final int writeBufferLength;        // must be larger than 8 (# of bytes in long)
+    // A compressed writer borrows the compressor's inputBuffer[].
+    // Uncompressed output uses writeBuffer[] provided by its caller.
+    private byte[] writeBuffer;
+    private int writeBufferLength;        // must be larger than 8 (# of bytes in long)
     private int writeOffset;
 
     private final Compressor compressorExternal;  // not to be shared with concurrent threads
     private final CompressorPool taskContext;
-    @Nullable
-    private final CompressionProvider codec;
 
     private IFileOutputStream checksumOut;
-    private CompressionOutputStream compressedOut;
+    private BlockCompressionOutputStream compressedOut;
     private Compressor compressor;
-    private boolean compressOutput = false;
     protected DataOutputStream out;
 
     // true iff this Writer created and owns rawOut
@@ -358,9 +356,10 @@ public class IFile {
                      boolean useMaxKeyValLen,
                      boolean isRleEnabled,
                      int maxKeyLen, int maxValLen,
-                     byte[] writeBuffer,
+                     @Nullable byte[] writeBuffer,
                      @Nullable Compressor compressorExternal,
                      CompressorPool taskContext) throws IOException {
+      assert (codec == null) == (writeBuffer != null);
       this.rawOut = outputStream;
       this.writtenRecordsCounter = writesCounter;
       this.serializedUncompressedBytes = serializedBytesCounter;
@@ -374,18 +373,20 @@ public class IFile {
       assert !(!useMaxKeyValLen) || (maxKeyLen == -1 && maxValLen == -1);
 
       this.writeBuffer = writeBuffer;
-      this.writeBufferLength = writeBuffer.length;
       this.writeOffset = 0;
 
       this.compressorExternal = compressorExternal;
       this.taskContext = taskContext;
-      this.codec = codec;
 
       setupOutputStream(codec);
       writeHeader(outputStream);
     }
 
     void setupOutputStream(@Nullable CompressionProvider codec) throws IOException {
+      // also used when FileBackedInMemIFileWriter switches from memory to disk
+      assert writeOffset == 0;
+      compressedOut = null;
+
       this.checksumOut = new IFileOutputStream(this.rawOut);
       if (codec != null) {
         if (compressorExternal != null) {
@@ -395,9 +396,13 @@ public class IFile {
         }
         if (this.compressor != null) {
           this.compressor.reset();
-          this.compressedOut = codec.createOutputStream(checksumOut, compressor);
+
+          CompressionOutputStream stream = codec.createOutputStream(checksumOut, compressor);
+          assert stream instanceof BlockCompressionOutputStream;  // true in the current implementation
+
+          this.compressedOut = (BlockCompressionOutputStream) stream;
           this.out = new DataOutputStream(this.compressedOut);
-          this.compressOutput = true;
+          writeBuffer = compressedOut.beginPreparedBlocks();
         } else {
           LOG.warn("Could not obtain compressor from CodecPool");
           this.out = new DataOutputStream(checksumOut);
@@ -405,13 +410,18 @@ public class IFile {
       } else {
         this.out = new DataOutputStream(checksumOut);
       }
+
+      if (writeBuffer == null) {
+        writeBuffer = IFile.allocateWriteBuffer();
+      }
+      writeBufferLength = writeBuffer.length;
     }
 
     protected void writeHeader(OutputStream outputStream) throws IOException {
       if (!headerWritten) {
         outputStream.write(HEADER, 0, HEADER.length - 1);
         byte flag = 0;
-        if (compressOutput) {
+        if (compressedOut != null) {
           flag |= FLAG_COMPRESSED;
         }
         if (isRleEnabled) {
@@ -429,33 +439,33 @@ public class IFile {
 
       onClose();
 
-      // Write EOF_MARKER for key/value length
+      // write EOF_MARKER for key/value length
       long combined = ((long) EOF_MARKER << 32) | (EOF_MARKER & 0xFFFFFFFFL);
       bufferWriteLong(combined);
 
       decompressedBytesWritten += 2 * INT_SIZE;
-      //account for header bytes
+      // account for header bytes
       decompressedBytesWritten += HEADER.length;
 
-      flushWriteBuffer();   // Ensure all buffered data is written to 'out'
+      flushWriteBuffer();   // ensure that all buffered data is written to 'out'
 
-      // Close the underlying stream iff we own it
+      // close the underlying stream iff we own it
       if (ownOutputStream) {
         out.close();
       } else {
-        if (compressOutput) {
-          // Flush
+        if (compressedOut != null) {
+          // flush
           compressedOut.finish();
           compressedOut.resetState();
         }
-        // Write the checksum and flush the buffer
+        // write the checksum and flush the buffer
         checksumOut.finish();
       }
       // header bytes are already included in rawOut
       compressedBytesWritten = rawOut.getPos() - start;
 
-      if (compressOutput) {
-        // Return back the compressor
+      if (compressedOut != null) {
+        // return back the compressor
         // if compressorExternal != null, this Writer does not own compressor, so do not return it to CodecPool
         if (compressorExternal == null) {
           // this Writer owns compressor
@@ -464,6 +474,10 @@ public class IFile {
         compressor = null;
       }
 
+      // do not retain the compressor's inputBuffer[] after this writer closes
+      compressedOut = null;
+      writeBuffer = null;
+      writeBufferLength = 0;
       out = null;
       if (writtenRecordsCounter != null) {
         writtenRecordsCounter.increment(numRecordsWritten);
@@ -519,28 +533,55 @@ public class IFile {
     }
 
     protected void bufferWriteInt(int val) throws IOException {
+      // writeOffset >= 0 && writeOffset <= writeBufferLength;
       final int len = 4;
       final int remaining = writeBufferLength - writeOffset;
       if (len > remaining) {
         flushWriteBuffer();
       }
+      // writeOffset + len <= writeBufferLength;
       FastByteComparisons.theUnsafe.putInt(writeBuffer,
           FastByteComparisons.BYTE_ARRAY_BASE_OFFSET + (long) writeOffset, val);
       writeOffset += len;
     }
 
     protected void bufferWriteLong(long val) throws IOException {
+      // writeOffset >= 0 && writeOffset <= writeBufferLength;
       final int len = 8;
       final int remaining = writeBufferLength - writeOffset;
       if (len > remaining) {
         flushWriteBuffer();
       }
+      // writeOffset + len <= writeBufferLength;
       FastByteComparisons.theUnsafe.putLong(writeBuffer,
           FastByteComparisons.BYTE_ARRAY_BASE_OFFSET + (long) writeOffset, val);
       writeOffset += len;
     }
 
     protected void bufferWriteBytes(byte[] data, int off, int len) throws IOException {
+      // writeOffset >= 0 && writeOffset <= writeBufferLength;
+      // off >= 0 && len >= 0 && off <= data.length - len;
+      if (compressedOut != null) {
+        while (len > 0) {
+          if (writeOffset == writeBufferLength) {
+            flushWriteBuffer();
+          }
+
+          if (writeOffset == 0 && len >= writeBufferLength) {
+            // the caller array holds a complete block, so compress without copying
+            compressedOut.writeDirectBlock(data, off, writeBufferLength);
+            off += writeBufferLength;
+            len -= writeBufferLength;
+          } else {
+            int copied = Math.min(len, writeBufferLength - writeOffset);
+            System.arraycopy(data, off, writeBuffer, writeOffset, copied);
+            writeOffset += copied;
+            off += copied;
+            len -= copied;
+          }
+        }
+        return;
+      }
       final int remaining = writeBufferLength - writeOffset;
       if (len > remaining) {
         flushWriteBuffer();
@@ -568,8 +609,13 @@ public class IFile {
     }
 
     protected void flushWriteBuffer() throws IOException {
+      assert writeOffset >= 0 && writeOffset <= writeBufferLength;
       if (writeOffset > 0) {
-        out.write(writeBuffer, 0, writeOffset);
+        if (compressedOut != null) {
+          compressedOut.writePreparedBlock(writeOffset);
+        } else {
+          out.write(writeBuffer, 0, writeOffset);
+        }
         writeOffset = 0;
       }
     }
@@ -612,7 +658,7 @@ public class IFile {
                                  TezCounter writesCounter,
                                  TezCounter serializedBytesCounter,
                                  boolean isRleEnabled,
-                                 byte[] writeBuffer,
+                                 @Nullable byte[] writeBuffer,
                                  CompressorPool taskContext) throws IOException {
       this(fs.create(file), codec, writesCounter, serializedBytesCounter,
           false, isRleEnabled, -1, -1,
@@ -627,7 +673,7 @@ public class IFile {
                                  boolean useMaxKeyValLen,
                                  boolean isRleEnabled,
                                  int maxKeyLen, int maxValLen,
-                                 byte[] writeBuffer,
+                                 @Nullable byte[] writeBuffer,
                                  @Nullable Compressor compressorExternal,
                                  CompressorPool taskContext)
         throws IOException {
@@ -832,7 +878,7 @@ public class IFile {
         TezCounter serializedBytesCounter,
         boolean useMaxKeyValLen,
         int maxKeyLen, int maxValLen,
-        byte[] writeBuffer,
+        @Nullable byte[] writeBuffer,
         CompressorPool taskContext) throws IOException {
       this(fs.create(file), codec, writesCounter, serializedBytesCounter, useMaxKeyValLen,
           maxKeyLen, maxValLen,
@@ -844,7 +890,7 @@ public class IFile {
         @Nullable CompressionProvider codec, TezCounter writesCounter, TezCounter serializedBytesCounter,
         boolean useMaxKeyValLen,
         int maxKeyLen, int maxValLen,
-        byte[] writeBuffer, @Nullable Compressor compressorExternal,
+        @Nullable byte[] writeBuffer, @Nullable Compressor compressorExternal,
         CompressorPool taskContext)
         throws IOException {
       super(outputStream, codec, writesCounter, serializedBytesCounter, useMaxKeyValLen, false,
