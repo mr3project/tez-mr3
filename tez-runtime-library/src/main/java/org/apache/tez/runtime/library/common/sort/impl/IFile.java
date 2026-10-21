@@ -415,8 +415,8 @@ public class IFile {
         this.out = new DataOutputStream(checksumOut);
       }
 
-      // If acquiring a compressor failed, write uncompressed data instead.
-      // Reuse the existing staging array after a memory-to-disk transition.
+      // Use staging for uncompressed output or providers without a prepared
+      // block path; reuse an existing buffer across memory-to-disk transitions.
       if (writeBuffer == null) {
         writeBuffer = IFile.allocateWriteBuffer();
       }
@@ -668,7 +668,7 @@ public class IFile {
                                  TezCounter writesCounter,
                                  TezCounter serializedBytesCounter,
                                  boolean isRleEnabled,
-                                 byte[] writeBuffer,
+                                 @Nullable byte[] writeBuffer,
                                  CompressorPool taskContext) throws IOException {
       this(fs.create(file), codec, writesCounter, serializedBytesCounter,
           false, isRleEnabled, -1, -1,
@@ -683,7 +683,7 @@ public class IFile {
                                  boolean useMaxKeyValLen,
                                  boolean isRleEnabled,
                                  int maxKeyLen, int maxValLen,
-                                 byte[] writeBuffer,
+                                 @Nullable byte[] writeBuffer,
                                  @Nullable Compressor compressorExternal,
                                  CompressorPool taskContext)
         throws IOException {
@@ -888,7 +888,7 @@ public class IFile {
         TezCounter serializedBytesCounter,
         boolean useMaxKeyValLen,
         int maxKeyLen, int maxValLen,
-        byte[] writeBuffer,
+        @Nullable byte[] writeBuffer,
         CompressorPool taskContext) throws IOException {
       this(fs.create(file), codec, writesCounter, serializedBytesCounter, useMaxKeyValLen,
           maxKeyLen, maxValLen,
@@ -900,7 +900,7 @@ public class IFile {
         @Nullable CompressionProvider codec, TezCounter writesCounter, TezCounter serializedBytesCounter,
         boolean useMaxKeyValLen,
         int maxKeyLen, int maxValLen,
-        byte[] writeBuffer, @Nullable Compressor compressorExternal,
+        @Nullable byte[] writeBuffer, @Nullable Compressor compressorExternal,
         CompressorPool taskContext)
         throws IOException {
       super(outputStream, codec, writesCounter, serializedBytesCounter, useMaxKeyValLen, false,
