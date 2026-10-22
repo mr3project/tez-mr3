@@ -91,7 +91,9 @@ one block. The compressed writer borrows the compressor's input buffer.
   writes EOF, finishes Snappy if selected, writes the CRC32, closes the
   logical segment. The shared underlying `FSDataOutputStream` is NOT
   closed. It discards output bytes without copying them into a storage
-  buffer, but still accounts for output positions. A compressor is
+  buffer, but samples the final emitted byte (the CRC trailer) so that
+  the compiler cannot discard the encoding work. Output positions are
+  still accounted for. A compressor is
   reused per JMH thread; its creation is outside the timed operation.
 - **`readIFile`**: creates a new IFile reader over already-encoded bytes,
   reads one record and EOF, verifies CRC32, closes the reader. A
