@@ -148,6 +148,12 @@ public abstract class BlockCompressionOutputStream extends CompressionOutputStre
 
   @Override
   public void finish() throws IOException {
+    finishSegment(true);
+  }
+
+  // Segment framing is written directly to the underlying stream. A shared
+  // IFile output needs no flush between adjacent, independently framed segments.
+  public final void finishSegment(boolean flush) throws IOException {
     assert state != State.CLOSED;
     if (state != State.FINISHED) {
       if (preparedInput) {
@@ -158,7 +164,9 @@ public abstract class BlockCompressionOutputStream extends CompressionOutputStre
       }
       output.writeInt(0);
       output.writeInt(0);
-      output.flush();
+      if (flush) {
+        output.flush();
+      }
       state = State.FINISHED;
     }
   }
