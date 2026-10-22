@@ -84,6 +84,11 @@ bytes, NOT IFile metadata. For one ordinary non-RLE record,
 
 Snappy uses a fixed 64 KiB block buffer so all tested segments fit in
 one block. The compressed writer borrows the compressor's input buffer.
+The uncompressed writer receives a separate 64 KiB buffer allocated once
+per JMH thread in setup. Both variants therefore reuse their write buffers
+without per-operation buffer allocation. This differs from uncompressed
+callers that allocate a new 4 KiB buffer per segment, intentionally isolating
+the benefit of skipping compression in an adaptive writer.
 
 ## What is measured?
 
