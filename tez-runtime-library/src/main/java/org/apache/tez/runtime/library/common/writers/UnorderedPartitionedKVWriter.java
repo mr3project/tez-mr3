@@ -1093,7 +1093,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
                       fsOutput, codec, null, null, compositeFetch, false,
                       maxKeyLen, maxValLen, writeBuffer, compressorExternal, outputContext);
                 } else {
-                  writer.startNextSegment();
+                  writer.startNextSegment(maxKeyLen, maxValLen);
                 }
               }
               numRecords += writeBufferedPartition(i, buffer, writer);
@@ -1619,7 +1619,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
               out, codec, null, null, compositeFetch, false,
               maxKeyLen, maxValLen, writeBuffer, null, outputContext);
         } else {
-          writer.startNextSegment();
+          writer.startNextSegment(maxKeyLen, maxValLen);
         }
         for (WrappedBuffer buffer : filledBuffers) {
           if (hasRecordsForPartition(i, buffer)) {
