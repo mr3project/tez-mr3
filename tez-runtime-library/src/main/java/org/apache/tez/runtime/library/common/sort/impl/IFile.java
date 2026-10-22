@@ -344,8 +344,6 @@ public class IFile {
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private boolean segmentFinished = false;
     private boolean failed = false;
-    private final int initialMaxKeyLen;
-    private final int initialMaxValLen;
     protected int maxKeyLen;
     protected int maxValLen;
     protected boolean keyLenTransitioned = false;
@@ -373,8 +371,6 @@ public class IFile {
       this.isRleEnabled = isRleEnabled;
       this.maxKeyLen = maxKeyLen;
       this.maxValLen = maxValLen;
-      this.initialMaxKeyLen = maxKeyLen;
-      this.initialMaxValLen = maxValLen;
       assert !(useMaxKeyValLen && isRleEnabled);
       assert !(!useMaxKeyValLen) || (maxKeyLen == -1 && maxValLen == -1);
 
@@ -473,7 +469,7 @@ public class IFile {
     }
 
     // Caller must finish the previous segment before beginning another one.
-    public final void startNextSegment() throws IOException {
+    public final void startNextSegment(int maxKeyLen, int maxValLen) throws IOException {
       if (closed.get() || failed || !segmentFinished) {
         throw new IOException("IFile segment is not ready for reuse");
       }
@@ -489,8 +485,8 @@ public class IFile {
         compressedBytesWritten = 0;
         numRecordsWritten = 0;
         numSerializedBytesWritten = 0;
-        maxKeyLen = initialMaxKeyLen;
-        maxValLen = initialMaxValLen;
+        this.maxKeyLen = maxKeyLen;
+        this.maxValLen = maxValLen;
         keyLenTransitioned = false;
         valLenTransitioned = false;
         firstKeyOffset = -1;
