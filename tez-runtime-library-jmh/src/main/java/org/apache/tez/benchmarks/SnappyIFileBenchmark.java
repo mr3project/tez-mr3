@@ -95,6 +95,7 @@ public class SnappyIFileBenchmark {
     private DecompressorPool decompressorPool;
     private FSDataOutputStream sharedOutput;
     private DiscardingOutputStream outputSink;
+    private byte[] uncompressedWriteBuffer;
     private byte[] encoded;
 
     @Setup(Level.Trial)
@@ -127,6 +128,9 @@ public class SnappyIFileBenchmark {
       // header flag determines whether decompression is actually performed.
       codec = new XerialSnappyCompressionProvider(SNAPPY_BLOCK_SIZE);
       compressor = codec.createCompressor();
+      // Reuse the raw buffer across IFiles, just as the compressed writer
+      // reuses its compressor-owned buffer. No allocation is timed.
+      uncompressedWriteBuffer = new byte[SNAPPY_BLOCK_SIZE];
       decompressor = codec.createDecompressor();
       decompressorPool = new SingleDecompressorPool(decompressor);
       outputSink = new DiscardingOutputStream();
@@ -180,7 +184,7 @@ public class SnappyIFileBenchmark {
       return new IFile.WriterBytesWritable(
           output, useCompression ? codec : null,
           null, null, false, -1, -1,
-          useCompression ? null : IFile.allocateWriteBuffer(),
+          useCompression ? null : uncompressedWriteBuffer,
           useCompression ? compressor : null, null);
     }
 
