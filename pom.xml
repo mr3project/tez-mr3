@@ -854,6 +854,13 @@
   </build>
 
   <profiles>
+    <!-- Benchmark module is opt-in and is not part of the regular Tez build. -->
+    <profile>
+      <id>ifile-jmh</id>
+      <modules>
+        <module>tez-runtime-library-jmh</module>
+      </modules>
+    </profile>
     <profile>
       <activation>
         <activeByDefault>false</activeByDefault>
