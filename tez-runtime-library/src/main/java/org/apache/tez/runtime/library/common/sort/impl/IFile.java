@@ -444,36 +444,33 @@ public class IFile {
     }
 
     private void finishSegmentInternal() throws IOException {
-      try {
-        onClose();
+      failed = true;
+      onClose();
 
-        // write EOF_MARKER for key/value length
-        long combined = ((long) EOF_MARKER << 32) | (EOF_MARKER & 0xFFFFFFFFL);
-        bufferWriteLong(combined);
+      // write EOF_MARKER for key/value length
+      long combined = ((long) EOF_MARKER << 32) | (EOF_MARKER & 0xFFFFFFFFL);
+      bufferWriteLong(combined);
 
-        decompressedBytesWritten += 2 * INT_SIZE;
-        // account for header bytes
-        decompressedBytesWritten += HEADER.length;
+      decompressedBytesWritten += 2 * INT_SIZE;
+      // account for header bytes
+      decompressedBytesWritten += HEADER.length;
 
-        flushWriteBuffer();   // ensure that all buffered data is written to 'out'
+      flushWriteBuffer();   // ensure that all buffered data is written to 'out'
 
-        if (compressedOut != null) {
-          compressedOut.finishSegment(false);
-        }
-        checksumOut.finishWithoutFlush();
-        // header bytes are already included in rawOut
-        compressedBytesWritten = rawOut.getPos() - start;
-        segmentFinished = true;
-        if (writtenRecordsCounter != null) {
-          writtenRecordsCounter.increment(numRecordsWritten);
-        }
-        if (serializedUncompressedBytes != null) {
-          serializedUncompressedBytes.increment(numSerializedBytesWritten);
-        }
-      } catch (IOException | RuntimeException e) {
-        failed = true;
-        throw e;
+      if (compressedOut != null) {
+        compressedOut.finishSegment(false);
       }
+      checksumOut.finishWithoutFlush();
+      // header bytes are already included in rawOut
+      compressedBytesWritten = rawOut.getPos() - start;
+      segmentFinished = true;
+      if (writtenRecordsCounter != null) {
+        writtenRecordsCounter.increment(numRecordsWritten);
+      }
+      if (serializedUncompressedBytes != null) {
+        serializedUncompressedBytes.increment(numSerializedBytesWritten);
+      }
+      failed = false;
     }
 
     // Caller must finish the previous segment before beginning another one.
@@ -482,33 +479,30 @@ public class IFile {
         throw new IOException("IFile segment is not ready for reuse");
       }
       assert !(failed || !segmentFinished);
-      try {
-        start = rawOut.getPos();
-        checksumOut.resetState();
-        if (compressedOut != null) {
-          compressedOut.resetState();
-          writeBuffer = compressedOut.beginPreparedBlocks();
-        }
-        writeOffset = 0;
-        decompressedBytesWritten = 0;
-        compressedBytesWritten = 0;
-        numRecordsWritten = 0;
-        numSerializedBytesWritten = 0;
-        this.maxKeyLen = maxKeyLen;
-        this.maxValLen = maxValLen;
-        keyLenTransitioned = false;
-        valLenTransitioned = false;
-        firstKeyOffset = -1;
-        firstValOffset = -1;
-        eofPos = -1;
-        resetSegmentState();
-        headerWritten = false;
-        writeHeader(rawOut);
-        segmentFinished = false;
-      } catch (IOException | RuntimeException e) {
-        failed = true;
-        throw e;
+      failed = true;
+      start = rawOut.getPos();
+      checksumOut.resetState();
+      if (compressedOut != null) {
+        compressedOut.resetState();
+        writeBuffer = compressedOut.beginPreparedBlocks();
       }
+      writeOffset = 0;
+      decompressedBytesWritten = 0;
+      compressedBytesWritten = 0;
+      numRecordsWritten = 0;
+      numSerializedBytesWritten = 0;
+      this.maxKeyLen = maxKeyLen;
+      this.maxValLen = maxValLen;
+      keyLenTransitioned = false;
+      valLenTransitioned = false;
+      firstKeyOffset = -1;
+      firstValOffset = -1;
+      eofPos = -1;
+      resetSegmentState();
+      headerWritten = false;
+      writeHeader(rawOut);
+      segmentFinished = false;
+      failed = false;
     }
 
     protected void resetSegmentState() { }
