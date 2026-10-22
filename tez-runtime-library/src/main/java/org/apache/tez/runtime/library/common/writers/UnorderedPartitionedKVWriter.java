@@ -1073,10 +1073,9 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
 
         byte[] writeBuffer = codec == null ? IFile.allocateWriteBuffer() : null;
 
-        WriterDataInputBuffer reusableWriter = null;
+        WriterDataInputBuffer writer = null;
         try {
-        for (int i = 0; i < numPartitions; i++) {
-          WriterDataInputBuffer writer = null;
+          for (int i = 0; i < numPartitions; i++) {
             long segmentStart = fsOutput.getPos();
             long numRecords = 0;
             for (WrappedBuffer buffer : filledBuffers) {
@@ -1084,26 +1083,25 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
                 // Skip empty partition.
                 continue;
               }
-              if (writer == null) {
+              if (numRecords == 0) {
                 if (codec != null && compressorExternal == null) {
                   compressorExternal = outputContext.getCompressor(codec);
                 }
-                // all Writer instances share the same FSDataOutputStream out
-                if (reusableWriter == null) {
-                  reusableWriter = new WriterDataInputBuffer(
+                // All nonempty partitions share a writer on the same FSDataOutputStream.
+                if (writer == null) {
+                  writer = new WriterDataInputBuffer(
                       fsOutput, codec, null, null, compositeFetch, false,
                       maxKeyLen, maxValLen, writeBuffer, compressorExternal, outputContext);
                 } else {
-                  reusableWriter.startNextSegment();
+                  writer.startNextSegment();
                 }
-                writer = reusableWriter;
               }
               numRecords += writeBufferedPartition(i, buffer, writer);
             }
-            if (writer != null) {
+            if (numRecords > 0) {
               if (numRecordsCounter != null) {
-                // TezCounter (from TaskCounter) is not thread-safe; Since numRecordsCounter would be updated from
-                // multiple threads, it is good to synchronize it when incrementing it for correctness.
+                // TezCounter (from TaskCounter) is not thread-safe; Since numRecordsCounter would be
+                // updated from multiple threads, synchronize its increment for correctness.
                 synchronized (numRecordsCounter) {
                   numRecordsCounter.increment(numRecords);
                 }
@@ -1116,12 +1114,11 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
               if (spillOffsetRecordMap != null && indexRecord.hasData()) {
                 spillOffsetRecordMap.put(i, writer.getTezOffsetRecord());
               }
-              writer = null;
             }
-        }
+          }
         } finally {
-          if (reusableWriter != null) {
-            reusableWriter.close();
+          if (writer != null) {
+            writer.close();
           }
         }
       } finally {
