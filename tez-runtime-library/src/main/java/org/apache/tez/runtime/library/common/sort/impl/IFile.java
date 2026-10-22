@@ -440,9 +440,10 @@ public class IFile {
 
     // Finish one independently readable IFile without releasing reusable resources.
     public final void finishSegment() throws IOException {
-      if (closed.get() || failed || segmentFinished) {
-        throw new IOException("IFile segment is not active");
+      if (closed.get()) {
+        throw new IOException("IFile writer is closed");
       }
+      assert !(failed || segmentFinished);
       finishSegmentInternal();
     }
 
