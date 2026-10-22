@@ -20,10 +20,14 @@ package org.apache.tez.runtime.io.compress;
 import java.io.IOException;
 
 import org.apache.tez.runtime.api.CompressionAlgorithm;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.xerial.snappy.Snappy;
 
 /** Raw xerial Snappy block compressor. A scratch buffer prevents partial caller output. */
 final class XerialSnappyCompressor implements Compressor {
+
+  private static final Logger LOG = LoggerFactory.getLogger(XerialSnappyCompressor.class);
 
   private byte[] input;
   private byte[] scratch;
@@ -57,7 +61,11 @@ final class XerialSnappyCompressor implements Compressor {
     CompressionStreamUtils.checkRange(source, offset, inputLength, "input");
     assert inputLength > 0 && inputLength <= input.length;
     try {
-      return Snappy.rawCompress(source, offset, inputLength, scratch, 0);
+      long start = System.nanoTime();
+      int compressedLength = Snappy.rawCompress(source, offset, inputLength, scratch, 0);
+      long duration = System.nanoTime() - start;
+      LOG.error("xxx {} {}", inputLength, duration);
+      return compressedLength;
     } catch (Throwable e) {
       throw new IOException("Xerial Snappy compression failed", e);
     }
