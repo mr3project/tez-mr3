@@ -731,7 +731,7 @@ public final class PipelinedSorter {
                   fsOutput, codec, spilledRecordsCounter, null, false, isRleEnabled,
                   -1, -1, writeBuffer, compressorExternal, outputContext);
             } else {
-              writer.startNextSegment();
+              writer.startNextSegment(-1, -1);
             }
           }
           while (kvIter.next()) {
@@ -1032,7 +1032,7 @@ public final class PipelinedSorter {
                   finalOut, codec, spilledRecordsCounter, null, false, isFinalMergeRleEnabled,
                   -1, -1, writeBuffer, null, outputContext);
             } else {
-              writer.startNextSegment();
+              writer.startNextSegment(-1, -1);
             }
             TezMerger.writeFile(kvIter, writer,
                 TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
