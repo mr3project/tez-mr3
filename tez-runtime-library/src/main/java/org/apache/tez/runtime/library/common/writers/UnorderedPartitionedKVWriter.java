@@ -1077,7 +1077,6 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
         try {
         for (int i = 0; i < numPartitions; i++) {
           WriterDataInputBuffer writer = null;
-          try {
             long segmentStart = fsOutput.getPos();
             long numRecords = 0;
             for (WrappedBuffer buffer : filledBuffers) {
@@ -1119,9 +1118,6 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
               }
               writer = null;
             }
-          } finally {
-            // The shared writer is closed once after all partitions.
-          }
         }
         } finally {
           if (reusableWriter != null) {
@@ -1628,12 +1624,11 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
         } else {
           writer.startNextSegment();
         }
-        try {
-          for (WrappedBuffer buffer : filledBuffers) {
-            if (hasRecordsForPartition(i, buffer)) {
-              writeBufferedPartition(i, buffer, writer);
-            }
+        for (WrappedBuffer buffer : filledBuffers) {
+          if (hasRecordsForPartition(i, buffer)) {
+            writeBufferedPartition(i, buffer, writer);
           }
+        }
           if (hasRecordsForPartition(i, currentBuffer)) {
             // Write current buffer last to preserve oldest->newest in-memory buffer ordering.
             writeBufferedPartition(i, currentBuffer, writer);
@@ -1731,9 +1726,6 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
             spillOffsetRecordMap.put(i, writer.getTezOffsetRecord());
           }
           finalSpillRecord.putIndex(indexRecord, i);
-        } finally {
-          // The shared writer remains open for the next nonempty partition.
-        }
       }
       } finally {
         if (writer != null) {
