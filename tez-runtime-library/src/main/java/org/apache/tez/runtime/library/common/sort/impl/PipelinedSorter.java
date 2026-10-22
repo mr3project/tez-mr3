@@ -712,46 +712,54 @@ public final class PipelinedSorter {
         fsOutput = new FSDataOutputStream(byteArrayOutput, null);
       }
 
-      for (int i = 0; i < partitions; ++i) {
-        if (isThreadInterrupted()) {
-          return false;
-        }
-        PartitionFilter kvIter = merger.filter(i);
-        // write merged output to disk
-        long segmentStart = fsOutput.getPos();
-        WriterDataInputBuffer writer = null;
-        boolean hasNext = kvIter.hasNext();
-        if (hasNext) {
-          if (codec != null && compressorExternal == null) {
-            compressorExternal = outputContext.getCompressor(codec);
+      WriterDataInputBuffer writer = null;
+      try {
+        for (int i = 0; i < partitions; ++i) {
+          if (isThreadInterrupted()) {
+            return false;
           }
-          writer = new WriterDataInputBuffer(
-              fsOutput,
-              codec, spilledRecordsCounter, null, false, isRleEnabled,
-              -1, -1,
-              writeBuffer, compressorExternal, outputContext);
-        }
-        while (kvIter.next()) {
-          kvIter.appendCurrentTo(writer);
-        }
+          PartitionFilter kvIter = merger.filter(i);
+          // write merged output to disk
+          long segmentStart = fsOutput.getPos();
+          boolean hasNext = kvIter.hasNext();
+          if (hasNext) {
+            if (codec != null && compressorExternal == null) {
+              compressorExternal = outputContext.getCompressor(codec);
+            }
+            if (writer == null) {
+              writer = new WriterDataInputBuffer(
+                  fsOutput, codec, spilledRecordsCounter, null, false, isRleEnabled,
+                  -1, -1, writeBuffer, compressorExternal, outputContext);
+            } else {
+              writer.startNextSegment(-1, -1);
+            }
+          }
+          while (kvIter.next()) {
+            kvIter.appendCurrentTo(writer);
+          }
 
-        long rawLength = 0;
-        long partLength = 0;
+          long rawLength = 0;
+          long partLength = 0;
+          if (hasNext) {
+            writer.finishSegment();
+            rawLength = writer.getRawLength();
+            partLength = writer.getCompressedLength();
+          }
+          adjustSpillCounters(rawLength, partLength);
+          sumPartLength += partLength;
+
+          // record offsets
+          final TezIndexRecord rec = new TezIndexRecord(segmentStart, rawLength, partLength);
+          spillRec.putIndex(rec, i);
+          if (!isFinalMergeEnabled && reportPartitionStats()) {
+            partitionStats[i] += rawLength;
+          }
+        }
+      } finally {
         if (writer != null) {
           writer.close();
-          rawLength = writer.getRawLength();
-          partLength = writer.getCompressedLength();
         }
-        adjustSpillCounters(rawLength, partLength);
-        sumPartLength += partLength;
-
-        // record offsets
-        final TezIndexRecord rec = new TezIndexRecord(segmentStart, rawLength, partLength);
-        spillRec.putIndex(rec, i);
-        if (!isFinalMergeEnabled && reportPartitionStats()) {
-          partitionStats[i] += rawLength;
-        }
-      } // end of for loop
+      }
     } finally {
       if (compressorExternal != null) {
         outputContext.returnCompressor(compressorExternal);
@@ -989,6 +997,7 @@ public final class PipelinedSorter {
       final TezSpillRecord spillRec = new TezSpillRecord(partitions);
       final boolean isFinalMergeRleEnabled = merger.needsRLE();
       long finalOutputSize = 0;
+      WriterDataInputBuffer writer = null;
       try {
         for (int parts = 0; parts < partitions; parts++) {
           boolean shouldWrite = false;
@@ -1017,18 +1026,18 @@ public final class PipelinedSorter {
           long segmentStart = finalOut.getPos();
           long rawLength = 0;
           long partLength = 0;
-          WriterDataInputBuffer writer = null;
           if (shouldWrite) {
-            writer = new WriterDataInputBuffer(
-                finalOut,
-                codec, spilledRecordsCounter, null, false, isFinalMergeRleEnabled,
-                -1, -1,
-                writeBuffer, null, outputContext);
+            if (writer == null) {
+              writer = new WriterDataInputBuffer(
+                  finalOut, codec, spilledRecordsCounter, null, false, isFinalMergeRleEnabled,
+                  -1, -1, writeBuffer, null, outputContext);
+            } else {
+              writer.startNextSegment(-1, -1);
+            }
             TezMerger.writeFile(kvIter, writer,
                 TezRuntimeConfiguration.TEZ_RUNTIME_RECORDS_BEFORE_PROGRESS_DEFAULT);
 
-            //close
-            writer.close();
+            writer.finishSegment();
             rawLength = writer.getRawLength();
             partLength = writer.getCompressedLength();
           }
@@ -1043,7 +1052,13 @@ public final class PipelinedSorter {
           }
         }
       } finally {
-        finalOut.close();
+        try {
+          if (writer != null) {
+            writer.close();
+          }
+        } finally {
+          finalOut.close();
+        }
       }
 
       // numShuffleChunks.setValue(1); // final merge has happened.

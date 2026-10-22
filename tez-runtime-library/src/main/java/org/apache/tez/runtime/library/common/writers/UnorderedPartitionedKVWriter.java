@@ -1073,9 +1073,9 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
 
         byte[] writeBuffer = codec == null ? IFile.allocateWriteBuffer() : null;
 
-        for (int i = 0; i < numPartitions; i++) {
-          WriterDataInputBuffer writer = null;
-          try {
+        WriterDataInputBuffer writer = null;
+        try {
+          for (int i = 0; i < numPartitions; i++) {
             long segmentStart = fsOutput.getPos();
             long numRecords = 0;
             for (WrappedBuffer buffer : filledBuffers) {
@@ -1083,27 +1083,30 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
                 // Skip empty partition.
                 continue;
               }
-              if (writer == null) {
+              if (numRecords == 0) {
                 if (codec != null && compressorExternal == null) {
                   compressorExternal = outputContext.getCompressor(codec);
                 }
-                // all Writer instances share the same FSDataOutputStream out
-                writer = new WriterDataInputBuffer(
-                    fsOutput, codec, null, null, compositeFetch, false,
-                    maxKeyLen, maxValLen,
-                    writeBuffer, compressorExternal, outputContext);
+                // All nonempty partitions share a writer on the same FSDataOutputStream.
+                if (writer == null) {
+                  writer = new WriterDataInputBuffer(
+                      fsOutput, codec, null, null, compositeFetch, false,
+                      maxKeyLen, maxValLen, writeBuffer, compressorExternal, outputContext);
+                } else {
+                  writer.startNextSegment(maxKeyLen, maxValLen);
+                }
               }
               numRecords += writeBufferedPartition(i, buffer, writer);
             }
-            if (writer != null) {
+            if (numRecords > 0) {
               if (numRecordsCounter != null) {
-                // TezCounter (from TaskCounter) is not thread-safe; Since numRecordsCounter would be updated from
-                // multiple threads, it is good to synchronize it when incrementing it for correctness.
+                // TezCounter (from TaskCounter) is not thread-safe; Since numRecordsCounter would be
+                // updated from multiple threads, synchronize its increment for correctness.
                 synchronized (numRecordsCounter) {
                   numRecordsCounter.increment(numRecords);
                 }
               }
-              writer.close();   // write does not own fsOutput, so fsOutput.close() is not called
+              writer.finishSegment();
               compressedLength += writer.getCompressedLength();
               TezIndexRecord indexRecord = new TezIndexRecord(segmentStart, writer.getRawLength(),
                   writer.getCompressedLength());
@@ -1111,12 +1114,11 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
               if (spillOffsetRecordMap != null && indexRecord.hasData()) {
                 spillOffsetRecordMap.put(i, writer.getTezOffsetRecord());
               }
-              writer = null;
             }
-          } finally {
-            if (writer != null) {
-              writer.close();
-            }
+          }
+        } finally {
+          if (writer != null) {
+            writer.close();
           }
         }
       } finally {
@@ -1600,9 +1602,10 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
       } else {
         out = new FSDataOutputStream(byteArrayOutput, null);
       }
-      WriterDataInputBuffer writer;
+      WriterDataInputBuffer writer = null;
 
       byte[] writeBuffer = codec == null ? IFile.allocateWriteBuffer() : null;
+      try {
       for (int i = 0; i < numPartitions; i++) {
         long segmentStart = out.getPos();
         if (numRecordsPerPartition[i] == 0) {
@@ -1611,17 +1614,18 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
           }
           continue;
         }
-        // inside close()
-        writer = new WriterDataInputBuffer(
-            out, codec, null, null, compositeFetch, false,
-            maxKeyLen, maxValLen,
-            writeBuffer, null, outputContext);
-        try {
-          for (WrappedBuffer buffer : filledBuffers) {
-            if (hasRecordsForPartition(i, buffer)) {
-              writeBufferedPartition(i, buffer, writer);
-            }
+        if (writer == null) {
+          writer = new WriterDataInputBuffer(
+              out, codec, null, null, compositeFetch, false,
+              maxKeyLen, maxValLen, writeBuffer, null, outputContext);
+        } else {
+          writer.startNextSegment(maxKeyLen, maxValLen);
+        }
+        for (WrappedBuffer buffer : filledBuffers) {
+          if (hasRecordsForPartition(i, buffer)) {
+            writeBufferedPartition(i, buffer, writer);
           }
+        }
           if (hasRecordsForPartition(i, currentBuffer)) {
             // Write current buffer last to preserve oldest->newest in-memory buffer ordering.
             writeBufferedPartition(i, currentBuffer, writer);
@@ -1711,19 +1715,18 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
               }
             }
           }
-          writer.close();
+          writer.finishSegment();
           finalOutSize += writer.getCompressedLength();
           TezIndexRecord indexRecord = new TezIndexRecord(segmentStart, writer.getRawLength(),
               writer.getCompressedLength());
           if (spillOffsetRecordMap != null && indexRecord.hasData()) {
             spillOffsetRecordMap.put(i, writer.getTezOffsetRecord());
           }
-          writer = null;
           finalSpillRecord.putIndex(indexRecord, i);
-        } finally {
-          if (writer != null) {
-            writer.close();
-          }
+      }
+      } finally {
+        if (writer != null) {
+          writer.close();
         }
       }
     } finally {

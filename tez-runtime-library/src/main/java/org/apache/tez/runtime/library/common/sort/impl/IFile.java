@@ -307,7 +307,7 @@ public class IFile {
     protected FSDataOutputStream rawOut;
     private final TezCounter writtenRecordsCounter;
     private final TezCounter serializedUncompressedBytes;
-    private final long start;
+    private long start;
 
     protected final boolean useMaxKeyValLen;
     protected final boolean isRleEnabled;
@@ -342,6 +342,8 @@ public class IFile {
     protected long numSerializedBytesWritten = 0;
 
     private final AtomicBoolean closed = new AtomicBoolean(false);
+    private boolean segmentFinished = false;
+    private boolean failed = false;
     protected int maxKeyLen;
     protected int maxValLen;
     protected boolean keyLenTransitioned = false;
@@ -432,11 +434,17 @@ public class IFile {
       }
     }
 
-    public void close() throws IOException {
-      if (closed.getAndSet(true)) {
-        throw new IOException("Writer was already closed earlier");
+    // Finish one independently readable IFile without releasing reusable resources.
+    public final void finishSegment() throws IOException {
+      if (closed.get()) {
+        throw new IOException("IFile writer is closed");
       }
+      assert !(failed || segmentFinished);
+      finishSegmentInternal();
+    }
 
+    private void finishSegmentInternal() throws IOException {
+      failed = true;
       onClose();
 
       // write EOF_MARKER for key/value length
@@ -449,41 +457,98 @@ public class IFile {
 
       flushWriteBuffer();   // ensure that all buffered data is written to 'out'
 
-      // close the underlying stream iff we own it
-      if (ownOutputStream) {
-        out.close();
-      } else {
-        if (compressedOut != null) {
-          // flush
-          compressedOut.finish();
-          compressedOut.resetState();
-        }
-        // write the checksum and flush the buffer
-        checksumOut.finish();
+      if (compressedOut != null) {
+        compressedOut.finishSegment(false);
       }
+      checksumOut.finishWithoutFlush();
       // header bytes are already included in rawOut
       compressedBytesWritten = rawOut.getPos() - start;
-
-      if (compressedOut != null) {
-        // return back the compressor
-        // if compressorExternal != null, this Writer does not own compressor, so do not return it to CodecPool
-        if (compressorExternal == null) {
-          // this Writer owns compressor
-          taskContext.returnCompressor(compressor);
-        }
-        compressor = null;
-      }
-
-      // do not retain the compressor's inputBuffer[] after this writer closes
-      compressedOut = null;
-      writeBuffer = null;
-      writeBufferLength = 0;
-      out = null;
+      segmentFinished = true;
       if (writtenRecordsCounter != null) {
         writtenRecordsCounter.increment(numRecordsWritten);
       }
       if (serializedUncompressedBytes != null) {
         serializedUncompressedBytes.increment(numSerializedBytesWritten);
+      }
+      failed = false;
+    }
+
+    // Caller must finish the previous segment before beginning another one.
+    public final void startNextSegment(int maxKeyLen, int maxValLen) throws IOException {
+      if (closed.get()) {
+        throw new IOException("IFile segment is not ready for reuse");
+      }
+      assert !(failed || !segmentFinished);
+      failed = true;
+      start = rawOut.getPos();
+      checksumOut.resetState();
+      if (compressedOut != null) {
+        compressedOut.resetState();
+        writeBuffer = compressedOut.beginPreparedBlocks();
+      }
+      writeOffset = 0;
+      decompressedBytesWritten = 0;
+      compressedBytesWritten = 0;
+      numRecordsWritten = 0;
+      numSerializedBytesWritten = 0;
+      this.maxKeyLen = maxKeyLen;
+      this.maxValLen = maxValLen;
+      keyLenTransitioned = false;
+      valLenTransitioned = false;
+      firstKeyOffset = -1;
+      firstValOffset = -1;
+      eofPos = -1;
+      resetSegmentState();
+      headerWritten = false;
+      writeHeader(rawOut);
+      segmentFinished = false;
+      failed = false;
+    }
+
+    protected void resetSegmentState() { }
+
+    public void close() throws IOException {
+      if (closed.getAndSet(true)) {
+        throw new IOException("Writer was already closed earlier");
+      }
+      IOException error = null;
+      try {
+        if (!segmentFinished && !failed) {
+          // close() is also the original one-segment API.
+          finishSegmentInternal();
+        }
+        if (!failed) {
+          rawOut.flush();
+        }
+      } catch (IOException e) {
+        failed = true;
+        error = e;
+      } finally {
+        // return back the compressor
+        // if compressorExternal != null, this Writer does not own compressor, so do not return it to CodecPool
+        if (compressedOut != null && compressorExternal == null) {
+          // this Writer owns compressor
+          taskContext.returnCompressor(compressor);
+        }
+        compressor = null;
+
+        // do not retain the compressor's inputBuffer[] after this writer closes
+        compressedOut = null;
+        writeBuffer = null;
+        writeBufferLength = 0;
+        out = null;
+
+        // close the underlying stream iff we own it
+        if (ownOutputStream) {
+          try {
+            rawOut.close();
+          } catch (IOException e) {
+            error = e;
+          }
+        }
+      }
+      if (error != null) {
+        throw error;
       }
     }
 
@@ -830,6 +895,16 @@ public class IFile {
         bufferWriteInt(V_END_MARKER);
         incrementDecompressedBytesWritten(V_END_MARKER_SIZE);
       }
+    }
+
+    @Override
+    protected void resetSegmentState() {
+      previousKeyData = new byte[0];
+      previousKeyOffset = 0;
+      previousKeyLength = 0;
+      previousSameKey = false;
+      rleWritten = 0;
+      totalKeySaving = 0;
     }
 
     @Override
