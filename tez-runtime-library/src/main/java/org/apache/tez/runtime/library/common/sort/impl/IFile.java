@@ -461,6 +461,7 @@ public class IFile {
           compressedOut.finishSegment(false);
         }
         checksumOut.finishWithoutFlush();
+        // header bytes are already included in rawOut
         compressedBytesWritten = rawOut.getPos() - start;
         segmentFinished = true;
         if (writtenRecordsCounter != null) {
@@ -529,14 +530,21 @@ public class IFile {
         failed = true;
         error = e;
       } finally {
+        // return back the compressor
+        // if compressorExternal != null, this Writer does not own compressor, so do not return it to CodecPool
         if (compressedOut != null && compressorExternal == null) {
+          // this Writer owns compressor
           taskContext.returnCompressor(compressor);
         }
         compressor = null;
+
+        // do not retain the compressor's inputBuffer[] after this writer closes
         compressedOut = null;
         writeBuffer = null;
         writeBufferLength = 0;
         out = null;
+
+        // close the underlying stream iff we own it
         if (ownOutputStream) {
           try {
             rawOut.close();
