@@ -443,6 +443,10 @@ public class IFile {
       if (closed.get() || failed || segmentFinished) {
         throw new IOException("IFile segment is not active");
       }
+      finishSegmentInternal();
+    }
+
+    private void finishSegmentInternal() throws IOException {
       try {
         onClose();
         long combined = ((long) EOF_MARKER << 32) | (EOF_MARKER & 0xFFFFFFFFL);
@@ -511,12 +515,7 @@ public class IFile {
       try {
         if (!segmentFinished && !failed) {
           // close() is also the original one-segment API.
-          closed.set(false);
-          try {
-            finishSegment();
-          } finally {
-            closed.set(true);
-          }
+          finishSegmentInternal();
         }
         if (!failed) {
           rawOut.flush();
