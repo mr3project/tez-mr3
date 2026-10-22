@@ -94,6 +94,7 @@ public class SnappyIFileBenchmark {
     private Decompressor decompressor;
     private DecompressorPool decompressorPool;
     private FSDataOutputStream sharedOutput;
+    private DiscardingOutputStream outputSink;
     private byte[] encoded;
 
     @Setup(Level.Trial)
@@ -128,7 +129,8 @@ public class SnappyIFileBenchmark {
       compressor = codec.createCompressor();
       decompressor = codec.createDecompressor();
       decompressorPool = new SingleDecompressorPool(decompressor);
-      sharedOutput = new FSDataOutputStream(new DiscardingOutputStream(), null);
+      outputSink = new DiscardingOutputStream();
+      sharedOutput = new FSDataOutputStream(outputSink, null);
 
       // Encode once OUTSIDE the measured method to prepare the read benchmark.
       ByteArrayOutputStream bytes = new ByteArrayOutputStream(payloadSize + 128);
@@ -203,16 +205,27 @@ public class SnappyIFileBenchmark {
   }
 
   /**
-   * No actual output copy or device I/O; FSDataOutputStream tracks positions.
-   * Its per-write accounting remains part of the benchmark.
+   * No output copy or device I/O. Sampling the last emitted byte (normally
+   * part of the CRC trailer) makes the computed content observable to JMH,
+   * preventing the JVM from eliding otherwise-unused encoding work.
    */
   private static final class DiscardingOutputStream extends OutputStream {
+    private int lastByte;
+
     @Override
     public void write(int value) {
+      lastByte = value & 0xff;
     }
 
     @Override
     public void write(byte[] data, int offset, int length) {
+      if (length > 0) {
+        lastByte = data[offset + length - 1] & 0xff;
+      }
+    }
+
+    int lastByte() {
+      return lastByte;
     }
   }
 
@@ -260,7 +273,7 @@ public class SnappyIFileBenchmark {
     IFile.WriterBytesWritable writer = state.newWriter(state.sharedOutput);
     writer.appendNoRle(state.key, state.value);
     writer.close();
-    return writer.getCompressedLength();
+    return writer.getCompressedLength() ^ state.outputSink.lastByte();
   }
 
   /**
