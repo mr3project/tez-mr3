@@ -39,6 +39,20 @@
       <artifactId>tez-runtime-library</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- Tez normally obtains SLF4J from its runtime container. The standalone
+         shaded JMH executable must bundle its own API and logging binding. -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+      <version>${slf4j.version}</version>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-nop</artifactId>
+      <version>${slf4j.version}</version>
+      <scope>runtime</scope>
+    </dependency>
     <dependency>
       <groupId>org.openjdk.jmh</groupId>
       <artifactId>jmh-core</artifactId>
