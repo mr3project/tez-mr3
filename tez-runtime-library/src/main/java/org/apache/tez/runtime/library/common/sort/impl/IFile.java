@@ -541,11 +541,7 @@ public class IFile {
           try {
             rawOut.close();
           } catch (IOException e) {
-            if (error == null) {
-              error = e;
-            } else {
-              error.addSuppressed(e);
-            }
+            error = e;
           }
         }
       }
