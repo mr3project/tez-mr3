@@ -89,9 +89,7 @@ public class IFileOutputStream extends FilterOutputStream {
   }
 
   void resetState() {
-    if (!finished || closed) {
-      throw new IllegalStateException("Checksum stream is not ready for reuse");
-    }
+    assert finished && !closed;
     sum.reset();
     finished = false;
   }
