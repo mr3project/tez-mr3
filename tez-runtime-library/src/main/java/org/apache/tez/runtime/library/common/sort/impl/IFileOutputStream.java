@@ -67,13 +67,33 @@ public class IFileOutputStream extends FilterOutputStream {
    * @throws IOException
    */
   public void finish() throws IOException {
+    finish(true);
+  }
+
+  // IFile.Writer can finish several segments on one shared output stream.
+  // The checksum itself is written immediately; only the flush is deferred.
+  void finishWithoutFlush() throws IOException {
+    finish(false);
+  }
+
+  private void finish(boolean flush) throws IOException {
     if (finished) {
       return;
     }
     finished = true;
     writeChecksumValue(sum.getValue());
     out.write(checksum, 0, CHECKSUM_SIZE);
-    out.flush();
+    if (flush) {
+      out.flush();
+    }
+  }
+
+  void resetState() {
+    if (!finished || closed) {
+      throw new IllegalStateException("Checksum stream is not ready for reuse");
+    }
+    sum.reset();
+    finished = false;
   }
 
   void writeChecksumValue(long value) {
