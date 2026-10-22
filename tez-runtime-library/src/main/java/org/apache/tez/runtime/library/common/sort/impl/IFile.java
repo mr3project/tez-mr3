@@ -446,10 +446,17 @@ public class IFile {
     private void finishSegmentInternal() throws IOException {
       try {
         onClose();
+
+        // write EOF_MARKER for key/value length
         long combined = ((long) EOF_MARKER << 32) | (EOF_MARKER & 0xFFFFFFFFL);
         bufferWriteLong(combined);
-        decompressedBytesWritten += 2 * INT_SIZE + HEADER.length;
-        flushWriteBuffer();
+
+        decompressedBytesWritten += 2 * INT_SIZE;
+        // account for header bytes
+        decompressedBytesWritten += HEADER.length;
+
+        flushWriteBuffer();   // ensure that all buffered data is written to 'out'
+
         if (compressedOut != null) {
           compressedOut.finishSegment(false);
         }
@@ -470,9 +477,10 @@ public class IFile {
 
     // Caller must finish the previous segment before beginning another one.
     public final void startNextSegment(int maxKeyLen, int maxValLen) throws IOException {
-      if (closed.get() || failed || !segmentFinished) {
+      if (closed.get()) {
         throw new IOException("IFile segment is not ready for reuse");
       }
+      assert !(failed || !segmentFinished);
       try {
         start = rawOut.getPos();
         checksumOut.resetState();
