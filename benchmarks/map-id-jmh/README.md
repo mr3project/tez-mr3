@@ -1,4 +1,4 @@
-# Shuffle map ID serialization JMH benchmark
+# Shuffle map ID serialization and deserialization JMH benchmarks
 
 This standalone benchmark compares three ways to write a composite shuffle map ID
 to Hadoop's real `DataOutputBuffer`:
@@ -26,6 +26,9 @@ mvn -f benchmarks/map-id-jmh/pom.xml -DskipTests package
 
 java -jar benchmarks/map-id-jmh/target/map-id-jmh.jar \
   'MapIdSerializationBenchmark' -prof gc
+
+java -jar benchmarks/map-id-jmh/target/map-id-jmh.jar \
+  'MapIdDeserializationBenchmark' -prof gc
 ```
 
 JMH reports average time in nanoseconds per invocation (`avgt`) and the GC
@@ -39,6 +42,40 @@ To run a shorter initial experiment:
 java -jar benchmarks/map-id-jmh/target/map-id-jmh.jar \
   'MapIdSerializationBenchmark' -f 1 -wi 2 -i 3 -r 1s -w 1s -prof gc
 ```
+
+## Deserialization variants
+
+`MapIdDeserializationBenchmark` measures the full
+`ShuffleHeader.readMapId()`-style operation: read a 4-byte length, validate
+the maximum 1000-byte ID length, allocate and read the byte array, and
+construct the returned String. It compares:
+
+1. **currentTextDecode**: `Text.decode(bytes)` (the current implementation).
+2. **newStringUtf8**: `new String(bytes, StandardCharsets.UTF_8)`.
+3. **newStringUsAscii**: `new String(bytes, StandardCharsets.US_ASCII)`.
+4. **checkedUsAscii**: explicitly reject bytes with the high bit set, then
+   decode using `US_ASCII`. This measures the cost of strict validation
+   versus silently replacing non-ASCII bytes.
+
+Each variant receives the same length-prefixed ASCII-only map ID of 40, 64,
+or 128 characters. A per-thread `DataInputBuffer` is reset for each operation,
+and the decoded String is returned to JMH to prevent dead-code elimination.
+The byte-array read/allocation and length checks are included in all variants.
+Setup checks verify identical decoded results and confirm that strict ASCII
+decoding rejects a byte outside the ASCII range. Malformed input is not timed.
+
+To run just the deserialization benchmarks:
+
+```bash
+java -jar benchmarks/map-id-jmh/target/map-id-jmh.jar \
+  'MapIdDeserializationBenchmark' -prof gc
+```
+
+Results apply to composite MR3 shuffle map IDs. The non-composite Hadoop
+shuffle protocol uses a different header-reading method. Also note that the
+MR3 ShuffleHandler currently embeds arbitrary exception text in a special
+disk-error map ID; enforcing ASCII in that path is a separate production
+change and is **not** performed by this benchmark.
 
 ## Java 21+ and dnsjava service loading
 
