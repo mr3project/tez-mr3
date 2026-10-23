@@ -1142,9 +1142,6 @@ public class ShuffleHandler {
       }
 
       long getPartLength(int index) {
-        if (index < reduceRange.first || index > reduceRange.last) {
-          throw new IllegalArgumentException("Reduce Index: " + index + " out of range");
-        }
         return spillRecord != null ? spillRecord.getPartLength(index) : indexRecord.getPartLength();
       }
 
