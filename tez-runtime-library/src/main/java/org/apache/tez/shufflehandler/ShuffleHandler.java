@@ -49,6 +49,7 @@ import java.util.Map;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 
 import javax.annotation.Nullable;
@@ -134,6 +135,14 @@ public class ShuffleHandler {
 
   private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(ShuffleHandler.class);
   private static final boolean isLogDebugEnabled = LOG.isDebugEnabled();
+
+  // Aggregate connection statistics across all ShuffleHandlers in this JVM.
+  private static final AtomicLong newConnections = new AtomicLong();
+  private static final AtomicLong totalRequests = new AtomicLong();
+  private static final AtomicLong reusedConnections = new AtomicLong();
+  private static final AtomicLong reusedRequests = new AtomicLong();
+  private static final AttributeKey<Integer> REQUEST_COUNT =
+      AttributeKey.valueOf("shuffleRequestCount");
 
   public static final String SHUFFLE_MANAGE_OS_CACHE = "tez.shuffle.manage.os.cache";
   public static final boolean DEFAULT_SHUFFLE_MANAGE_OS_CACHE = true;
@@ -853,12 +862,31 @@ public class ShuffleHandler {
         return;
       }
       accepted.add(ctx.channel());
+      newConnections.incrementAndGet();
       super.channelActive(ctx);
     }
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object message)
         throws Exception {
+      Attribute<Integer> attr = ctx.channel().attr(REQUEST_COUNT);
+      Integer previous = attr.get();
+      if (previous == null) {
+        attr.set(1);
+      } else {
+        attr.set(previous + 1);
+        reusedRequests.incrementAndGet();
+        if (previous == 1) {
+          reusedConnections.incrementAndGet();
+        }
+      }
+
+      long count = totalRequests.incrementAndGet();
+      if (count % 100000 == 0) {
+        LOG.error("xxx {} {} {} {}", newConnections.get(), count,
+            reusedConnections.get(), reusedRequests.get());
+      }
+
       FullHttpRequest request = (FullHttpRequest) message;
       handleRequest(ctx, request);
       request.release();
