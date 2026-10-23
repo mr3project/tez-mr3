@@ -40,6 +40,22 @@ java -jar benchmarks/map-id-jmh/target/map-id-jmh.jar \
   'MapIdSerializationBenchmark' -f 1 -wi 2 -i 3 -r 1s -w 1s -prof gc
 ```
 
+## Java 21+ and dnsjava service loading
+
+Hadoop 3.4.1 transitively brings in dnsjava. Its multi-release JAR may
+contribute `META-INF/services/java.net.spi.InetAddressResolverProvider` to
+an uber-JAR without a loadable provider class. That would cause
+`DnsjavaInetAddressResolverProvider not found` when JMH launches a fork.
+The shade configuration deliberately excludes this unnecessary DNS SPI
+registration from the standalone benchmark JAR.
+
+After upgrading this benchmark, rebuild the JAR with the Maven `clean` goal
+so no resources from a previous shaded build remain:
+
+```bash
+mvn -f benchmarks/map-id-jmh/pom.xml clean package -DskipTests
+```
+
 ## Interpretation
 
 The benchmark compares serialization only, not overall `sendMapOutput()`

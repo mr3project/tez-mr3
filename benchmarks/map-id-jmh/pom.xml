@@ -79,6 +79,9 @@
                     <exclude>META-INF/*.SF</exclude>
                     <exclude>META-INF/*.DSA</exclude>
                     <exclude>META-INF/*.RSA</exclude>
+                    <!-- dnsjava's Java 18+ resolver SPI does not survive shading
+                         of its multi-release JAR, and is not needed here. -->
+                    <exclude>META-INF/services/java.net.spi.InetAddressResolverProvider</exclude>
                   </excludes>
                 </filter>
               </filters>
