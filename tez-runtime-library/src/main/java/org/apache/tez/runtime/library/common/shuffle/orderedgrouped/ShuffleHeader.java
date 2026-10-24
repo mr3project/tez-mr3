@@ -21,6 +21,7 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
@@ -132,7 +133,7 @@ public class ShuffleHeader implements Writable {
     }
     byte [] bytes = new byte[length];
     in.readFully(bytes, 0, length);
-    return Text.decode(bytes);
+    return new String(bytes, StandardCharsets.UTF_8);   // MR3 shuffle mapIds are ASCII-only
   }
 
   public static ByteBuffer encodeMapId(String mapId) throws IOException {

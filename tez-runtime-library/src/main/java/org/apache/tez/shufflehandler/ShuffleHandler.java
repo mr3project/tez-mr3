@@ -41,6 +41,7 @@ import java.net.InetSocketAddress;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -1061,13 +1062,10 @@ public class ShuffleHandler {
         if (mapOutputInfoMap.size() < mapOutputMetaInfoCacheSize) {
           mapOutputInfoMap.put(mapId, outputInfo);
         }
-        // ShuffleHeader.encodeMapId() is called twice because it is called again in sendMapOutput().
-        // TODO: optimize by caching mapIdBytes in MapOutputInfo (effective only when keep-alive is enabled)
-        ByteBuffer mapIdBytes = ShuffleHeader.encodeMapId(mapId);
-        contentLength += ShuffleHeader.mapIdWriteLength(mapIdBytes);
+        // MR3 shuffle mapIds are ASCII-only, so their UTF-8 size equals String.length().
+        contentLength += 4 + mapId.length();
         for (int reduce = reduceRange.getFirst(); reduce <= reduceRange.getLast(); reduce++) {
-          TezIndexRecord indexRecord = outputInfo.getIndex(reduce);
-          long partLength = indexRecord.getPartLength();
+          long partLength = outputInfo.getPartLength(reduce);
           // Expand: contentLength += (new ShuffleHeader(...)).compositePartitionWriteLength();
           contentLength += 8;  // compressedLength
           if (partLength != 0) {
@@ -1143,6 +1141,10 @@ public class ShuffleHandler {
         }
       }
 
+      long getPartLength(int index) {
+        return spillRecord != null ? spillRecord.getPartLength(index) : indexRecord.getPartLength();
+      }
+
       @Nullable
       TezOffsetRecord getTezOffsetRecord(int index) {
         if (offsetRecord != null) {
@@ -1208,8 +1210,10 @@ public class ShuffleHandler {
       DataOutputBuffer dob = new DataOutputBuffer();
       // Indicate how many records are in this composite block, followed by the shared map id.
       dob.writeInt(reduceRange.getLast() - reduceRange.getFirst() + 1);
-      ByteBuffer mapIdBytes = ShuffleHeader.encodeMapId(mapId);
-      ShuffleHeader.writeMapId(dob, mapIdBytes);
+      // MR3 shuffle mapIds are ASCII-only
+      byte[] mapIdBytes = mapId.getBytes(StandardCharsets.US_ASCII);
+      dob.writeInt(mapIdBytes.length);
+      dob.write(mapIdBytes);
       // DataOutputBuffer is reused below, so copy bytes before enqueuing async channel write.
       ChannelFuture writeFuture = ch.write(Unpooled.copiedBuffer(dob.getData(), 0, dob.getLength()));
       for (int reduce = reduceRange.getFirst(); reduce <= reduceRange.getLast(); reduce++) {

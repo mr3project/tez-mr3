@@ -113,6 +113,14 @@ public class TezSpillRecord {
   }
 
   /**
+   * Return partition length without creating a TezIndexRecord.
+   */
+  public long getPartLength(int partition) {
+    final int pos = partition * Constants.MAP_OUTPUT_INDEX_RECORD_LENGTH / 8;
+    return entries.get(pos + 2);
+  }
+
+  /**
    * Set spill offsets for given partition.
    */
   public void putIndex(TezIndexRecord rec, int partition) {
