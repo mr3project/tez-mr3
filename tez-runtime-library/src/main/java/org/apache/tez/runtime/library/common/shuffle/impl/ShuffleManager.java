@@ -53,9 +53,14 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
 
   private final long startTime;
 
-  // accessed only from ShuffleInputEventHandler thread, so thread-safe
-  private long inputRecordsFromEvents = 0L;
-  private long eventsReceived = 0L;
+  // Accessed only from the ShuffleInputEventHandler thread.
+  // Each final event provides the source attempt's cumulative record count:
+  // the only event in non-pipelined shuffle, or last_event in pipelined shuffle.
+  // We average these final-event observations, not individual spill events.
+  // This is a best-effort estimate, so duplicate events and retried attempts
+  // may bias it; we deliberately do not track completion per source.
+  private long inputRecordsFromFinalEvents = 0L;
+  private long finalEventsReceived = 0L;
 
   private final AtomicInteger numFetchedSpills = new AtomicInteger(0);
   private final AtomicLong totalBytesShuffledTillNow = new AtomicLong(0L);
@@ -118,14 +123,16 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
     return inputManager;
   }
 
-  // called from ShuffleInputEventHandler thread
-  public void updateApproximateInputRecords(int delta) {
-    if (delta <= 0) {
+  // Called only with the cumulative record count of a final single-partition event.
+  public void updateApproximateInputRecords(int numRecords) {
+    // Ignore invalid/overflowed int32 counts; zero is a valid final-event sample.
+    if (numRecords < 0) {
       return;
     }
-    inputRecordsFromEvents += delta;
-    eventsReceived++;
-    approximateInputRecords.setValue((inputRecordsFromEvents / eventsReceived) * numInputs);
+    inputRecordsFromFinalEvents += numRecords;
+    finalEventsReceived++;
+    approximateInputRecords.setValue(
+        (inputRecordsFromFinalEvents / finalEventsReceived) * numInputs);
   }
 
   public void run() throws IOException {
