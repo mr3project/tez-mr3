@@ -181,22 +181,20 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
           .stringify(shufflePayload));
     }
 
-    if (shufflePayload.hasEmptyPartitions()) {
-      if (emptyPartitionsBitSet.get(srcIndex)) {
-        CompositeInputAttemptIdentifier srcAttemptIdentifier = constructInputAttemptIdentifier(
-            dme.getTargetIndex(), 1, dme.getVersion(), compositeFetch, shufflePayload);
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Source partition: " + srcIndex + " did not generate any data. SrcAttempt: ["
-              + srcAttemptIdentifier + "]. Not fetching.");
-        }
-        numDmeEventsNoData.getAndIncrement();
-        shuffleManager.addCompletedInputWithNoData(srcAttemptIdentifier.expand(0));
-        return;
-      } else {
-        shuffleManager.updateApproximateInputRecords(shufflePayload.getNumRecord());
+    // A final pipelined event may have no data in its own spill even though numRecord includes all preceding spills.
+    // Account for it before returning early for an empty partition.
+    maybeUpdateApproximateInputRecords(shufflePayload);
+
+    if (shufflePayload.hasEmptyPartitions() && emptyPartitionsBitSet.get(srcIndex)) {
+      CompositeInputAttemptIdentifier srcAttemptIdentifier = constructInputAttemptIdentifier(
+          dme.getTargetIndex(), 1, dme.getVersion(), compositeFetch, shufflePayload);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Source partition: " + srcIndex + " did not generate any data. SrcAttempt: ["
+            + srcAttemptIdentifier + "]. Not fetching.");
       }
-    } else {
-      shuffleManager.updateApproximateInputRecords(shufflePayload.getNumRecord());
+      numDmeEventsNoData.getAndIncrement();
+      shuffleManager.addCompletedInputWithNoData(srcAttemptIdentifier.expand(0));
+      return;
     }
 
     CompositeInputAttemptIdentifier srcAttemptIdentifier = constructInputAttemptIdentifier(
@@ -242,6 +240,8 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
           .stringify(shufflePayload));
     }
 
+    maybeUpdateApproximateInputRecords(shufflePayload);
+
     if (shufflePayload.hasEmptyPartitions()) {
       CompositeInputAttemptIdentifier compositeInputAttemptIdentifier = constructInputAttemptIdentifier(
           crdme.getTargetIndex(), crdme.getCount(), crdme.getVersion(), compositeFetch, shufflePayload);
@@ -270,6 +270,18 @@ public class ShuffleInputEventHandlerImpl implements ShuffleEventHandler {
         crdme.getTargetIndex(), crdme.getCount(), crdme.getVersion(), compositeFetch, shufflePayload);
 
     processShufflePayload(shufflePayload, srcAttemptIdentifier, partitionId, crdme.getTargetIndex());
+  }
+
+  // numRecord is populated only for single-partition outputs.
+  // In pipelined shuffle each spill reports the cumulative count for the source attempt, so use only last_event;
+  // intermediate counts must not be averaged again.
+  // One final event supplies one approximate sample.
+  // We intentionally do not deduplicate source attempts because this counter is only an estimate.
+  private void maybeUpdateApproximateInputRecords(DataMovementEventPayloadProto shufflePayload) {
+    if (shufflePayload.hasNumRecord()
+        && (!shufflePayload.hasSpillId() || shufflePayload.getLastEvent())) {
+      shuffleManager.updateApproximateInputRecords(shufflePayload.getNumRecord());
+    }
   }
 
   private void processShufflePayload(DataMovementEventPayloadProto shufflePayload,

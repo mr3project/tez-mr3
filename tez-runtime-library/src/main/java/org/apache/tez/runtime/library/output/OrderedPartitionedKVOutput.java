@@ -190,7 +190,8 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput implements
       LOG.warn(getContext().getDestinationVertexName() +
           ": Attempting to close output {} of type {} before it was started. Generating empty events",
           getContext().getDestinationVertexName(), this.getClass().getSimpleName());
-      returnEvents = generateEmptyEvents();
+      returnEvents = Lists.newLinkedList();
+      ShuffleUtils.generateEventsForNonStartedOutput(returnEvents, getNumPhysicalOutputs(), getContext(), true, true, deflater);
     }
 
     return returnEvents;
@@ -223,12 +224,6 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput implements
           getNumPhysicalOutputs(), pathComponent,
           sorter.getPartitionStats(), sorter.reportDetailedPartitionStats(), auxiliaryService, deflater);
     }
-    return eventList;
-  }
-
-  private List<Event> generateEmptyEvents() throws IOException {
-    List<Event> eventList = Lists.newLinkedList();
-    ShuffleUtils.generateEventsForNonStartedOutput(eventList, getNumPhysicalOutputs(), getContext(), true, true, deflater);
     return eventList;
   }
 

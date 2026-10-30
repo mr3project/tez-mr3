@@ -1382,6 +1382,9 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
 
     DataMovementEventPayloadProto.Builder payloadBuilder = DataMovementEventPayloadProto.newBuilder();
     if (numPartitions == 1) {
+      // numRecord is cumulative for this source attempt, not the number of records in this spill.
+      // Pipelined shuffle emits it on every spill, including a final empty spill.
+      // The receiver samples only final events.
       payloadBuilder.setNumRecord((int) outputRecordsCounter.getValue());
     }
 

@@ -116,9 +116,8 @@ public class UnorderedPartitionedKVOutput extends AbstractLogicalOutput implemen
           ": Attempting to close output {} of type {} before it was started. Generating empty events",
           getContext().getDestinationVertexName(), this.getClass().getSimpleName());
       returnEvents = new LinkedList<Event>();
-      ShuffleUtils
-          .generateEventsForNonStartedOutput(returnEvents, getNumPhysicalOutputs(), getContext(),
-              false, true, TezCommonUtils.newBestCompressionDeflater());
+      ShuffleUtils.generateEventsForNonStartedOutput(returnEvents, getNumPhysicalOutputs(), getContext(),
+          false, true, TezCommonUtils.newBestCompressionDeflater());
     }
 
     return returnEvents;
