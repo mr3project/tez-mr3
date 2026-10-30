@@ -362,6 +362,11 @@ public class ShuffleUtils {
                                                        boolean generateVmEvent,
                                                        boolean isCompositeEvent, Deflater deflater) throws IOException {
     DataMovementEventPayloadProto.Builder payloadBuilder = DataMovementEventPayloadProto.newBuilder();
+    // A non-started single-partition output is a completed zero-record sample
+    // for the approximate input-record estimator.
+    if (numPhysicalOutputs == 1) {
+      payloadBuilder.setNumRecord(0);
+    }
 
     // Construct the VertexManager event if required.
     if (generateVmEvent) {
