@@ -353,6 +353,7 @@ public class ShuffleUtils {
    * @param context
    * @param generateVmEvent whether to generate a vm event or not
    * @param isCompositeEvent whether to generate a CompositeDataMovementEvent or a DataMovementEvent
+   * @param isUnorderedOutput whether the output uses unordered shuffle
    * @param deflater
    * @throws IOException
    */
@@ -360,13 +361,14 @@ public class ShuffleUtils {
                                                        int numPhysicalOutputs,
                                                        OutputContext context,
                                                        boolean generateVmEvent,
-                                                       boolean isCompositeEvent, Deflater deflater) throws IOException {
+                                                       boolean isCompositeEvent, boolean isUnorderedOutput,
+                                                       Deflater deflater) throws IOException {
     DataMovementEventPayloadProto.Builder payloadBuilder = DataMovementEventPayloadProto.newBuilder();
 
-    // A non-started single-partition output is a completed zero-record sample
+    // A non-started single-partition unordered output is a completed zero-record sample
     // for the approximate input-record estimator.
-    if (numPhysicalOutputs == 1) {
-      payloadBuilder.setNumRecord(0);
+    if (isUnorderedOutput && numPhysicalOutputs == 1) {
+      payloadBuilder.setNumLogicalRecords(0);
     }
 
     // Construct the VertexManager event if required.

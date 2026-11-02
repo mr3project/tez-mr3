@@ -191,7 +191,8 @@ public class OrderedPartitionedKVOutput extends AbstractLogicalOutput implements
           ": Attempting to close output {} of type {} before it was started. Generating empty events",
           getContext().getDestinationVertexName(), this.getClass().getSimpleName());
       returnEvents = Lists.newLinkedList();
-      ShuffleUtils.generateEventsForNonStartedOutput(returnEvents, getNumPhysicalOutputs(), getContext(), true, true, deflater);
+      ShuffleUtils.generateEventsForNonStartedOutput(returnEvents, getNumPhysicalOutputs(), getContext(),
+          true, true, false, deflater);
     }
 
     return returnEvents;

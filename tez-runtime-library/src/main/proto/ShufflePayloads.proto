@@ -31,7 +31,11 @@ message DataMovementEventPayloadProto {
   optional DataProto data = 8;
   optional bool last_event = 9;   // Related to pipelined shuffle
   optional int32 spill_id = 10;   // Related to pipelined shuffle
-  optional int32 num_record = 11;
+  // For single-partition unordered output, the cumulative logical record count
+  // explicitly supplied through writeForSinglePartition(key, value, numLogicalRecords).
+  // Other write methods do not contribute; zero need not mean empty output.
+  // Pipelined events carry the cumulative total; only the final event is sampled.
+  optional int32 num_logical_records = 11;
 } 
 
 message DataProto {

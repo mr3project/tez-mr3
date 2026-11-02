@@ -23,6 +23,11 @@ import java.io.IOException;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.tez.runtime.api.WriterEdge;
 
+/**
+ * Requirement:
+ *   After any write operation throws an exception,
+ *   the caller must not write any more records through this writer.
+ */
 public abstract class KeyValueWriterEdge implements WriterEdge {
 
   // Invariant:
@@ -44,6 +49,17 @@ public abstract class KeyValueWriterEdge implements WriterEdge {
    * @throws {@link IOInterruptedException} if IO was performing a blocking operation and was interrupted
    */
   public abstract void write(BytesWritable key, BytesWritable value) throws IOException;
+
+  /**
+   * Writes one Tez key/value record representing {@code numLogicalRecords} logical records.
+   * Requires {@code getNumUnorderedPartitions() == 1}.
+   * Only this method contributes to the logical record count reported in data movement events;
+   * other write methods do not contribute.
+   */
+  public void writeForSinglePartition(BytesWritable key, BytesWritable value, int numLogicalRecords)
+      throws IOException {
+    throw new UnsupportedOperationException("Logical record counts require a single-partition unordered writer");
+  }
 
   // Return:
   //   >= 0: unordered edge and Tez shuffle

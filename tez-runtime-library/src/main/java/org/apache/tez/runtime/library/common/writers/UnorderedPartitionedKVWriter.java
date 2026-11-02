@@ -255,6 +255,8 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
   private long localOutputRecordBytesCounter = 0;
   private long localOutputBytesWithOverheadCounter = 0;
   private long localOutputRecordsCounter = 0;
+  // Updated only by writeForSinglePartition(), independently of physical record counters.
+  private int totalLogicalRecords = 0;
   // notify after x records
   private static final int NOTIFY_THRESHOLD = 100_000;
 
@@ -566,6 +568,32 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
     } else {
       int partition = partitioner.getPartition(key, value, numPartitions);
       writeRecord(key, value, partition);
+    }
+  }
+
+  @Override
+  public void writeForSinglePartition(BytesWritable key, BytesWritable value, int numLogicalRecords)
+      throws IOException {
+    Preconditions.checkArgument(getNumUnorderedPartitions() == 1);
+
+    if (writerState != WriterState.RUNNING) {
+      throw new IOException("Write already closed or spill failed");
+    }
+
+    if (trackMaxKeyValLen) {
+      maxKeyLen = Math.max(maxKeyLen, key.getLength());
+      maxValLen = Math.max(maxValLen, value.getLength());
+    }
+
+    // A pipelined write may emit a spill event before returning.
+    // The caller must discard this writer after a write exception, so this count needs no rollback.
+    totalLogicalRecords += numLogicalRecords;
+    if (isPipelinedShuffle) {
+      writeSinglePartitionPipelined(key, value);
+    } else if (!considerDataViaEvents) {
+      writer.appendNoRleTez(key, value);
+    } else {
+      writer.appendNoRle(key, value);
     }
   }
 
@@ -1382,10 +1410,11 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
 
     DataMovementEventPayloadProto.Builder payloadBuilder = DataMovementEventPayloadProto.newBuilder();
     if (numPartitions == 1) {
-      // numRecord is cumulative for this source attempt, not the number of records in this spill.
+      // numLogicalRecords is cumulative for this source attempt and is updated only
+      // by writeForSinglePartition(); zero does not necessarily mean empty output.
       // Pipelined shuffle emits it on every spill, including a final empty spill.
       // The receiver samples only final events.
-      payloadBuilder.setNumRecord((int) outputRecordsCounter.getValue());
+      payloadBuilder.setNumLogicalRecords(totalLogicalRecords);
     }
 
     if (emptyPartitions.cardinality() != 0) {

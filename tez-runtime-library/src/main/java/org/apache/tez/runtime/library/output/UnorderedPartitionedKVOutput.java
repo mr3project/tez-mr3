@@ -117,7 +117,7 @@ public class UnorderedPartitionedKVOutput extends AbstractLogicalOutput implemen
           getContext().getDestinationVertexName(), this.getClass().getSimpleName());
       returnEvents = new LinkedList<Event>();
       ShuffleUtils.generateEventsForNonStartedOutput(returnEvents, getNumPhysicalOutputs(), getContext(),
-          false, true, TezCommonUtils.newBestCompressionDeflater());
+          false, true, true, TezCommonUtils.newBestCompressionDeflater());
     }
 
     return returnEvents;

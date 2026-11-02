@@ -131,7 +131,7 @@ public class UnorderedKVOutput extends AbstractLogicalOutput implements LogicalO
           getContext().getDestinationVertexName(), this.getClass().getSimpleName());
       returnEvents = new LinkedList<Event>();
       ShuffleUtils.generateEventsForNonStartedOutput(returnEvents, getNumPhysicalOutputs(), getContext(),
-          false, false, TezCommonUtils.newBestCompressionDeflater());
+          false, false, true, TezCommonUtils.newBestCompressionDeflater());
     }
 
     return returnEvents;
