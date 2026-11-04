@@ -69,8 +69,8 @@ public class ConcurrentByteCache {
   /**
    * This method is called by the single remover thread.
    * Keys removed from the cache map are not immediately removed from the
-   * insertion order queue by this method due to performance reasons; they
-   * become "stale" entries in the queue.
+   * insertion order queue by this method due to performance reasons;
+   * they become "stale" entries in the queue.
    */
   // called from ShuffleHandlerDaemonProcessor thread
   public int removeEntriesByPrefix(String mapIdPrefix) {
