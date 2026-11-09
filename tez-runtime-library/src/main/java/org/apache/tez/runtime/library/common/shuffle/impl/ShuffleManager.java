@@ -124,15 +124,17 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
   }
 
   // Called only with the cumulative logical record count of a final single-partition unordered event.
-  public void updateApproximateInputRecords(int numLogicalRecords) {
-    // Ignore invalid/overflowed int32 counts; zero is a valid final-event sample.
+  public void updateApproximateInputRecords(long numLogicalRecords) {
+    // Ignore negative counts; zero is a valid final-event sample.
     if (numLogicalRecords < 0) {
       return;
     }
     inputRecordsFromFinalEvents += numLogicalRecords;
     finalEventsReceived++;
+    long quotient = inputRecordsFromFinalEvents / finalEventsReceived;
+    long remainder = inputRecordsFromFinalEvents % finalEventsReceived;
     approximateInputRecords.setValue(
-        (inputRecordsFromFinalEvents / finalEventsReceived) * numInputs);
+        quotient * numInputs + (remainder * numInputs) / finalEventsReceived);
   }
 
   public void run() throws IOException {

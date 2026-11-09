@@ -256,7 +256,7 @@ public class UnorderedPartitionedKVWriter extends KeyValuesWriterEdge {
   private long localOutputBytesWithOverheadCounter = 0;
   private long localOutputRecordsCounter = 0;
   // Updated only by writeForSinglePartition(), independently of physical record counters.
-  private int totalLogicalRecords = 0;
+  private long totalLogicalRecords = 0;
   // notify after x records
   private static final int NOTIFY_THRESHOLD = 100_000;
 
