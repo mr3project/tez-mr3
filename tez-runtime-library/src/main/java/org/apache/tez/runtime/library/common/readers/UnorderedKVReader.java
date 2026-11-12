@@ -116,11 +116,18 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
       Runnable setupForEachReader,
       KeyValueReaderEdge.ThrowingBiConsumer<BytesWritable, BytesWritable> consumer) throws Exception {
     assert numRecordsRead == 0L;  // must not be mixed with next()
-    setupForEachReader.run();
-    while (moveToNextInput()) {
-      long currentConsumed = currentReader.consumeAll(consumer);
-      inputRecordCounter.increment(currentConsumed);
-      numRecordsRead += currentConsumed;
+    try {
+      setupForEachReader.run();
+      while (moveToNextInput()) {
+        long currentConsumed = currentReader.consumeAll(consumer);
+        inputRecordCounter.increment(currentConsumed);
+        numRecordsRead += currentConsumed;
+        consumer.onInputEnd();
+      }
+    } catch (Exception | Error failure) {
+      consumer.terminateInputEnd();
+      closeCurrentInput();
+      throw failure;
     }
     LOG.info("Num Records read in consumeAll(): {}", numRecordsRead);
     completedProcessing = true;
@@ -157,15 +164,7 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
    * @throws IOException
    */
   private boolean moveToNextInput() throws IOException {
-    if (currentReader != null) {  // Close the current reader.
-      currentReader.close();
-      /**
-       * clear reader explicitly. Otherwise this could point to stale reference when next() is
-       * called and end up throwing EOF exception from IFIle. Ref: TEZ-2348
-       */
-      currentReader = null;
-      currentFetchedInput.free();
-    }
+    closeCurrentInput();
     try {
       currentFetchedInput = shuffleManager.getNextInput();
     } catch (InterruptedException e) {
@@ -179,6 +178,24 @@ public class UnorderedKVReader extends KeyValueReaderEdge {
     } else {
       currentReader = openIFileReader(currentFetchedInput);
       return true;
+    }
+  }
+
+  private void closeCurrentInput() throws IOException {
+    assert currentReader == null || currentFetchedInput != null;
+    IFile.KeyValueReaderBytesWritable reader = currentReader;
+    FetchedInput fetchedInput = currentFetchedInput;
+    // release the fetched input even when closing its reader fails
+    try {
+      if (reader != null) {
+        currentReader = null;
+        reader.close();
+      }
+    } finally {
+      if (fetchedInput != null) {
+        currentFetchedInput = null;
+        fetchedInput.free();
+      }
     }
   }
 
