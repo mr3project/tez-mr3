@@ -47,14 +47,6 @@ public abstract class KeyValueReaderEdge extends KeyValueReader implements Reade
   @FunctionalInterface
   public interface ThrowingBiConsumer<T, U> {
     void accept(T t, U u) throws Exception;
-
-    // materialize retained records
-    default void onInputEnd() throws Exception {
-    }
-
-    // discard retained state on failure
-    default void terminateInputEnd() {
-    }
   }
 
   // Contract: next() and consumeAll() are mutually exclusive and must not be mixed.
