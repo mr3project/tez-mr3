@@ -19,6 +19,7 @@
 package org.apache.tez.runtime.library.common.shuffle.impl;
 
 import java.io.DataInputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.SocketTimeoutException;
@@ -667,6 +668,8 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       int currentIndex, boolean isFetchFromLocal) throws FetcherReadTimeoutException {
     FetchedInput fetchedInput = null;
     InputAttemptIdentifier srcAttemptId = null;   // to be constructed from data fetched from ShuffleServer
+    String sharedMapId = null;
+    ShuffleHeader header = null;
     long decompressedLength = 0;
     long compressedLength = 0;
     try {
@@ -674,7 +677,6 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
       int partitionCount = 1;   // single partition only when using Hadoop shuffle service
 
       // read the first part - partitionCount and, for composite fetches, the shared map id
-      String sharedMapId = null;
       if (fetcherConfigCommon.compositeFetch) {
         // multiple partitions are fetched
         partitionCount = input.readInt();
@@ -691,7 +693,7 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
 
         // build srcAttemptId and MapOutputStat
         try {
-          ShuffleHeader header = new ShuffleHeader(fetcherConfigCommon.compositeFetch);
+          header = new ShuffleHeader(fetcherConfigCommon.compositeFetch);
           if (fetcherConfigCommon.compositeFetch) {
             header.readCompositeFields(input, sharedMapId);
           } else {
@@ -838,6 +840,10 @@ public class FetcherUnordered extends Fetcher<FetchedInput> {
         // Cleanup fetchedInput before returning.
         cleanupFetchedInput(fetchedInput);
         if (srcAttemptId == null) {
+          if (ioe instanceof EOFException && sharedMapId == null
+              && (header == null || header.getMapId() == null)) {
+            return new CompositeInputAttemptIdentifier[]{ inputAttemptIdentifier };
+          }
           return buildInputSeqFromIndex(currentIndex);
         } else {
           return new CompositeInputAttemptIdentifier[]{ new CompositeInputAttemptIdentifier(srcAttemptId) };
