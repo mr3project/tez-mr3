@@ -344,8 +344,11 @@ public class ShuffleManager extends ShuffleClient<FetchedInput> {
   // Called only while holding lockForInput(inputIdentifier).
   private void maybeInformInputReady(FetchedInput fetchedInput) {
     if (!(fetchedInput instanceof NullFetchedInput)) {
-      completedInputs.add(fetchedInput);
+      // call addAndGet() BEFORE completedInputs.add() because UnorderedKVReader may consume fetchedInput
+      // and call fetchedInput.free() right away, thus throwing NullPointerException
       totalSizeOfCompletedInputs.addAndGet(fetchedInput.getSize());
+      completedInputs.add(fetchedInput);
+      // now UnorderedKVReader can consume fetchedInput safely
     }
     if (!inputReadyNotificationSent.getAndSet(true)) {
       // TODO Should eventually be controlled by Inputs which are processing the data.
