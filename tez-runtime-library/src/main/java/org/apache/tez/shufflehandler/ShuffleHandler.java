@@ -934,7 +934,6 @@ public class ShuffleHandler {
             ShuffleHandlerError.DISK_ERROR_EXCEPTION + ": " + errorMessage, response);
         return;
       } catch (IOException e) {
-        ch.write(response);
         LOG.error("Shuffle error in populating headers :", e);
         String errorMessage = getErrorMessage(e);
         sendError(ctx, errorMessage, INTERNAL_SERVER_ERROR);
