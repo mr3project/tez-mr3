@@ -232,7 +232,7 @@ public class MultiByteArrayOutputStream extends OutputStream {
     //   2. A speculative fetcher is created and the task is completed, and later clean() is called.
     //   3. Later the original fetcher resumes and find 'buffers == null'.
     if (buffersFinal == null) {
-      LOG.error("Cleaned while writing: outputPath={}", outputPath);
+      LOG.warn("Cleaned while writing: AttemptOutputDir={}", taskOutput.getAttemptOutputDir());
       return null;
     }
 

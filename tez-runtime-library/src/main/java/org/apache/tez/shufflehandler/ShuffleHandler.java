@@ -935,8 +935,9 @@ public class ShuffleHandler {
         return;
       } catch (IOException e) {
         ch.write(response);
-        LOG.error("Shuffle error in populating headers :", e);
         String errorMessage = getErrorMessage(e);
+        // 'IndexPathCache not found' usually means 'IndexPathCache and ConcurrentByteCache already cleared'
+        LOG.warn("Shuffle error in populating headers: " + errorMessage);
         sendError(ctx, errorMessage, INTERNAL_SERVER_ERROR);
         return;
       }

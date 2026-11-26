@@ -101,4 +101,6 @@ public interface TezTaskOutput {
    * @return a spill file name independent of the unique identifier and local directories
    */
   public String getSpillFileName(int srcId, int spillNum);
+
+  public Path getAttemptOutputDir();
 }

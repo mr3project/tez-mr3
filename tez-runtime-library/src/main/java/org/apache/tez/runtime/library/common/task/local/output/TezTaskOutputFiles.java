@@ -79,8 +79,6 @@ import org.apache.tez.runtime.library.common.Constants;
  */
 public class TezTaskOutputFiles implements TezTaskOutput {
 
-  private static final Logger LOG = LoggerFactory.getLogger(TezTaskOutputFiles.class);
-
   private static final String SPILL_FILE_SRC_SEPARATOR = "_src_";
   private static final String SPILL_FILE_SPILL_SEPARATOR = "_spill_";
   private static final String SPILL_FILE_EXTENSION = ".out";
@@ -281,7 +279,7 @@ public class TezTaskOutputFiles implements TezTaskOutput {
                                    while shuffle map ids omit the containerId prefix:
                                    "vertexId/${uniqueId}"
    */
-  private Path getAttemptOutputDir() {
+  public Path getAttemptOutputDir() {
     String dagPath = getDagOutputDir(this.outputDir);
     return new Path(dagPath, uniqueId);
   }
