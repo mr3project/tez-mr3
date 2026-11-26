@@ -38,6 +38,11 @@ public class ConcurrentByteCache {
     return cacheMap.get(key);
   }
 
+  // The daemon trims stale keys from the insertion order queue.
+  public void removeByMapId(String mapId) {
+    cacheMap.remove(mapId);
+  }
+
   /**
    * Checks if the cache map contains a specific key.
    *

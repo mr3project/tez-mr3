@@ -829,8 +829,15 @@ public final class PipelinedSorter {
   }
 
   private void cleanSpillOutputBuffers() {
-    for (SpillInfo spillInfo : spillInfoList) {
+    assert isFinalMergeEnabled && numSpills > 1;
+    assert spillInfoList.size() == numSpills;
+    for (int spillId = 0; spillId < numSpills; spillId++) {
+      SpillInfo spillInfo = spillInfoList.get(spillId);
       if (spillInfo.spillOutput != null) {
+        String pathComponent = ShuffleUtils.getPathComponentSpillId(outputContext, compositeFetch, spillId);
+        String mapId = ShuffleUtils.buildTezShuffleMapId(outputContext.getTaskVertexIndex(), pathComponent);
+        outputContext.getIndexPathCache().removeByMapId(mapId);
+        outputContext.getConcurrentByteCache().removeByMapId(mapId);
         spillInfo.spillOutput.clean();
       }
     }

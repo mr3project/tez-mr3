@@ -56,6 +56,10 @@ public class IndexPathCache {
     cache.put(mapId, new MapOutputInfo(mapOutputFilePath, spillRecord, offsetRecordMap));
   }
 
+  public void removeByMapId(String mapId) {
+    cache.remove(mapId);
+  }
+
   /**
    * Removes all mappings whose key matches the given prefix
    *
