@@ -26,7 +26,6 @@ import static io.netty.handler.codec.http.HttpResponseStatus.BAD_REQUEST;
 import static io.netty.handler.codec.http.HttpResponseStatus.FORBIDDEN;
 import static io.netty.handler.codec.http.HttpResponseStatus.INTERNAL_SERVER_ERROR;
 import static io.netty.handler.codec.http.HttpResponseStatus.METHOD_NOT_ALLOWED;
-import static io.netty.handler.codec.http.HttpResponseStatus.NOT_FOUND;
 import static io.netty.handler.codec.http.HttpResponseStatus.OK;
 import static io.netty.handler.codec.http.HttpResponseStatus.UNAUTHORIZED;
 import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
@@ -296,11 +295,14 @@ public class ShuffleHandler {
 
     @Override
     public void operationComplete(ChannelFuture future) throws Exception {
-      Channel ch = future.channel();
-      if (!future.isSuccess()) {
-        ch.close();
+      if (reduceContext.aborted) {
         return;
       }
+      if (!future.isSuccess()) {
+        reduceContext.abort();
+        return;
+      }
+      Channel ch = future.channel();
       int waitCount = this.reduceContext.getMapsToWait().decrementAndGet();
       if (waitCount == 0) {
         if (isLogDebugEnabled) {
@@ -320,7 +322,7 @@ public class ShuffleHandler {
           ch.close();
         }
       } else {
-        SHUFFLE.sendMap(reduceContext);
+        SHUFFLE.sendMap(null, reduceContext);
       }
     }
   }
@@ -338,6 +340,8 @@ public class ShuffleHandler {
     private ChannelHandlerContext ctx;
     private Map<String, Shuffle.MapOutputInfo> infoMap;
     private final boolean keepAlive;
+    // Updated and read on the channel's event loop.
+    private boolean aborted;
 
     public ReduceContext(List<String> mapIds, Range reduceRange,
                          ChannelHandlerContext context,
@@ -362,6 +366,11 @@ public class ShuffleHandler {
       this.ctx = context;
       this.infoMap = mapOutputInfoMap;
       this.keepAlive = keepAlive;
+    }
+
+    private void abort() {
+      aborted = true;
+      ctx.close();
     }
 
     public Range getReduceRange() {
@@ -939,12 +948,11 @@ public class ShuffleHandler {
         sendError(ctx, errorMessage, INTERNAL_SERVER_ERROR);
         return;
       }
-      ch.write(response);
       //Initialize one ReduceContext object per channelRead call
       boolean keepAlive = keepAliveParam || connectionKeepAliveEnabled;
       ReduceContext reduceContext = new ReduceContext(mapIds, reduceRange, ctx, mapOutputInfoMap, keepAlive);
       for (int i = 0; i < Math.min(maxSessionOpenFiles, mapIds.size()); i++) {
-        ChannelFuture nextMap = sendMap(reduceContext);
+        ChannelFuture nextMap = sendMap(i == 0 ? response : null, reduceContext);
         if(nextMap == null) {
           return;
         }
@@ -958,10 +966,14 @@ public class ShuffleHandler {
      * sendMapOutput operation. This limits the number of open files on a node,
      * which can get really large(exhausting file descriptors on the NM) if all
      * sendMapOutputs are called in one go, as was done previous to this change.
+     * @param response the pending HTTP response, passed only when sending the first map.
      * @param reduceContext used to call sendMapOutput with correct params.
      * @return the ChannelFuture of the sendMapOutput, can be null.
      */
-    ChannelFuture sendMap(ReduceContext reduceContext) {
+    ChannelFuture sendMap(@Nullable HttpResponse response, ReduceContext reduceContext) {
+      if (reduceContext.aborted) {
+        return null;
+      }
       ChannelFuture nextMap = null;
       if (reduceContext.getMapsToSend().get() <
           reduceContext.getMapIds().size()) {
@@ -969,17 +981,20 @@ public class ShuffleHandler {
         String mapId = reduceContext.getMapIds().get(nextIndex);
 
         try {
-          MapOutputInfo info = reduceContext.getInfoMap().get(mapId);
+          MapOutputInfo info = reduceContext.getInfoMap().remove(mapId);
 
           if (info == null) {
             info = getMapOutputInfo(mapId, reduceContext.getReduceRange());
           }
 
-          nextMap = sendMapOutput(reduceContext.getCtx().channel(),
-              mapId, reduceContext.getReduceRange(), info);
+          Channel ch = reduceContext.getCtx().channel();
+          if (response != null) {
+            ch.write(response);
+            response = null;
+          }
+          nextMap = sendMapOutput(ch, mapId, reduceContext.getReduceRange(), info);
           if (null == nextMap) {
-            // TODO: Can we call sendFakeShuffleHeaderWithError() with DISK_ERROR_EXCEPTION instead???
-            sendError(reduceContext.getCtx(), NOT_FOUND);
+            reduceContext.abort();
             return null;
           }
           nextMap.addListener(new ReduceMapFileCount(reduceContext));
@@ -989,9 +1004,11 @@ public class ShuffleHandler {
           } else {
             LOG.error("Shuffle error: {}", e.getMessage());
           }
-          String errorMessage = getErrorMessage(e);
-          sendError(reduceContext.getCtx(), errorMessage,
-              INTERNAL_SERVER_ERROR);
+          if (response != null) {
+            sendError(reduceContext.getCtx(), getErrorMessage(e), INTERNAL_SERVER_ERROR);
+          } else {
+            reduceContext.abort();
+          }
           return null;
         }
       }
